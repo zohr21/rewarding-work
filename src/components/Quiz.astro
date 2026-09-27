@@ -1,0 +1,413 @@
+---
+/**
+ * Four-question quiz → 2–3 technique recommendations.
+ * Questions, answers and scoring live in src/data/quiz.ts.
+ */
+import { QUIZ, TIE_BREAK } from '../data/quiz';
+import { CATEGORIES, EVIDENCE } from '../data/taxonomy';
+import { getTechniques } from '../lib/techniques';
+import { url } from '../lib/paths';
+
+// Build-time check: every slug in the quiz data must be a real technique.
+const techniques = await getTechniques();
+const known = new Set(techniques.map((t) => t.id));
+for (const q of QUIZ) {
+  for (const o of q.options) {
+    for (const slug of Object.keys(o.points)) {
+      if (!known.has(slug)) throw new Error(`quiz.ts: question "${q.id}", option "${o.id}" uses unknown technique slug "${slug}"`);
+    }
+  }
+}
+for (const slug of TIE_BREAK) {
+  if (!known.has(slug)) throw new Error(`quiz.ts: TIE_BREAK has unknown technique slug "${slug}"`);
+}
+
+// Only what the results need, embedded as JSON for the client script.
+const info = Object.fromEntries(
+  techniques.map((t) => [
+    t.id,
+    {
+      title: t.data.title,
+      summary: t.data.summary,
+      minutes: t.data.time_to_try,
+      category: CATEGORIES[t.data.category].label,
+      evidence: EVIDENCE[t.data.evidence].label,
+      evidenceKey: EVIDENCE[t.data.evidence].key,
+      href: url(`/techniques/${t.id}`),
+    },
+  ]),
+);
+const json = JSON.stringify(info).replace(/</g, '\\u003c');
+const total = QUIZ.length;
+---
+
+<div class="quiz card" data-quiz>
+  <script type="application/json" data-quiz-info set:html={json} />
+
+  <form class="quiz__form" data-quiz-form novalidate>
+    <div class="quiz__progress" aria-hidden="true">
+      <span class="quiz__progress-bar" data-quiz-bar></span>
+    </div>
+
+    {
+      QUIZ.map((q, i) => (
+        <fieldset class="quiz__step" data-quiz-step={i} tabindex="-1">
+          <legend>
+            <span class="quiz__count">
+              Question {i + 1} of {total}
+            </span>
+            <span class="quiz__question">{q.question}</span>
+          </legend>
+          {q.hint && <p class="muted quiz__hint">{q.hint}</p>}
+          <div class="quiz__options">
+            {q.options.map((o) => (
+              <label class="quiz__option">
+                <input type="radio" name={q.id} value={o.id} required />
+                <span>{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))
+    }
+
+    <div class="quiz__nav" data-quiz-nav hidden>
+      <button type="button" class="btn btn--ghost" data-quiz-back>Back</button>
+      <button type="submit" class="btn" data-quiz-next disabled>Next</button>
+    </div>
+    <noscript><p class="muted">The quiz needs JavaScript. You can <a href={url('/techniques')}>browse all techniques</a> instead.</p></noscript>
+  </form>
+
+  <section class="quiz__result" data-quiz-result tabindex="-1" hidden aria-labelledby="quiz-result-heading">
+    <h3 id="quiz-result-heading" class="quiz__result-title">Try these first</h3>
+    <p class="muted quiz__result-intro">Pick one and try it today. If it doesn't fit, come back and try another.</p>
+    <ol class="quiz__picks" data-quiz-picks></ol>
+    <div class="quiz__again">
+      <button type="button" class="btn btn--ghost btn--small" data-quiz-restart>Start over</button>
+      <a href={url('/techniques')}>Browse all techniques</a>
+    </div>
+  </section>
+</div>
+
+<script>
+  import { scoreQuiz } from '../data/quiz';
+
+  interface Info {
+    title: string;
+    summary: string;
+    minutes: number;
+    category: string;
+    evidence: string;
+    evidenceKey: string;
+    href: string;
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-quiz]').forEach((root) => {
+    const info = JSON.parse(root.querySelector('[data-quiz-info]')?.textContent ?? '{}') as Record<string, Info>;
+    const form = root.querySelector<HTMLFormElement>('[data-quiz-form]')!;
+    const steps = Array.from(root.querySelectorAll<HTMLFieldSetElement>('[data-quiz-step]'));
+    const nav = root.querySelector<HTMLElement>('[data-quiz-nav]')!;
+    const back = root.querySelector<HTMLButtonElement>('[data-quiz-back]')!;
+    const next = root.querySelector<HTMLButtonElement>('[data-quiz-next]')!;
+    const bar = root.querySelector<HTMLElement>('[data-quiz-bar]')!;
+    const result = root.querySelector<HTMLElement>('[data-quiz-result]')!;
+    const picks = root.querySelector<HTMLOListElement>('[data-quiz-picks]')!;
+    const restart = root.querySelector<HTMLButtonElement>('[data-quiz-restart]')!;
+    let current = 0;
+
+    nav.hidden = false;
+
+    const answered = (i: number) => !!steps[i]!.querySelector('input:checked');
+
+    function show(i: number, moveFocus: boolean): void {
+      current = i;
+      steps.forEach((s, j) => (s.hidden = j !== i));
+      back.hidden = i === 0;
+      next.textContent = i === steps.length - 1 ? 'Show my techniques' : 'Next';
+      next.disabled = !answered(i);
+      bar.style.width = `${(i / steps.length) * 100}%`;
+      if (moveFocus) steps[i]!.focus();
+    }
+
+    function answers(): Record<string, string> {
+      const data = new FormData(form);
+      const out: Record<string, string> = {};
+      data.forEach((v, k) => (out[k] = String(v)));
+      return out;
+    }
+
+    function renderResult(): void {
+      const recs = scoreQuiz(answers()).filter((p) => info[p.slug]);
+      picks.replaceChildren(
+        ...recs.map((p, idx) => {
+          const t = info[p.slug]!;
+          const li = document.createElement('li');
+          li.className = 'quiz__pick';
+          li.style.setProperty('--i', String(idx));
+
+          const top = document.createElement('p');
+          top.className = 'quiz__pick-meta';
+          top.textContent = `${t.category} · ${t.evidence} · ${t.minutes} min to try`;
+
+          const h = document.createElement('h4');
+          const a = document.createElement('a');
+          a.href = t.href;
+          a.textContent = t.title;
+          h.append(a);
+
+          const sum = document.createElement('p');
+          sum.textContent = t.summary;
+
+          const why = document.createElement('p');
+          why.className = 'quiz__why';
+          why.textContent = `Because you said: ${[...new Set(p.because)].join(' · ')}`;
+
+          li.append(top, h, sum, why);
+          return li;
+        }),
+      );
+      form.hidden = true;
+      result.hidden = false;
+      bar.style.width = '100%';
+      result.focus();
+    }
+
+    form.addEventListener('change', () => {
+      next.disabled = !answered(current);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!answered(current)) return;
+      if (current < steps.length - 1) show(current + 1, true);
+      else renderResult();
+    });
+
+    back.addEventListener('click', () => show(Math.max(0, current - 1), true));
+
+    restart.addEventListener('click', () => {
+      form.reset();
+      result.hidden = true;
+      form.hidden = false;
+      show(0, true);
+    });
+
+    show(0, false);
+  });
+</script>
+
+<style>
+  .quiz {
+    padding: var(--space-5);
+  }
+
+  .quiz__progress {
+    height: 4px;
+    margin-bottom: var(--space-5);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    overflow: hidden;
+  }
+
+  .quiz__progress-bar {
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--color-accent);
+    border-radius: inherit;
+    transition: width var(--duration-slow) var(--ease-out);
+  }
+
+  .quiz__step {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .quiz__step[hidden] {
+    display: none;
+  }
+
+  .quiz__step:focus {
+    outline: none;
+  }
+
+  .quiz__step:focus-visible legend {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  .quiz__step legend {
+    display: grid;
+    gap: var(--space-1);
+    padding: 0;
+    margin-bottom: var(--space-4);
+  }
+
+  .quiz__count {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-accent);
+  }
+
+  .quiz__question {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: var(--leading-tight);
+  }
+
+  .quiz__hint {
+    margin-bottom: var(--space-3);
+  }
+
+  .quiz__options {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .quiz__option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .quiz__option:hover {
+    background: var(--color-surface-2);
+  }
+
+  .quiz__option input {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  .quiz__option:has(input:checked) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    font-weight: 600;
+  }
+
+  .quiz__nav {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-top: var(--space-5);
+  }
+
+  .quiz__nav [data-quiz-next] {
+    margin-left: auto;
+  }
+
+  .quiz__nav [hidden] {
+    display: none;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Results */
+  .quiz__result:focus {
+    outline: none;
+  }
+
+  .quiz__result-title {
+    font-size: var(--text-xl);
+  }
+
+  .quiz__result-intro {
+    margin-top: var(--space-1);
+  }
+
+  .quiz__picks {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding: 0;
+    list-style: none;
+  }
+
+  .quiz :global(.quiz__pick) {
+    position: relative;
+    max-width: none;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-left: 4px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    background: var(--color-bg);
+    animation: pick-in var(--duration-slow) var(--ease-out) both;
+    animation-delay: calc(var(--i) * 90ms);
+  }
+
+  .quiz :global(.quiz__pick h4) {
+    font-size: var(--text-lg);
+    margin-block: var(--space-1);
+  }
+
+  .quiz :global(.quiz__pick h4 a) {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  /* Whole card clickable. */
+  .quiz :global(.quiz__pick h4 a::after) {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .quiz :global(.quiz__pick:hover) {
+    border-color: var(--color-accent);
+  }
+
+  .quiz :global(.quiz__pick:focus-within) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .quiz :global(.quiz__pick h4 a:focus-visible) {
+    outline: none;
+  }
+
+  .quiz :global(.quiz__pick-meta) {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .quiz :global(.quiz__why) {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--color-accent);
+  }
+
+  @keyframes pick-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .quiz__again {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-4);
+    margin-top: var(--space-5);
+  }
+</style>

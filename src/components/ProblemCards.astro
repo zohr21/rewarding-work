@@ -1,0 +1,113 @@
+---
+import { PROBLEMS, PROBLEM_SLUGS, type ProblemSlug } from '../data/taxonomy';
+import { getTechniques } from '../lib/techniques';
+import { url } from '../lib/paths';
+
+const techniques = await getTechniques();
+const counts = Object.fromEntries(
+  PROBLEM_SLUGS.map((p) => [p, techniques.filter((t) => t.data.problems.includes(p)).length]),
+) as Record<ProblemSlug, number>;
+
+// Simple 24px line icons (stroke = currentColor).
+const ICONS: Record<ProblemSlug, string> = {
+  'cant-start': 'M5 4l14 8-14 8z',
+  'lose-focus': 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
+  'no-progress': 'M4 20V14M10 20V9M16 20V12M22 20H2M20 4l-4 4-3-3-5 5',
+  'too-much': 'M4 6h16M4 10h16M4 14h16M4 18h10',
+  'burn-out': 'M3 8h15a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1zM21 11v2M5 11v2',
+};
+---
+
+<ul class="problems" role="list">
+  {
+    PROBLEM_SLUGS.map((slug) => (
+      <li>
+        <a class="problem" href={url(`/problems/${slug}`)}>
+          <span class="problem__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="24" height="24">
+              <path d={ICONS[slug]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+          <span class="problem__body">
+            <span class="problem__title">“{PROBLEMS[slug].title}”</span>
+            <span class="problem__teaser">{PROBLEMS[slug].teaser}</span>
+            <span class="problem__count">{counts[slug]} techniques →</span>
+          </span>
+        </a>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .problems {
+    display: grid;
+    gap: var(--space-3);
+    padding: 0;
+    list-style: none;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  }
+
+  .problems li {
+    max-width: none;
+  }
+
+  .problem {
+    display: flex;
+    gap: var(--space-3);
+    height: 100%;
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out);
+  }
+
+  .problem:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .problem__icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .problem__body {
+    display: grid;
+    gap: var(--space-1);
+    align-content: start;
+  }
+
+  .problem__title {
+    font-weight: 700;
+    font-size: var(--text-lg);
+    line-height: var(--leading-tight);
+  }
+
+  .problem__teaser {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .problem__count {
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-accent);
+  }
+</style>

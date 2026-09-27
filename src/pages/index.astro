@@ -1,0 +1,109 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProblemCards from '../components/ProblemCards.astro';
+import Quiz from '../components/Quiz.astro';
+import { SITE } from '../config/site';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout>
+  <div class="container">
+    <header class="hero">
+      <h1>Make the work feel worth doing.</h1>
+      <p class="hero__lead">{SITE.tagline}</p>
+    </header>
+
+    <section class="section" aria-labelledby="problems-heading">
+      <h2 id="problems-heading">What's your problem right now?</h2>
+      <p class="muted section__intro">Pick the one that fits best. Each leads to techniques you can try in minutes.</p>
+      <ProblemCards />
+    </section>
+
+    <section class="section quiz-section" aria-labelledby="quiz-heading">
+      <div class="quiz-section__text">
+        <h2 id="quiz-heading">Not sure? Four quick questions.</h2>
+        <p class="muted section__intro">Answer honestly and get 2–3 techniques to try first. Nothing is saved or sent anywhere.</p>
+      </div>
+      <Quiz />
+    </section>
+
+    <section class="section tools" aria-labelledby="tools-heading">
+      <h2 id="tools-heading" class="visually-hidden">Tools</h2>
+      <a class="tool-link" href={url('/timer')}>
+        <strong>Focus timer</strong>
+        <span class="muted">Pomodoro, 52/17, Flowtime or your own rhythm.</span>
+      </a>
+      <a class="tool-link" href={url('/progress')}>
+        <strong>Your progress</strong>
+        <span class="muted">Focus heatmap, done list and a habit chain.</span>
+      </a>
+      <a class="tool-link" href={url('/techniques')}>
+        <strong>All techniques</strong>
+        <span class="muted">Filter by problem or type, with honest evidence notes.</span>
+      </a>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding-block: var(--space-7) var(--space-5);
+    max-width: 44rem;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 1.5rem + 2.5vw, 3rem);
+  }
+
+  .hero__lead {
+    margin-top: var(--space-3);
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+  }
+
+  .section {
+    margin-top: var(--space-6);
+  }
+
+  .section__intro {
+    margin-block: var(--space-1) var(--space-4);
+  }
+
+  .quiz-section {
+    display: grid;
+    gap: 0 var(--space-6);
+  }
+
+  @media (min-width: 56rem) {
+    .quiz-section {
+      grid-template-columns: 1fr 1.6fr;
+      align-items: start;
+    }
+  }
+
+  .tools {
+    display: grid;
+    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  }
+
+  .tool-link {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: border-color var(--duration-fast) var(--ease-out);
+  }
+
+  .tool-link:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+  }
+
+  .tool-link span {
+    font-size: var(--text-sm);
+  }
+</style>

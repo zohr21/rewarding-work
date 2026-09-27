@@ -1,0 +1,72 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TimerWidget from '../components/TimerWidget.astro';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Focus timer" description="A calm focus timer with Pomodoro, 52/17, Flowtime and custom modes.">
+  <div class="container timer-page">
+    <header class="page-header">
+      <h1>Focus timer</h1>
+      <p>Pick a rhythm, name your task if you like, and start.</p>
+    </header>
+
+    <TimerWidget standalone />
+
+    <section class="modes" aria-labelledby="modes-heading">
+      <h2 id="modes-heading">Which mode?</h2>
+      <dl>
+        <div>
+          <dt><a href={url('/techniques/pomodoro')}>Pomodoro</a></dt>
+          <dd>25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.</dd>
+        </div>
+        <div>
+          <dt><a href={url('/techniques/fifty-two-seventeen')}>52/17</a></dt>
+          <dd>Longer focus blocks with a proper break. Suits work that takes a while to get into.</dd>
+        </div>
+        <div>
+          <dt><a href={url('/techniques/flowtime')}>Flowtime</a></dt>
+          <dd>Counts up. Press “Stop &amp; take a break” when your focus fades; the break is a fifth of your focus time.</dd>
+        </div>
+        <div>
+          <dt><a href={url('/techniques/timeboxing')}>Custom</a></dt>
+          <dd>Your own lengths — handy for timeboxing a task. Set the break to 0 for no break.</dd>
+        </div>
+      </dl>
+      <p class="muted note">
+        Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
+        minute or more are saved in this browser and shown on your <a href={url('/progress')}>progress page</a>.
+      </p>
+    </section>
+  </div>
+</BaseLayout>
+
+<style>
+  .timer-page {
+    max-width: 44rem;
+  }
+
+  .modes {
+    margin-top: var(--space-7);
+  }
+
+  .modes dl {
+    display: grid;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+  }
+
+  .modes dt {
+    font-weight: 600;
+  }
+
+  .modes dd {
+    margin: var(--space-1) 0 0;
+    color: var(--color-text-muted);
+  }
+
+  .note {
+    margin-top: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

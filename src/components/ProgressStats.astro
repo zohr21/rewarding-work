@@ -1,0 +1,93 @@
+---
+/** Three stat tiles: focus today, focus this week, sessions completed. */
+---
+
+<section class="stats" data-progress-stats aria-label="Focus totals">
+  <div class="stat">
+    <p class="stat__label">Today</p>
+    <p class="stat__value"><span data-stat="today">0</span> <span class="stat__unit">min</span></p>
+    <p class="stat__sub muted">focused</p>
+  </div>
+  <div class="stat">
+    <p class="stat__label">This week</p>
+    <p class="stat__value"><span data-stat="week">0</span> <span class="stat__unit">min</span></p>
+    <p class="stat__sub muted" data-stat="week-sub">Mon–Sun</p>
+  </div>
+  <div class="stat">
+    <p class="stat__label">Sessions completed</p>
+    <p class="stat__value"><span data-stat="sessions">0</span></p>
+    <p class="stat__sub muted">all time</p>
+  </div>
+</section>
+
+<script>
+  import { getSessions, subscribe } from '../lib/storage';
+  import { totals } from '../lib/stats';
+
+  document.querySelectorAll<HTMLElement>('[data-progress-stats]').forEach((root) => {
+    const set = (name: string, text: string) => {
+      const el = root.querySelector(`[data-stat="${name}"]`);
+      if (el) el.textContent = text;
+    };
+    const render = () => {
+      const t = totals(getSessions());
+      set('today', t.todayMin.toLocaleString());
+      set('week', t.weekMin.toLocaleString());
+      set('sessions', t.completedSessions.toLocaleString());
+      set('week-sub', `${t.weekSessions} session${t.weekSessions === 1 ? '' : 's'} this week`);
+    };
+    render();
+    subscribe('sessions', render);
+  });
+</script>
+
+<style>
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .stat {
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    min-width: 0;
+  }
+
+  .stat__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .stat__value {
+    margin-top: var(--space-1);
+    font-size: clamp(1.5rem, 1.1rem + 2vw, 2.25rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .stat__unit {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .stat__sub {
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+  }
+
+  @media (max-width: 30rem) {
+    .stats {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .stat:last-child {
+      grid-column: span 2;
+    }
+  }
+</style>

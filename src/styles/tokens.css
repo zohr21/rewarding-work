@@ -1,0 +1,211 @@
+/*
+ * Design tokens — the single source of truth for colour, type, spacing and motion.
+ * Light is the default (<html data-theme="light">). The Appearance menu can switch to
+ * dark, or to auto (data-theme="auto"), which follows prefers-color-scheme.
+ * Text/background pairs were chosen to meet WCAG AA (4.5:1 for body text).
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --color-bg: #fbf8f3;
+  /* Slightly see-through so the ambient background glows through cards. */
+  --color-surface: rgb(255 255 255 / 0.8);
+  --color-surface-solid: #ffffff;
+  --header-bg: rgb(255 255 255 / 0.62);
+  --color-surface-2: #efede6;
+  --color-border: #d9d6cc;
+  --color-border-strong: #a8a497;
+
+  /* Text */
+  --color-text: #1f1e1b;
+  --color-text-muted: #595750; /* 6.9:1 on --color-bg */
+
+  /* Brand / interactive */
+  --color-accent: #2f6b4f; /* calm green, 6.2:1 on white */
+  --color-accent-hover: #245640;
+  --color-accent-soft: #e1eee6;
+  --color-on-accent: #ffffff;
+  --color-focus: #1d5fd0;
+
+  /* Categories (text on their soft background meets AA) */
+  --cat-reward: #8a4b08;
+  --cat-reward-bg: #fbecd9;
+  --cat-visual: #1d5f8a;
+  --cat-visual-bg: #dcecf7;
+  --cat-time: #6a3d9a;
+  --cat-time-bg: #ece3f6;
+  --cat-structure: #2f6b4f;
+  --cat-structure-bg: #e1eee6;
+
+  /* Evidence badges */
+  --ev-strong: #1e6b3a;
+  --ev-strong-bg: #dcf0e2;
+  --ev-some: #7a5a00;
+  --ev-some-bg: #f8edc8;
+  --ev-anecdotal: #5b5b5b;
+  --ev-anecdotal-bg: #ececec;
+
+  /* Heatmap scale (used in step 4) */
+  --heat-0: #e8e6df;
+  --heat-1: #c3e2cd;
+  --heat-2: #86c39c;
+  --heat-3: #3f8f61;
+  --heat-4: #1f5a3d;
+
+  /* Typography */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: clamp(1.75rem, 1.4rem + 1.6vw, 2.375rem);
+  --leading-tight: 1.25;
+  --leading-normal: 1.6;
+
+  /* Spacing (4px scale) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Shape & depth */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 2px 8px rgb(0 0 0 / 0.08);
+
+  /* Layout */
+  --content-width: 46rem;
+  --wide-width: 68rem;
+  --gutter: var(--space-4);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+  --duration-slow: 420ms;
+}
+
+/* Dark palette — shared by the media query and the manual toggle. */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] {
+    color-scheme: dark;
+    --color-bg: #151714;
+    --color-surface: rgb(29 32 28 / 0.84);
+    --color-surface-solid: #1d201c;
+    --header-bg: rgb(29 32 28 / 0.7);
+    --amb-opacity: 0.22;
+    --color-surface-2: #262a25;
+    --color-border: #353a33;
+    --color-border-strong: #5a6157;
+    --color-text: #ebeae4;
+    --color-text-muted: #a9aca2;
+    --color-accent: #7cc49b;
+    --color-accent-hover: #97d4b0;
+    --color-accent-soft: #22362a;
+    --color-on-accent: #0e1a13;
+    --color-focus: #8ab4ff;
+    --cat-reward: #f2b877;
+    --cat-reward-bg: #3a2a17;
+    --cat-visual: #8cc3ea;
+    --cat-visual-bg: #1a2e3c;
+    --cat-time: #c9a8ef;
+    --cat-time-bg: #2e2340;
+    --cat-structure: #7cc49b;
+    --cat-structure-bg: #22362a;
+    --ev-strong: #8bd6a3;
+    --ev-strong-bg: #1d3526;
+    --ev-some: #e8c96a;
+    --ev-some-bg: #3a3118;
+    --ev-anecdotal: #c4c4c4;
+    --ev-anecdotal-bg: #2d2d2d;
+    --heat-0: #2b302a;
+    --heat-1: #1f5037;
+    --heat-2: #2f7a52;
+    --heat-3: #54a877;
+    --heat-4: #9adcb4;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 2px 10px rgb(0 0 0 / 0.45);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #151714;
+  --color-surface: rgb(29 32 28 / 0.84);
+    --color-surface-solid: #1d201c;
+    --header-bg: rgb(29 32 28 / 0.7);
+    --amb-opacity: 0.22;
+  --color-surface-2: #262a25;
+  --color-border: #353a33;
+  --color-border-strong: #5a6157;
+  --color-text: #ebeae4;
+  --color-text-muted: #a9aca2;
+  --color-accent: #7cc49b;
+  --color-accent-hover: #97d4b0;
+  --color-accent-soft: #22362a;
+  --color-on-accent: #0e1a13;
+  --color-focus: #8ab4ff;
+  --cat-reward: #f2b877;
+  --cat-reward-bg: #3a2a17;
+  --cat-visual: #8cc3ea;
+  --cat-visual-bg: #1a2e3c;
+  --cat-time: #c9a8ef;
+  --cat-time-bg: #2e2340;
+  --cat-structure: #7cc49b;
+  --cat-structure-bg: #22362a;
+  --ev-strong: #8bd6a3;
+  --ev-strong-bg: #1d3526;
+  --ev-some: #e8c96a;
+  --ev-some-bg: #3a3118;
+  --ev-anecdotal: #c4c4c4;
+  --ev-anecdotal-bg: #2d2d2d;
+  --heat-0: #2b302a;
+  --heat-1: #1f5037;
+  --heat-2: #2f7a52;
+  --heat-3: #54a877;
+  --heat-4: #9adcb4;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 2px 10px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+
+/* ---------- Ambient background palettes (<html data-bg="…">) ---------- */
+:root {
+  --amb-opacity: 1;
+  --amb-1: #ffc9b0; /* sunrise: peach */
+  --amb-2: #ffe49a; /* butter */
+  --amb-3: #ffc2d9; /* pink */
+  --amb-4: #bfe0ff; /* sky */
+}
+
+:root[data-bg='meadow'] {
+  --amb-1: #bdecc9;
+  --amb-2: #e4f5a3;
+  --amb-3: #b5e2ff;
+  --amb-4: #fff0b8;
+}
+
+:root[data-bg='lavender'] {
+  --amb-1: #dccfff;
+  --amb-2: #c4dcff;
+  --amb-3: #ffd3ea;
+  --amb-4: #cdf2e6;
+}

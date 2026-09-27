@@ -1,0 +1,302 @@
+---
+/**
+ * "Done" list: log finished tasks. One tap to add from today's timer labels,
+ * or type and press Enter. Each new item gets a small check-off animation.
+ */
+---
+
+<section class="card done" data-done-list aria-labelledby="done-heading">
+  <h2 id="done-heading" class="panel-title">Done</h2>
+  <p class="muted done__intro">Finished something? Log it — seeing what you've done is its own reward.</p>
+
+  <form class="done__form" data-done-form>
+    <label for="done-input" class="visually-hidden">Something you finished</label>
+    <input id="done-input" class="input" type="text" maxlength="200" autocomplete="off" placeholder="I finished…" data-done-input />
+    <button type="submit" class="btn">Add</button>
+  </form>
+
+  <div class="done__quick" data-done-quick hidden>
+    <p class="done__quick-label muted">From today's timer:</p>
+    <div class="done__chips" data-done-chips></div>
+  </div>
+
+  <div data-done-groups></div>
+  <p class="muted done__empty" data-done-empty>Nothing logged yet. Small things count.</p>
+  <p class="visually-hidden" aria-live="polite" data-done-live></p>
+</section>
+
+<script>
+  import { addDone, getDone, getSessions, removeDone, subscribe, type DoneItem } from '../lib/storage';
+  import { startOfDay, startOfWeek } from '../lib/dates';
+  import { celebrate } from '../lib/appearance';
+
+  const CHECK_SVG =
+    '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11"></circle><path d="M7 12.5l3.2 3.2L17 9"></path></svg>';
+  const X_SVG =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+  const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
+  document.querySelectorAll<HTMLElement>('[data-done-list]').forEach((root) => {
+    const form = root.querySelector<HTMLFormElement>('[data-done-form]')!;
+    const input = root.querySelector<HTMLInputElement>('[data-done-input]')!;
+    const quick = root.querySelector<HTMLElement>('[data-done-quick]')!;
+    const chips = root.querySelector<HTMLElement>('[data-done-chips]')!;
+    const groups = root.querySelector<HTMLElement>('[data-done-groups]')!;
+    const empty = root.querySelector<HTMLElement>('[data-done-empty]')!;
+    const live = root.querySelector<HTMLElement>('[data-done-live]')!;
+    let justAdded: string | null = null;
+
+    function announce(text: string): void {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    }
+
+    function add(text: string): void {
+      const item = addDone(text);
+      if (!item) return;
+      justAdded = item.id;
+      celebrate();
+      announce(`Logged: ${item.text}`);
+      // Render happens via the storage subscription.
+    }
+
+    function renderItem(item: DoneItem, showDay: boolean): HTMLLIElement {
+      const li = document.createElement('li');
+      li.className = `done__item${item.id === justAdded ? ' is-new' : ''}`;
+
+      const check = document.createElement('span');
+      check.className = 'done__check';
+      check.innerHTML = CHECK_SVG;
+
+      const body = document.createElement('span');
+      body.className = 'done__text';
+      body.textContent = item.text;
+
+      const when = document.createElement('time');
+      when.className = 'done__time muted';
+      when.dateTime = new Date(item.doneAt).toISOString();
+      when.textContent = showDay ? dayFmt.format(item.doneAt) : timeFmt.format(item.doneAt);
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'icon-btn done__remove';
+      del.setAttribute('aria-label', `Remove “${item.text}”`);
+      del.innerHTML = X_SVG;
+      del.addEventListener('click', () => {
+        removeDone(item.id);
+        announce(`Removed: ${item.text}`);
+        input.focus();
+      });
+
+      li.append(check, body, when, del);
+      return li;
+    }
+
+    function render(): void {
+      const items = getDone();
+      const today = startOfDay(new Date()).getTime();
+      const week = startOfWeek(new Date()).getTime();
+      const buckets: [string, DoneItem[], boolean][] = [
+        ['Today', items.filter((i) => i.doneAt >= today), false],
+        ['Earlier this week', items.filter((i) => i.doneAt < today && i.doneAt >= week), true],
+        ['Before that', items.filter((i) => i.doneAt < week).slice(0, 30), true],
+      ];
+
+      const frag = document.createDocumentFragment();
+      for (const [title, list, showDay] of buckets) {
+        if (!list.length) continue;
+        const h = document.createElement('h3');
+        h.className = 'done__group';
+        h.textContent = `${title} · ${list.length}`;
+        const ul = document.createElement('ul');
+        ul.className = 'done__items';
+        ul.append(...list.map((i) => renderItem(i, showDay)));
+        frag.append(h, ul);
+      }
+      groups.replaceChildren(frag);
+      empty.hidden = items.length > 0;
+      justAdded = null;
+
+      // Quick-add chips: today's timer labels not already logged today.
+      const loggedToday = new Set(buckets[0]![1].map((i) => i.text.toLowerCase()));
+      const labels = [
+        ...new Set(
+          getSessions()
+            .filter((s) => s.start >= today && s.label)
+            .map((s) => s.label),
+        ),
+      ].filter((l) => !loggedToday.has(l.toLowerCase()));
+      quick.hidden = labels.length === 0;
+      chips.replaceChildren(
+        ...labels.slice(-6).map((label) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'done__chip';
+          b.textContent = `+ ${label}`;
+          b.setAttribute('aria-label', `Log “${label}” as done`);
+          b.addEventListener('click', () => add(label));
+          return b;
+        }),
+      );
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      add(input.value);
+      input.value = '';
+      input.focus();
+    });
+
+    render();
+    subscribe('done', render);
+    subscribe('sessions', render);
+  });
+</script>
+
+<style>
+  .done__intro {
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-4);
+  }
+
+  .done__form {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .done__form .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .done__quick {
+    margin-top: var(--space-3);
+  }
+
+  .done__quick[hidden] {
+    display: none;
+  }
+
+  .done__quick-label {
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-2);
+  }
+
+  .done__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .done :global(.done__chip) {
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 1px dashed var(--color-accent);
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .done :global(.done__chip:hover) {
+    border-style: solid;
+  }
+
+  .done :global(.done__group) {
+    margin-top: var(--space-5);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+
+  .done :global(.done__items) {
+    list-style: none;
+    padding: 0;
+    margin-top: var(--space-2);
+  }
+
+  .done :global(.done__item) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-left: var(--space-1);
+    border-bottom: 1px solid var(--color-border);
+    max-width: none;
+  }
+
+  .done :global(.done__text) {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding-block: var(--space-2);
+  }
+
+  .done :global(.done__time) {
+    font-size: var(--text-xs);
+    white-space: nowrap;
+  }
+
+  /* Check mark */
+  .done :global(.done__check svg) {
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .done :global(.done__check circle) {
+    fill: var(--color-accent);
+  }
+
+  .done :global(.done__check path) {
+    fill: none;
+    stroke: var(--color-on-accent);
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* New item: circle pops, tick draws itself, row softly highlights. */
+  .done :global(.is-new) {
+    animation: done-row 1.2s var(--ease-out);
+  }
+
+  .done :global(.is-new .done__check svg) {
+    animation: done-pop 450ms var(--ease-out);
+  }
+
+  .done :global(.is-new .done__check path) {
+    stroke-dasharray: 16;
+    stroke-dashoffset: 16;
+    animation: done-draw 350ms 150ms var(--ease-out) forwards;
+  }
+
+  @keyframes done-pop {
+    0% { transform: scale(0.4); opacity: 0; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes done-draw {
+    to { stroke-dashoffset: 0; }
+  }
+
+  @keyframes done-row {
+    0% { background: var(--color-accent-soft); }
+    100% { background: transparent; }
+  }
+
+  .done__empty {
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .done__empty[hidden] {
+    display: none;
+  }
+</style>

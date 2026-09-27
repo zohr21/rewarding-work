@@ -1,0 +1,231 @@
+---
+/** Export / import all data as JSON, and delete everything. No pop-ups: confirmations are inline. */
+---
+
+<section class="card data" data-data-tools aria-labelledby="data-heading">
+  <h2 id="data-heading" class="panel-title">Your data</h2>
+  <p class="muted data__intro">
+    Everything is stored only in this browser. Export a backup to move it to another device or keep it safe.
+  </p>
+  <p class="data__warn" data-data-warn hidden>
+    This browser isn't saving data (private browsing or blocked storage?). It will be lost when you close the tab —
+    export it if you want to keep it.
+  </p>
+
+  <div class="data__actions">
+    <button type="button" class="btn" data-export>Export as JSON</button>
+    <label class="btn btn--ghost data__import">
+      Import from JSON
+      <input type="file" accept="application/json,.json" class="visually-hidden" data-import />
+    </label>
+  </div>
+
+  <div class="data__confirm" data-import-panel hidden>
+    <p data-import-summary></p>
+    <div class="data__actions">
+      <button type="button" class="btn btn--small" data-import-merge>Merge with my data</button>
+      <button type="button" class="btn btn--ghost btn--small" data-import-replace>Replace my data</button>
+      <button type="button" class="btn btn--ghost btn--small" data-import-cancel>Cancel</button>
+    </div>
+    <p class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
+  </div>
+
+  <details class="data__danger disclosure">
+    <summary>Delete all data</summary>
+    <p class="muted">Removes your sessions, done list, chain and settings from this browser. Export first if you might want them back.</p>
+    <div class="data__actions">
+      <button type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
+    </div>
+  </details>
+
+  <p class="data__status" role="status" data-data-status></p>
+</section>
+
+<script>
+  import {
+    applyBackup,
+    clearAll,
+    exportBackup,
+    getAppearance,
+    getTheme,
+    isPersistent,
+    parseBackup,
+    type BackupData,
+  } from '../lib/storage';
+  import { applyAppearance, applyTheme } from '../lib/appearance';
+  import { dayKey } from '../lib/dates';
+
+  document.querySelectorAll<HTMLElement>('[data-data-tools]').forEach((root) => {
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const status = $<HTMLElement>('[data-data-status]');
+    const fileInput = $<HTMLInputElement>('[data-import]');
+    const panel = $<HTMLElement>('[data-import-panel]');
+    const summary = $<HTMLElement>('[data-import-summary]');
+    const clearBtn = $<HTMLButtonElement>('[data-clear]');
+    let pending: BackupData | null = null;
+    let clearArmed = false;
+
+    $<HTMLElement>('[data-data-warn]').hidden = isPersistent();
+
+    const say = (t: string) => (status.textContent = t);
+
+    function applyThemeNow(): void {
+      applyTheme(getTheme());
+      applyAppearance(getAppearance());
+    }
+
+    $<HTMLButtonElement>('[data-export]').addEventListener('click', () => {
+      try {
+        const backup = exportBackup();
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `rewarding-work-${dayKey(new Date())}.json`;
+        document.body.append(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        const d = backup.data;
+        say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items and ${d.chain.days.length} chain days.`);
+      } catch {
+        say('Export failed in this browser.');
+      }
+    });
+
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (!file) return;
+      if (file.size > 5_000_000) {
+        say('That file is too large to be an export from this site.');
+        return;
+      }
+      const result = parseBackup(await file.text());
+      if (!result.ok) {
+        panel.hidden = true;
+        say(result.error);
+        return;
+      }
+      pending = result.data;
+      const d = result.data;
+      summary.textContent =
+        `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items` +
+        `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
+        `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
+      panel.hidden = false;
+      say('');
+      $<HTMLButtonElement>('[data-import-merge]').focus();
+    });
+
+    function finishImport(mode: 'merge' | 'replace'): void {
+      if (!pending) return;
+      applyBackup(pending, mode);
+      if (mode === 'replace') applyThemeNow();
+      pending = null;
+      panel.hidden = true;
+      say(mode === 'merge' ? 'Imported and merged with your data.' : 'Your data was replaced with the file.');
+    }
+
+    $<HTMLButtonElement>('[data-import-merge]').addEventListener('click', () => finishImport('merge'));
+    $<HTMLButtonElement>('[data-import-replace]').addEventListener('click', () => finishImport('replace'));
+    $<HTMLButtonElement>('[data-import-cancel]').addEventListener('click', () => {
+      pending = null;
+      panel.hidden = true;
+      say('Import cancelled.');
+    });
+
+    // Two-step delete: the first press asks, the second press deletes.
+    clearBtn.addEventListener('click', () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clearBtn.textContent = 'Yes, delete everything';
+        say('Press again to confirm. This cannot be undone.');
+        window.setTimeout(() => {
+          clearArmed = false;
+          clearBtn.textContent = 'Delete everything';
+        }, 6000);
+        return;
+      }
+      clearArmed = false;
+      clearBtn.textContent = 'Delete everything';
+      clearAll();
+      applyThemeNow();
+      say('All data deleted from this browser.');
+    });
+  });
+</script>
+
+<style>
+  .data__intro {
+    font-size: var(--text-sm);
+  }
+
+  .data__warn {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--ev-some-bg);
+    color: var(--ev-some);
+    font-size: var(--text-sm);
+  }
+
+  .data__warn[hidden] {
+    display: none;
+  }
+
+  .data__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+
+  .data__import {
+    position: relative;
+  }
+
+  .data__import:focus-within {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .data__confirm {
+    margin-top: var(--space-4);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .data__confirm[hidden] {
+    display: none;
+  }
+
+  .data__confirm .data__actions {
+    margin-top: var(--space-3);
+  }
+
+  .data__hint {
+    margin-top: var(--space-3);
+    font-size: var(--text-xs);
+  }
+
+  .data__danger {
+    margin-top: var(--space-5);
+    font-size: var(--text-sm);
+  }
+
+  .data__danger summary {
+    color: var(--color-text-muted);
+  }
+
+  .data__danger p {
+    margin-top: var(--space-1);
+  }
+
+  .data__status {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    min-height: 1.6em;
+  }
+</style>

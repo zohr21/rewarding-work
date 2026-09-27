@@ -1,0 +1,140 @@
+---
+import AppearanceMenu from './AppearanceMenu.astro';
+import { NAV, SITE } from '../config/site';
+import { url, isActive } from '../lib/paths';
+
+const current = Astro.url.pathname;
+---
+
+<header class="site-header">
+  <div class="container site-header__inner">
+    <a class="brand" href={url('/')} aria-current={isActive(current, '/') ? 'page' : undefined}>
+      <svg class="brand__mark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"></circle>
+        <path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span>{SITE.name}</span>
+    </a>
+
+    <nav class="site-nav" aria-label="Main">
+      <ul>
+        {
+          NAV.map((item) => (
+            <li>
+              <a href={url(item.href)} aria-current={isActive(current, item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="site-header__tools">
+      <AppearanceMenu />
+    </div>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: relative;
+    z-index: 10;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--header-bg);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    backdrop-filter: saturate(1.4) blur(14px);
+  }
+
+  /* Mobile-first: brand + toggle on row one, nav on row two. */
+  .site-header__inner {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'brand toggle'
+      'nav nav';
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding-block: var(--space-3);
+  }
+
+  .brand {
+    grid-area: brand;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--color-text);
+    font-weight: 700;
+    font-size: var(--text-lg);
+    text-decoration: none;
+    min-height: 44px;
+  }
+
+  .brand:hover {
+    color: var(--color-text);
+  }
+
+  .brand__mark {
+    color: var(--color-accent);
+    flex-shrink: 0;
+  }
+
+  .site-nav {
+    grid-area: nav;
+  }
+
+  .site-nav ul {
+    display: flex;
+    gap: var(--space-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .site-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-pill);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .site-nav li:first-child a {
+    margin-left: calc(-1 * var(--space-3));
+  }
+
+  .site-nav a:hover {
+    color: var(--color-text);
+    background: var(--color-surface-2);
+  }
+
+  .site-nav a[aria-current='page'] {
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
+    font-weight: 600;
+  }
+
+  .site-header__tools {
+    grid-area: toggle;
+  }
+
+  /* Wider screens: everything on one row. */
+  @media (min-width: 40rem) {
+    .site-header__inner {
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: 'brand nav toggle';
+      gap: var(--space-5);
+    }
+
+    .site-nav ul {
+      justify-content: flex-end;
+    }
+
+    .site-nav li:first-child a {
+      margin-left: 0;
+    }
+  }
+</style>

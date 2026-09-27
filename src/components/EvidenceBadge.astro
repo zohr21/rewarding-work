@@ -1,0 +1,25 @@
+---
+import { EVIDENCE, type EvidenceLevel } from '../data/taxonomy';
+
+interface Props {
+  level: EvidenceLevel;
+}
+const { level } = Astro.props;
+const ev = EVIDENCE[level];
+---
+
+<span class={`badge ev ev--${ev.key}`} title={ev.description}>
+  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+    {/* Filled bars (1–3) so the level isn't conveyed by colour alone. */}
+    <rect x="1" y="7" width="2.5" height="4" rx="0.5" fill="currentColor"></rect>
+    <rect x="4.75" y="4" width="2.5" height="7" rx="0.5" fill="currentColor" opacity={ev.key === 'anecdotal' ? 0.3 : 1}></rect>
+    <rect x="8.5" y="1" width="2.5" height="10" rx="0.5" fill="currentColor" opacity={ev.key === 'strong' ? 1 : 0.3}></rect>
+  </svg>
+  <span><span class="visually-hidden">Evidence: </span>{ev.label}</span>
+</span>
+
+<style>
+  .ev--strong { color: var(--ev-strong); background: var(--ev-strong-bg); }
+  .ev--some { color: var(--ev-some); background: var(--ev-some-bg); }
+  .ev--anecdotal { color: var(--ev-anecdotal); background: var(--ev-anecdotal-bg); }
+</style>

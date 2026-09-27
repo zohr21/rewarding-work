@@ -1,0 +1,17 @@
+---
+import { CATEGORIES, type CategorySlug } from '../data/taxonomy';
+
+interface Props {
+  category: CategorySlug;
+}
+const { category } = Astro.props;
+---
+
+<span class={`badge cat cat--${category}`}>{CATEGORIES[category].label}</span>
+
+<style>
+  .cat--reward { color: var(--cat-reward); background: var(--cat-reward-bg); }
+  .cat--visual { color: var(--cat-visual); background: var(--cat-visual-bg); }
+  .cat--time { color: var(--cat-time); background: var(--cat-time-bg); }
+  .cat--structure { color: var(--cat-structure); background: var(--cat-structure-bg); }
+</style>

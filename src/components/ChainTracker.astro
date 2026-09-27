@@ -1,0 +1,382 @@
+---
+/**
+ * Don't-break-the-chain tracker for one habit. Best chain is the headline number;
+ * a gap is never framed as failure. Used on /progress and the technique page.
+ */
+interface Props {
+  headingLevel?: 'h2' | 'h3';
+}
+const { headingLevel = 'h2' } = Astro.props;
+const Heading = headingLevel;
+---
+
+<section class="card chain" data-chain aria-labelledby="chain-heading">
+  <Heading id="chain-heading" class="panel-title">Chain</Heading>
+
+  <!-- Setup / edit habit -->
+  <form class="chain__setup" data-chain-form hidden>
+    <label for="chain-habit">What small thing will you do every day?</label>
+    <div class="chain__row">
+      <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
+      <button type="submit" class="btn">Save</button>
+    </div>
+    <button type="button" class="btn btn--ghost btn--small chain__cancel" data-chain-cancel hidden>Cancel</button>
+  </form>
+
+  <!-- Tracker -->
+  <div data-chain-body hidden>
+    <div class="chain__habit">
+      <p><span class="muted">Habit:</span> <strong data-chain-name></strong></p>
+      <button type="button" class="btn btn--ghost btn--small" data-chain-edit>Edit</button>
+    </div>
+
+    <div class="chain__stats">
+      <div class="chain__best">
+        <p class="chain__label">Best chain</p>
+        <p class="chain__big"><span data-chain-best>0</span> <span class="chain__unit" data-chain-best-unit>days</span></p>
+      </div>
+      <div class="chain__side">
+        <p><span class="chain__label">Current</span> <strong data-chain-current>0</strong></p>
+        <p><span class="chain__label">Total days</span> <strong data-chain-total>0</strong></p>
+      </div>
+    </div>
+
+    <p class="chain__message" data-chain-message></p>
+
+    <button type="button" class="btn chain__today" data-chain-today aria-pressed="false">Mark today done</button>
+
+    <div class="chain__cal-wrap">
+      <p class="chain__cal-title muted" id="chain-cal-label">Last 5 weeks — tap a day to mark or unmark it</p>
+      <div class="chain__weekdays" aria-hidden="true">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div class="chain__cal" role="group" aria-labelledby="chain-cal-label" data-chain-cal></div>
+    </div>
+  </div>
+
+  <p class="visually-hidden" aria-live="polite" data-chain-live></p>
+</section>
+
+<script>
+  import { getChain, setChain, subscribe, toggleChainDay } from '../lib/storage';
+  import { chainStats } from '../lib/stats';
+  import { addDays, dayKey, formatDay, startOfDay, startOfWeek } from '../lib/dates';
+  import { celebrate } from '../lib/appearance';
+
+  document.querySelectorAll<HTMLElement>('[data-chain]').forEach((root) => {
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const form = $<HTMLFormElement>('[data-chain-form]');
+    const input = $<HTMLInputElement>('[data-chain-input]');
+    const cancel = $<HTMLButtonElement>('[data-chain-cancel]');
+    const body = $<HTMLElement>('[data-chain-body]');
+    const name = $<HTMLElement>('[data-chain-name]');
+    const edit = $<HTMLButtonElement>('[data-chain-edit]');
+    const best = $<HTMLElement>('[data-chain-best]');
+    const bestUnit = $<HTMLElement>('[data-chain-best-unit]');
+    const current = $<HTMLElement>('[data-chain-current]');
+    const total = $<HTMLElement>('[data-chain-total]');
+    const message = $<HTMLElement>('[data-chain-message]');
+    const today = $<HTMLButtonElement>('[data-chain-today]');
+    const cal = $<HTMLElement>('[data-chain-cal]');
+    const live = $<HTMLElement>('[data-chain-live]');
+    let editing = false;
+    let pulseKey: string | null = null;
+
+    const announce = (t: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = t), 50);
+    };
+    const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
+    function encouragement(s: ReturnType<typeof chainStats>): string {
+      if (s.total === 0) return 'Mark the first day whenever you have done it.';
+      if (s.current === 0) return `Your best is ${days(s.best)}. Every day you mark counts — start a new chain today.`;
+      if (!s.doneToday) return `${days(s.current)} so far. Mark today when it's done.`;
+      if (s.current >= s.best && s.best > 1) return `${days(s.current)} — that's your best chain yet.`;
+      return `${days(s.current)} and counting.`;
+    }
+
+    function render(): void {
+      const chain = getChain();
+      const hasHabit = chain.habit.length > 0;
+      form.hidden = hasHabit && !editing;
+      body.hidden = !hasHabit || editing;
+      cancel.hidden = !(hasHabit && editing);
+      if (!hasHabit || editing) {
+        if (document.activeElement !== input) input.value = chain.habit;
+        return;
+      }
+
+      const s = chainStats(chain.days);
+      name.textContent = chain.habit;
+      best.textContent = String(s.best);
+      bestUnit.textContent = s.best === 1 ? 'day' : 'days';
+      current.textContent = days(s.current);
+      total.textContent = String(s.total);
+      message.textContent = encouragement(s);
+
+      today.textContent = s.doneToday ? '✓ Done today' : 'Mark today done';
+      today.setAttribute('aria-pressed', String(s.doneToday));
+      today.classList.toggle('is-done', s.doneToday);
+
+      // 5-week calendar, Monday first, ending with this week.
+      const set = new Set(chain.days);
+      const now = startOfDay(new Date());
+      const first = addDays(startOfWeek(now), -28);
+      const buttons: HTMLElement[] = [];
+      for (let i = 0; i < 35; i++) {
+        const date = addDays(first, i);
+        const key = dayKey(date);
+        const marked = set.has(key);
+        const future = date > now;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chain__day';
+        b.textContent = String(date.getDate());
+        b.disabled = future;
+        b.setAttribute('aria-pressed', String(marked));
+        b.setAttribute('aria-label', `${formatDay(date)}${key === dayKey(now) ? ' (today)' : ''}`);
+        if (marked) {
+          b.classList.add('is-marked');
+          // Visually link consecutive days within a week row.
+          if (i % 7 !== 0 && set.has(dayKey(addDays(date, -1)))) b.classList.add('link-left');
+          if (i % 7 !== 6 && set.has(dayKey(addDays(date, 1)))) b.classList.add('link-right');
+        }
+        if (key === dayKey(now)) b.classList.add('is-today');
+        if (key === pulseKey) b.classList.add('is-pulse');
+        b.addEventListener('click', () => toggle(key, date));
+        buttons.push(b);
+      }
+      const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
+      buttons.forEach((b, i) => (b.dataset.key = dayKey(addDays(first, i))));
+      cal.replaceChildren(...buttons);
+      if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
+      pulseKey = null;
+    }
+
+    function toggle(key: string, date: Date): void {
+      const nowMarked = toggleChainDay(key);
+      if (nowMarked) {
+        pulseKey = key;
+        celebrate();
+      }
+      const s = chainStats(getChain().days);
+      announce(`${formatDay(date)} ${nowMarked ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`);
+    }
+
+    today.addEventListener('click', () => toggle(dayKey(new Date()), new Date()));
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const habit = input.value.trim();
+      if (!habit) {
+        input.focus();
+        return;
+      }
+      editing = false;
+      setChain({ ...getChain(), habit });
+      announce(`Habit saved: ${habit}`);
+      today.focus();
+    });
+    edit.addEventListener('click', () => {
+      editing = true;
+      render();
+      input.focus();
+      input.select();
+    });
+    cancel.addEventListener('click', () => {
+      editing = false;
+      render();
+      edit.focus();
+    });
+
+    render();
+    subscribe('chain', render);
+  });
+</script>
+
+<style>
+  .chain__setup {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .chain__setup[hidden] {
+    display: none;
+  }
+
+  .chain__setup label {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+
+  .chain__row {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .chain__row .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chain__cancel {
+    justify-self: start;
+  }
+
+  .chain__cancel[hidden] {
+    display: none;
+  }
+
+  .chain__habit {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .chain__habit p {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .chain__stats {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-accent-soft);
+    border-radius: var(--radius-md);
+  }
+
+  .chain__label {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+  }
+
+  .chain__big {
+    font-size: clamp(2.5rem, 2rem + 3vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--color-accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chain__unit {
+    font-size: var(--text-lg);
+    font-weight: 600;
+  }
+
+  .chain__side {
+    display: grid;
+    gap: var(--space-1);
+    text-align: right;
+    font-size: var(--text-sm);
+  }
+
+  .chain__message {
+    margin-top: var(--space-3);
+    min-height: 1.6em;
+  }
+
+  .chain__today {
+    width: 100%;
+    margin-top: var(--space-3);
+  }
+
+  .chain__today.is-done {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  .chain__cal-wrap {
+    margin-top: var(--space-5);
+    max-width: 22rem;
+  }
+
+  .chain__cal-title {
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-2);
+  }
+
+  .chain__weekdays,
+  .chain__cal {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    column-gap: 0;
+    row-gap: var(--space-1);
+  }
+
+  .chain__weekdays span {
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .chain :global(.chain__day) {
+    position: relative;
+    aspect-ratio: 1;
+    min-height: 36px;
+    margin: 0 2px;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-fast) var(--ease-out);
+  }
+
+  .chain :global(.chain__day:hover:not(:disabled)) {
+    border-color: var(--color-accent);
+  }
+
+  .chain :global(.chain__day:disabled) {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .chain :global(.chain__day.is-today) {
+    border: 2px solid var(--color-text);
+    color: var(--color-text);
+    font-weight: 700;
+  }
+
+  .chain :global(.chain__day.is-marked) {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+  }
+
+  /* Links between consecutive marked days make the chain visible. */
+  .chain :global(.chain__day.link-right)::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -6px;
+    width: 8px;
+    height: 4px;
+    transform: translateY(-50%);
+    background: var(--color-accent);
+  }
+
+  .chain :global(.chain__day.is-pulse) {
+    animation: chain-pulse 500ms var(--ease-out);
+  }
+
+  @keyframes chain-pulse {
+    0% { transform: scale(0.7); }
+    60% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+</style>

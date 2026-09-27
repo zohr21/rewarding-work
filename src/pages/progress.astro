@@ -1,0 +1,50 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProgressStats from '../components/ProgressStats.astro';
+import Heatmap from '../components/Heatmap.astro';
+import DoneList from '../components/DoneList.astro';
+import ChainTracker from '../components/ChainTracker.astro';
+import DataTools from '../components/DataTools.astro';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Progress" description="Your focus history, done list and habit chain — stored only in this browser.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Your progress</h1>
+      <p>
+        Focus sessions from the <a href={url('/timer')}>timer</a>, things you've finished, and your chain. Stored only in
+        this browser.
+      </p>
+    </header>
+
+    <div class="progress">
+      <ProgressStats />
+      <Heatmap />
+      <div class="progress__pair">
+        <DoneList />
+        <ChainTracker />
+      </div>
+      <DataTools />
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .progress {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .progress__pair {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  @media (min-width: 52rem) {
+    .progress__pair {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>

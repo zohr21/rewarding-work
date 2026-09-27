@@ -1,0 +1,28 @@
+---
+import { SITE } from '../config/site';
+---
+
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      {SITE.name} · Your data stays in this browser — nothing is sent anywhere.
+    </p>
+    <p>
+      Techniques are labelled by how well they're supported by evidence. What works varies from person to person; treat
+      everything here as an experiment.
+    </p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--color-border);
+    padding-block: var(--space-5);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .site-footer p + p {
+    margin-top: var(--space-2);
+  }
+</style>

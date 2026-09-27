@@ -1,0 +1,36 @@
+---
+/** Embeds the interactive widget named by a technique's `tool` frontmatter field. */
+import TimerWidget from './TimerWidget.astro';
+import ChainTracker from './ChainTracker.astro';
+import BreakdownTool from './BreakdownTool.astro';
+import ProgressStats from './ProgressStats.astro';
+import type { TimerMode, ToolSlug } from '../data/taxonomy';
+import { url } from '../lib/paths';
+
+interface Props {
+  tool: ToolSlug;
+  timerMode?: TimerMode;
+}
+const { tool, timerMode } = Astro.props;
+---
+
+{tool === 'timer' && <TimerWidget defaultMode={timerMode} />}
+{tool === 'chain' && <ChainTracker />}
+{tool === 'breakdown' && <BreakdownTool />}
+{
+  tool === 'progress' && (
+    <section aria-labelledby="tool-progress-heading">
+      <h2 id="tool-progress-heading" class="panel-title">Your focus so far</h2>
+      <ProgressStats />
+      <p class="tool-more">
+        <a href={url('/progress')}>See your full progress</a>
+      </p>
+    </section>
+  )
+}
+
+<style>
+  .tool-more {
+    margin-top: var(--space-3);
+  }
+</style>

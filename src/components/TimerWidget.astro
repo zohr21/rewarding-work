@@ -1,0 +1,431 @@
+---
+/**
+ * Focus timer. Used standalone on /timer and embedded on technique pages.
+ * Use at most one per page (element ids are fixed).
+ *
+ * There is one shared timer across the whole site: a session started on a technique
+ * page keeps running on /timer, after a reload, or in another tab.
+ */
+import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
+import { url } from '../lib/paths';
+
+interface Props {
+  /** Mode shown when no session is in progress. Standalone uses the user's last mode. */
+  defaultMode?: TimerMode;
+  /** Standalone page: enables Space / R shortcuts and a larger layout. */
+  standalone?: boolean;
+}
+
+const { defaultMode, standalone = false } = Astro.props;
+const RADIUS = 92;
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+---
+
+<section
+  class:list={['timer', { 'timer--standalone': standalone }]}
+  data-timer
+  data-default-mode={defaultMode}
+  data-shortcuts={standalone ? '' : undefined}
+  data-icon={url('/favicon.svg')}
+  data-phase="work"
+  data-status="idle"
+  aria-labelledby="timer-heading">
+  <div class="timer__head">
+    <h2 id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
+    <fieldset class="timer__modes" data-modes>
+      <legend class="visually-hidden">Timer mode</legend>
+      {
+        TIMER_MODES.map((m) => (
+          <label class="seg">
+            <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
+            <span>{TIMER_MODE_LABELS[m]}</span>
+          </label>
+        ))
+      }
+    </fieldset>
+    <p class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
+  </div>
+
+  <div class="timer__custom" data-custom hidden>
+    <label>
+      <span>Focus (min)</span>
+      <input type="number" inputmode="numeric" min="1" max="240" step="1" value="15" data-custom-work />
+    </label>
+    <label>
+      <span>Break (min)</span>
+      <input type="number" inputmode="numeric" min="0" max="60" step="1" value="5" data-custom-break />
+    </label>
+  </div>
+
+  <div class="timer__dial" data-dial>
+    <svg class="timer__ring" viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="timer__track" cx="100" cy="100" r={RADIUS}></circle>
+      <circle
+        class="timer__progress"
+        cx="100"
+        cy="100"
+        r={RADIUS}
+        stroke-dasharray={CIRCUMFERENCE}
+        stroke-dashoffset="0"
+        data-ring
+        data-circumference={CIRCUMFERENCE}></circle>
+    </svg>
+    <div class="timer__readout">
+      <p class="timer__phase" data-phase-label>Focus</p>
+      <p class="timer__time" role="timer" aria-atomic="true" data-time>25:00</p>
+      <p class="timer__dots" data-dots hidden>
+        <span></span><span></span><span></span><span></span>
+      </p>
+    </div>
+  </div>
+
+  <p class="timer__message" data-message></p>
+
+  <div class="timer__controls">
+    <button type="button" class="btn timer__main" data-action="toggle">Start</button>
+    <button type="button" class="btn btn--ghost" data-action="stop" hidden>Stop &amp; take a break</button>
+    <button type="button" class="btn btn--ghost" data-action="skip" hidden>Skip break</button>
+    <button type="button" class="btn btn--ghost" data-action="reset">Reset</button>
+  </div>
+
+  <label class="timer__label">
+    <span>What are you working on? <span class="muted">(optional)</span></span>
+    <input type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
+  </label>
+
+  <div class="timer__footer">
+    <label class="timer__sound">
+      <input type="checkbox" data-sound checked />
+      <span>Sound</span>
+    </label>
+    <span class="muted" data-notify-status></span>
+    <a href={url('/progress')} class="timer__today" data-today></a>
+  </div>
+
+  {
+    standalone && (
+      <p class="timer__keys muted">
+        Keyboard: <kbd>Space</kbd> start / pause · <kbd>R</kbd> reset
+      </p>
+    )
+  }
+
+  <p class="visually-hidden" aria-live="polite" aria-atomic="true" data-live></p>
+  <noscript><p class="timer__message">The timer needs JavaScript enabled.</p></noscript>
+</section>
+
+<script>
+  import { mountTimers } from '../scripts/timer-ui';
+  mountTimers();
+</script>
+
+<style>
+  .timer {
+    --phase-color: var(--color-accent);
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    justify-items: center;
+    text-align: center;
+  }
+
+  .timer[data-phase='short-break'],
+  .timer[data-phase='long-break'] {
+    --phase-color: var(--cat-visual);
+  }
+
+  .timer__head {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: center;
+    width: 100%;
+  }
+
+  .timer__head h2 {
+    font-size: var(--text-lg);
+  }
+
+  /* Segmented mode control */
+  .timer__modes {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    min-width: 0;
+  }
+
+  .seg {
+    position: relative;
+  }
+
+  .seg input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .seg input:disabled {
+    cursor: not-allowed;
+  }
+
+  .seg span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  @media (max-width: 26rem) {
+    .timer {
+      padding-inline: var(--space-3);
+    }
+
+    .seg span {
+      padding: 0 0.55rem;
+      font-size: var(--text-xs);
+    }
+  }
+
+  .seg input:checked + span {
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .seg input:focus-visible + span {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 1px;
+  }
+
+  .seg input:disabled:not(:checked) + span {
+    opacity: 0.5;
+  }
+
+  .timer__mode-hint {
+    font-size: var(--text-xs);
+  }
+
+  .timer__custom {
+    display: flex;
+    gap: var(--space-4);
+    justify-content: center;
+  }
+
+  .timer__custom[hidden] {
+    display: none;
+  }
+
+  .timer__custom label {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .timer__custom input {
+    width: 6rem;
+    min-height: 44px;
+    padding: var(--space-2);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    text-align: center;
+  }
+
+  /* Dial */
+  .timer__dial {
+    position: relative;
+    width: min(100%, 260px);
+    aspect-ratio: 1;
+  }
+
+  .timer--standalone .timer__dial {
+    width: min(100%, 320px);
+  }
+
+  .timer__ring {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .timer__track {
+    fill: none;
+    stroke: var(--color-surface-2);
+    stroke-width: 10;
+  }
+
+  .timer__progress {
+    fill: none;
+    stroke: var(--phase-color);
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition:
+      stroke-dashoffset 300ms linear,
+      stroke var(--duration-base) var(--ease-out);
+  }
+
+  /* Flowtime focus counts up: show a calm dashed ring instead of progress. */
+  .timer[data-countup] .timer__progress {
+    stroke-dasharray: 4 10 !important;
+    stroke-dashoffset: 0 !important;
+    opacity: 0.6;
+  }
+
+  .timer__readout {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    gap: var(--space-1);
+  }
+
+  .timer__phase {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--phase-color);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .timer__time {
+    font-family: var(--font-mono);
+    font-size: clamp(2.75rem, 12vw, 3.5rem);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .timer--standalone .timer__time {
+    font-size: clamp(3rem, 14vw, 4.25rem);
+  }
+
+  .timer__dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .timer__dots[hidden] {
+    display: none;
+  }
+
+  .timer__dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid var(--color-border-strong);
+  }
+
+  .timer__dots span.is-done {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  /* Completion: a soft glow + gentle pop. Disabled by prefers-reduced-motion (global.css). */
+  .timer__dial.is-complete .timer__ring {
+    animation: dial-complete 900ms var(--ease-out);
+  }
+
+  @keyframes dial-complete {
+    0% { filter: drop-shadow(0 0 0 transparent); scale: 1; }
+    35% { filter: drop-shadow(0 0 12px var(--phase-color)); scale: 1.04; }
+    100% { filter: drop-shadow(0 0 0 transparent); scale: 1; }
+  }
+
+  .timer__message {
+    min-height: 1.6em;
+    max-width: 32rem;
+    color: var(--color-text-muted);
+  }
+
+  .timer__controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .timer__main {
+    min-width: 8rem;
+  }
+
+  .timer__controls [hidden] {
+    display: none;
+  }
+
+  .timer__label {
+    display: grid;
+    gap: var(--space-1);
+    width: min(100%, 26rem);
+    text-align: left;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .timer__label input {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    font-weight: 400;
+  }
+
+  .timer__footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .timer__sound {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .timer__sound input {
+    width: 1.1rem;
+    height: 1.1rem;
+    accent-color: var(--color-accent);
+  }
+
+  .timer__today:empty {
+    display: none;
+  }
+
+  .timer__keys {
+    font-size: var(--text-xs);
+  }
+
+  kbd {
+    padding: 0 0.35em;
+    border: 1px solid var(--color-border-strong);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+  }
+</style>

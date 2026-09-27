@@ -1,0 +1,99 @@
+---
+import CategoryBadge from './CategoryBadge.astro';
+import EvidenceBadge from './EvidenceBadge.astro';
+import { url } from '../lib/paths';
+import type { Technique } from '../lib/techniques';
+
+interface Props {
+  technique: Technique;
+  headingLevel?: 'h2' | 'h3';
+}
+const { technique, headingLevel = 'h2' } = Astro.props;
+const { title, summary, category, evidence, time_to_try, problems } = technique.data;
+const Heading = headingLevel;
+---
+
+<article
+  class="tcard"
+  data-technique
+  data-title={title.toLowerCase()}
+  data-category={category}
+  data-problems={problems.join(' ')}>
+  <div class="tcard__badges">
+    <CategoryBadge category={category} />
+    <EvidenceBadge level={evidence} />
+  </div>
+  <Heading class="tcard__title">
+    {/* The whole card is clickable via the stretched link. */}
+    <a href={url(`/techniques/${technique.id}`)}>{title}</a>
+  </Heading>
+  <p class="tcard__summary">{summary}</p>
+  <p class="tcard__meta">Try it in {time_to_try} min</p>
+</article>
+
+<style>
+  .tcard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-5);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out);
+  }
+
+  .tcard:hover {
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .tcard:focus-within {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .tcard__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .tcard__title {
+    font-size: var(--text-lg);
+    margin-top: var(--space-1);
+  }
+
+  .tcard__title a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .tcard__title a:focus-visible {
+    outline: none; /* the card shows the focus ring */
+  }
+
+  .tcard__title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .tcard__summary {
+    color: var(--color-text-muted);
+    flex: 1;
+  }
+
+  .tcard__meta {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+</style>

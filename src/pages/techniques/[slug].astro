@@ -1,0 +1,201 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CategoryBadge from '../../components/CategoryBadge.astro';
+import EvidenceBadge from '../../components/EvidenceBadge.astro';
+import TechniqueCard from '../../components/TechniqueCard.astro';
+import TechniqueTool from '../../components/TechniqueTool.astro';
+import { getTechniques, getRelated, type Technique } from '../../lib/techniques';
+import { EVIDENCE, PROBLEMS } from '../../data/taxonomy';
+import { url } from '../../lib/paths';
+
+export async function getStaticPaths() {
+  const all = await getTechniques();
+  return all.map((technique) => ({
+    params: { slug: technique.id },
+    props: { technique, related: getRelated(technique, all) },
+  }));
+}
+
+interface Props {
+  technique: Technique;
+  related: Technique[];
+}
+
+const { technique, related } = Astro.props;
+const { title, summary, category, evidence, time_to_try, problems, tool, timer_mode, limits, evidence_note } = technique.data;
+const { Content } = await render(technique);
+---
+
+<BaseLayout title={title} description={summary}>
+  <div class="container">
+    <nav class="crumbs" aria-label="Breadcrumb">
+      <a href={url('/techniques')}>Techniques</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{title}</span>
+    </nav>
+
+    <article class="technique">
+      <header class="technique__header">
+        <div class="technique__badges">
+          <CategoryBadge category={category} />
+          <EvidenceBadge level={evidence} />
+          <span class="badge time-badge">⏱ {time_to_try} min to try</span>
+        </div>
+        <h1>{title}</h1>
+        <p class="technique__summary">{summary}</p>
+        <p class="technique__problems">
+          Helps with:{' '}
+          {
+            problems.map((p, i) => (
+              <>
+                <a href={url(`/problems/${p}`)}>“{PROBLEMS[p].title}”</a>
+                {i < problems.length - 1 ? ', ' : ''}
+              </>
+            ))
+          }
+        </p>
+      </header>
+
+      <div class="prose technique__body">
+        <Content />
+      </div>
+
+      {tool && <div class="technique__tool"><TechniqueTool tool={tool} timerMode={timer_mode} /></div>}
+
+      <section class="prose technique__section" aria-labelledby="limits-heading">
+        <h2 id="limits-heading">When it does not work</h2>
+        <ul>
+          {limits.map((l) => <li>{l}</li>)}
+        </ul>
+      </section>
+
+      <section class={`technique__section evidence evidence--${EVIDENCE[evidence].key}`} aria-labelledby="evidence-heading">
+        <div class="evidence__head">
+          <h2 id="evidence-heading">Evidence</h2>
+          <EvidenceBadge level={evidence} />
+        </div>
+        <p>{evidence_note}</p>
+        <p class="evidence__scale muted">
+          <strong>{EVIDENCE[evidence].label}:</strong>{' '}{EVIDENCE[evidence].description}
+        </p>
+      </section>
+    </article>
+
+    {
+      related.length > 0 && (
+        <section class="related" aria-labelledby="related-heading">
+          <h2 id="related-heading">Related techniques</h2>
+          <div class="related__grid">
+            {related.map((t) => (
+              <TechniqueCard technique={t} headingLevel="h3" />
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </div>
+</BaseLayout>
+
+<style>
+  .crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    padding-top: var(--space-5);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .technique {
+    max-width: var(--content-width);
+  }
+
+  .technique__header {
+    padding-block: var(--space-4) var(--space-5);
+  }
+
+  .technique__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+  }
+
+  .time-badge {
+    color: var(--color-text-muted);
+    background: var(--color-surface-2);
+  }
+
+  .technique__summary {
+    margin-top: var(--space-3);
+    font-size: var(--text-lg);
+  }
+
+  .technique__problems {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  /* Markdown body: blockquotes are used for example if-then plans. */
+  .technique__body :global(blockquote) {
+    padding: var(--space-3) var(--space-4);
+    border-left: 4px solid var(--color-accent);
+    background: var(--color-accent-soft);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+
+  .technique__body :global(h2:first-child) {
+    margin-top: 0;
+  }
+
+  .technique__tool,
+  .technique__section {
+    margin-top: var(--space-6);
+  }
+
+  .technique__section h2 {
+    margin-bottom: var(--space-3);
+  }
+
+  .evidence {
+    padding: var(--space-5);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    border-left-width: 6px;
+    background: var(--color-surface);
+  }
+
+  .evidence--strong { border-left-color: var(--ev-strong); }
+  .evidence--some { border-left-color: var(--ev-some); }
+  .evidence--anecdotal { border-left-color: var(--ev-anecdotal); }
+
+  .evidence__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .evidence__head h2 {
+    margin: 0;
+  }
+
+  .evidence__scale {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .related {
+    margin-top: var(--space-7);
+  }
+
+  .related__grid {
+    display: grid;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+</style>

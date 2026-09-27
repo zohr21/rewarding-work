@@ -1,0 +1,475 @@
+---
+/**
+ * GitHub-style heatmap of focus minutes, last 12 weeks. Rendered client-side
+ * (data lives in localStorage). Columns = weeks, rows = Mon…Sun.
+ * Sequential single-hue scale; hover/tap tooltip per cell; a side panel with
+ * the key numbers; a table view for screen readers and anyone who prefers numbers.
+ *
+ * Note: cells, labels and table rows are created by JS, so their styles use
+ * :global() — Astro's scoped styles only reach elements written in this template.
+ */
+import { HEAT_THRESHOLDS } from '../lib/stats';
+
+const [, t2, t3, t4] = HEAT_THRESHOLDS;
+const LEGEND = [
+  { level: 0, label: '0' },
+  { level: 1, label: `<${t2}` },
+  { level: 2, label: `<${t3}` },
+  { level: 3, label: `<${t4}` },
+  { level: 4, label: `${t4}+` },
+];
+---
+
+<section class="card heat" data-heatmap aria-labelledby="heat-heading">
+  <h2 id="heat-heading" class="panel-title">Focus, last 12 weeks</h2>
+
+  <div class="heat__layout">
+    <div class="heat__main">
+      <div class="heat__wrap">
+        <div class="heat__grid" data-heat-grid aria-hidden="true"></div>
+        <div class="heat__tip" data-heat-tip aria-hidden="true" hidden></div>
+      </div>
+
+      <div class="heat__legend" aria-hidden="true">
+        <span class="heat__legend-end">Less</span>
+        {
+          LEGEND.map(({ level, label }) => (
+            <span class="heat__legend-item">
+              <span class={`cell l${level}`} />
+              <span class="heat__legend-label">{label}</span>
+            </span>
+          ))
+        }
+        <span class="heat__legend-end">More</span>
+        <span class="heat__legend-unit">minutes per day</span>
+      </div>
+    </div>
+
+    <dl class="heat__facts" data-heat-facts>
+      <div><dt>Total focus</dt><dd data-fact="total">0 min</dd></div>
+      <div><dt>Days with focus</dt><dd data-fact="active">0 of 0</dd></div>
+      <div><dt>Average on focus days</dt><dd data-fact="avg">—</dd></div>
+      <div class="heat__fact-wide"><dt>Best day</dt><dd data-fact="best">—</dd></div>
+    </dl>
+  </div>
+
+  <p class="muted heat__empty" data-heat-empty hidden>Nothing yet — finish a timer session and it shows up here.</p>
+
+  <details class="heat__table disclosure">
+    <summary>Show as a table</summary>
+    <div class="heat__table-scroll">
+      <table>
+        <caption class="visually-hidden">Focus per week, last 12 weeks, newest first</caption>
+        <thead>
+          <tr>
+            <th scope="col">Week of</th>
+            <th scope="col" class="num">Focus</th>
+            <th scope="col" class="num">Days with focus</th>
+            <th scope="col" class="num">Sessions</th>
+          </tr>
+        </thead>
+        <tbody data-heat-table></tbody>
+        <tfoot data-heat-foot></tfoot>
+      </table>
+    </div>
+  </details>
+</section>
+
+<script>
+  import { getSessions, subscribe } from '../lib/storage';
+  import { heatmapWeeks, type HeatCell } from '../lib/stats';
+  import { addDays, dayKey, formatDay, formatMonth, formatShort, startOfWeek } from '../lib/dates';
+
+  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  function formatDuration(min: number): string {
+    if (min < 60) return `${min} min`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m ? `${h} h ${m} min` : `${h} h`;
+  }
+
+  function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-heatmap]').forEach((root) => {
+    const grid = root.querySelector<HTMLElement>('[data-heat-grid]')!;
+    const tip = root.querySelector<HTMLElement>('[data-heat-tip]')!;
+    const tbody = root.querySelector<HTMLElement>('[data-heat-table]')!;
+    const tfoot = root.querySelector<HTMLElement>('[data-heat-foot]')!;
+    const empty = root.querySelector<HTMLElement>('[data-heat-empty]')!;
+    const fact = (name: string, text: string) => {
+      const node = root.querySelector(`[data-fact="${name}"]`);
+      if (node) node.textContent = text;
+    };
+    let cellsByKey = new Map<string, HeatCell>();
+
+    function render(): void {
+      const sessions = getSessions();
+      const weeks = heatmapWeeks(sessions, 12);
+      const todayKey = dayKey(new Date());
+      cellsByKey = new Map(weeks.flat().map((c) => [c.key, c]));
+      const frag = document.createDocumentFragment();
+
+      // Row 0: month labels. A label sits on the first column whose week contains the 1st
+      // of a month (and on column 0), and spans 3 columns so it never gets clipped.
+      frag.append(el('span'));
+      let lastLabelled = -10;
+      weeks.forEach((col, i) => {
+        const monthStart = col.find((c) => c.date.getDate() === 1);
+        const label = i === 0 ? formatMonth(col[0]!.date) : monthStart ? formatMonth(monthStart.date) : '';
+        const span = el('span', 'heat__month');
+        span.style.gridColumn = `${i + 2}`;
+        span.style.gridRow = '1';
+        // Skip a label that would collide with the previous one (e.g. column 0 then 1st in column 1).
+        if (label && i - lastLabelled >= 3) {
+          span.textContent = label;
+          lastLabelled = i;
+        }
+        frag.append(span);
+      });
+
+      for (let row = 0; row < 7; row++) {
+        const label = el('span', 'heat__day', WEEKDAYS[row]);
+        label.style.gridRow = `${row + 2}`;
+        frag.append(label);
+        weeks.forEach((col, i) => {
+          const c = col[row]!;
+          const cls = ['cell', `l${c.level}`];
+          if (c.future) cls.push('is-future');
+          if (c.key === todayKey) cls.push('is-today');
+          const cell = el('span', cls.join(' '));
+          cell.style.gridColumn = `${i + 2}`;
+          cell.style.gridRow = `${row + 2}`;
+          if (!c.future) cell.dataset.key = c.key;
+          frag.append(cell);
+        });
+      }
+      grid.replaceChildren(frag);
+
+      // Facts panel
+      const days = weeks.flat().filter((c) => !c.future);
+      const active = days.filter((c) => c.minutes > 0);
+      const total = days.reduce((s, c) => s + c.minutes, 0);
+      const best = active.reduce<HeatCell | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
+      fact('total', formatDuration(total));
+      fact('active', `${active.length} of ${days.length}`);
+      fact('best', best ? `${formatDay(best.date)} · ${formatDuration(best.minutes)}` : '—');
+      fact('avg', active.length ? formatDuration(Math.round(total / active.length)) : '—');
+      empty.hidden = total > 0;
+
+      // Table: one row per week, newest first, plus a total row.
+      const thisWeek = dayKey(startOfWeek(new Date()));
+      const sessionCount = new Map<string, number>();
+      for (const s of sessions) {
+        if (!s.completed) continue;
+        const wk = dayKey(startOfWeek(s.start));
+        sessionCount.set(wk, (sessionCount.get(wk) ?? 0) + 1);
+      }
+      let sumSessions = 0;
+      const rows = weeks
+        .slice()
+        .reverse()
+        .map((col) => {
+          const start = col[0]!.date;
+          const key = dayKey(start);
+          const mins = col.reduce((s, c) => s + c.minutes, 0);
+          const act = col.filter((c) => c.minutes > 0).length;
+          const elapsedDays = col.filter((c) => !c.future).length;
+          const n = sessionCount.get(key) ?? 0;
+          sumSessions += n;
+
+          const tr = el('tr', key === thisWeek ? 'is-current' : undefined);
+          const th = el('th', undefined, key === thisWeek ? 'This week' : `${formatShort(start)} – ${formatShort(addDays(start, 6))}`);
+          th.scope = 'row';
+          tr.append(
+            th,
+            el('td', 'num', mins ? formatDuration(mins) : '—'),
+            el('td', 'num', `${act} / ${elapsedDays}`),
+            el('td', 'num', String(n)),
+          );
+          return tr;
+        });
+      tbody.replaceChildren(...rows);
+
+      const foot = el('tr');
+      const fth = el('th', undefined, 'Total');
+      fth.scope = 'row';
+      foot.append(fth, el('td', 'num', formatDuration(total)), el('td', 'num', `${active.length} / ${days.length}`), el('td', 'num', String(sumSessions)));
+      tfoot.replaceChildren(foot);
+    }
+
+    // Tooltip: hover on pointer devices, tap on touch.
+    function showTip(target: HTMLElement): void {
+      const cell = target.dataset.key ? cellsByKey.get(target.dataset.key) : undefined;
+      if (!cell) return hideTip();
+      tip.textContent = `${formatDay(cell.date)} · ${cell.minutes ? formatDuration(cell.minutes) : 'no focus'}`;
+      tip.hidden = false;
+      const wrap = grid.parentElement!.getBoundingClientRect();
+      const r = target.getBoundingClientRect();
+      const x = r.left - wrap.left + r.width / 2;
+      const half = tip.offsetWidth / 2;
+      tip.style.left = `${Math.min(wrap.width - half, Math.max(half, x))}px`;
+      tip.style.top = `${r.top - wrap.top - 6}px`;
+    }
+    function hideTip(): void {
+      tip.hidden = true;
+    }
+
+    grid.addEventListener('pointerover', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
+      if (t) showTip(t);
+    });
+    grid.addEventListener('pointerleave', hideTip);
+    grid.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
+      if (t) showTip(t);
+    });
+
+    render();
+    subscribe('sessions', render);
+  });
+</script>
+
+<style>
+  .heat__layout {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  @media (min-width: 44rem) {
+    .heat__layout {
+      grid-template-columns: minmax(0, 30rem) minmax(12rem, 1fr);
+      align-items: start;
+      gap: var(--space-6);
+    }
+  }
+
+  .heat__wrap {
+    position: relative;
+  }
+
+  /* 2.25rem label column + 12 equal week columns; cells are square. */
+  .heat__grid {
+    display: grid;
+    grid-template-columns: 2.25rem repeat(12, minmax(0, 1fr));
+    grid-template-rows: auto;
+    gap: 4px;
+  }
+
+  .heat :global(.heat__month) {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    line-height: 1.4;
+    padding-bottom: 2px;
+  }
+
+  .heat :global(.heat__day) {
+    grid-column: 1;
+    align-self: center;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+
+  .heat :global(.cell) {
+    display: block;
+    aspect-ratio: 1;
+    border-radius: 4px;
+    background: var(--heat-0);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .heat :global(.cell.l1) { background: var(--heat-1); }
+  .heat :global(.cell.l2) { background: var(--heat-2); }
+  .heat :global(.cell.l3) { background: var(--heat-3); }
+  .heat :global(.cell.l4) { background: var(--heat-4); }
+
+  .heat :global(.heat__grid .cell[data-key]:hover) {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 3px var(--color-border-strong);
+  }
+
+  .heat :global(.cell.is-future) {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--color-border);
+  }
+
+  .heat :global(.cell.is-today) {
+    box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-text);
+  }
+
+  .heat__tip {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    padding: var(--space-1) var(--space-3);
+    background: var(--color-text);
+    color: var(--color-bg);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: var(--shadow-md);
+  }
+
+  /* Legend: each swatch labelled with its range. */
+  .heat__legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    padding-left: calc(2.25rem + 4px);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .heat__legend-item {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-width: 1.75rem;
+  }
+
+  .heat__legend-item .cell {
+    width: 16px;
+  }
+
+  .heat__legend-label {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .heat__legend-end {
+    line-height: 16px;
+  }
+
+  .heat__legend-unit {
+    width: 100%;
+  }
+
+  /* Facts panel */
+  .heat__facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  .heat__fact-wide {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 30rem) {
+    .heat__legend {
+      gap: var(--space-1);
+      padding-left: 0;
+    }
+
+    .heat__legend-item {
+      min-width: 1.6rem;
+    }
+  }
+
+  @media (min-width: 44rem) {
+    .heat__facts {
+      grid-template-columns: 1fr;
+      padding-left: var(--space-5);
+      border-left: 1px solid var(--color-border);
+    }
+  }
+
+  .heat__facts dt {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .heat__facts dd {
+    margin: 2px 0 0;
+    font-size: var(--text-lg);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.3;
+  }
+
+  .heat__empty {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .heat__empty[hidden] {
+    display: none;
+  }
+
+  /* Table view */
+  .heat__table {
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .heat__table summary {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .heat__table-scroll {
+    overflow-x: auto;
+    margin-top: var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .heat__table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .heat__table :global(th),
+  .heat__table :global(td) {
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    white-space: nowrap;
+    font-weight: 400;
+  }
+
+  .heat__table :global(.num) {
+    text-align: right;
+  }
+
+  .heat__table thead :global(th) {
+    background: var(--color-surface-2);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .heat__table :global(tbody tr) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .heat__table :global(tbody tr.is-current th) {
+    font-weight: 600;
+  }
+
+  .heat__table :global(tfoot tr) {
+    border-top: 2px solid var(--color-border-strong);
+  }
+
+  .heat__table :global(tfoot th),
+  .heat__table :global(tfoot td) {
+    font-weight: 700;
+  }
+</style>

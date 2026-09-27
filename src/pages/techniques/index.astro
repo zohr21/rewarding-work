@@ -1,0 +1,178 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TechniqueCard from '../../components/TechniqueCard.astro';
+import { getTechniques } from '../../lib/techniques';
+import { CATEGORIES, CATEGORY_SLUGS, PROBLEMS, PROBLEM_SLUGS } from '../../data/taxonomy';
+
+const techniques = await getTechniques();
+---
+
+<BaseLayout title="Techniques" description="Browse techniques for making work feel rewarding, filtered by category or problem.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Technique library</h1>
+      <p>Every technique explains the idea and lets you try it on the spot.</p>
+    </header>
+
+    <!-- Works without JS (all cards shown); the script below adds filtering. -->
+    <form class="filters" role="search" aria-label="Filter techniques" data-filters>
+      <div class="filters__search">
+        <label for="q">Search by title</label>
+        <input id="q" name="q" type="search" autocomplete="off" placeholder="e.g. Pomodoro" />
+      </div>
+
+      <fieldset class="chips">
+        <legend>Category</legend>
+        <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
+        {
+          CATEGORY_SLUGS.map((c) => (
+            <label class="chip">
+              <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <fieldset class="chips">
+        <legend>Problem</legend>
+        <label class="chip"><input type="radio" name="problem" value="" checked /> <span>All</span></label>
+        {
+          PROBLEM_SLUGS.map((p) => (
+            <label class="chip">
+              <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].short}</span>
+            </label>
+          ))
+        }
+      </fieldset>
+    </form>
+
+    <p class="results-count muted" aria-live="polite" data-count>
+      Showing all {techniques.length} techniques
+    </p>
+
+    <div class="grid" data-grid>
+      {techniques.map((t) => <TechniqueCard technique={t} />)}
+    </div>
+
+    <div class="empty card" data-empty hidden>
+      <p>No techniques match these filters.</p>
+      <button type="button" class="btn btn--ghost" data-reset>Clear filters</button>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { initLibraryFilters } from '../../scripts/library-filters';
+  initLibraryFilters();
+</script>
+
+<style>
+  .filters {
+    display: grid;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .filters__search label,
+  .chips legend {
+    display: block;
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .filters__search input {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    border: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .chips legend {
+    width: 100%;
+    float: left; /* lets the chips wrap below the legend inside flex fieldsets */
+  }
+
+  .chip {
+    position: relative;
+  }
+
+  .chip input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .chip span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
+  }
+
+  .chip:hover span {
+    background: var(--color-surface-2);
+  }
+
+  .chip input:checked + span {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 600;
+  }
+
+  .chip input:focus-visible + span {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .results-count {
+    margin-block: var(--space-5) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .grid {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+
+  .grid :global([data-technique][hidden]) {
+    display: none;
+  }
+
+  .empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .empty[hidden] {
+    display: none;
+  }
+</style>

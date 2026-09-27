@@ -1,0 +1,110 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import TechniqueCard from '../../components/TechniqueCard.astro';
+import { getTechniquesForProblem } from '../../lib/techniques';
+import { PROBLEMS, PROBLEM_SLUGS, type ProblemSlug } from '../../data/taxonomy';
+import { url } from '../../lib/paths';
+
+export function getStaticPaths() {
+  return PROBLEM_SLUGS.map((slug) => ({ params: { slug } }));
+}
+
+const slug = Astro.params.slug as ProblemSlug;
+const problem = PROBLEMS[slug];
+const techniques = await getTechniquesForProblem(slug);
+const others = PROBLEM_SLUGS.filter((p) => p !== slug);
+---
+
+<BaseLayout title={problem.title} description={problem.explanation}>
+  <div class="container">
+    <header class="page-header">
+      <p class="eyebrow">Problem</p>
+      <h1>“{problem.title}”</h1>
+    </header>
+
+    <div class="prose">
+      <p class="lead">{problem.explanation}</p>
+    </div>
+
+    <section class="matches" aria-labelledby="matches-heading">
+      <h2 id="matches-heading">Techniques that can help ({techniques.length})</h2>
+      <div class="grid">
+        {techniques.map((t) => <TechniqueCard technique={t} headingLevel="h3" />)}
+      </div>
+      <p class="more">
+        <a href={url(`/techniques?problem=${slug}`)}>See these in the technique library</a>
+      </p>
+    </section>
+
+    <nav class="others" aria-labelledby="others-heading">
+      <h2 id="others-heading">Something else?</h2>
+      <ul>
+        {
+          others.map((p) => (
+            <li>
+              <a href={url(`/problems/${p}`)}>{PROBLEMS[p].title}</a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+</BaseLayout>
+
+<style>
+  .eyebrow {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-accent);
+  }
+
+  .lead {
+    font-size: var(--text-lg);
+  }
+
+  .matches {
+    margin-top: var(--space-7);
+  }
+
+  .grid {
+    display: grid;
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  }
+
+  .more {
+    margin-top: var(--space-4);
+  }
+
+  .others {
+    margin-top: var(--space-7);
+  }
+
+  .others ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .others a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .others a:hover {
+    background: var(--color-surface-2);
+  }
+</style>

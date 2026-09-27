@@ -1,0 +1,13 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Page not found">
+  <div class="container">
+    <header class="page-header">
+      <h1>That page doesn't exist.</h1>
+      <p>No harm done. Try the <a href={url('/techniques')}>technique library</a> or go <a href={url('/')}>home</a>.</p>
+    </header>
+  </div>
+</BaseLayout>
