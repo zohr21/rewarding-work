@@ -8,7 +8,10 @@
  *  - pages:    network first (you get updates when online), cached copy when offline.
  *              Includes the client-side router's fetch() of pages, not just navigations.
  *  - assets:   cache first (file names are content-hashed, so they never go stale).
- *  - activate: delete caches from older builds.
+ *  - activate: delete caches from older builds, but keep the previous one. For a few
+ *              minutes after a deploy a browser can still show the old page (GitHub
+ *              Pages lets it cache HTML for 10 minutes), and that page needs the old
+ *              build's CSS/JS, which are no longer on the server.
  */
 const VERSION = '__VERSION__';
 const PRECACHE = /* __PRECACHE__ */ [];
@@ -29,7 +32,11 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('rw-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => {
+        // keys() lists caches oldest first: keep this build's and the one before it.
+        const older = keys.filter((k) => k.startsWith('rw-') && k !== CACHE);
+        return Promise.all(older.slice(0, -1).map((k) => caches.delete(k)));
+      })
       .then(() => self.clients.claim()),
   );
 });
@@ -48,7 +55,9 @@ function pageKeys(href) {
 async function handlePage(request) {
   const cache = await caches.open(CACHE);
   try {
-    const response = await fetch(request);
+    // no-cache: always check with the server, so we never pair a stale page from the
+    // browser's HTTP cache with this build's (differently named) CSS/JS.
+    const response = await fetch(request, { cache: 'no-cache' });
     // Keep the offline copy fresh. Redirects/opaque responses are passed through, not cached.
     if (response.ok && response.type === 'basic' && !response.redirected) {
       cache.put(pageKeys(request.url)[0], response.clone());
@@ -71,7 +80,8 @@ async function handleAsset(request) {
   const cache = await caches.open(CACHE);
   // ignoreVary: module scripts are requested with an Origin header; precached copies were
   // stored without one, so a `Vary: Origin` response header would otherwise never match.
-  const hit = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
+  const opts = { ignoreSearch: true, ignoreVary: true };
+  const hit = (await cache.match(request, opts)) ?? (await caches.match(request, opts)); // then the previous build's
   if (hit) return hit;
   const response = await fetch(request);
   if (response.ok && response.type === 'basic') cache.put(request, response.clone());
