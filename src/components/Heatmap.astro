@@ -79,6 +79,7 @@ const LEGEND = [
   import { getSessions, subscribe } from '../lib/storage';
   import { heatmapWeeks, type HeatCell } from '../lib/stats';
   import { addDays, dayKey, formatDay, formatMonth, formatShort, startOfWeek } from '../lib/dates';
+  import { cleanups, onPage } from '../lib/page';
 
   const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -96,142 +97,146 @@ const LEGEND = [
     return node;
   }
 
-  document.querySelectorAll<HTMLElement>('[data-heatmap]').forEach((root) => {
-    const grid = root.querySelector<HTMLElement>('[data-heat-grid]')!;
-    const tip = root.querySelector<HTMLElement>('[data-heat-tip]')!;
-    const tbody = root.querySelector<HTMLElement>('[data-heat-table]')!;
-    const tfoot = root.querySelector<HTMLElement>('[data-heat-foot]')!;
-    const empty = root.querySelector<HTMLElement>('[data-heat-empty]')!;
-    const fact = (name: string, text: string) => {
-      const node = root.querySelector(`[data-fact="${name}"]`);
-      if (node) node.textContent = text;
-    };
-    let cellsByKey = new Map<string, HeatCell>();
+  onPage('heatmap', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-heatmap]').forEach((root) => {
+      const grid = root.querySelector<HTMLElement>('[data-heat-grid]')!;
+      const tip = root.querySelector<HTMLElement>('[data-heat-tip]')!;
+      const tbody = root.querySelector<HTMLElement>('[data-heat-table]')!;
+      const tfoot = root.querySelector<HTMLElement>('[data-heat-foot]')!;
+      const empty = root.querySelector<HTMLElement>('[data-heat-empty]')!;
+      const fact = (name: string, text: string) => {
+        const node = root.querySelector(`[data-fact="${name}"]`);
+        if (node) node.textContent = text;
+      };
+      let cellsByKey = new Map<string, HeatCell>();
 
-    function render(): void {
-      const sessions = getSessions();
-      const weeks = heatmapWeeks(sessions, 12);
-      const todayKey = dayKey(new Date());
-      cellsByKey = new Map(weeks.flat().map((c) => [c.key, c]));
-      const frag = document.createDocumentFragment();
+      function render(): void {
+        const sessions = getSessions();
+        const weeks = heatmapWeeks(sessions, 12);
+        const todayKey = dayKey(new Date());
+        cellsByKey = new Map(weeks.flat().map((c) => [c.key, c]));
+        const frag = document.createDocumentFragment();
 
-      // Row 0: month labels. A label sits on the first column whose week contains the 1st
-      // of a month (and on column 0), and spans 3 columns so it never gets clipped.
-      frag.append(el('span'));
-      let lastLabelled = -10;
-      weeks.forEach((col, i) => {
-        const monthStart = col.find((c) => c.date.getDate() === 1);
-        const label = i === 0 ? formatMonth(col[0]!.date) : monthStart ? formatMonth(monthStart.date) : '';
-        const span = el('span', 'heat__month');
-        span.style.gridColumn = `${i + 2}`;
-        span.style.gridRow = '1';
-        // Skip a label that would collide with the previous one (e.g. column 0 then 1st in column 1).
-        if (label && i - lastLabelled >= 3) {
-          span.textContent = label;
-          lastLabelled = i;
+        // Row 0: month labels. A label sits on the first column whose week contains the 1st
+        // of a month (and on column 0), and spans 3 columns so it never gets clipped.
+        frag.append(el('span'));
+        let lastLabelled = -10;
+        weeks.forEach((col, i) => {
+          const monthStart = col.find((c) => c.date.getDate() === 1);
+          const label = i === 0 ? formatMonth(col[0]!.date) : monthStart ? formatMonth(monthStart.date) : '';
+          const span = el('span', 'heat__month');
+          span.style.gridColumn = `${i + 2}`;
+          span.style.gridRow = '1';
+          // Skip a label that would collide with the previous one (e.g. column 0 then 1st in column 1).
+          if (label && i - lastLabelled >= 3) {
+            span.textContent = label;
+            lastLabelled = i;
+          }
+          frag.append(span);
+        });
+
+        for (let row = 0; row < 7; row++) {
+          const label = el('span', 'heat__day', WEEKDAYS[row]);
+          label.style.gridRow = `${row + 2}`;
+          frag.append(label);
+          weeks.forEach((col, i) => {
+            const c = col[row]!;
+            const cls = ['cell', `l${c.level}`];
+            if (c.future) cls.push('is-future');
+            if (c.key === todayKey) cls.push('is-today');
+            const cell = el('span', cls.join(' '));
+            cell.style.gridColumn = `${i + 2}`;
+            cell.style.gridRow = `${row + 2}`;
+            if (!c.future) cell.dataset.key = c.key;
+            frag.append(cell);
+          });
         }
-        frag.append(span);
+        grid.replaceChildren(frag);
+
+        // Facts panel
+        const days = weeks.flat().filter((c) => !c.future);
+        const active = days.filter((c) => c.minutes > 0);
+        const total = days.reduce((s, c) => s + c.minutes, 0);
+        const best = active.reduce<HeatCell | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
+        fact('total', formatDuration(total));
+        fact('active', `${active.length} of ${days.length}`);
+        fact('best', best ? `${formatDay(best.date)} · ${formatDuration(best.minutes)}` : '—');
+        fact('avg', active.length ? formatDuration(Math.round(total / active.length)) : '—');
+        empty.hidden = total > 0;
+
+        // Table: one row per week, newest first, plus a total row.
+        const thisWeek = dayKey(startOfWeek(new Date()));
+        const sessionCount = new Map<string, number>();
+        for (const s of sessions) {
+          if (!s.completed) continue;
+          const wk = dayKey(startOfWeek(s.start));
+          sessionCount.set(wk, (sessionCount.get(wk) ?? 0) + 1);
+        }
+        let sumSessions = 0;
+        const rows = weeks
+          .slice()
+          .reverse()
+          .map((col) => {
+            const start = col[0]!.date;
+            const key = dayKey(start);
+            const mins = col.reduce((s, c) => s + c.minutes, 0);
+            const act = col.filter((c) => c.minutes > 0).length;
+            const elapsedDays = col.filter((c) => !c.future).length;
+            const n = sessionCount.get(key) ?? 0;
+            sumSessions += n;
+
+            const tr = el('tr', key === thisWeek ? 'is-current' : undefined);
+            const th = el('th', undefined, key === thisWeek ? 'This week' : `${formatShort(start)} – ${formatShort(addDays(start, 6))}`);
+            th.scope = 'row';
+            tr.append(
+              th,
+              el('td', 'num', mins ? formatDuration(mins) : '—'),
+              el('td', 'num', `${act} / ${elapsedDays}`),
+              el('td', 'num', String(n)),
+            );
+            return tr;
+          });
+        tbody.replaceChildren(...rows);
+
+        const foot = el('tr');
+        const fth = el('th', undefined, 'Total');
+        fth.scope = 'row';
+        foot.append(fth, el('td', 'num', formatDuration(total)), el('td', 'num', `${active.length} / ${days.length}`), el('td', 'num', String(sumSessions)));
+        tfoot.replaceChildren(foot);
+      }
+
+      // Tooltip: hover on pointer devices, tap on touch.
+      function showTip(target: HTMLElement): void {
+        const cell = target.dataset.key ? cellsByKey.get(target.dataset.key) : undefined;
+        if (!cell) return hideTip();
+        tip.textContent = `${formatDay(cell.date)} · ${cell.minutes ? formatDuration(cell.minutes) : 'no focus'}`;
+        tip.hidden = false;
+        const wrap = grid.parentElement!.getBoundingClientRect();
+        const r = target.getBoundingClientRect();
+        const x = r.left - wrap.left + r.width / 2;
+        const half = tip.offsetWidth / 2;
+        tip.style.left = `${Math.min(wrap.width - half, Math.max(half, x))}px`;
+        tip.style.top = `${r.top - wrap.top - 6}px`;
+      }
+      function hideTip(): void {
+        tip.hidden = true;
+      }
+
+      grid.addEventListener('pointerover', (e) => {
+        const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
+        if (t) showTip(t);
+      });
+      grid.addEventListener('pointerleave', hideTip);
+      grid.addEventListener('click', (e) => {
+        const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
+        if (t) showTip(t);
       });
 
-      for (let row = 0; row < 7; row++) {
-        const label = el('span', 'heat__day', WEEKDAYS[row]);
-        label.style.gridRow = `${row + 2}`;
-        frag.append(label);
-        weeks.forEach((col, i) => {
-          const c = col[row]!;
-          const cls = ['cell', `l${c.level}`];
-          if (c.future) cls.push('is-future');
-          if (c.key === todayKey) cls.push('is-today');
-          const cell = el('span', cls.join(' '));
-          cell.style.gridColumn = `${i + 2}`;
-          cell.style.gridRow = `${row + 2}`;
-          if (!c.future) cell.dataset.key = c.key;
-          frag.append(cell);
-        });
-      }
-      grid.replaceChildren(frag);
-
-      // Facts panel
-      const days = weeks.flat().filter((c) => !c.future);
-      const active = days.filter((c) => c.minutes > 0);
-      const total = days.reduce((s, c) => s + c.minutes, 0);
-      const best = active.reduce<HeatCell | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
-      fact('total', formatDuration(total));
-      fact('active', `${active.length} of ${days.length}`);
-      fact('best', best ? `${formatDay(best.date)} · ${formatDuration(best.minutes)}` : '—');
-      fact('avg', active.length ? formatDuration(Math.round(total / active.length)) : '—');
-      empty.hidden = total > 0;
-
-      // Table: one row per week, newest first, plus a total row.
-      const thisWeek = dayKey(startOfWeek(new Date()));
-      const sessionCount = new Map<string, number>();
-      for (const s of sessions) {
-        if (!s.completed) continue;
-        const wk = dayKey(startOfWeek(s.start));
-        sessionCount.set(wk, (sessionCount.get(wk) ?? 0) + 1);
-      }
-      let sumSessions = 0;
-      const rows = weeks
-        .slice()
-        .reverse()
-        .map((col) => {
-          const start = col[0]!.date;
-          const key = dayKey(start);
-          const mins = col.reduce((s, c) => s + c.minutes, 0);
-          const act = col.filter((c) => c.minutes > 0).length;
-          const elapsedDays = col.filter((c) => !c.future).length;
-          const n = sessionCount.get(key) ?? 0;
-          sumSessions += n;
-
-          const tr = el('tr', key === thisWeek ? 'is-current' : undefined);
-          const th = el('th', undefined, key === thisWeek ? 'This week' : `${formatShort(start)} – ${formatShort(addDays(start, 6))}`);
-          th.scope = 'row';
-          tr.append(
-            th,
-            el('td', 'num', mins ? formatDuration(mins) : '—'),
-            el('td', 'num', `${act} / ${elapsedDays}`),
-            el('td', 'num', String(n)),
-          );
-          return tr;
-        });
-      tbody.replaceChildren(...rows);
-
-      const foot = el('tr');
-      const fth = el('th', undefined, 'Total');
-      fth.scope = 'row';
-      foot.append(fth, el('td', 'num', formatDuration(total)), el('td', 'num', `${active.length} / ${days.length}`), el('td', 'num', String(sumSessions)));
-      tfoot.replaceChildren(foot);
-    }
-
-    // Tooltip: hover on pointer devices, tap on touch.
-    function showTip(target: HTMLElement): void {
-      const cell = target.dataset.key ? cellsByKey.get(target.dataset.key) : undefined;
-      if (!cell) return hideTip();
-      tip.textContent = `${formatDay(cell.date)} · ${cell.minutes ? formatDuration(cell.minutes) : 'no focus'}`;
-      tip.hidden = false;
-      const wrap = grid.parentElement!.getBoundingClientRect();
-      const r = target.getBoundingClientRect();
-      const x = r.left - wrap.left + r.width / 2;
-      const half = tip.offsetWidth / 2;
-      tip.style.left = `${Math.min(wrap.width - half, Math.max(half, x))}px`;
-      tip.style.top = `${r.top - wrap.top - 6}px`;
-    }
-    function hideTip(): void {
-      tip.hidden = true;
-    }
-
-    grid.addEventListener('pointerover', (e) => {
-      const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
-      if (t) showTip(t);
+      render();
+      c.add(subscribe('sessions', render));
     });
-    grid.addEventListener('pointerleave', hideTip);
-    grid.addEventListener('click', (e) => {
-      const t = (e.target as HTMLElement).closest<HTMLElement>('.cell');
-      if (t) showTip(t);
-    });
-
-    render();
-    subscribe('sessions', render);
+    return c.run;
   });
 </script>
 

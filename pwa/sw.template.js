@@ -6,6 +6,7 @@
  * Strategy
  *  - install:  cache every page and asset, so the whole site works offline.
  *  - pages:    network first (you get updates when online), cached copy when offline.
+ *              Includes the client-side router's fetch() of pages, not just navigations.
  *  - assets:   cache first (file names are content-hashed, so they never go stale).
  *  - activate: delete caches from older builds.
  */
@@ -77,11 +78,19 @@ async function handleAsset(request) {
   return response;
 }
 
+/** Page requests: real navigations, and the client-side router's fetch() of a page URL. */
+function isPage(request) {
+  if (request.mode === 'navigate') return true;
+  if (request.destination !== '') return false; // <script>, <img>, <link> …
+  const path = new URL(request.url).pathname;
+  return path.endsWith('/') || path.endsWith('.html') || !/\.[a-z0-9]+$/i.test(path);
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (!request.url.startsWith(SCOPE)) return; // other origins / paths: let the browser handle it
-  event.respondWith(request.mode === 'navigate' ? handlePage(request) : handleAsset(request));
+  event.respondWith(isPage(request) ? handlePage(request) : handleAsset(request));
 });
 
 // Clicking a timer notification focuses the open app (or opens the timer).

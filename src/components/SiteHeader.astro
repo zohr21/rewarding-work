@@ -1,5 +1,6 @@
 ---
 import AppearanceMenu from './AppearanceMenu.astro';
+import SoundMenu from './SoundMenu.astro';
 import { NAV, SITE } from '../config/site';
 import { url, isActive } from '../lib/paths';
 
@@ -31,6 +32,7 @@ const current = Astro.url.pathname;
     </nav>
 
     <div class="site-header__tools">
+      <SoundMenu />
       <AppearanceMenu />
     </div>
   </div>
@@ -119,6 +121,8 @@ const current = Astro.url.pathname;
 
   .site-header__tools {
     grid-area: toggle;
+    display: flex;
+    gap: var(--space-2);
   }
 
   /* Wider screens: everything on one row. */

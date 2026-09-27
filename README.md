@@ -33,8 +33,10 @@ src/
   styles/tokens.css     all colours, type, spacing, motion, background palettes
   styles/global.css     reset, base elements, shared .btn / .card / .input …
   layouts/BaseLayout.astro
-  components/           UI pieces (timer, heatmap, chain, quiz, appearance menu …)
-  lib/                  storage, timer engine, stats, dates, paths, appearance
+  components/           UI pieces (timer, heatmap, chain, quiz, look + sound menus …)
+  lib/                  storage, timer engine, stats, dates, paths, appearance, page lifecycle
+  lib/scene/            WebGL background scenes (runner + one shader per scene)
+  lib/sound/            background sound: synthesised soundscapes, YouTube, player
   pages/                one file per route
 public/                 copied as-is: favicon, manifest.webmanifest, icons/
 pwa/                    service worker template + the build step that generates it
@@ -45,15 +47,57 @@ pwa/                    service worker template + the build step that generates 
 
 - Colours are CSS custom properties in `src/styles/tokens.css`.
 - **Light is the default.** The "Look" menu in the header switches theme
-  (Light / Dark / Auto = follow the system), background (Sunrise / Meadow /
-  Lavender / Plain) and gentle background motion. Choices are stored locally and
-  applied before first paint (no flash).
-- The ambient background (`src/components/Ambient.astro`) is four soft CSS gradients
-  that drift slowly, lean towards the pointer, and briefly "bloom" when you finish a
-  session, log something as done, tick a step or mark your chain. Motion stops with
-  the menu switch or `prefers-reduced-motion`. Palettes are the `--amb-*` tokens.
+  (Light / Dark / Auto = follow the system), background and gentle background motion.
+  Choices are stored locally and applied before first paint (no flash).
+- Backgrounds come in two kinds:
+  - **Soft glows** (Sunrise / Meadow / Lavender, or Plain): four CSS gradients that
+    drift slowly and lean towards the pointer. Palettes are the `--amb-*` tokens.
+  - **Live scenes** (Aurora / Floating lights / Calm water / Rolling hills): WebGL
+    fragment shaders in `src/lib/scene/scenes/`, drawn by `src/lib/scene/runner.ts`.
+    Fully procedural (no images or models, a few KB each, loaded only when chosen),
+    with a light and a dark palette each. To stay cheap on battery they render at
+    reduced resolution, at most 30 fps, not at all in a hidden tab, and as one still
+    frame when motion is off. While a focus session runs they slow down and fade back.
+    Without WebGL the Sunrise glow is shown instead.
+- Both kinds "bloom" when you finish a session, log something as done, tick a step
+  or mark your chain (`celebrate()` in `src/lib/appearance.ts`), and stop moving with
+  the menu switch or `prefers-reduced-motion`. `src/components/Ambient.astro` owns it.
+- To add a scene: write `src/lib/scene/scenes/<id>.ts` (a `scene(uv, p, t)` GLSL
+  function + two palettes; see `prelude.ts` for the uniforms and noise helpers), add
+  the id to `SCENES` in `src/lib/storage.ts`, and a label + preview in `src/lib/scene/index.ts`.
 - The dark palette appears twice in the tokens file (for `data-theme="auto"` inside
   the media query, and for `data-theme="dark"`) — edit both when changing it.
+
+### Background sound
+
+- The "Sound" menu in the header plays one source at a time:
+  - **Generated sounds** — Rain, Ocean waves, Wind, Fireplace, Brown / Pink noise, and
+    two endless generative music pieces (Soft pads, Gentle piano). All synthesised with
+    the Web Audio API in `src/lib/sound/soundscapes.ts` (building blocks in `kit.ts`):
+    no audio files, so they work offline and cost nothing to download.
+  - **A YouTube link** (video or playlist), played through the privacy-enhanced
+    `youtube-nocookie.com` embed. YouTube's terms don't allow hiding the video to play
+    audio only, so it shows in a small player in the corner (their 200 × 200 px minimum).
+- `src/lib/sound/player.ts` owns playback; the menu is only UI. Browsers only allow
+  sound after a click, so nothing plays on page load — after a full reload, press Play.
+- Sound keeps playing while you move around the site (see *Page navigation* below).
+
+### Page navigation (important for component scripts)
+
+The site uses Astro's client-side router (`<ClientRouter />` in `BaseLayout.astro`), so
+links swap the page without a full reload. That's what keeps the scene and the sound
+going between pages: the ambient background is `transition:persist`, and the YouTube
+player is attached outside `<body>` (which the router replaces).
+
+The catch: a component's `<script>` runs **once per visit, not once per page**. So:
+
+- Wrap page setup in `onPage(key, setup)` from `src/lib/page.ts`. It runs on every page
+  load, including the first. Return a cleanup function for anything that outlives the
+  page's DOM — `subscribe(...)`, intervals, listeners on `window`/`document` (use
+  `listen()` and `cleanups()` from the same file). See any component for the pattern.
+- `history.replaceState` must keep `history.state` (the router stores its data there).
+- The router resets `<html>` attributes on each navigation; the inline script in the
+  layout re-applies theme and background on `astro:after-swap`.
 
 ### Data and the timer
 
@@ -63,7 +107,8 @@ pwa/                    service worker template + the build step that generates 
 - `src/lib/timer/engine.ts` is the timer's state machine (pure functions, no DOM).
   It stores start timestamps and derives remaining time from `Date.now()`, so it
   doesn't drift in background tabs and survives reloads.
-- Stored items: `sessions`, `done`, `chain`, `breakdown`, `timer`, `timer-prefs`, `theme`.
+- Stored items: `sessions`, `done`, `chain`, `breakdown`, `timer`, `timer-prefs`, `theme`,
+  `appearance`, `sound`.
   Every read has a type guard, so corrupted or hand-edited data falls back to a
   safe default instead of breaking the page.
 - Export/import (on `/progress`) writes and reads a JSON file:

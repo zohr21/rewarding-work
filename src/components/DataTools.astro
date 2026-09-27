@@ -54,103 +54,106 @@
   } from '../lib/storage';
   import { applyAppearance, applyTheme } from '../lib/appearance';
   import { dayKey } from '../lib/dates';
+  import { onPage } from '../lib/page';
 
-  document.querySelectorAll<HTMLElement>('[data-data-tools]').forEach((root) => {
-    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
-    const status = $<HTMLElement>('[data-data-status]');
-    const fileInput = $<HTMLInputElement>('[data-import]');
-    const panel = $<HTMLElement>('[data-import-panel]');
-    const summary = $<HTMLElement>('[data-import-summary]');
-    const clearBtn = $<HTMLButtonElement>('[data-clear]');
-    let pending: BackupData | null = null;
-    let clearArmed = false;
+  onPage('data-tools', () => {
+    document.querySelectorAll<HTMLElement>('[data-data-tools]').forEach((root) => {
+      const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+      const status = $<HTMLElement>('[data-data-status]');
+      const fileInput = $<HTMLInputElement>('[data-import]');
+      const panel = $<HTMLElement>('[data-import-panel]');
+      const summary = $<HTMLElement>('[data-import-summary]');
+      const clearBtn = $<HTMLButtonElement>('[data-clear]');
+      let pending: BackupData | null = null;
+      let clearArmed = false;
 
-    $<HTMLElement>('[data-data-warn]').hidden = isPersistent();
+      $<HTMLElement>('[data-data-warn]').hidden = isPersistent();
 
-    const say = (t: string) => (status.textContent = t);
+      const say = (t: string) => (status.textContent = t);
 
-    function applyThemeNow(): void {
-      applyTheme(getTheme());
-      applyAppearance(getAppearance());
-    }
-
-    $<HTMLButtonElement>('[data-export]').addEventListener('click', () => {
-      try {
-        const backup = exportBackup();
-        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `rewarding-work-${dayKey(new Date())}.json`;
-        document.body.append(a);
-        a.click();
-        a.remove();
-        window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-        const d = backup.data;
-        say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items and ${d.chain.days.length} chain days.`);
-      } catch {
-        say('Export failed in this browser.');
+      function applyThemeNow(): void {
+        applyTheme(getTheme());
+        applyAppearance(getAppearance());
       }
-    });
 
-    fileInput.addEventListener('change', async () => {
-      const file = fileInput.files?.[0];
-      fileInput.value = '';
-      if (!file) return;
-      if (file.size > 5_000_000) {
-        say('That file is too large to be an export from this site.');
-        return;
-      }
-      const result = parseBackup(await file.text());
-      if (!result.ok) {
+      $<HTMLButtonElement>('[data-export]').addEventListener('click', () => {
+        try {
+          const backup = exportBackup();
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `rewarding-work-${dayKey(new Date())}.json`;
+          document.body.append(a);
+          a.click();
+          a.remove();
+          window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          const d = backup.data;
+          say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items and ${d.chain.days.length} chain days.`);
+        } catch {
+          say('Export failed in this browser.');
+        }
+      });
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0];
+        fileInput.value = '';
+        if (!file) return;
+        if (file.size > 5_000_000) {
+          say('That file is too large to be an export from this site.');
+          return;
+        }
+        const result = parseBackup(await file.text());
+        if (!result.ok) {
+          panel.hidden = true;
+          say(result.error);
+          return;
+        }
+        pending = result.data;
+        const d = result.data;
+        summary.textContent =
+          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items` +
+          `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
+          `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
+        panel.hidden = false;
+        say('');
+        $<HTMLButtonElement>('[data-import-merge]').focus();
+      });
+
+      function finishImport(mode: 'merge' | 'replace'): void {
+        if (!pending) return;
+        applyBackup(pending, mode);
+        if (mode === 'replace') applyThemeNow();
+        pending = null;
         panel.hidden = true;
-        say(result.error);
-        return;
+        say(mode === 'merge' ? 'Imported and merged with your data.' : 'Your data was replaced with the file.');
       }
-      pending = result.data;
-      const d = result.data;
-      summary.textContent =
-        `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items` +
-        `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
-        `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
-      panel.hidden = false;
-      say('');
-      $<HTMLButtonElement>('[data-import-merge]').focus();
-    });
 
-    function finishImport(mode: 'merge' | 'replace'): void {
-      if (!pending) return;
-      applyBackup(pending, mode);
-      if (mode === 'replace') applyThemeNow();
-      pending = null;
-      panel.hidden = true;
-      say(mode === 'merge' ? 'Imported and merged with your data.' : 'Your data was replaced with the file.');
-    }
+      $<HTMLButtonElement>('[data-import-merge]').addEventListener('click', () => finishImport('merge'));
+      $<HTMLButtonElement>('[data-import-replace]').addEventListener('click', () => finishImport('replace'));
+      $<HTMLButtonElement>('[data-import-cancel]').addEventListener('click', () => {
+        pending = null;
+        panel.hidden = true;
+        say('Import cancelled.');
+      });
 
-    $<HTMLButtonElement>('[data-import-merge]').addEventListener('click', () => finishImport('merge'));
-    $<HTMLButtonElement>('[data-import-replace]').addEventListener('click', () => finishImport('replace'));
-    $<HTMLButtonElement>('[data-import-cancel]').addEventListener('click', () => {
-      pending = null;
-      panel.hidden = true;
-      say('Import cancelled.');
-    });
-
-    // Two-step delete: the first press asks, the second press deletes.
-    clearBtn.addEventListener('click', () => {
-      if (!clearArmed) {
-        clearArmed = true;
-        clearBtn.textContent = 'Yes, delete everything';
-        say('Press again to confirm. This cannot be undone.');
-        window.setTimeout(() => {
-          clearArmed = false;
-          clearBtn.textContent = 'Delete everything';
-        }, 6000);
-        return;
-      }
-      clearArmed = false;
-      clearBtn.textContent = 'Delete everything';
-      clearAll();
-      applyThemeNow();
-      say('All data deleted from this browser.');
+      // Two-step delete: the first press asks, the second press deletes.
+      clearBtn.addEventListener('click', () => {
+        if (!clearArmed) {
+          clearArmed = true;
+          clearBtn.textContent = 'Yes, delete everything';
+          say('Press again to confirm. This cannot be undone.');
+          window.setTimeout(() => {
+            clearArmed = false;
+            clearBtn.textContent = 'Delete everything';
+          }, 6000);
+          return;
+        }
+        clearArmed = false;
+        clearBtn.textContent = 'Delete everything';
+        clearAll();
+        applyThemeNow();
+        say('All data deleted from this browser.');
+      });
     });
   });
 </script>

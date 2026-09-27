@@ -49,7 +49,8 @@ export function initLibraryFilters(): void {
       if (problem) params.set('problem', problem);
       if (q) params.set('q', q);
       const qs = params.toString();
-      history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+      // Keep history.state: the client-side router stores its own bookkeeping there.
+      history.replaceState(history.state, '', qs ? `?${qs}` : location.pathname);
     }
   }
 

@@ -1,8 +1,11 @@
 ---
 /**
- * Appearance menu (replaces the old theme toggle): theme, ambient background, motion.
+ * Appearance menu: theme, ambient background (soft glows or live scenes), motion.
  * A <details> disclosure — no modal, closes on Escape / outside click.
  */
+import { SCENES } from '../lib/storage';
+import { SCENE_INFO } from '../lib/scene';
+
 const THEMES = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
@@ -14,6 +17,7 @@ const BACKGROUNDS = [
   { value: 'lavender', label: 'Lavender', swatch: 'linear-gradient(135deg, #dccfff, #c4dcff 45%, #ffd3ea)' },
   { value: 'plain', label: 'Plain', swatch: 'var(--color-bg)' },
 ];
+const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].label, preview: SCENE_INFO[id].preview }));
 ---
 
 <details class="appearance" data-appearance>
@@ -48,7 +52,7 @@ const BACKGROUNDS = [
     </fieldset>
 
     <fieldset>
-      <legend>Background</legend>
+      <legend>Background · soft glow</legend>
       <div class="appearance__swatches">
         {
           BACKGROUNDS.map((b) => (
@@ -62,6 +66,23 @@ const BACKGROUNDS = [
       </div>
     </fieldset>
 
+    <fieldset>
+      <legend>Background · live scene</legend>
+      <div class="appearance__scenes">
+        {
+          SCENE_OPTIONS.map((sc) => (
+            <label class="scene">
+              <input type="radio" name="rw-bg" value={sc.value} />
+              <span class="scene__preview" style={`background:${sc.preview}`} />
+              <span class="scene__label">{sc.label}</span>
+            </label>
+          ))
+        }
+      </div>
+      <p class="appearance__note" data-scene-note>Drawn live in 3D. Scenes slow down and fade back while a focus session runs.</p>
+      <p class="appearance__note" data-no-webgl hidden>This browser can't draw scenes, so a soft glow is shown instead.</p>
+    </fieldset>
+
     <label class="appearance__switch">
       <input type="checkbox" name="rw-motion" role="switch" />
       <span>Gentle background motion</span>
@@ -73,45 +94,63 @@ const BACKGROUNDS = [
 <script>
   import { getAppearance, getTheme, setAppearance, setTheme, subscribe, type Backdrop, type ThemeChoice } from '../lib/storage';
   import { applyAppearance, applyTheme } from '../lib/appearance';
+  import { webglAvailable } from '../lib/scene';
+  import { cleanups, listen, onPage } from '../lib/page';
 
-  document.querySelectorAll<HTMLDetailsElement>('[data-appearance]').forEach((menu) => {
-    const q = <E extends Element>(s: string) => menu.querySelector<E>(s)!;
+  let canWebGL: boolean | null = null;
 
-    function sync(): void {
-      const theme = getTheme();
-      const a = getAppearance();
-      applyTheme(theme);
-      applyAppearance(a);
-      menu.querySelectorAll<HTMLInputElement>('input[name="rw-theme"]').forEach((i) => (i.checked = i.value === theme));
-      menu.querySelectorAll<HTMLInputElement>('input[name="rw-bg"]').forEach((i) => (i.checked = i.value === a.bg));
-      const motion = q<HTMLInputElement>('input[name="rw-motion"]');
-      motion.checked = a.motion;
-      motion.disabled = a.bg === 'plain';
-      q<HTMLElement>('[data-reduced-note]').hidden = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    }
+  onPage('appearance', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLDetailsElement>('[data-appearance]').forEach((menu) => {
+      const q = <E extends Element>(s: string) => menu.querySelector<E>(s)!;
 
-    menu.addEventListener('change', (e) => {
-      const input = e.target as HTMLInputElement;
-      if (input.name === 'rw-theme') setTheme(input.value as ThemeChoice);
-      if (input.name === 'rw-bg') setAppearance({ ...getAppearance(), bg: input.value as Backdrop });
-      if (input.name === 'rw-motion') setAppearance({ ...getAppearance(), motion: input.checked });
+      function sync(): void {
+        const theme = getTheme();
+        const a = getAppearance();
+        applyTheme(theme);
+        applyAppearance(a);
+        menu.querySelectorAll<HTMLInputElement>('input[name="rw-theme"]').forEach((i) => (i.checked = i.value === theme));
+        menu.querySelectorAll<HTMLInputElement>('input[name="rw-bg"]').forEach((i) => (i.checked = i.value === a.bg));
+        const motion = q<HTMLInputElement>('input[name="rw-motion"]');
+        motion.checked = a.motion;
+        motion.disabled = a.bg === 'plain';
+        q<HTMLElement>('[data-reduced-note]').hidden = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+
+      // Checking for WebGL creates a throwaway context, so only do it once the menu is opened.
+      menu.addEventListener('toggle', () => {
+        if (!menu.open) return;
+        canWebGL ??= webglAvailable();
+        q<HTMLElement>('[data-no-webgl]').hidden = canWebGL;
+        q<HTMLElement>('[data-scene-note]').hidden = !canWebGL;
+      });
+
+      menu.addEventListener('change', (e) => {
+        const input = e.target as HTMLInputElement;
+        if (input.name === 'rw-theme') setTheme(input.value as ThemeChoice);
+        if (input.name === 'rw-bg') setAppearance({ ...getAppearance(), bg: input.value as Backdrop });
+        if (input.name === 'rw-motion') setAppearance({ ...getAppearance(), motion: input.checked });
+        sync();
+      });
+
+      // Close on Escape (return focus to the button) and on outside click.
+      menu.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && menu.open) {
+          menu.open = false;
+          q<HTMLElement>('summary').focus();
+        }
+      });
+      c.add(
+        listen(document, 'click', (e) => {
+          if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
+        }),
+      );
+
+      c.add(subscribe('theme', sync, { otherTabsOnly: true }));
+      c.add(subscribe('appearance', sync, { otherTabsOnly: true }));
       sync();
     });
-
-    // Close on Escape (return focus to the button) and on outside click.
-    menu.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && menu.open) {
-        menu.open = false;
-        q<HTMLElement>('summary').focus();
-      }
-    });
-    document.addEventListener('click', (e) => {
-      if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
-    });
-
-    subscribe('theme', sync, { otherTabsOnly: true });
-    subscribe('appearance', sync, { otherTabsOnly: true });
-    sync();
+    return c.run;
   });
 </script>
 
@@ -151,7 +190,9 @@ const BACKGROUNDS = [
     right: 0;
     top: calc(100% + var(--space-2));
     z-index: 50;
-    width: min(18rem, calc(100vw - 2rem));
+    width: min(20rem, calc(100vw - 2rem));
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
     display: grid;
     gap: var(--space-4);
     padding: var(--space-4);
@@ -267,6 +308,61 @@ const BACKGROUNDS = [
   .swatch input:checked ~ .swatch__label {
     color: var(--color-text);
     font-weight: 600;
+  }
+
+  .appearance__scenes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2);
+  }
+
+  .scene {
+    position: relative;
+    display: grid;
+    gap: var(--space-1);
+    cursor: pointer;
+  }
+
+  .scene input {
+    position: absolute;
+    opacity: 0;
+    inset: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .scene__preview {
+    height: 56px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .scene:hover .scene__preview {
+    transform: scale(1.03);
+  }
+
+  .scene input:checked + .scene__preview {
+    box-shadow: 0 0 0 2px var(--color-surface-solid), 0 0 0 4px var(--color-accent);
+  }
+
+  .scene input:focus-visible + .scene__preview {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .scene__label {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .scene input:checked ~ .scene__label {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  fieldset .appearance__note {
+    margin-top: var(--space-2);
   }
 
   .appearance__switch {

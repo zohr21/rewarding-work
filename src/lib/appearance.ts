@@ -5,7 +5,7 @@
  *
  * The same attributes are set before first paint by the inline script in BaseLayout.
  */
-import type { Appearance, ThemeChoice } from './storage';
+import { isScene, type Appearance, type ThemeChoice } from './storage';
 
 export function applyTheme(theme: ThemeChoice): void {
   document.documentElement.dataset.theme = theme;
@@ -14,6 +14,7 @@ export function applyTheme(theme: ThemeChoice): void {
 export function applyAppearance(a: Appearance): void {
   const root = document.documentElement;
   root.dataset.bg = a.bg;
+  root.dataset.bgKind = isScene(a.bg) ? 'scene' : 'glow';
   root.dataset.motion = a.motion ? 'on' : 'off';
 }
 

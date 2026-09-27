@@ -3,7 +3,9 @@ import '../styles/global.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Ambient from '../components/Ambient.astro';
+import { ClientRouter } from 'astro:transitions';
 import { SITE } from '../config/site';
+import { SCENES } from '../lib/storage';
 import { url } from '../lib/paths';
 
 interface Props {
@@ -16,10 +18,11 @@ const fullTitle = title ? `${title} · ${SITE.name}` : SITE.name;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const swUrl = url('/sw.js');
 const swScope = url('/');
+const sceneIds = SCENES.join('|');
 ---
 
 <!doctype html>
-<html lang={SITE.lang} data-theme="light" data-bg="sunrise" data-motion="on">
+<html lang={SITE.lang} data-theme="light" data-bg="sunrise" data-bg-kind="glow" data-motion="on">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -35,10 +38,13 @@ const swScope = url('/');
     <!--
       Apply saved theme + background before first paint (no flash). Must be inline so it
       runs synchronously. Keys and defaults match src/lib/storage.ts.
+      The client-side router resets <html> attributes to the new page's defaults on every
+      navigation, so the same function runs again on astro:after-swap.
     -->
-    <script is:inline>
+    <script is:inline define:vars={{ sceneIds }}>
       (function () {
         var root = document.documentElement;
+        var scenes = new RegExp('^(' + sceneIds + ')$');
         function get(name) {
           try {
             return JSON.parse(localStorage.getItem('rw:v1:' + name) || 'null');
@@ -46,13 +52,21 @@ const swScope = url('/');
             return null;
           }
         }
-        var t = get('theme');
-        if (t === 'dark' || t === 'auto') root.dataset.theme = t;
-        var a = get('appearance');
-        if (a && /^(sunrise|meadow|lavender|plain)$/.test(a.bg)) root.dataset.bg = a.bg;
-        if (a && a.motion === false) root.dataset.motion = 'off';
+        function apply() {
+          var t = get('theme');
+          if (t === 'dark' || t === 'auto') root.dataset.theme = t;
+          var a = get('appearance');
+          if (a && (/^(sunrise|meadow|lavender|plain)$/.test(a.bg) || scenes.test(a.bg))) {
+            root.dataset.bg = a.bg;
+            root.dataset.bgKind = scenes.test(a.bg) ? 'scene' : 'glow';
+          }
+          if (a && a.motion === false) root.dataset.motion = 'off';
+        }
+        apply();
+        document.addEventListener('astro:after-swap', apply);
       })();
     </script>
+    <ClientRouter />
   </head>
   <body>
     <Ambient />

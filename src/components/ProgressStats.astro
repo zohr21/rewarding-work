@@ -23,21 +23,26 @@
 <script>
   import { getSessions, subscribe } from '../lib/storage';
   import { totals } from '../lib/stats';
+  import { cleanups, onPage } from '../lib/page';
 
-  document.querySelectorAll<HTMLElement>('[data-progress-stats]').forEach((root) => {
-    const set = (name: string, text: string) => {
-      const el = root.querySelector(`[data-stat="${name}"]`);
-      if (el) el.textContent = text;
-    };
-    const render = () => {
-      const t = totals(getSessions());
-      set('today', t.todayMin.toLocaleString());
-      set('week', t.weekMin.toLocaleString());
-      set('sessions', t.completedSessions.toLocaleString());
-      set('week-sub', `${t.weekSessions} session${t.weekSessions === 1 ? '' : 's'} this week`);
-    };
-    render();
-    subscribe('sessions', render);
+  onPage('progress-stats', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-progress-stats]').forEach((root) => {
+      const set = (name: string, text: string) => {
+        const el = root.querySelector(`[data-stat="${name}"]`);
+        if (el) el.textContent = text;
+      };
+      const render = () => {
+        const t = totals(getSessions());
+        set('today', t.todayMin.toLocaleString());
+        set('week', t.weekMin.toLocaleString());
+        set('sessions', t.completedSessions.toLocaleString());
+        set('week-sub', `${t.weekSessions} session${t.weekSessions === 1 ? '' : 's'} this week`);
+      };
+      render();
+      c.add(subscribe('sessions', render));
+    });
+    return c.run;
   });
 </script>
 

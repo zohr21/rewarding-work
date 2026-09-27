@@ -8,6 +8,7 @@ import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy
 import { addSession, getSessions, read, subscribe, write } from '../lib/storage';
 import { notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
+import { cleanups, listen } from '../lib/page';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -62,15 +63,19 @@ function isSameLocalDay(a: number, b: number): boolean {
 
 // ---------- Mount ----------
 
-export function mountTimers(): void {
+/** Mounts every timer on the page. Returns a cleanup to call before the page is swapped out. */
+export function mountTimers(): () => void {
+  const c = cleanups();
   document.querySelectorAll<HTMLElement>('[data-timer]').forEach((el) => {
     if (el.dataset.mounted) return;
     el.dataset.mounted = '1';
-    mountTimer(el);
+    c.add(mountTimer(el));
   });
+  return c.run;
 }
 
-function mountTimer(root: HTMLElement): void {
+function mountTimer(root: HTMLElement): () => void {
+  const c = cleanups();
   const q = <E extends Element>(sel: string) => root.querySelector<E>(sel)!;
   const els = {
     modes: Array.from(root.querySelectorAll<HTMLInputElement>('input[name="timer-mode"]')),
@@ -402,7 +407,7 @@ function mountTimer(root: HTMLElement): void {
 
   // Keyboard shortcuts (standalone page only, so Space still scrolls long technique pages).
   if (standalone) {
-    document.addEventListener('keydown', (e) => {
+    c.add(listen(document, 'keydown', (e) => {
       if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       if (target?.closest('input, textarea, select, button, a, [contenteditable="true"]')) return;
@@ -413,16 +418,18 @@ function mountTimer(root: HTMLElement): void {
         e.preventDefault();
         onReset();
       }
-    });
+    }));
   }
 
   // Background tabs: timers get throttled, so re-sync the instant the tab is visible again.
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') onTick();
-  });
+  c.add(
+    listen(document, 'visibilitychange', () => {
+      if (document.visibilityState === 'visible') onTick();
+    }),
+  );
 
   // Keep several open tabs in sync (session ids are stable, so no double logging).
-  subscribe(
+  c.add(subscribe(
     'timer',
     () => {
       const stored = read<TimerState | null>('timer', null, (v): v is TimerState | null => v === null || T.isTimerState(v));
@@ -432,9 +439,17 @@ function mountTimer(root: HTMLElement): void {
       render();
     },
     { otherTabsOnly: true },
-  );
-  subscribe('sessions', renderToday);
+  ));
+  c.add(subscribe('sessions', renderToday));
+
+  // Leaving the page (client-side navigation): stop ticking and restore the tab title.
+  c.add(() => {
+    window.clearInterval(interval);
+    window.clearTimeout(endTimer);
+    document.title = baseTitle;
+  });
 
   render();
   schedule();
+  return c.run;
 }
