@@ -62,136 +62,141 @@ const Heading = headingLevel;
   import { chainStats } from '../lib/stats';
   import { addDays, dayKey, formatDay, startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
+  import { cleanups, onPage } from '../lib/page';
 
-  document.querySelectorAll<HTMLElement>('[data-chain]').forEach((root) => {
-    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
-    const form = $<HTMLFormElement>('[data-chain-form]');
-    const input = $<HTMLInputElement>('[data-chain-input]');
-    const cancel = $<HTMLButtonElement>('[data-chain-cancel]');
-    const body = $<HTMLElement>('[data-chain-body]');
-    const name = $<HTMLElement>('[data-chain-name]');
-    const edit = $<HTMLButtonElement>('[data-chain-edit]');
-    const best = $<HTMLElement>('[data-chain-best]');
-    const bestUnit = $<HTMLElement>('[data-chain-best-unit]');
-    const current = $<HTMLElement>('[data-chain-current]');
-    const total = $<HTMLElement>('[data-chain-total]');
-    const message = $<HTMLElement>('[data-chain-message]');
-    const today = $<HTMLButtonElement>('[data-chain-today]');
-    const cal = $<HTMLElement>('[data-chain-cal]');
-    const live = $<HTMLElement>('[data-chain-live]');
-    let editing = false;
-    let pulseKey: string | null = null;
+  onPage('chain', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-chain]').forEach((root) => {
+      const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+      const form = $<HTMLFormElement>('[data-chain-form]');
+      const input = $<HTMLInputElement>('[data-chain-input]');
+      const cancel = $<HTMLButtonElement>('[data-chain-cancel]');
+      const body = $<HTMLElement>('[data-chain-body]');
+      const name = $<HTMLElement>('[data-chain-name]');
+      const edit = $<HTMLButtonElement>('[data-chain-edit]');
+      const best = $<HTMLElement>('[data-chain-best]');
+      const bestUnit = $<HTMLElement>('[data-chain-best-unit]');
+      const current = $<HTMLElement>('[data-chain-current]');
+      const total = $<HTMLElement>('[data-chain-total]');
+      const message = $<HTMLElement>('[data-chain-message]');
+      const today = $<HTMLButtonElement>('[data-chain-today]');
+      const cal = $<HTMLElement>('[data-chain-cal]');
+      const live = $<HTMLElement>('[data-chain-live]');
+      let editing = false;
+      let pulseKey: string | null = null;
 
-    const announce = (t: string) => {
-      live.textContent = '';
-      window.setTimeout(() => (live.textContent = t), 50);
-    };
-    const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+      const announce = (t: string) => {
+        live.textContent = '';
+        window.setTimeout(() => (live.textContent = t), 50);
+      };
+      const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 
-    function encouragement(s: ReturnType<typeof chainStats>): string {
-      if (s.total === 0) return 'Mark the first day whenever you have done it.';
-      if (s.current === 0) return `Your best is ${days(s.best)}. Every day you mark counts — start a new chain today.`;
-      if (!s.doneToday) return `${days(s.current)} so far. Mark today when it's done.`;
-      if (s.current >= s.best && s.best > 1) return `${days(s.current)} — that's your best chain yet.`;
-      return `${days(s.current)} and counting.`;
-    }
-
-    function render(): void {
-      const chain = getChain();
-      const hasHabit = chain.habit.length > 0;
-      form.hidden = hasHabit && !editing;
-      body.hidden = !hasHabit || editing;
-      cancel.hidden = !(hasHabit && editing);
-      if (!hasHabit || editing) {
-        if (document.activeElement !== input) input.value = chain.habit;
-        return;
+      function encouragement(s: ReturnType<typeof chainStats>): string {
+        if (s.total === 0) return 'Mark the first day whenever you have done it.';
+        if (s.current === 0) return `Your best is ${days(s.best)}. Every day you mark counts — start a new chain today.`;
+        if (!s.doneToday) return `${days(s.current)} so far. Mark today when it's done.`;
+        if (s.current >= s.best && s.best > 1) return `${days(s.current)} — that's your best chain yet.`;
+        return `${days(s.current)} and counting.`;
       }
 
-      const s = chainStats(chain.days);
-      name.textContent = chain.habit;
-      best.textContent = String(s.best);
-      bestUnit.textContent = s.best === 1 ? 'day' : 'days';
-      current.textContent = days(s.current);
-      total.textContent = String(s.total);
-      message.textContent = encouragement(s);
-
-      today.textContent = s.doneToday ? '✓ Done today' : 'Mark today done';
-      today.setAttribute('aria-pressed', String(s.doneToday));
-      today.classList.toggle('is-done', s.doneToday);
-
-      // 5-week calendar, Monday first, ending with this week.
-      const set = new Set(chain.days);
-      const now = startOfDay(new Date());
-      const first = addDays(startOfWeek(now), -28);
-      const buttons: HTMLElement[] = [];
-      for (let i = 0; i < 35; i++) {
-        const date = addDays(first, i);
-        const key = dayKey(date);
-        const marked = set.has(key);
-        const future = date > now;
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'chain__day';
-        b.textContent = String(date.getDate());
-        b.disabled = future;
-        b.setAttribute('aria-pressed', String(marked));
-        b.setAttribute('aria-label', `${formatDay(date)}${key === dayKey(now) ? ' (today)' : ''}`);
-        if (marked) {
-          b.classList.add('is-marked');
-          // Visually link consecutive days within a week row.
-          if (i % 7 !== 0 && set.has(dayKey(addDays(date, -1)))) b.classList.add('link-left');
-          if (i % 7 !== 6 && set.has(dayKey(addDays(date, 1)))) b.classList.add('link-right');
+      function render(): void {
+        const chain = getChain();
+        const hasHabit = chain.habit.length > 0;
+        form.hidden = hasHabit && !editing;
+        body.hidden = !hasHabit || editing;
+        cancel.hidden = !(hasHabit && editing);
+        if (!hasHabit || editing) {
+          if (document.activeElement !== input) input.value = chain.habit;
+          return;
         }
-        if (key === dayKey(now)) b.classList.add('is-today');
-        if (key === pulseKey) b.classList.add('is-pulse');
-        b.addEventListener('click', () => toggle(key, date));
-        buttons.push(b);
+
+        const s = chainStats(chain.days);
+        name.textContent = chain.habit;
+        best.textContent = String(s.best);
+        bestUnit.textContent = s.best === 1 ? 'day' : 'days';
+        current.textContent = days(s.current);
+        total.textContent = String(s.total);
+        message.textContent = encouragement(s);
+
+        today.textContent = s.doneToday ? '✓ Done today' : 'Mark today done';
+        today.setAttribute('aria-pressed', String(s.doneToday));
+        today.classList.toggle('is-done', s.doneToday);
+
+        // 5-week calendar, Monday first, ending with this week.
+        const set = new Set(chain.days);
+        const now = startOfDay(new Date());
+        const first = addDays(startOfWeek(now), -28);
+        const buttons: HTMLElement[] = [];
+        for (let i = 0; i < 35; i++) {
+          const date = addDays(first, i);
+          const key = dayKey(date);
+          const marked = set.has(key);
+          const future = date > now;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'chain__day';
+          b.textContent = String(date.getDate());
+          b.disabled = future;
+          b.setAttribute('aria-pressed', String(marked));
+          b.setAttribute('aria-label', `${formatDay(date)}${key === dayKey(now) ? ' (today)' : ''}`);
+          if (marked) {
+            b.classList.add('is-marked');
+            // Visually link consecutive days within a week row.
+            if (i % 7 !== 0 && set.has(dayKey(addDays(date, -1)))) b.classList.add('link-left');
+            if (i % 7 !== 6 && set.has(dayKey(addDays(date, 1)))) b.classList.add('link-right');
+          }
+          if (key === dayKey(now)) b.classList.add('is-today');
+          if (key === pulseKey) b.classList.add('is-pulse');
+          b.addEventListener('click', () => toggle(key, date));
+          buttons.push(b);
+        }
+        const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
+        buttons.forEach((b, i) => (b.dataset.key = dayKey(addDays(first, i))));
+        cal.replaceChildren(...buttons);
+        if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
+        pulseKey = null;
       }
-      const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
-      buttons.forEach((b, i) => (b.dataset.key = dayKey(addDays(first, i))));
-      cal.replaceChildren(...buttons);
-      if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
-      pulseKey = null;
-    }
 
-    function toggle(key: string, date: Date): void {
-      const nowMarked = toggleChainDay(key);
-      if (nowMarked) {
-        pulseKey = key;
-        celebrate();
+      function toggle(key: string, date: Date): void {
+        const nowMarked = toggleChainDay(key);
+        if (nowMarked) {
+          pulseKey = key;
+          celebrate();
+        }
+        const s = chainStats(getChain().days);
+        announce(`${formatDay(date)} ${nowMarked ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`);
       }
-      const s = chainStats(getChain().days);
-      announce(`${formatDay(date)} ${nowMarked ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`);
-    }
 
-    today.addEventListener('click', () => toggle(dayKey(new Date()), new Date()));
+      today.addEventListener('click', () => toggle(dayKey(new Date()), new Date()));
 
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const habit = input.value.trim();
-      if (!habit) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const habit = input.value.trim();
+        if (!habit) {
+          input.focus();
+          return;
+        }
+        editing = false;
+        setChain({ ...getChain(), habit });
+        announce(`Habit saved: ${habit}`);
+        today.focus();
+      });
+      edit.addEventListener('click', () => {
+        editing = true;
+        render();
         input.focus();
-        return;
-      }
-      editing = false;
-      setChain({ ...getChain(), habit });
-      announce(`Habit saved: ${habit}`);
-      today.focus();
-    });
-    edit.addEventListener('click', () => {
-      editing = true;
-      render();
-      input.focus();
-      input.select();
-    });
-    cancel.addEventListener('click', () => {
-      editing = false;
-      render();
-      edit.focus();
-    });
+        input.select();
+      });
+      cancel.addEventListener('click', () => {
+        editing = false;
+        render();
+        edit.focus();
+      });
 
-    render();
-    subscribe('chain', render);
+      render();
+      c.add(subscribe('chain', render));
+    });
+    return c.run;
   });
 </script>
 

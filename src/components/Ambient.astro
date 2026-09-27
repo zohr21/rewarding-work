@@ -1,36 +1,125 @@
 ---
 /**
- * Decorative ambient background: four large, soft colour glows that drift very slowly
- * and lean gently towards the pointer. It briefly "blooms" when you finish something.
+ * Decorative ambient background. Two kinds, chosen in the Look menu:
  *
- * - Pure CSS gradients + transforms (GPU-friendly; no canvas, no blur filters).
- * - Motion can be switched off in the Appearance menu and is off under
- *   prefers-reduced-motion. Hidden entirely with the "Plain" background.
- * - aria-hidden and pointer-events: none — it never gets in the way.
+ * - Glows: four large, soft CSS gradients that drift very slowly and lean towards the
+ *   pointer (GPU-friendly transforms, no canvas).
+ * - Scenes: a WebGL shader drawn into a <canvas> (src/lib/scene). The glows show while
+ *   a scene loads, and stay if WebGL isn't available.
+ *
+ * Both "bloom" when you finish something, follow the Motion switch and
+ * prefers-reduced-motion, and are hidden with the "Plain" background.
+ * Scenes also slow down and fade back while a focus session runs.
+ *
+ * transition:persist keeps this element (and its WebGL context) alive across
+ * client-side navigations. aria-hidden and pointer-events: none — it never gets in the way.
  */
 ---
 
-<div class="ambient" aria-hidden="true" data-ambient>
+<div class="ambient" aria-hidden="true" data-ambient transition:persist="ambient">
   <div class="ambient__field" data-ambient-field>
     <span class="blob b1"></span>
     <span class="blob b2"></span>
     <span class="blob b3"></span>
     <span class="blob b4"></span>
   </div>
+  <canvas class="ambient__scene" data-ambient-scene></canvas>
 </div>
 
 <script>
   import { onCelebrate } from '../lib/appearance';
+  import { isScene, read, subscribe, type SceneId } from '../lib/storage';
+  import { SCENE_INFO, webglAvailable } from '../lib/scene';
+  import { createRunner, type Runner, type RunnerOptions } from '../lib/scene/runner';
+  import { endsAt, isTimerState, type TimerState } from '../lib/timer/engine';
 
   const ambient = document.querySelector<HTMLElement>('[data-ambient]');
   const field = document.querySelector<HTMLElement>('[data-ambient-field]');
+  const canvas = document.querySelector<HTMLCanvasElement>('[data-ambient-scene]');
 
-  if (ambient && field) {
+  if (ambient && field && canvas) {
+    const root = document.documentElement;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
     const finePointer = window.matchMedia('(pointer: fine)');
-    const motionOn = () => document.documentElement.dataset.motion !== 'off' && !reduced.matches;
+    const motionOn = () => root.dataset.motion !== 'off' && !reduced.matches;
+    const isDark = () => root.dataset.theme === 'dark' || (root.dataset.theme === 'auto' && darkScheme.matches);
+    const pageBackground = () => getComputedStyle(root).getPropertyValue('--color-bg').trim() || '#fbf8f3';
 
-    // Pointer parallax: the glows drift up to ~2.5% of the viewport towards the cursor.
+    function focusRunning(): boolean {
+      const t = read<TimerState | null>('timer', null, (v): v is TimerState | null => v === null || isTimerState(v));
+      if (!t || t.status !== 'running' || t.phase !== 'work') return false;
+      const end = endsAt(t);
+      return end === null || end > Date.now(); // a session that ran out while no timer was open doesn't count
+    }
+
+    const options = (): RunnerOptions => ({
+      dark: isDark(),
+      background: pageBackground(),
+      motion: motionOn(),
+      focus: focusRunning(),
+    });
+
+    // ---- Scene lifecycle ----
+
+    const canWebGL = webglAvailable();
+    let runner: Runner | null = null;
+    let current: SceneId | null = null;
+    let loading = 0;
+
+    function stopScene(): void {
+      runner?.destroy();
+      runner = null;
+      current = null;
+      ambient!.classList.remove('is-scene-ready');
+    }
+
+    async function showScene(id: SceneId): Promise<void> {
+      if (current === id && runner) return;
+      stopScene();
+      if (!canWebGL) return; // glows stay as the fallback
+      current = id;
+      const ticket = ++loading;
+      try {
+        const def = (await SCENE_INFO[id].load()).default;
+        if (ticket !== loading) return; // the user picked something else meanwhile
+        runner = createRunner(canvas!, def, options());
+        if (runner) ambient!.classList.add('is-scene-ready');
+      } catch {
+        runner = null;
+      }
+    }
+
+    function sync(): void {
+      const bg = root.dataset.bg ?? '';
+      if (isScene(bg)) void showScene(bg);
+      else if (current) {
+        loading++;
+        stopScene();
+      }
+      runner?.update(options());
+    }
+
+    // <html> attributes carry theme / background / motion; they change from the Look menu,
+    // other tabs, and are re-applied after every client-side navigation.
+    let pending = 0;
+    new MutationObserver(() => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        sync();
+      });
+    }).observe(root, { attributes: true, attributeFilter: ['data-theme', 'data-bg', 'data-motion'] });
+    reduced.addEventListener('change', sync);
+    darkScheme.addEventListener('change', sync);
+    subscribe('timer', () => runner?.update({ focus: focusRunning() }));
+    canvas.addEventListener('scene:restore', () => {
+      stopScene();
+      sync();
+    });
+    sync();
+
+    // ---- Pointer parallax: the glows drift up to ~2.5% of the viewport towards the cursor ----
     let frame = 0;
     let tx = 0;
     let ty = 0;
@@ -38,8 +127,11 @@
       'pointermove',
       (e) => {
         if (!finePointer.matches || !motionOn()) return;
-        tx = (e.clientX / window.innerWidth - 0.5) * 5;
-        ty = (e.clientY / window.innerHeight - 0.5) * 5;
+        const nx = e.clientX / window.innerWidth - 0.5;
+        const ny = e.clientY / window.innerHeight - 0.5;
+        runner?.pointer(nx * 2, -ny * 2);
+        tx = nx * 5;
+        ty = ny * 5;
         if (frame) return;
         frame = requestAnimationFrame(() => {
           frame = 0;
@@ -53,6 +145,7 @@
     // Celebration bloom.
     let bloomTimer = 0;
     onCelebrate(() => {
+      runner?.bloom();
       ambient.classList.remove('is-bloom');
       void ambient.offsetWidth;
       ambient.classList.add('is-bloom');
@@ -73,6 +166,29 @@
 
   :global(html[data-bg='plain']) .ambient {
     display: none;
+  }
+
+  .ambient__scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 1.4s var(--ease-out);
+  }
+
+  .ambient.is-scene-ready .ambient__scene {
+    opacity: 1;
+  }
+
+  /* Once a scene is showing, the glows underneath stop animating (and costing GPU time). */
+  .ambient.is-scene-ready .ambient__field {
+    visibility: hidden;
+    transition: visibility 0s 1.4s;
+  }
+
+  .ambient.is-scene-ready .blob {
+    animation-play-state: paused;
   }
 
   .ambient__field {

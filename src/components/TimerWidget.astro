@@ -116,7 +116,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 <script>
   import { mountTimers } from '../scripts/timer-ui';
-  mountTimers();
+  import { onPage } from '../lib/page';
+  onPage('timer', mountTimers);
 </script>
 
 <style>

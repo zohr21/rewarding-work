@@ -63,7 +63,8 @@ const techniques = await getTechniques();
 
 <script>
   import { initLibraryFilters } from '../../scripts/library-filters';
-  initLibraryFilters();
+  import { onPage } from '../../lib/page';
+  onPage('library-filters', initLibraryFilters);
 </script>
 
 <style>

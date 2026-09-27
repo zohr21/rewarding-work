@@ -91,6 +91,7 @@ const total = QUIZ.length;
 
 <script>
   import { scoreQuiz } from '../data/quiz';
+  import { onPage } from '../lib/page';
 
   interface Info {
     title: string;
@@ -102,97 +103,99 @@ const total = QUIZ.length;
     href: string;
   }
 
-  document.querySelectorAll<HTMLElement>('[data-quiz]').forEach((root) => {
-    const info = JSON.parse(root.querySelector('[data-quiz-info]')?.textContent ?? '{}') as Record<string, Info>;
-    const form = root.querySelector<HTMLFormElement>('[data-quiz-form]')!;
-    const steps = Array.from(root.querySelectorAll<HTMLFieldSetElement>('[data-quiz-step]'));
-    const nav = root.querySelector<HTMLElement>('[data-quiz-nav]')!;
-    const back = root.querySelector<HTMLButtonElement>('[data-quiz-back]')!;
-    const next = root.querySelector<HTMLButtonElement>('[data-quiz-next]')!;
-    const bar = root.querySelector<HTMLElement>('[data-quiz-bar]')!;
-    const result = root.querySelector<HTMLElement>('[data-quiz-result]')!;
-    const picks = root.querySelector<HTMLOListElement>('[data-quiz-picks]')!;
-    const restart = root.querySelector<HTMLButtonElement>('[data-quiz-restart]')!;
-    let current = 0;
+  onPage('quiz', () => {
+    document.querySelectorAll<HTMLElement>('[data-quiz]').forEach((root) => {
+      const info = JSON.parse(root.querySelector('[data-quiz-info]')?.textContent ?? '{}') as Record<string, Info>;
+      const form = root.querySelector<HTMLFormElement>('[data-quiz-form]')!;
+      const steps = Array.from(root.querySelectorAll<HTMLFieldSetElement>('[data-quiz-step]'));
+      const nav = root.querySelector<HTMLElement>('[data-quiz-nav]')!;
+      const back = root.querySelector<HTMLButtonElement>('[data-quiz-back]')!;
+      const next = root.querySelector<HTMLButtonElement>('[data-quiz-next]')!;
+      const bar = root.querySelector<HTMLElement>('[data-quiz-bar]')!;
+      const result = root.querySelector<HTMLElement>('[data-quiz-result]')!;
+      const picks = root.querySelector<HTMLOListElement>('[data-quiz-picks]')!;
+      const restart = root.querySelector<HTMLButtonElement>('[data-quiz-restart]')!;
+      let current = 0;
 
-    nav.hidden = false;
+      nav.hidden = false;
 
-    const answered = (i: number) => !!steps[i]!.querySelector('input:checked');
+      const answered = (i: number) => !!steps[i]!.querySelector('input:checked');
 
-    function show(i: number, moveFocus: boolean): void {
-      current = i;
-      steps.forEach((s, j) => (s.hidden = j !== i));
-      back.hidden = i === 0;
-      next.textContent = i === steps.length - 1 ? 'Show my techniques' : 'Next';
-      next.disabled = !answered(i);
-      bar.style.width = `${(i / steps.length) * 100}%`;
-      if (moveFocus) steps[i]!.focus();
-    }
+      function show(i: number, moveFocus: boolean): void {
+        current = i;
+        steps.forEach((s, j) => (s.hidden = j !== i));
+        back.hidden = i === 0;
+        next.textContent = i === steps.length - 1 ? 'Show my techniques' : 'Next';
+        next.disabled = !answered(i);
+        bar.style.width = `${(i / steps.length) * 100}%`;
+        if (moveFocus) steps[i]!.focus();
+      }
 
-    function answers(): Record<string, string> {
-      const data = new FormData(form);
-      const out: Record<string, string> = {};
-      data.forEach((v, k) => (out[k] = String(v)));
-      return out;
-    }
+      function answers(): Record<string, string> {
+        const data = new FormData(form);
+        const out: Record<string, string> = {};
+        data.forEach((v, k) => (out[k] = String(v)));
+        return out;
+      }
 
-    function renderResult(): void {
-      const recs = scoreQuiz(answers()).filter((p) => info[p.slug]);
-      picks.replaceChildren(
-        ...recs.map((p, idx) => {
-          const t = info[p.slug]!;
-          const li = document.createElement('li');
-          li.className = 'quiz__pick';
-          li.style.setProperty('--i', String(idx));
+      function renderResult(): void {
+        const recs = scoreQuiz(answers()).filter((p) => info[p.slug]);
+        picks.replaceChildren(
+          ...recs.map((p, idx) => {
+            const t = info[p.slug]!;
+            const li = document.createElement('li');
+            li.className = 'quiz__pick';
+            li.style.setProperty('--i', String(idx));
 
-          const top = document.createElement('p');
-          top.className = 'quiz__pick-meta';
-          top.textContent = `${t.category} · ${t.evidence} · ${t.minutes} min to try`;
+            const top = document.createElement('p');
+            top.className = 'quiz__pick-meta';
+            top.textContent = `${t.category} · ${t.evidence} · ${t.minutes} min to try`;
 
-          const h = document.createElement('h4');
-          const a = document.createElement('a');
-          a.href = t.href;
-          a.textContent = t.title;
-          h.append(a);
+            const h = document.createElement('h4');
+            const a = document.createElement('a');
+            a.href = t.href;
+            a.textContent = t.title;
+            h.append(a);
 
-          const sum = document.createElement('p');
-          sum.textContent = t.summary;
+            const sum = document.createElement('p');
+            sum.textContent = t.summary;
 
-          const why = document.createElement('p');
-          why.className = 'quiz__why';
-          why.textContent = `Because you said: ${[...new Set(p.because)].join(' · ')}`;
+            const why = document.createElement('p');
+            why.className = 'quiz__why';
+            why.textContent = `Because you said: ${[...new Set(p.because)].join(' · ')}`;
 
-          li.append(top, h, sum, why);
-          return li;
-        }),
-      );
-      form.hidden = true;
-      result.hidden = false;
-      bar.style.width = '100%';
-      result.focus();
-    }
+            li.append(top, h, sum, why);
+            return li;
+          }),
+        );
+        form.hidden = true;
+        result.hidden = false;
+        bar.style.width = '100%';
+        result.focus();
+      }
 
-    form.addEventListener('change', () => {
-      next.disabled = !answered(current);
+      form.addEventListener('change', () => {
+        next.disabled = !answered(current);
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!answered(current)) return;
+        if (current < steps.length - 1) show(current + 1, true);
+        else renderResult();
+      });
+
+      back.addEventListener('click', () => show(Math.max(0, current - 1), true));
+
+      restart.addEventListener('click', () => {
+        form.reset();
+        result.hidden = true;
+        form.hidden = false;
+        show(0, true);
+      });
+
+      show(0, false);
     });
-
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (!answered(current)) return;
-      if (current < steps.length - 1) show(current + 1, true);
-      else renderResult();
-    });
-
-    back.addEventListener('click', () => show(Math.max(0, current - 1), true));
-
-    restart.addEventListener('click', () => {
-      form.reset();
-      result.hidden = true;
-      form.hidden = false;
-      show(0, true);
-    });
-
-    show(0, false);
   });
 </script>
 

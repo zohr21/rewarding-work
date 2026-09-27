@@ -29,6 +29,7 @@
   import { addDone, getDone, getSessions, removeDone, subscribe, type DoneItem } from '../lib/storage';
   import { startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
+  import { cleanups, onPage } from '../lib/page';
 
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11"></circle><path d="M7 12.5l3.2 3.2L17 9"></path></svg>';
@@ -38,120 +39,124 @@
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
   const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
-  document.querySelectorAll<HTMLElement>('[data-done-list]').forEach((root) => {
-    const form = root.querySelector<HTMLFormElement>('[data-done-form]')!;
-    const input = root.querySelector<HTMLInputElement>('[data-done-input]')!;
-    const quick = root.querySelector<HTMLElement>('[data-done-quick]')!;
-    const chips = root.querySelector<HTMLElement>('[data-done-chips]')!;
-    const groups = root.querySelector<HTMLElement>('[data-done-groups]')!;
-    const empty = root.querySelector<HTMLElement>('[data-done-empty]')!;
-    const live = root.querySelector<HTMLElement>('[data-done-live]')!;
-    let justAdded: string | null = null;
+  onPage('done-list', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-done-list]').forEach((root) => {
+      const form = root.querySelector<HTMLFormElement>('[data-done-form]')!;
+      const input = root.querySelector<HTMLInputElement>('[data-done-input]')!;
+      const quick = root.querySelector<HTMLElement>('[data-done-quick]')!;
+      const chips = root.querySelector<HTMLElement>('[data-done-chips]')!;
+      const groups = root.querySelector<HTMLElement>('[data-done-groups]')!;
+      const empty = root.querySelector<HTMLElement>('[data-done-empty]')!;
+      const live = root.querySelector<HTMLElement>('[data-done-live]')!;
+      let justAdded: string | null = null;
 
-    function announce(text: string): void {
-      live.textContent = '';
-      window.setTimeout(() => (live.textContent = text), 50);
-    }
+      function announce(text: string): void {
+        live.textContent = '';
+        window.setTimeout(() => (live.textContent = text), 50);
+      }
 
-    function add(text: string): void {
-      const item = addDone(text);
-      if (!item) return;
-      justAdded = item.id;
-      celebrate();
-      announce(`Logged: ${item.text}`);
-      // Render happens via the storage subscription.
-    }
+      function add(text: string): void {
+        const item = addDone(text);
+        if (!item) return;
+        justAdded = item.id;
+        celebrate();
+        announce(`Logged: ${item.text}`);
+        // Render happens via the storage subscription.
+      }
 
-    function renderItem(item: DoneItem, showDay: boolean): HTMLLIElement {
-      const li = document.createElement('li');
-      li.className = `done__item${item.id === justAdded ? ' is-new' : ''}`;
+      function renderItem(item: DoneItem, showDay: boolean): HTMLLIElement {
+        const li = document.createElement('li');
+        li.className = `done__item${item.id === justAdded ? ' is-new' : ''}`;
 
-      const check = document.createElement('span');
-      check.className = 'done__check';
-      check.innerHTML = CHECK_SVG;
+        const check = document.createElement('span');
+        check.className = 'done__check';
+        check.innerHTML = CHECK_SVG;
 
-      const body = document.createElement('span');
-      body.className = 'done__text';
-      body.textContent = item.text;
+        const body = document.createElement('span');
+        body.className = 'done__text';
+        body.textContent = item.text;
 
-      const when = document.createElement('time');
-      when.className = 'done__time muted';
-      when.dateTime = new Date(item.doneAt).toISOString();
-      when.textContent = showDay ? dayFmt.format(item.doneAt) : timeFmt.format(item.doneAt);
+        const when = document.createElement('time');
+        when.className = 'done__time muted';
+        when.dateTime = new Date(item.doneAt).toISOString();
+        when.textContent = showDay ? dayFmt.format(item.doneAt) : timeFmt.format(item.doneAt);
 
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'icon-btn done__remove';
-      del.setAttribute('aria-label', `Remove “${item.text}”`);
-      del.innerHTML = X_SVG;
-      del.addEventListener('click', () => {
-        removeDone(item.id);
-        announce(`Removed: ${item.text}`);
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'icon-btn done__remove';
+        del.setAttribute('aria-label', `Remove “${item.text}”`);
+        del.innerHTML = X_SVG;
+        del.addEventListener('click', () => {
+          removeDone(item.id);
+          announce(`Removed: ${item.text}`);
+          input.focus();
+        });
+
+        li.append(check, body, when, del);
+        return li;
+      }
+
+      function render(): void {
+        const items = getDone();
+        const today = startOfDay(new Date()).getTime();
+        const week = startOfWeek(new Date()).getTime();
+        const buckets: [string, DoneItem[], boolean][] = [
+          ['Today', items.filter((i) => i.doneAt >= today), false],
+          ['Earlier this week', items.filter((i) => i.doneAt < today && i.doneAt >= week), true],
+          ['Before that', items.filter((i) => i.doneAt < week).slice(0, 30), true],
+        ];
+
+        const frag = document.createDocumentFragment();
+        for (const [title, list, showDay] of buckets) {
+          if (!list.length) continue;
+          const h = document.createElement('h3');
+          h.className = 'done__group';
+          h.textContent = `${title} · ${list.length}`;
+          const ul = document.createElement('ul');
+          ul.className = 'done__items';
+          ul.append(...list.map((i) => renderItem(i, showDay)));
+          frag.append(h, ul);
+        }
+        groups.replaceChildren(frag);
+        empty.hidden = items.length > 0;
+        justAdded = null;
+
+        // Quick-add chips: today's timer labels not already logged today.
+        const loggedToday = new Set(buckets[0]![1].map((i) => i.text.toLowerCase()));
+        const labels = [
+          ...new Set(
+            getSessions()
+              .filter((s) => s.start >= today && s.label)
+              .map((s) => s.label),
+          ),
+        ].filter((l) => !loggedToday.has(l.toLowerCase()));
+        quick.hidden = labels.length === 0;
+        chips.replaceChildren(
+          ...labels.slice(-6).map((label) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'done__chip';
+            b.textContent = `+ ${label}`;
+            b.setAttribute('aria-label', `Log “${label}” as done`);
+            b.addEventListener('click', () => add(label));
+            return b;
+          }),
+        );
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        add(input.value);
+        input.value = '';
         input.focus();
       });
 
-      li.append(check, body, when, del);
-      return li;
-    }
-
-    function render(): void {
-      const items = getDone();
-      const today = startOfDay(new Date()).getTime();
-      const week = startOfWeek(new Date()).getTime();
-      const buckets: [string, DoneItem[], boolean][] = [
-        ['Today', items.filter((i) => i.doneAt >= today), false],
-        ['Earlier this week', items.filter((i) => i.doneAt < today && i.doneAt >= week), true],
-        ['Before that', items.filter((i) => i.doneAt < week).slice(0, 30), true],
-      ];
-
-      const frag = document.createDocumentFragment();
-      for (const [title, list, showDay] of buckets) {
-        if (!list.length) continue;
-        const h = document.createElement('h3');
-        h.className = 'done__group';
-        h.textContent = `${title} · ${list.length}`;
-        const ul = document.createElement('ul');
-        ul.className = 'done__items';
-        ul.append(...list.map((i) => renderItem(i, showDay)));
-        frag.append(h, ul);
-      }
-      groups.replaceChildren(frag);
-      empty.hidden = items.length > 0;
-      justAdded = null;
-
-      // Quick-add chips: today's timer labels not already logged today.
-      const loggedToday = new Set(buckets[0]![1].map((i) => i.text.toLowerCase()));
-      const labels = [
-        ...new Set(
-          getSessions()
-            .filter((s) => s.start >= today && s.label)
-            .map((s) => s.label),
-        ),
-      ].filter((l) => !loggedToday.has(l.toLowerCase()));
-      quick.hidden = labels.length === 0;
-      chips.replaceChildren(
-        ...labels.slice(-6).map((label) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'done__chip';
-          b.textContent = `+ ${label}`;
-          b.setAttribute('aria-label', `Log “${label}” as done`);
-          b.addEventListener('click', () => add(label));
-          return b;
-        }),
-      );
-    }
-
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      add(input.value);
-      input.value = '';
-      input.focus();
+      render();
+      c.add(subscribe('done', render));
+      c.add(subscribe('sessions', render));
     });
-
-    render();
-    subscribe('done', render);
-    subscribe('sessions', render);
+    return c.run;
   });
 </script>
 

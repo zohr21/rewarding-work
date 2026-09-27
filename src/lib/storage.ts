@@ -15,9 +15,9 @@ const NAMESPACE = 'rw';
 const META_KEY = `${NAMESPACE}:meta`;
 
 /** Every stored item. Add new names here so keys stay discoverable. */
-export type StoreName = 'theme' | 'appearance' | 'sessions' | 'timer' | 'timer-prefs' | 'done' | 'chain' | 'breakdown';
+export type StoreName = 'theme' | 'appearance' | 'sessions' | 'timer' | 'timer-prefs' | 'done' | 'chain' | 'breakdown' | 'sound';
 
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'breakdown'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'breakdown', 'sound'];
 
 export function storageKey(name: StoreName, version = SCHEMA_VERSION): string {
   return `${NAMESPACE}:v${version}:${name}`;
@@ -201,8 +201,17 @@ export function setTheme(choice: ThemeChoice): void {
 
 // ---------- Appearance (ambient background) ----------
 
-export const BACKDROPS = ['sunrise', 'meadow', 'lavender', 'plain'] as const;
+/** Soft CSS glows (cheap, always available). */
+export const GLOWS = ['sunrise', 'meadow', 'lavender'] as const;
+/** WebGL scenes (src/lib/scene). Fall back to the Sunrise glow where WebGL is unavailable. */
+export const SCENES = ['aurora', 'lights', 'water', 'hills'] as const;
+export const BACKDROPS = [...GLOWS, ...SCENES, 'plain'] as const;
 export type Backdrop = (typeof BACKDROPS)[number];
+export type SceneId = (typeof SCENES)[number];
+
+export function isScene(bg: string): bg is SceneId {
+  return (SCENES as readonly string[]).includes(bg);
+}
 
 export interface Appearance {
   bg: Backdrop;
@@ -224,6 +233,43 @@ export function getAppearance(): Appearance {
 
 export function setAppearance(a: Appearance): void {
   write('appearance', a);
+}
+
+// ---------- Background sound ----------
+
+/** Sounds synthesised in the browser (src/lib/sound) — no audio files, work offline. */
+export const SOUNDS = ['rain', 'waves', 'wind', 'fire', 'brown', 'pink', 'pads', 'piano'] as const;
+export type SoundId = (typeof SOUNDS)[number];
+export type SoundSource = SoundId | 'youtube';
+
+export interface SoundPrefs {
+  source: SoundSource;
+  /** 0–1. */
+  volume: number;
+  /** Last YouTube link the user pasted. */
+  youtube: string;
+}
+
+export const DEFAULT_SOUND: SoundPrefs = { source: 'rain', volume: 0.5, youtube: '' };
+
+export function isSoundPrefs(v: unknown): v is SoundPrefs {
+  if (typeof v !== 'object' || v === null) return false;
+  const p = v as Record<string, unknown>;
+  return (
+    ((SOUNDS as readonly unknown[]).includes(p.source) || p.source === 'youtube') &&
+    typeof p.volume === 'number' &&
+    p.volume >= 0 &&
+    p.volume <= 1 &&
+    typeof p.youtube === 'string'
+  );
+}
+
+export function getSoundPrefs(): SoundPrefs {
+  return read<SoundPrefs>('sound', DEFAULT_SOUND, isSoundPrefs);
+}
+
+export function setSoundPrefs(p: SoundPrefs): void {
+  write('sound', p);
 }
 
 // ---------- Focus sessions ----------
