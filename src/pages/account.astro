@@ -1,0 +1,511 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AuthPanel from '../components/AuthPanel.astro';
+import PasswordField from '../components/PasswordField.astro';
+import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Account" description="Optional account: keep your progress safe and in sync across your devices.">
+  <div class="container account" data-account-page>
+    <header class="page-header">
+      <h1>Account</h1>
+      <p>Optional. Sign in to keep your progress safe and in sync across your devices.</p>
+    </header>
+
+    <p class="account__page-msg" role="status" data-page-msg></p>
+
+    {
+      !ACCOUNTS_ENABLED && (
+        <section class="card">
+          <h2 class="panel-title">Accounts aren't set up on this copy of the site</h2>
+          <p class="muted">
+            Everything still works and is saved in this browser. To turn on accounts, connect a Firebase project — see
+            “Accounts” in the README.
+          </p>
+        </section>
+      )
+    }
+
+    <p class="muted" data-view="loading" hidden={!ACCOUNTS_ENABLED}>Loading your account…</p>
+
+    <!-- Signed out -->
+    <div class="account__grid" data-view="signed-out" hidden>
+      <section class="card" aria-labelledby="acc-signin-h">
+        <h2 id="acc-signin-h" class="panel-title">Sign in or create an account</h2>
+        <AuthPanel id="acc" />
+      </section>
+
+      <div class="account__side">
+        <section class="card" aria-labelledby="acc-guest-h">
+          <h2 id="acc-guest-h" class="panel-title">No email? Continue as a guest</h2>
+          <p class="muted">
+            Start straight away — no email, no password. Your progress is backed up to a guest account tied to this
+            browser. Save it with an email or Google whenever you like to keep it for good and use it on other devices.
+          </p>
+          <div class="account__actions">
+            <button type="button" class="btn btn--ghost" data-guest>Continue as guest</button>
+          </div>
+          <p class="account__msg" role="status" data-guest-msg></p>
+        </section>
+
+        <section class="card account__info" aria-labelledby="acc-what-h">
+          <h2 id="acc-what-h" class="panel-title">What your account keeps</h2>
+          <ul>
+            <li>Focus sessions, done list, habit chain and task breakdown.</li>
+            <li>Timer settings, theme and background.</li>
+            <li>The running timer and sound settings stay on each device.</li>
+            <li>Anything already in this browser is added to your account when you sign in — nothing is overwritten.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+
+    <!-- Signed in -->
+    <div class="account__grid" data-view="signed-in" hidden>
+      <div class="account__main">
+        <section class="card profile" aria-labelledby="acc-profile-h">
+          <div class="profile__head">
+            <span class="profile__avatar" aria-hidden="true" data-avatar></span>
+            <div>
+              <h2 id="acc-profile-h" class="profile__name" data-name></h2>
+              <p class="profile__badges" data-badges></p>
+            </div>
+          </div>
+
+          <div class="profile__verify" data-verify hidden>
+            <p>
+              Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
+            </p>
+            <div class="account__actions">
+              <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
+              <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
+            </div>
+          </div>
+
+          <p class="sync" data-sync="idle">
+            <span class="sync__dot" aria-hidden="true"></span>
+            <span data-sync-text>Connecting…</span>
+          </p>
+          <p class="account__msg" role="status" data-profile-msg></p>
+        </section>
+
+        <section class="card" aria-labelledby="acc-save-h" data-guest-only hidden>
+          <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
+          <p class="muted account__lead">
+            Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
+            it safe and to sign in on your other devices.
+          </p>
+          <AuthPanel id="guest" guest />
+        </section>
+
+        <section class="card" aria-labelledby="acc-security-h" data-member-only hidden>
+          <h2 id="acc-security-h" class="panel-title">Sign-in and security</h2>
+
+          <div class="security__row" data-has-password hidden>
+            <h3>Change password</h3>
+            <form class="auth__form" data-form="change-password" novalidate>
+              <PasswordField id="acc-cur-pw" label="Current password" name="current" />
+              <PasswordField id="acc-new-pw" label="New password" isNew />
+              <div class="account__actions">
+                <button type="submit" class="btn btn--small">Change password</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="security__row">
+            <h3>Google</h3>
+            <p class="muted" data-google-linked hidden>Connected — you can sign in with Google.</p>
+            <div data-google-unlinked hidden>
+              <p class="muted">Connect Google to sign in with one click, alongside your password.</p>
+              <div class="account__actions">
+                <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect Google</button>
+              </div>
+            </div>
+          </div>
+          <p class="account__msg" role="status" data-security-msg></p>
+        </section>
+      </div>
+
+      <div class="account__side">
+        <section class="card" aria-labelledby="acc-device-h">
+          <h2 id="acc-device-h" class="panel-title">This device</h2>
+          <div data-member-only hidden>
+            <p class="muted">Signing out removes your data from this browser. It stays in your account.</p>
+            <div class="account__actions">
+              <button type="button" class="btn btn--ghost" data-sign-out>Sign out</button>
+            </div>
+            <div class="account__warn" data-sign-out-warn hidden>
+              <p>Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
+              <div class="account__actions">
+                <button type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
+                <button type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
+              </div>
+            </div>
+          </div>
+          <p class="muted" data-guest-only hidden>
+            You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
+            Google first if you want to use it elsewhere.
+          </p>
+          <p class="account__msg" role="status" data-device-msg></p>
+        </section>
+
+        <section class="card danger" aria-labelledby="acc-delete-h">
+          <h2 id="acc-delete-h" class="panel-title" data-delete-title>Delete account</h2>
+          <p class="muted">
+            Permanently deletes your account, everything stored in it, and this browser's copy. This can't be undone —{' '}
+            <a href={url('/progress')}>export a backup</a> first if you might want your data.
+          </p>
+          <form class="auth__form" data-form="delete" novalidate>
+            <div data-delete-password hidden>
+              <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
+            </div>
+            <div class="account__actions">
+              <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
+            </div>
+          </form>
+          <p class="account__msg" role="status" data-delete-msg></p>
+        </section>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import '../scripts/account-ui';
+</script>
+
+<style>
+  .account__page-msg:empty {
+    display: none;
+  }
+
+  .account__page-msg {
+    margin-bottom: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+
+  .account :global([hidden]) {
+    display: none !important;
+  }
+
+  .account__grid {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  .account__main,
+  .account__side {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  @media (min-width: 52rem) {
+    .account__grid {
+      grid-template-columns: 3fr 2fr;
+    }
+  }
+
+  .account__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .account__lead {
+    margin-bottom: var(--space-4);
+  }
+
+  .account__msg {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .account__msg:empty {
+    display: none;
+  }
+
+  .account__info ul {
+    padding-left: var(--space-5);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .account__info li + li {
+    margin-top: var(--space-2);
+  }
+
+  .account__warn,
+  .profile__verify {
+    margin-top: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--ev-some-bg);
+    color: var(--ev-some);
+    font-size: var(--text-sm);
+  }
+
+  .profile__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .profile__avatar {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-size: var(--text-xl);
+    font-weight: 700;
+  }
+
+  .profile__name {
+    font-size: var(--text-lg);
+    overflow-wrap: anywhere;
+  }
+
+  .profile__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    margin-top: var(--space-1);
+  }
+
+  .profile__badges .badge {
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+  }
+
+  .sync {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .sync__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-border-strong);
+  }
+
+  .sync[data-sync='synced'] .sync__dot {
+    background: var(--color-accent);
+  }
+
+  .sync[data-sync='saving'] .sync__dot,
+  .sync[data-sync='offline'] .sync__dot {
+    background: #c28a00;
+  }
+
+  .sync[data-sync='error'] .sync__dot {
+    background: #b3261e;
+  }
+
+  .security__row + .security__row {
+    margin-top: var(--space-5);
+    padding-top: var(--space-5);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .security__row h3 {
+    font-size: var(--text-base);
+    margin-bottom: var(--space-2);
+  }
+
+  .danger {
+    border-color: color-mix(in srgb, #b3261e 35%, var(--color-border));
+  }
+
+  /* ---------- Shared by AuthPanel / PasswordField (rendered inside this page) ---------- */
+  .account :global(.auth__tabs) {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+  }
+
+  .account :global(.auth__tab) {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .account :global(.auth__tab[aria-pressed='true']) {
+    background: var(--color-surface-solid);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .account :global(.auth__google) {
+    width: 100%;
+    margin-top: var(--space-4);
+  }
+
+  .account :global(.auth__or) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-block: var(--space-4);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .account :global(.auth__or::before),
+  .account :global(.auth__or::after) {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
+  }
+
+  .account :global(.auth__form) {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+  }
+
+  .account :global(.auth__form > .btn) {
+    margin-top: var(--space-1);
+  }
+
+  .account :global(.field) {
+    display: grid;
+    gap: var(--space-1);
+    width: 100%;
+  }
+
+  .account :global(.field label) {
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+
+  .account :global(.field .input[aria-invalid='true']) {
+    border-color: #b3261e;
+  }
+
+  .account :global(.pw) {
+    position: relative;
+  }
+
+  .account :global(.pw__input) {
+    padding-right: 4.5rem;
+  }
+
+  .account :global(.pw__toggle) {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .account :global(.pw__toggle:hover) {
+    background: var(--color-surface-2);
+  }
+
+  .account :global(.pw__meter) {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: var(--space-1);
+  }
+
+  .account :global(.pw__meter span) {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--color-surface-2);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .account :global(.pw__meter[data-strength='1'] span:nth-child(-n + 1)) {
+    background: #c28a00;
+  }
+
+  .account :global(.pw__meter[data-strength='2'] span:nth-child(-n + 2)) {
+    background: var(--heat-3);
+  }
+
+  .account :global(.pw__meter[data-strength='3'] span) {
+    background: var(--color-accent);
+  }
+
+  .account :global(.pw__hint) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .account :global(.pw__hint.is-problem) {
+    color: #b3261e;
+  }
+
+  .account :global(.auth__link) {
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .account :global(.auth__fine) {
+    font-size: var(--text-xs);
+  }
+
+  .account :global(.auth__msg) {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .account :global(.auth__msg:empty) {
+    display: none;
+  }
+
+  .account :global(.is-error) {
+    color: #b3261e;
+  }
+
+  :global([data-theme='dark']) .account :global(.is-error),
+  :global([data-theme='dark']) .account :global(.pw__hint.is-problem) {
+    color: #ff8a80;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global([data-theme='auto']) .account :global(.is-error),
+    :global([data-theme='auto']) .account :global(.pw__hint.is-problem) {
+      color: #ff8a80;
+    }
+  }
+</style>

@@ -15,9 +15,21 @@ const NAMESPACE = 'rw';
 const META_KEY = `${NAMESPACE}:meta`;
 
 /** Every stored item. Add new names here so keys stay discoverable. */
-export type StoreName = 'theme' | 'appearance' | 'sessions' | 'timer' | 'timer-prefs' | 'done' | 'chain' | 'breakdown' | 'sound';
+export type StoreName = 'theme' | 'appearance' | 'sessions' | 'timer' | 'timer-prefs' | 'done' | 'chain' | 'breakdown' | 'sound' | 'sync';
 
+/** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
 const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'breakdown', 'sound'];
+
+/**
+ * Stores copied to your account when you're signed in (src/lib/account).
+ * The live timer and sound settings stay per device.
+ */
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
+export type SyncedStore = (typeof SYNCED_STORES)[number];
+
+export function isSyncedStore(name: string): name is SyncedStore {
+  return (SYNCED_STORES as readonly string[]).includes(name);
+}
 
 export function storageKey(name: StoreName, version = SCHEMA_VERSION): string {
   return `${NAMESPACE}:v${version}:${name}`;
@@ -143,12 +155,49 @@ export function write<T>(name: StoreName, value: T): boolean {
   }
   const ok = setRaw(storageKey(name), json);
   notifyLocal(name);
+  notifyWrite(name);
   return ok;
 }
 
 export function remove(name: StoreName): void {
   ensureMigrated();
   removeRaw(storageKey(name));
+  notifyLocal(name);
+  notifyWrite(name);
+}
+
+// ---------- Raw access for account sync ----------
+
+type WriteListener = (name: StoreName) => void;
+const writeListeners = new Set<WriteListener>();
+
+function notifyWrite(name: StoreName): void {
+  writeListeners.forEach((fn) => {
+    try {
+      fn(name);
+    } catch {
+      /* a listener must never break a write */
+    }
+  });
+}
+
+/** Called after every local write/remove on this page (not for other tabs, not for writeJsonFromSync). */
+export function onWrite(fn: WriteListener): () => void {
+  writeListeners.add(fn);
+  return () => writeListeners.delete(fn);
+}
+
+/** The stored JSON text of a store, or null. */
+export function readJson(name: StoreName): string | null {
+  ensureMigrated();
+  return getRaw(storageKey(name));
+}
+
+/** Store JSON that came from your account. Widgets are notified; it doesn't count as a local change. */
+export function writeJsonFromSync(name: StoreName, json: string | null): void {
+  ensureMigrated();
+  if (json === null) removeRaw(storageKey(name));
+  else setRaw(storageKey(name), json);
   notifyLocal(name);
 }
 
@@ -552,4 +601,35 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
 /** Remove everything this site stores under the current schema version (including the live timer). */
 export function clearAll(): void {
   ALL_STORES.forEach((name) => remove(name));
+}
+
+// ---------- Account sync bookkeeping ----------
+
+export interface SyncMeta {
+  /** The account the data in this browser belongs to (null: not linked to any account yet). */
+  uid: string | null;
+  /** Signed in on this device — loads the account code on every page. */
+  active: boolean;
+  /** Stores changed here that haven't reached the account yet. */
+  dirty: SyncedStore[];
+}
+
+const EMPTY_SYNC: SyncMeta = { uid: null, active: false, dirty: [] };
+
+function isSyncMeta(v: unknown): v is SyncMeta {
+  return (
+    isObj(v) &&
+    (v.uid === null || typeof v.uid === 'string') &&
+    typeof v.active === 'boolean' &&
+    Array.isArray(v.dirty) &&
+    v.dirty.every((d) => typeof d === 'string' && isSyncedStore(d))
+  );
+}
+
+export function getSyncMeta(): SyncMeta {
+  return read<SyncMeta>('sync', EMPTY_SYNC, isSyncMeta);
+}
+
+export function setSyncMeta(meta: SyncMeta): void {
+  write('sync', { ...meta, dirty: [...new Set(meta.dirty)] });
 }

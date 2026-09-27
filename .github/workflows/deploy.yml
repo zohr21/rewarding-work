@@ -47,6 +47,12 @@ jobs:
         env:
           SITE_URL: ${{ steps.paths.outputs.site }}
           BASE_PATH: ${{ steps.paths.outputs.base }}
+          # Optional accounts (see README → Accounts). Repository variables, not secrets:
+          # Firebase web config is public by design; firestore.rules protects the data.
+          PUBLIC_FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+          PUBLIC_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
 
       - uses: actions/upload-pages-artifact@v4
         with:

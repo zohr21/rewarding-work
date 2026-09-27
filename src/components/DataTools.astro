@@ -1,11 +1,14 @@
 ---
 /** Export / import all data as JSON, and delete everything. No pop-ups: confirmations are inline. */
+import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { url } from '../lib/paths';
 ---
 
 <section class="card data" data-data-tools aria-labelledby="data-heading">
   <h2 id="data-heading" class="panel-title">Your data</h2>
   <p class="muted data__intro">
-    Everything is stored only in this browser. Export a backup to move it to another device or keep it safe.
+    Everything is stored in this browser. Export a backup to move it to another device or keep it safe.
+    {ACCOUNTS_ENABLED && <>{' '}Or <a href={url('/account')}>sign in</a> to keep it in sync across your devices.</>}
   </p>
   <p class="data__warn" data-data-warn hidden>
     This browser isn't saving data (private browsing or blocked storage?). It will be lost when you close the tab —
@@ -32,7 +35,10 @@
 
   <details class="data__danger disclosure">
     <summary>Delete all data</summary>
-    <p class="muted">Removes your sessions, done list, chain and settings from this browser. Export first if you might want them back.</p>
+    <p class="muted">
+      Removes your sessions, done list, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
+      Export first if you might want them back.
+    </p>
     <div class="data__actions">
       <button type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
     </div>

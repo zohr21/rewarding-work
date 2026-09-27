@@ -1,6 +1,7 @@
 ---
 import AppearanceMenu from './AppearanceMenu.astro';
 import SoundMenu from './SoundMenu.astro';
+import AccountButton from './AccountButton.astro';
 import { NAV, SITE } from '../config/site';
 import { url, isActive } from '../lib/paths';
 
@@ -34,6 +35,7 @@ const current = Astro.url.pathname;
     <div class="site-header__tools">
       <SoundMenu />
       <AppearanceMenu />
+      <AccountButton />
     </div>
   </div>
 </header>
