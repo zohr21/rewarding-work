@@ -2,7 +2,8 @@
 
 A static site that teaches evidence-aware techniques for making tasks feel rewarding —
 and lets you try each one on the spot. Built with Astro, TypeScript and plain CSS.
-No backend: all user data lives in the browser's localStorage.
+No backend of its own: user data lives in the browser's localStorage. Optional accounts
+(email + password, Google, or guest) sync it through Firebase — see [Accounts](#accounts).
 
 ## Run locally
 
@@ -108,7 +109,7 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
   It stores start timestamps and derives remaining time from `Date.now()`, so it
   doesn't drift in background tabs and survives reloads.
 - Stored items: `sessions`, `done`, `chain`, `breakdown`, `timer`, `timer-prefs`, `theme`,
-  `appearance`, `sound`.
+  `appearance`, `sound`, and `sync` (account bookkeeping, see *Accounts*).
   Every read has a type guard, so corrupted or hand-edited data falls back to a
   safe default instead of breaking the page.
 - Export/import (on `/progress`) writes and reads a JSON file:
@@ -121,6 +122,71 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
   technique pages whose frontmatter has `tool: timer` (pick the starting mode with
   `timer_mode: pomodoro | 52-17 | flowtime | custom`). There is one shared timer
   across the site.
+
+## Accounts
+
+Optional. Without Firebase settings the site builds and works exactly as before (no
+account button). With them, the header gets an **Account** button and `/account` offers:
+
+- **Continue as guest** — no email or password (Firebase anonymous sign-in). Data is
+  backed up at once, but the guest account lives in that browser only. It can be saved
+  later with an email or Google, keeping the same account and data.
+- **Email and password** — with email confirmation and "forgot password".
+- **Google**.
+- Settings: change password, connect Google, sign out, delete account.
+
+Password rules follow NIST SP 800-63B: at least 8 characters (max 128), any characters,
+no forced symbol/digit rules, common passwords refused, and a check against known data
+breaches via Have I Been Pwned (only the first 5 characters of the password's SHA-1 hash
+leave the browser). Firebase stores passwords hashed and rate-limits sign-in attempts.
+
+### How sync works
+
+- localStorage stays what the widgets read, so everything works offline and for people
+  who never sign in. `src/lib/account/` adds sync on top; no widget knows about accounts.
+- Each synced store is one Firestore document, `users/{uid}/stores/{name}`, holding the same
+  JSON text as localStorage. Synced: `sessions`, `done`, `chain`, `breakdown`, `timer-prefs`,
+  `theme`, `appearance`. The running timer and sound settings stay on each device.
+- A local change is sent ~1.5 s later. Changes from other devices arrive live. If both
+  changed (e.g. edits made offline), lists are merged by id/day and the result is sent
+  back (`src/lib/account/merge.ts`). Unsent changes survive a reload (`rw:v1:sync`).
+- Signing in on a browser that already has data merges it into the account. Signing out
+  sends waiting changes, then removes the data from that browser.
+- The Firebase SDK (~130 kB gzipped) is only downloaded when someone is signed in on that
+  device or opens `/account`.
+
+### Setting it up (one time, ~15 minutes)
+
+1. [Firebase console](https://console.firebase.google.com) → **Add project** (Analytics not needed).
+2. **Build → Authentication → Get started → Sign-in method**: enable **Email/Password**,
+   **Google** and **Anonymous**.
+3. **Authentication → Settings → Authorized domains**: add your site's domain, e.g.
+   `<your-user>.github.io` (`localhost` is there already).
+4. **Build → Firestore Database → Create database** (production mode, a region near you).
+   Then **Rules**: paste the contents of `firestore.rules` and **Publish** (or run
+   `npx firebase-tools deploy --only firestore:rules --project <project-id>`).
+5. **Project settings → General → Your apps → Web (`</>`)**: register an app and copy
+   `apiKey`, `authDomain`, `projectId` and `appId`.
+6. Locally: copy `.env.example` to `.env` and fill those in, then restart `npm run dev`.
+7. For the deployed site: GitHub repo → **Settings → Secrets and variables → Actions →
+   Variables** → add `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`,
+   `FIREBASE_APP_ID`. Push, or re-run the deploy workflow.
+
+These values aren't secrets (every Firebase web app ships them to the browser); the
+Firestore rules are what protect the data: each person can read and write only their own
+documents, only the known store names, and nothing over ~800 kB. Recommended extras:
+**App Check** (limits use of your project to your site) and, in Authentication settings,
+**email enumeration protection** (on by default for new projects).
+
+### Testing locally with the emulators
+
+```bash
+npx firebase-tools emulators:start --only auth,firestore --project demo-rw
+```
+
+(needs Java 21+; ports and rules come from `firebase.json`). Then in `.env` set any placeholder values, `PUBLIC_FIREBASE_PROJECT_ID=demo-rw` and
+`PUBLIC_FIREBASE_EMULATOR=true`. The emulators show a fake Google sign-in and print
+confirmation/reset emails instead of sending them.
 
 ## Adding a technique
 

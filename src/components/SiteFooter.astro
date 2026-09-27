@@ -1,11 +1,17 @@
 ---
 import { SITE } from '../config/site';
+import { ACCOUNTS_ENABLED } from '../config/firebase';
 ---
 
 <footer class="site-footer">
   <div class="container">
     <p>
-      {SITE.name} · Your data stays in this browser — nothing is sent anywhere.
+      {SITE.name} ·{' '}
+      {
+        ACCOUNTS_ENABLED
+          ? 'Your data stays in this browser unless you sign in — then it is also kept in your account.'
+          : 'Your data stays in this browser — nothing is sent anywhere.'
+      }
     </p>
     <p>
       Techniques are labelled by how well they're supported by evidence. What works varies from person to person; treat

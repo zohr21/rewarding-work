@@ -13,4 +13,6 @@ export default defineConfig({
   output: 'static',
   trailingSlash: 'ignore',
   integrations: [serviceWorker()],
+  // The Firebase chunk for accounts is ~550 kB (≈130 kB gzipped). It loads only for signed-in visitors.
+  vite: { build: { chunkSizeWarningLimit: 600 } },
 });

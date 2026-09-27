@@ -146,8 +146,8 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
         }),
       );
 
-      c.add(subscribe('theme', sync, { otherTabsOnly: true }));
-      c.add(subscribe('appearance', sync, { otherTabsOnly: true }));
+      c.add(subscribe('theme', sync)); // also changes arriving from your account
+      c.add(subscribe('appearance', sync));
       sync();
     });
     return c.run;

@@ -8,7 +8,9 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SKIP = [/\.map$/, /^sw\.js$/, /^\.nojekyll$/];
+// The Firebase chunk (src/lib/account/firebase.ts) is only needed by people who sign in,
+// so it isn't precached for everyone; the worker caches it the first time it's used.
+const SKIP = [/\.map$/, /^sw\.js$/, /^\.nojekyll$/, /^_astro\/firebase\.[^/]+\.js$/];
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
