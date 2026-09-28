@@ -3,6 +3,7 @@ import '../styles/global.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Ambient from '../components/Ambient.astro';
+import RewardNotice from '../components/RewardNotice.astro';
 import { ClientRouter } from 'astro:transitions';
 import { SITE } from '../config/site';
 import { SCENES } from '../lib/storage';
@@ -76,6 +77,7 @@ const sceneIds = SCENES.join('|');
       <slot />
     </main>
     <SiteFooter />
+    <RewardNotice />
 
     {
       /* Service worker only in production builds — in dev it would cache stale files. */
