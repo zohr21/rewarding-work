@@ -399,6 +399,9 @@ export function newId(prefix: string): string {
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isDayKey = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
+/** Deletion markers (done items, tasks) older than this are dropped; by then every device has long since synced. */
+const TOMBSTONE_MS = 180 * 86_400_000;
+
 // ---------- Done list ----------
 
 export interface DoneItem {
@@ -410,6 +413,11 @@ export interface DoneItem {
   source?: string;
   /** The task it belongs to. */
   taskId?: string;
+  /**
+   * Set when the item was removed: a marker (text, source and task stripped) that stays
+   * in the store so the removal reaches other devices instead of the item coming back.
+   */
+  deletedAt?: number;
 }
 
 export function isDoneItem(v: unknown): v is DoneItem {
@@ -419,15 +427,28 @@ export function isDoneItem(v: unknown): v is DoneItem {
     typeof v.text === 'string' &&
     typeof v.doneAt === 'number' &&
     (v.source === undefined || typeof v.source === 'string') &&
-    (v.taskId === undefined || typeof v.taskId === 'string')
+    (v.taskId === undefined || typeof v.taskId === 'string') &&
+    (v.deletedAt === undefined || typeof v.deletedAt === 'number')
   );
 }
 
-/** Newest first. */
-export function getDone(): DoneItem[] {
+const byDoneAt = (a: DoneItem, b: DoneItem) => b.doneAt - a.doneAt;
+
+/** Everything stored, including deletion markers (for sync and backups). Newest first. */
+export function getDoneStore(): DoneItem[] {
   const raw = read<unknown>('done', []);
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isDoneItem).sort((a, b) => b.doneAt - a.doneAt);
+  return raw.filter(isDoneItem).sort(byDoneAt);
+}
+
+/** Live (not removed) items, newest first. */
+export function getDone(): DoneItem[] {
+  return getDoneStore().filter((d) => d.deletedAt === undefined);
+}
+
+function writeDone(items: DoneItem[]): void {
+  const cutoff = Date.now() - TOMBSTONE_MS;
+  write('done', items.filter((d) => d.deletedAt === undefined || d.deletedAt > cutoff).sort(byDoneAt));
 }
 
 export function addDone(text: string, link: { source?: string; taskId?: string } = {}): DoneItem | null {
@@ -440,16 +461,41 @@ export function addDone(text: string, link: { source?: string; taskId?: string }
     ...(link.source ? { source: link.source } : {}),
     ...(link.taskId ? { taskId: link.taskId } : {}),
   };
-  write('done', [item, ...getDone()]);
+  writeDone([item, ...getDoneStore()]);
   return item;
 }
 
+/** Replace every live item matching `hit` with a deletion marker. */
+function markDoneRemoved(hit: (d: DoneItem) => boolean): void {
+  const all = getDoneStore();
+  if (!all.some((d) => d.deletedAt === undefined && hit(d))) return;
+  const now = Date.now();
+  writeDone(
+    all.map((d) => (d.deletedAt === undefined && hit(d) ? { id: d.id, text: '', doneAt: d.doneAt, deletedAt: now } : d)),
+  );
+}
+
 export function removeDone(id: string): void {
-  write('done', getDone().filter((d) => d.id !== id));
+  markDoneRemoved((d) => d.id === id);
 }
 
 export function removeDoneBySource(source: string): void {
-  write('done', getDone().filter((d) => d.source !== source));
+  markDoneRemoved((d) => d.source === source);
+}
+
+/**
+ * Combine two copies of the done list (account sync, backup import). Items are never
+ * edited, only added or removed, so per id a deletion marker beats the live copy.
+ */
+export function mergeDoneLists(a: DoneItem[], b: DoneItem[]): DoneItem[] {
+  const byId = new Map(a.map((d) => [d.id, d]));
+  for (const d of b) {
+    const mine = byId.get(d.id);
+    if (!mine || (d.deletedAt !== undefined && (mine.deletedAt === undefined || d.deletedAt < mine.deletedAt))) {
+      byId.set(d.id, d);
+    }
+  }
+  return [...byId.values()].sort(byDoneAt);
 }
 
 // ---------- Chain ----------
@@ -516,9 +562,6 @@ export interface TaskStore {
 }
 
 export const EMPTY_TASKS: TaskStore = { items: [], current: null, currentAt: 0 };
-
-/** Deletion markers older than this are dropped; by then every device has long since synced. */
-const TOMBSTONE_MS = 180 * 86_400_000;
 
 export function isTaskStep(v: unknown): v is TaskStep {
   return isObj(v) && typeof v.id === 'string' && typeof v.text === 'string' && typeof v.done === 'boolean';
@@ -726,7 +769,7 @@ export function exportBackup(): Backup {
     exportedAt: new Date().toISOString(),
     data: {
       sessions: getSessions(),
-      done: getDone(),
+      done: getDoneStore(),
       chain: getChain(),
       tasks: getTaskStore(),
       timerPrefs: read<unknown>('timer-prefs', null),
@@ -791,13 +834,14 @@ function parseBackupTasks(d: Record<string, unknown>, skip: (n: number) => void)
 }
 
 /**
- * merge: keeps everything you have and adds what's new (by id / by day).
+ * merge: keeps everything you have and adds what's new (by id / by day); a removal
+ *   recorded on either side (done item, task) wins over the live copy.
  * replace: your current data is swapped for the file's contents.
  */
 export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
   if (mode === 'replace') {
     write('sessions', [...data.sessions].sort((a, b) => a.start - b.start));
-    write('done', data.done);
+    writeDone(data.done);
     setChain(data.chain);
     writeTasks(data.tasks);
     if (data.timerPrefs) write('timer-prefs', data.timerPrefs);
@@ -810,9 +854,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
   data.sessions.forEach((s) => sessions.has(s.id) || sessions.set(s.id, s));
   write('sessions', [...sessions.values()].sort((a, b) => a.start - b.start));
 
-  const done = new Map(getDone().map((d) => [d.id, d]));
-  data.done.forEach((d) => done.has(d.id) || done.set(d.id, d));
-  write('done', [...done.values()].sort((a, b) => b.doneAt - a.doneAt));
+  writeDone(mergeDoneLists(getDoneStore(), data.done));
 
   const chain = getChain();
   setChain({ habit: chain.habit || data.chain.habit, days: [...chain.days, ...data.chain.days] });
