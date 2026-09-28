@@ -1,0 +1,189 @@
+---
+/**
+ * Reward tiers on the progress page: one ladder of five tiers per track
+ * (src/lib/rewards.ts), with how far it is to the next one.
+ */
+---
+
+<section class="card tiers" data-reward-tiers aria-labelledby="tiers-heading">
+  <h2 id="tiers-heading" class="panel-title">Tiers</h2>
+  <p class="muted tiers__intro">
+    Markers along the way — there to show how far you've come, not to keep score. The chain counts your best run, so a
+    missed day never takes a tier away.
+  </p>
+  <ul class="tiers__grid" data-tiers-list></ul>
+</section>
+
+<script>
+  import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
+  import { allProgress, TIER_NAMES, type TrackProgress } from '../lib/rewards';
+  import { cleanups, onPage } from '../lib/page';
+
+  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  const LEAF_SVG =
+    '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /** Focus hours read better with one decimal below 10. */
+  function amount(p: TrackProgress): string {
+    if (p.track.id !== 'focus') return p.value.toLocaleString();
+    const v = p.value < 10 ? Math.floor(p.value * 10) / 10 : Math.floor(p.value);
+    return v.toLocaleString();
+  }
+
+  function renderTrack(p: TrackProgress): HTMLLIElement {
+    const { track, level, reachedAt } = p;
+    const li = document.createElement('li');
+    li.className = 'tier';
+
+    const head = document.createElement('div');
+    head.className = 'tier__head';
+    const title = document.createElement('h3');
+    title.className = 'tier__title';
+    title.textContent = track.title;
+    const current = document.createElement('p');
+    current.className = `tier__current${level ? '' : ' muted'}`;
+    current.innerHTML = level ? LEAF_SVG : '';
+    current.append(level ? TIER_NAMES[level - 1]! : 'No tier yet');
+    head.append(title, current);
+
+    // One segment per tier; the next one fills partway with progress towards it.
+    const pips = document.createElement('ol');
+    pips.className = 'tier__pips';
+    track.thresholds.forEach((n, i) => {
+      const pip = document.createElement('li');
+      const at = reachedAt[i];
+      pip.className = `tier__pip${at !== null ? ' is-reached' : ''}`;
+      if (i === level) {
+        const prev = level ? track.thresholds[level - 1]! : 0;
+        const fill = document.createElement('span');
+        fill.className = 'tier__fill';
+        fill.style.inlineSize = `${Math.min(100, Math.max(0, ((p.value - prev) / (n - prev)) * 100))}%`;
+        pip.append(fill);
+      }
+      const label = `${TIER_NAMES[i]}: ${track.describe(n)}`;
+      pip.title = at !== null ? `${label} — reached ${dateFmt.format(at)}` : label;
+      const name = document.createElement('span');
+      name.className = 'visually-hidden';
+      name.textContent = at !== null ? `${pip.title}.` : `${label}, not reached yet.`;
+      pip.append(name);
+      pips.append(pip);
+    });
+
+    li.append(head, pips);
+
+    const next = track.thresholds[level];
+    const foot = document.createElement('p');
+    foot.className = 'tier__next muted';
+    if (next === undefined) {
+      foot.textContent = `All five tiers reached — ${track.describe(track.thresholds.at(-1)!)}.`;
+    } else {
+      foot.textContent = `${amount(p)} of ${next} ${track.unit(next)} to ${TIER_NAMES[level]}`;
+    }
+    li.append(foot);
+    return li;
+  }
+
+  onPage('reward-tiers', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-reward-tiers]').forEach((root) => {
+      const list = root.querySelector<HTMLElement>('[data-tiers-list]')!;
+      const render = () => {
+        const progress = allProgress({ sessions: getSessions(), done: getDone(), chainDays: getChain().days });
+        list.replaceChildren(...progress.map(renderTrack));
+      };
+      render();
+      c.add(subscribe('sessions', render));
+      c.add(subscribe('done', render));
+      c.add(subscribe('chain', render));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .tiers__intro {
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  .tiers__grid {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 40rem) {
+    .tiers__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .tiers__grid :global(.tier) {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    min-width: 0;
+  }
+
+  .tiers__grid :global(.tier__head) {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .tiers__grid :global(.tier__title) {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .tiers__grid :global(.tier__current) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-weight: 700;
+    color: var(--color-accent);
+  }
+
+  .tiers__grid :global(.tier__current.muted) {
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .tiers__grid :global(.tier__pips) {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--space-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .tiers__grid :global(.tier__pip) {
+    block-size: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--heat-0);
+    overflow: hidden;
+  }
+
+  .tiers__grid :global(.tier__pip.is-reached) {
+    background: var(--color-accent);
+  }
+
+  .tiers__grid :global(.tier__fill) {
+    display: block;
+    block-size: 100%;
+    background: var(--heat-2);
+    border-radius: inherit;
+  }
+
+  .tiers__grid :global(.tier__next) {
+    font-size: var(--text-xs);
+  }
+</style>

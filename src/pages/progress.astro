@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProgressStats from '../components/ProgressStats.astro';
 import Heatmap from '../components/Heatmap.astro';
+import RewardTiers from '../components/RewardTiers.astro';
 import DoneList from '../components/DoneList.astro';
 import ChainTracker from '../components/ChainTracker.astro';
 import DataTools from '../components/DataTools.astro';
@@ -13,7 +14,7 @@ import { url } from '../lib/paths';
     <header class="page-header">
       <h1>Your progress</h1>
       <p>
-        Focus sessions from the <a href={url('/timer')}>timer</a>, things you've finished, and your chain. Stored only in
+        Focus sessions from the <a href={url('/timer')}>timer</a>, the tiers they add up to, things you've finished, and your chain. Stored only in
         this browser.
       </p>
     </header>
@@ -21,6 +22,7 @@ import { url } from '../lib/paths';
     <div class="progress">
       <ProgressStats />
       <Heatmap />
+      <RewardTiers />
       <div class="progress__pair">
         <DoneList />
         <ChainTracker />

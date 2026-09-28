@@ -123,6 +123,19 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
   `timer_mode: pomodoro | 52-17 | flowtime | custom`). There is one shared timer
   across the site.
 
+### Reward tiers
+
+- Four tracks (focus hours, completed sessions, best chain, things done), each with five
+  tiers: Seedling, Sprout, Sapling, Tree, Grove. Thresholds live in `TRACKS` in
+  `src/lib/rewards.ts` — edit them there.
+- Tiers are **derived** from `sessions`, `done` and `chain` on every render; nothing extra
+  is stored or synced. The date each tier was reached is worked out from the data too.
+- `src/components/RewardTiers.astro` shows the ladders on `/progress`.
+  `src/components/RewardNotice.astro` (in `BaseLayout`, on every page) shows a notice when
+  one of *your actions on that page* reaches a new tier. Data from another tab or from
+  your account updates quietly, so a tier is never announced twice.
+- The chain track uses your best-ever run, so a missed day never takes a tier away.
+
 ## Accounts
 
 Optional. Without Firebase settings the site builds and works exactly as before (no

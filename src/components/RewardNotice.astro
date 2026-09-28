@@ -1,0 +1,203 @@
+---
+/**
+ * A small notice when you reach a new tier (src/lib/rewards.ts), on any page.
+ *
+ * Only your own actions on this page announce a tier: data arriving from another tab
+ * or from your account (e.g. signing in on a new device) updates the baseline quietly,
+ * so the same tier is never celebrated twice across tabs or devices.
+ */
+import { url } from '../lib/paths';
+---
+
+<div class="reward-notice" data-reward-notice transition:persist="reward-notice">
+  <div class="reward-notice__card" data-rn-card hidden>
+    <span class="reward-notice__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22"
+        ><path
+          d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l7-7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"></path></svg
+      >
+    </span>
+    <div class="reward-notice__body">
+      <p class="reward-notice__title" data-rn-title></p>
+      <p class="reward-notice__text muted" data-rn-text></p>
+      <a class="reward-notice__link" href={url('/progress')}>See your tiers</a>
+    </div>
+    <button type="button" class="icon-btn reward-notice__close" aria-label="Dismiss" data-rn-close>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+        ><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg
+      >
+    </button>
+  </div>
+  <p class="visually-hidden" role="status" data-rn-live></p>
+</div>
+
+<script>
+  import { getChain, getDone, getSessions, onWrite, subscribe, type StoreName } from '../lib/storage';
+  import { earnedTierIds, tierInfo, type TierInfo } from '../lib/rewards';
+  import { celebrate } from '../lib/appearance';
+  import { cleanups, onPage } from '../lib/page';
+
+  const WATCHED: StoreName[] = ['sessions', 'done', 'chain'];
+  const SHOW_MS = 8000;
+
+  const earnedNow = () => earnedTierIds({ sessions: getSessions(), done: getDone(), chainDays: getChain().days });
+
+  // Module state outlives page swaps (the script runs once per visit).
+  let known = new Set<string>();
+  /** Announced during this visit — unticking and re-ticking something doesn't repeat it. */
+  const announced = new Set<string>();
+  let hideTimer = 0;
+
+  onPage('reward-notice', () => {
+    const c = cleanups();
+    const root = document.querySelector<HTMLElement>('[data-reward-notice]');
+    if (!root) return;
+    const card = root.querySelector<HTMLElement>('[data-rn-card]')!;
+    const title = root.querySelector<HTMLElement>('[data-rn-title]')!;
+    const text = root.querySelector<HTMLElement>('[data-rn-text]')!;
+    const live = root.querySelector<HTMLElement>('[data-rn-live]')!;
+    const close = root.querySelector<HTMLButtonElement>('[data-rn-close]')!;
+
+    const hide = () => {
+      window.clearTimeout(hideTimer);
+      card.hidden = true;
+    };
+
+    function show(tiers: TierInfo[]): void {
+      // Several at once (e.g. a first session reaches two tracks): lead with the highest tier.
+      const [top, ...rest] = [...tiers].sort((a, b) => b.index - a.index);
+      if (!top) return;
+      title.textContent = `New tier: ${top.name}`;
+      const others = rest.map((t) => `${t.name} for ${t.track.describe(t.threshold)}`);
+      text.textContent =
+        `You've reached ${top.track.describe(top.threshold)}.` + (others.length ? ` Also: ${others.join('; ')}.` : '');
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = `${title.textContent}. ${text.textContent}`), 50);
+      card.hidden = false;
+      celebrate();
+      window.clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(hide, SHOW_MS);
+    }
+
+    let queued = false;
+    let fromHere = false;
+    /** Coalesce the writes of one action (a store change fires both listeners) into one check. */
+    function queue(local: boolean): void {
+      fromHere ||= local;
+      if (queued) return;
+      queued = true;
+      queueMicrotask(() => {
+        queued = false;
+        const announce = fromHere;
+        fromHere = false;
+        const now = earnedNow();
+        const fresh = announce ? [...now].filter((id) => !known.has(id) && !announced.has(id)) : [];
+        known = now;
+        fresh.forEach((id) => announced.add(id));
+        const tiers = fresh.map(tierInfo).filter((t): t is TierInfo => t !== null);
+        if (tiers.length) show(tiers);
+      });
+    }
+
+    known = earnedNow();
+    // Hovering keeps the notice open; it fades on its own a little after the pointer leaves.
+    const hold = () => window.clearTimeout(hideTimer);
+    const release = () => {
+      if (!card.hidden) hideTimer = window.setTimeout(hide, SHOW_MS / 2);
+    };
+    close.addEventListener('click', hide);
+    card.addEventListener('pointerenter', hold);
+    card.addEventListener('pointerleave', release);
+    c.add(() => {
+      close.removeEventListener('click', hide);
+      card.removeEventListener('pointerenter', hold);
+      card.removeEventListener('pointerleave', release);
+    });
+    c.add(onWrite((name) => WATCHED.includes(name) && queue(true)));
+    WATCHED.forEach((name) => c.add(subscribe(name, () => queue(false))));
+    return c.run;
+  });
+</script>
+
+<style>
+  .reward-notice {
+    position: fixed;
+    inset-inline: var(--gutter);
+    inset-block-end: var(--space-4);
+    z-index: 50;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .reward-notice__card {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    inline-size: min(100%, 26rem);
+    padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+    background: var(--color-surface-solid);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+    animation: reward-in var(--duration-slow) var(--ease-out);
+  }
+
+  .reward-notice__card[hidden] {
+    display: none;
+  }
+
+  .reward-notice__icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    border-radius: 50%;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .reward-notice__body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .reward-notice__title {
+    font-weight: 700;
+  }
+
+  .reward-notice__text {
+    font-size: var(--text-sm);
+  }
+
+  .reward-notice__link {
+    display: inline-block;
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .reward-notice__close {
+    flex: none;
+  }
+
+  @keyframes reward-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reward-notice__card {
+      animation: none;
+    }
+  }
+</style>
