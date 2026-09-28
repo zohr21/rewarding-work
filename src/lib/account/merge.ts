@@ -4,10 +4,11 @@
  * lists are joined by id / day; for single settings this device's value wins.
  */
 import {
-  isBreakdown,
   isChain,
   isDoneItem,
   isFocusSession,
+  mergeTaskStores,
+  normaliseTasks,
   type DoneItem,
   type FocusSession,
   type SyncedStore,
@@ -32,6 +33,8 @@ const list = <T>(v: unknown, guard: (x: unknown) => x is T): T[] => (Array.isArr
 
 /** Merge two stored JSON values of `name`. Returns JSON text (null only if both are empty). */
 export function mergeJson(name: SyncedStore, localJson: string | null, remoteJson: string | null): string | null {
+  // Retired: its content now lives in `tasks`, so the removal always wins.
+  if (name === 'breakdown') return null;
   const local = parse(localJson);
   const remote = parse(remoteJson);
   if (local === undefined) return remote === undefined ? null : remoteJson;
@@ -51,10 +54,8 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
       if (!isChain(remote)) return localJson;
       return JSON.stringify({ habit: local.habit || remote.habit, days: [...new Set([...local.days, ...remote.days])].sort() });
     }
-    case 'breakdown': {
-      if (!isBreakdown(local)) return remoteJson;
-      return local.task || local.steps.length ? localJson : remoteJson;
-    }
+    case 'tasks':
+      return JSON.stringify(mergeTaskStores(normaliseTasks(local), normaliseTasks(remote)));
     default:
       return localJson;
   }

@@ -5,7 +5,7 @@
 import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import { addSession, getSessions, read, subscribe, write } from '../lib/storage';
+import { addSession, getSessions, getTask, getTasks, read, subscribe, write, type Task } from '../lib/storage';
 import { notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
@@ -94,6 +94,8 @@ function mountTimer(root: HTMLElement): () => void {
     skip: q<HTMLButtonElement>('[data-action="skip"]'),
     reset: q<HTMLButtonElement>('[data-action="reset"]'),
     label: q<HTMLInputElement>('[data-label]'),
+    taskOptions: q<HTMLDataListElement>('[data-task-options]'),
+    taskLink: q<HTMLElement>('[data-task-link]'),
     sound: q<HTMLInputElement>('[data-sound]'),
     notifyStatus: q<HTMLElement>('[data-notify-status]'),
     today: q<HTMLAnchorElement>('[data-today]'),
@@ -136,7 +138,7 @@ function mountTimer(root: HTMLElement): () => void {
     const wanted = standalone ? prefs.mode : ((root.dataset.defaultMode as TimerMode | undefined) ?? prefs.mode);
     const mode = (TIMER_MODES as readonly string[]).includes(wanted) ? wanted : 'pomodoro';
     const cycle = stored && stored.mode === mode ? stored.cycle : 0;
-    return T.createState(mode, prefs.custom, stored?.label ?? '', cycle);
+    return T.createState(mode, prefs.custom, stored?.label ?? '', cycle, stored?.taskId);
   }
 
   function commit(next: TimerState, events: TimerEvent[] = []): void {
@@ -392,10 +394,44 @@ function mountTimer(root: HTMLElement): () => void {
   els.customWork.addEventListener('change', onCustomChange);
   els.customBreak.addEventListener('change', onCustomChange);
 
+  // ---- Linking the label to a task ----
+
+  /** The open task whose title is exactly this label (ignoring case and spaces). */
+  function taskForLabel(label: string): Task | undefined {
+    const key = label.trim().toLowerCase();
+    return key ? getTasks().find((t) => t.status === 'active' && t.title.toLowerCase() === key) : undefined;
+  }
+
+  function renderTasks(): void {
+    els.taskOptions.replaceChildren(
+      ...getTasks()
+        .filter((t) => t.status === 'active' && t.title)
+        .map((t) => Object.assign(document.createElement('option'), { value: t.title })),
+    );
+    const task = state.taskId ? getTask(state.taskId) : null;
+    els.taskLink.hidden = !task;
+    els.taskLink.textContent = task ? 'Linked to your task — this session will show on it.' : '';
+  }
+
+  els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
+  els.label.setAttribute('list', els.taskOptions.id);
+
   els.label.addEventListener('input', () => {
-    state = T.setLabel(state, els.label.value);
+    state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id);
     write('timer', state);
+    renderTasks();
   });
+
+  // Arriving from "Focus on this" on the tasks page: /timer?task=<id>
+  const wantedTask = standalone ? new URLSearchParams(location.search).get('task') : null;
+  if (wantedTask) {
+    const task = getTask(wantedTask);
+    if (task && state.status === 'idle' && state.phase === 'work') {
+      state = T.setLabel(state, task.title, task.id);
+      write('timer', state);
+    }
+    history.replaceState(history.state, '', location.pathname);
+  }
 
   els.sound.addEventListener('change', () => {
     savePrefs({ sound: els.sound.checked });
@@ -437,10 +473,12 @@ function mountTimer(root: HTMLElement): () => void {
       state = stored;
       schedule();
       render();
+      renderTasks();
     },
     { otherTabsOnly: true },
   ));
   c.add(subscribe('sessions', renderToday));
+  c.add(subscribe('tasks', renderTasks));
 
   // Leaving the page (client-side navigation): stop ticking and restore the tab title.
   c.add(() => {
@@ -450,6 +488,7 @@ function mountTimer(root: HTMLElement): () => void {
   });
 
   render();
+  renderTasks();
   schedule();
   return c.run;
 }

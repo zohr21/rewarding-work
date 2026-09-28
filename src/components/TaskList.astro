@@ -1,0 +1,261 @@
+---
+/**
+ * All your tasks: add one, pick which one the breakdown tool shows, start a focus
+ * session on it, finish, reopen or delete it. Focus time comes from timer sessions
+ * whose label matched the task.
+ */
+import { url } from '../lib/paths';
+
+const timerUrl = url('/timer');
+---
+
+<section class="card tasks" data-task-list data-timer-url={timerUrl} aria-labelledby="tasks-heading">
+  <h2 id="tasks-heading" class="panel-title">Your tasks</h2>
+
+  <form class="tasks__form" data-tl-form>
+    <label for="tl-new" class="visually-hidden">New task</label>
+    <input id="tl-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…" data-tl-input />
+    <button type="submit" class="btn">Add</button>
+  </form>
+
+  <ul class="tasks__items" data-tl-open></ul>
+  <p class="muted tasks__empty" data-tl-empty>No open tasks. Add one above, or break one down below.</p>
+
+  <details class="disclosure tasks__finished" data-tl-finished-wrap hidden>
+    <summary data-tl-finished-summary>Finished</summary>
+    <ul class="tasks__items" data-tl-finished></ul>
+  </details>
+  <p class="visually-hidden" aria-live="polite" data-tl-live></p>
+</section>
+
+<script>
+  import { createTask, deleteTask, getCurrentTask, getSessions, getTasks, setCurrentTask, subscribe, type Task } from '../lib/storage';
+  import { finishTask, focusByTask, formatFocus, reopenTask, taskName } from '../lib/tasks';
+  import { celebrate } from '../lib/appearance';
+  import { cleanups, onPage } from '../lib/page';
+
+  const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
+
+  onPage('task-list', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-task-list]').forEach((root) => {
+      const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+      const form = $<HTMLFormElement>('[data-tl-form]');
+      const input = $<HTMLInputElement>('[data-tl-input]');
+      const openList = $<HTMLUListElement>('[data-tl-open]');
+      const empty = $<HTMLElement>('[data-tl-empty]');
+      const finishedWrap = $<HTMLDetailsElement>('[data-tl-finished-wrap]');
+      const finishedSummary = $<HTMLElement>('[data-tl-finished-summary]');
+      const finishedList = $<HTMLUListElement>('[data-tl-finished]');
+      const live = $<HTMLElement>('[data-tl-live]');
+      const timerUrl = root.dataset.timerUrl!;
+      /** Delete asks for a second click; this is the task waiting for it. */
+      let armed: string | null = null;
+      let armTimer = 0;
+
+      const announce = (t: string) => {
+        live.textContent = '';
+        window.setTimeout(() => (live.textContent = t), 50);
+      };
+
+      function button(text: string, onClick: () => void, cls = 'btn btn--ghost btn--small'): HTMLButtonElement {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = cls;
+        b.textContent = text;
+        b.addEventListener('click', onClick);
+        return b;
+      }
+
+      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>): HTMLLIElement {
+        const li = document.createElement('li');
+        li.className = `task${task.id === currentId ? ' is-current' : ''}${task.status === 'done' ? ' is-done' : ''}`;
+        const name = taskName(task);
+
+        const body = document.createElement('div');
+        body.className = 'task__body';
+        const title = document.createElement('p');
+        title.className = 'task__title';
+        title.textContent = name;
+        if (task.id === currentId) {
+          const badge = document.createElement('span');
+          badge.className = 'badge task__badge';
+          badge.textContent = 'Current';
+          title.append(' ', badge);
+        }
+        const meta = document.createElement('p');
+        meta.className = 'task__meta muted';
+        const parts: string[] = [];
+        const n = task.steps.length;
+        if (n) parts.push(`${task.steps.filter((s) => s.done).length} of ${n} step${n === 1 ? '' : 's'}`);
+        const seconds = focus.get(task.id) ?? 0;
+        if (seconds >= 60) parts.push(`${formatFocus(seconds)} focused`);
+        parts.push(task.status === 'done' && task.doneAt ? `finished ${dayFmt.format(task.doneAt)}` : `added ${dayFmt.format(task.createdAt)}`);
+        meta.textContent = parts.join(' · ');
+        body.append(title, meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'task__actions';
+        if (task.status === 'active') {
+          if (task.id !== currentId) {
+            actions.append(
+              button('Break down', () => {
+                setCurrentTask(task.id);
+                announce(`Showing “${name}” in the breakdown below.`);
+                document.querySelector<HTMLInputElement>('[data-bd-step]')?.focus();
+              }),
+            );
+          }
+          const focusLink = document.createElement('a');
+          focusLink.className = 'btn btn--ghost btn--small';
+          focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
+          focusLink.textContent = 'Focus';
+          focusLink.setAttribute('aria-label', `Start a focus session on “${name}”`);
+          actions.append(
+            focusLink,
+            button('Done', () => {
+              finishTask(task.id);
+              celebrate();
+              announce(`Finished: ${name}`);
+            }),
+          );
+        } else {
+          actions.append(
+            button('Reopen', () => {
+              reopenTask(task.id);
+              announce(`Reopened: ${name}`);
+            }),
+          );
+        }
+        const del = button(armed === task.id ? 'Really delete?' : 'Delete', () => {
+          if (armed !== task.id) {
+            armed = task.id;
+            window.clearTimeout(armTimer);
+            armTimer = window.setTimeout(() => {
+              armed = null;
+              render();
+            }, 4000);
+            render();
+            root.querySelector<HTMLButtonElement>(`[data-del="${CSS.escape(task.id)}"]`)?.focus();
+            return;
+          }
+          armed = null;
+          deleteTask(task.id);
+          announce(`Deleted: ${name}. Its focus sessions and Done entries stay in your history.`);
+          input.focus();
+        }, `btn btn--small ${armed === task.id ? 'btn--danger' : 'btn--ghost'}`);
+        del.dataset.del = task.id;
+        del.setAttribute('aria-label', armed === task.id ? `Confirm deleting “${name}”` : `Delete “${name}”`);
+        actions.append(del);
+
+        li.append(body, actions);
+        return li;
+      }
+
+      function render(): void {
+        const tasks = getTasks();
+        const currentId = getCurrentTask()?.id ?? null;
+        const focus = focusByTask(getSessions());
+        const open = tasks.filter((t) => t.status === 'active');
+        const finished = tasks.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
+        openList.replaceChildren(...open.map((t) => renderTask(t, currentId, focus)));
+        empty.hidden = open.length > 0;
+        finishedWrap.hidden = finished.length === 0;
+        finishedSummary.textContent = `Finished · ${finished.length}`;
+        finishedList.replaceChildren(...finished.map((t) => renderTask(t, currentId, focus)));
+      }
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        // Becomes the current task only if the breakdown has nothing open to show.
+        const current = getCurrentTask();
+        createTask(text, { makeCurrent: !current || current.status === 'done' });
+        input.value = '';
+        input.focus();
+        announce(`Added: ${text}`);
+      });
+
+      render();
+      c.add(subscribe('tasks', render));
+      c.add(subscribe('sessions', render));
+      c.add(() => window.clearTimeout(armTimer));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .tasks__form {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .tasks__form .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .tasks__items {
+    margin-top: var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .tasks__empty {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .tasks__empty[hidden],
+  .tasks__finished[hidden] {
+    display: none;
+  }
+
+  .tasks__finished {
+    margin-top: var(--space-4);
+  }
+
+  .tasks :global(.task) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    padding-block: var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tasks :global(.task__body) {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .tasks :global(.task__title) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .tasks :global(.task.is-done .task__title) {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+  }
+
+  .tasks :global(.task__badge) {
+    vertical-align: middle;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .tasks :global(.task__meta) {
+    font-size: var(--text-xs);
+  }
+
+  .tasks :global(.task__actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+</style>

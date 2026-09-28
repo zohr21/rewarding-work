@@ -91,7 +91,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   <label class="timer__label">
     <span>What are you working on? <span class="muted">(optional)</span></span>
     <input type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
+    <datalist data-task-options></datalist>
   </label>
+  <p class="timer__task muted" data-task-link hidden></p>
 
   <div class="timer__footer">
     <label class="timer__sound">
@@ -388,6 +390,17 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     border-radius: var(--radius-sm);
     background: var(--color-bg);
     font-weight: 400;
+  }
+
+  .timer__task {
+    width: min(100%, 26rem);
+    margin-top: calc(-1 * var(--space-2));
+    text-align: left;
+    font-size: var(--text-xs);
+  }
+
+  .timer__task[hidden] {
+    display: none;
   }
 
   .timer__footer {

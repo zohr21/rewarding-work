@@ -56,8 +56,8 @@
         window.setTimeout(() => (live.textContent = text), 50);
       }
 
-      function add(text: string): void {
-        const item = addDone(text);
+      function add(text: string, taskId?: string): void {
+        const item = addDone(text, { taskId });
         if (!item) return;
         justAdded = item.id;
         celebrate();
@@ -122,15 +122,13 @@
         empty.hidden = items.length > 0;
         justAdded = null;
 
-        // Quick-add chips: today's timer labels not already logged today.
+        // Quick-add chips: today's timer labels not already logged today (with the task they were for).
         const loggedToday = new Set(buckets[0]![1].map((i) => i.text.toLowerCase()));
-        const labels = [
-          ...new Set(
-            getSessions()
-              .filter((s) => s.start >= today && s.label)
-              .map((s) => s.label),
-          ),
-        ].filter((l) => !loggedToday.has(l.toLowerCase()));
+        const taskOf = new Map<string, string | undefined>();
+        getSessions()
+          .filter((s) => s.start >= today && s.label)
+          .forEach((s) => taskOf.set(s.label, s.taskId ?? taskOf.get(s.label)));
+        const labels = [...taskOf.keys()].filter((l) => !loggedToday.has(l.toLowerCase()));
         quick.hidden = labels.length === 0;
         chips.replaceChildren(
           ...labels.slice(-6).map((label) => {
@@ -139,7 +137,7 @@
             b.className = 'done__chip';
             b.textContent = `+ ${label}`;
             b.setAttribute('aria-label', `Log “${label}” as done`);
-            b.addEventListener('click', () => add(label));
+            b.addEventListener('click', () => add(label, taskOf.get(label)));
             return b;
           }),
         );

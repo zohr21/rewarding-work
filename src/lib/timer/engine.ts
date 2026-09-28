@@ -34,6 +34,8 @@ export interface TimerState {
   /** Completed focus sessions in the current Pomodoro set. */
   cycle: number;
   label: string;
+  /** Set when the label is one of your tasks; sessions are then linked to it. */
+  taskId?: string;
   custom: CustomDurations;
 }
 
@@ -123,7 +125,7 @@ export function isBreak(phase: Phase): boolean {
 
 // ---------- Constructors ----------
 
-export function createState(mode: TimerMode, custom: CustomDurations, label = '', cycle = 0): TimerState {
+export function createState(mode: TimerMode, custom: CustomDurations, label = '', cycle = 0, taskId?: string): TimerState {
   return {
     mode,
     phase: 'work',
@@ -134,12 +136,13 @@ export function createState(mode: TimerMode, custom: CustomDurations, label = ''
     phaseStartedAt: null,
     cycle,
     label,
+    ...(taskId ? { taskId } : {}),
     custom,
   };
 }
 
 function idleWork(s: TimerState, cycle = s.cycle): TimerState {
-  return createState(s.mode, s.custom, s.label, cycle);
+  return createState(s.mode, s.custom, s.label, cycle, s.taskId);
 }
 
 function makeSession(s: TimerState, end: number, focusMs: number, completed: boolean): FocusSession {
@@ -152,6 +155,7 @@ function makeSession(s: TimerState, end: number, focusMs: number, completed: boo
     mode: s.mode,
     label: s.label.trim(),
     completed,
+    ...(s.taskId ? { taskId: s.taskId } : {}),
   };
 }
 
@@ -259,7 +263,7 @@ export function reset(s: TimerState, now: number): Result {
 /** Only allowed while idle (the UI disables mode switching during a phase). */
 export function setMode(s: TimerState, mode: TimerMode): TimerState {
   if (s.status !== 'idle' || s.mode === mode) return s;
-  return createState(mode, s.custom, s.label, 0);
+  return createState(mode, s.custom, s.label, 0, s.taskId);
 }
 
 export function setCustom(s: TimerState, custom: CustomDurations): TimerState {
@@ -268,8 +272,9 @@ export function setCustom(s: TimerState, custom: CustomDurations): TimerState {
   return next;
 }
 
-export function setLabel(s: TimerState, label: string): TimerState {
-  return { ...s, label };
+export function setLabel(s: TimerState, label: string, taskId?: string): TimerState {
+  const { taskId: _old, ...rest } = s;
+  return taskId ? { ...rest, label, taskId } : { ...rest, label };
 }
 
 // ---------- Validation (for state restored from storage) ----------
@@ -290,6 +295,7 @@ export function isTimerState(v: unknown): v is TimerState {
     numOrNull(s.phaseStartedAt) &&
     num(s.cycle) &&
     typeof s.label === 'string' &&
+    (s.taskId === undefined || typeof s.taskId === 'string') &&
     typeof custom === 'object' &&
     custom !== null &&
     num(custom.workMin) &&

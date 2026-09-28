@@ -36,7 +36,7 @@ import { url } from '../lib/paths';
   <details class="data__danger disclosure">
     <summary>Delete all data</summary>
     <p class="muted">
-      Removes your sessions, done list, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
+      Removes your sessions, done list, tasks, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
       Export first if you might want them back.
     </p>
     <div class="data__actions">
@@ -94,7 +94,8 @@ import { url } from '../lib/paths';
           a.remove();
           window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           const d = backup.data;
-          say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items and ${d.chain.days.length} chain days.`);
+          const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
+          say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items, ${tasks} tasks and ${d.chain.days.length} chain days.`);
         } catch {
           say('Export failed in this browser.');
         }
@@ -117,7 +118,8 @@ import { url } from '../lib/paths';
         pending = result.data;
         const d = result.data;
         summary.textContent =
-          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items` +
+          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items, ` +
+          `${d.tasks.items.filter((t) => t.deletedAt === undefined).length} tasks` +
           `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
           `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
         panel.hidden = false;

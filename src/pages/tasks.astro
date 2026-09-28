@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TaskList from '../components/TaskList.astro';
+import BreakdownTool from '../components/BreakdownTool.astro';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Tasks" description="Your tasks, broken into small steps, with the focus time you've spent on each.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Tasks</h1>
+      <p>
+        Keep what you're working on in one place. Break a task into small steps, then press Focus to start
+        a <a href={url('/timer')}>timer</a> session on it — the time shows up here.
+      </p>
+    </header>
+
+    <div class="tasks-page">
+      <TaskList />
+      <BreakdownTool heading="Break it down" linkToTasks={false} intro="Steps for your current task. Make each one small enough to start in two minutes." />
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .tasks-page {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  @media (min-width: 52rem) {
+    .tasks-page {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
