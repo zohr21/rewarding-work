@@ -108,8 +108,9 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
 - `src/lib/timer/engine.ts` is the timer's state machine (pure functions, no DOM).
   It stores start timestamps and derives remaining time from `Date.now()`, so it
   doesn't drift in background tabs and survives reloads.
-- Stored items: `sessions`, `done`, `chain`, `breakdown`, `timer`, `timer-prefs`, `theme`,
-  `appearance`, `sound`, and `sync` (account bookkeeping, see *Accounts*).
+- Stored items: `sessions`, `done`, `chain`, `tasks`, `timer`, `timer-prefs`, `theme`,
+  `appearance`, `sound`, and `sync` (account bookkeeping, see *Accounts*). `breakdown` is
+  the old single-task store: on first load it is moved into `tasks` and removed.
   Every read has a type guard, so corrupted or hand-edited data falls back to a
   safe default instead of breaking the page.
 - Export/import (on `/progress`) writes and reads a JSON file:
@@ -122,6 +123,18 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
   technique pages whose frontmatter has `tool: timer` (pick the starting mode with
   `timer_mode: pomodoro | 52-17 | flowtime | custom`). There is one shared timer
   across the site.
+
+### Tasks
+
+- `/tasks` lists your tasks (`src/components/TaskList.astro`) next to the breakdown tool,
+  which always edits the *current* task (`BreakdownTool.astro`, also embedded on the
+  Eat the Frog page). Actions shared by both live in `src/lib/tasks.ts`.
+- Ticking a step, or finishing a whole task, adds a Done entry with `taskId` and a
+  `source`; unticking or reopening removes it again.
+- The timer links a session to a task when its label matches an open task's title
+  (ignoring case). The label field suggests your open tasks, and **Focus** on the tasks
+  page opens `/timer?task=<id>`. Linked sessions carry `taskId`, which is how each task
+  shows its focus time.
 
 ### Reward tiers
 
@@ -158,11 +171,15 @@ leave the browser). Firebase stores passwords hashed and rate-limits sign-in att
 - localStorage stays what the widgets read, so everything works offline and for people
   who never sign in. `src/lib/account/` adds sync on top; no widget knows about accounts.
 - Each synced store is one Firestore document, `users/{uid}/stores/{name}`, holding the same
-  JSON text as localStorage. Synced: `sessions`, `done`, `chain`, `breakdown`, `timer-prefs`,
-  `theme`, `appearance`. The running timer and sound settings stay on each device.
+  JSON text as localStorage. Synced: `sessions`, `done`, `chain`, `tasks`, `timer-prefs`,
+  `theme`, `appearance` (plus `breakdown`, only so its removal reaches the account).
+  The running timer and sound settings stay on each device.
 - A local change is sent ~1.5 s later. Changes from other devices arrive live. If both
   changed (e.g. edits made offline), lists are merged by id/day and the result is sent
-  back (`src/lib/account/merge.ts`). Unsent changes survive a reload (`rw:v1:sync`).
+  back (`src/lib/account/merge.ts`). Tasks merge per task: the copy with the newer
+  `updatedAt` wins, and a deleted task keeps a small marker (no title or steps) for
+  180 days so the deletion reaches other devices instead of the task coming back.
+  Unsent changes survive a reload (`rw:v1:sync`).
 - Signing in on a browser that already has data merges it into the account. Signing out
   sends waiting changes, then removes the data from that browser.
 - The Firebase SDK (~130 kB gzipped) is only downloaded when someone is signed in on that

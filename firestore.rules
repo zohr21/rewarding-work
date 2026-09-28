@@ -12,7 +12,7 @@ service cloud.firestore {
 
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && store in ['sessions', 'done', 'chain', 'breakdown', 'timer-prefs', 'theme', 'appearance']
+        && store in ['sessions', 'done', 'chain', 'tasks', 'breakdown', 'timer-prefs', 'theme', 'appearance']
         && request.resource.data.keys().hasOnly(['data', 'updatedAt'])
         && request.resource.data.data is string
         && request.resource.data.data.size() <= 800000

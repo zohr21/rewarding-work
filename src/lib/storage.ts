@@ -15,16 +15,28 @@ const NAMESPACE = 'rw';
 const META_KEY = `${NAMESPACE}:meta`;
 
 /** Every stored item. Add new names here so keys stay discoverable. */
-export type StoreName = 'theme' | 'appearance' | 'sessions' | 'timer' | 'timer-prefs' | 'done' | 'chain' | 'breakdown' | 'sound' | 'sync';
+export type StoreName =
+  | 'theme'
+  | 'appearance'
+  | 'sessions'
+  | 'timer'
+  | 'timer-prefs'
+  | 'done'
+  | 'chain'
+  | 'tasks'
+  | 'breakdown' // legacy: moved into `tasks` on first load (see migrateBreakdown)
+  | 'sound'
+  | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'breakdown', 'sound'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'breakdown', 'sound'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
- * The live timer and sound settings stay per device.
+ * The live timer and sound settings stay per device. `breakdown` stays listed only so
+ * its removal (after moving into `tasks`) reaches the account too.
  */
-export const SYNCED_STORES = ['sessions', 'done', 'chain', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
 export type SyncedStore = (typeof SYNCED_STORES)[number];
 
 export function isSyncedStore(name: string): name is SyncedStore {
@@ -130,6 +142,11 @@ function ensureMigrated(): void {
   if (migrated || typeof window === 'undefined') return;
   migrated = true;
   migrate();
+  try {
+    migrateBreakdown();
+  } catch {
+    /* never break the page; it is retried on the next load */
+  }
 }
 
 // ---------- Typed read / write ----------
@@ -335,6 +352,8 @@ export interface FocusSession {
   label: string;
   /** false when the session was reset part-way (still counts towards focus minutes). */
   completed: boolean;
+  /** The task this session was for, when the label matched one. */
+  taskId?: string;
 }
 
 export function isFocusSession(v: unknown): v is FocusSession {
@@ -348,7 +367,8 @@ export function isFocusSession(v: unknown): v is FocusSession {
     s.focusSeconds >= 0 &&
     typeof s.mode === 'string' &&
     typeof s.label === 'string' &&
-    typeof s.completed === 'boolean'
+    typeof s.completed === 'boolean' &&
+    (s.taskId === undefined || typeof s.taskId === 'string')
   );
 }
 
@@ -386,8 +406,10 @@ export interface DoneItem {
   text: string;
   /** Epoch ms. */
   doneAt: number;
-  /** Set when the item came from a breakdown step, so unticking the step removes it. */
+  /** Set when the item came from a task step (or a whole task), so unticking removes it. */
   source?: string;
+  /** The task it belongs to. */
+  taskId?: string;
 }
 
 export function isDoneItem(v: unknown): v is DoneItem {
@@ -396,7 +418,8 @@ export function isDoneItem(v: unknown): v is DoneItem {
     typeof v.id === 'string' &&
     typeof v.text === 'string' &&
     typeof v.doneAt === 'number' &&
-    (v.source === undefined || typeof v.source === 'string')
+    (v.source === undefined || typeof v.source === 'string') &&
+    (v.taskId === undefined || typeof v.taskId === 'string')
   );
 }
 
@@ -407,10 +430,16 @@ export function getDone(): DoneItem[] {
   return raw.filter(isDoneItem).sort((a, b) => b.doneAt - a.doneAt);
 }
 
-export function addDone(text: string, source?: string): DoneItem | null {
+export function addDone(text: string, link: { source?: string; taskId?: string } = {}): DoneItem | null {
   const clean = text.trim().slice(0, 200);
   if (!clean) return null;
-  const item: DoneItem = { id: newId('d'), text: clean, doneAt: Date.now(), ...(source ? { source } : {}) };
+  const item: DoneItem = {
+    id: newId('d'),
+    text: clean,
+    doneAt: Date.now(),
+    ...(link.source ? { source: link.source } : {}),
+    ...(link.taskId ? { taskId: link.taskId } : {}),
+  };
   write('done', [item, ...getDone()]);
   return item;
 }
@@ -453,36 +482,219 @@ export function toggleChainDay(key: string): boolean {
   return !has;
 }
 
-// ---------- Task breakdown ----------
+// ---------- Tasks ----------
 
-export interface BreakdownStep {
+export interface TaskStep {
   id: string;
   text: string;
   done: boolean;
 }
 
-export interface Breakdown {
-  task: string;
-  steps: BreakdownStep[];
+export interface Task {
+  id: string;
+  title: string;
+  steps: TaskStep[];
+  status: 'active' | 'done';
+  /** Epoch ms. */
+  createdAt: number;
+  /** Bumped on every change; account sync keeps the newer copy of each task. */
+  updatedAt: number;
+  doneAt?: number;
+  /**
+   * Set when the task is deleted. The entry stays (without title or steps) so the
+   * deletion reaches your other devices instead of the task coming back from them.
+   */
+  deletedAt?: number;
 }
 
-export const EMPTY_BREAKDOWN: Breakdown = { task: '', steps: [] };
+export interface TaskStore {
+  items: Task[];
+  /** The task the breakdown tool shows. */
+  current: string | null;
+  /** When `current` was last changed (for account sync). */
+  currentAt: number;
+}
 
-export function isBreakdown(v: unknown): v is Breakdown {
+export const EMPTY_TASKS: TaskStore = { items: [], current: null, currentAt: 0 };
+
+/** Deletion markers older than this are dropped; by then every device has long since synced. */
+const TOMBSTONE_MS = 180 * 86_400_000;
+
+export function isTaskStep(v: unknown): v is TaskStep {
+  return isObj(v) && typeof v.id === 'string' && typeof v.text === 'string' && typeof v.done === 'boolean';
+}
+
+export function isTask(v: unknown): v is Task {
   return (
     isObj(v) &&
-    typeof v.task === 'string' &&
+    typeof v.id === 'string' &&
+    typeof v.title === 'string' &&
     Array.isArray(v.steps) &&
-    v.steps.every((s) => isObj(s) && typeof s.id === 'string' && typeof s.text === 'string' && typeof s.done === 'boolean')
+    v.steps.every(isTaskStep) &&
+    (v.status === 'active' || v.status === 'done') &&
+    typeof v.createdAt === 'number' &&
+    typeof v.updatedAt === 'number' &&
+    (v.doneAt === undefined || typeof v.doneAt === 'number') &&
+    (v.deletedAt === undefined || typeof v.deletedAt === 'number')
   );
 }
 
-export function getBreakdown(): Breakdown {
-  return read<Breakdown>('breakdown', EMPTY_BREAKDOWN, isBreakdown);
+export function isTaskStore(v: unknown): v is TaskStore {
+  return (
+    isObj(v) &&
+    Array.isArray(v.items) &&
+    (v.current === null || typeof v.current === 'string') &&
+    typeof v.currentAt === 'number'
+  );
 }
 
-export function setBreakdown(b: Breakdown): void {
-  write('breakdown', b);
+/** Tolerant: malformed tasks are dropped, not the whole store. */
+export function normaliseTasks(v: unknown): TaskStore {
+  if (!isTaskStore(v)) return EMPTY_TASKS;
+  return { items: v.items.filter(isTask), current: v.current, currentAt: v.currentAt };
+}
+
+/** Everything stored, including deletion markers (for sync and backups). */
+export function getTaskStore(): TaskStore {
+  return normaliseTasks(read<unknown>('tasks', null));
+}
+
+/** Live (not deleted) tasks, newest first. */
+export function getTasks(): Task[] {
+  return getTaskStore()
+    .items.filter((t) => t.deletedAt === undefined)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function getTask(id: string): Task | null {
+  return getTasks().find((t) => t.id === id) ?? null;
+}
+
+/** The current task, if it still exists. */
+export function getCurrentTask(): Task | null {
+  const { current } = getTaskStore();
+  return current ? getTask(current) : null;
+}
+
+function writeTasks(store: TaskStore): void {
+  const cutoff = Date.now() - TOMBSTONE_MS;
+  write('tasks', { ...store, items: store.items.filter((t) => t.deletedAt === undefined || t.deletedAt > cutoff) });
+}
+
+const cleanTitle = (title: string) => title.trim().slice(0, 120);
+
+/** A copy of `task` stamped as changed now (always later than its previous stamp). */
+function touched(task: Task, patch: Partial<Task>): Task {
+  return { ...task, ...patch, updatedAt: Math.max(Date.now(), task.updatedAt + 1) };
+}
+
+export function setCurrentTask(id: string | null): void {
+  const store = getTaskStore();
+  if (store.current === id) return;
+  writeTasks({ ...store, current: id, currentAt: Math.max(Date.now(), store.currentAt + 1) });
+}
+
+export function createTask(title: string, { makeCurrent = true } = {}): Task {
+  const now = Date.now();
+  const task: Task = { id: newId('t'), title: cleanTitle(title), steps: [], status: 'active', createdAt: now, updatedAt: now };
+  const store = getTaskStore();
+  writeTasks({
+    items: [...store.items, task],
+    current: makeCurrent ? task.id : store.current,
+    currentAt: makeCurrent ? Math.max(now, store.currentAt + 1) : store.currentAt,
+  });
+  return task;
+}
+
+/** Apply `change` to one live task. Returns the updated task, or null if it doesn't exist. */
+export function updateTask(id: string, change: (task: Task) => Partial<Task>): Task | null {
+  const store = getTaskStore();
+  const old = store.items.find((t) => t.id === id && t.deletedAt === undefined);
+  if (!old) return null;
+  const next = touched(old, change(old));
+  next.title = cleanTitle(next.title);
+  writeTasks({ ...store, items: store.items.map((t) => (t.id === id ? next : t)) });
+  return next;
+}
+
+export function deleteTask(id: string): void {
+  const store = getTaskStore();
+  const old = store.items.find((t) => t.id === id);
+  if (!old || old.deletedAt !== undefined) return;
+  const now = Date.now();
+  const marker: Task = { ...touched(old, { deletedAt: now }), title: '', steps: [] };
+  writeTasks({
+    items: store.items.map((t) => (t.id === id ? marker : t)),
+    current: store.current === id ? null : store.current,
+    currentAt: store.current === id ? Math.max(now, store.currentAt + 1) : store.currentAt,
+  });
+}
+
+/**
+ * Combine two copies of the task store (account sync, backup import).
+ * Per task the newer `updatedAt` wins, so a deletion beats an older edit and a
+ * newer edit beats an older deletion. The newer `current` choice wins.
+ */
+export function mergeTaskStores(a: TaskStore, b: TaskStore): TaskStore {
+  const byId = new Map(a.items.map((t) => [t.id, t]));
+  for (const t of b.items) {
+    const mine = byId.get(t.id);
+    if (!mine || t.updatedAt > mine.updatedAt || (t.updatedAt === mine.updatedAt && t.deletedAt !== undefined)) {
+      byId.set(t.id, t);
+    }
+  }
+  const newer = b.currentAt > a.currentAt ? b : a;
+  return {
+    items: [...byId.values()].sort((x, y) => x.createdAt - y.createdAt),
+    current: newer.current,
+    currentAt: newer.currentAt,
+  };
+}
+
+// ---------- Legacy: the single task breakdown (before tasks existed) ----------
+
+export interface Breakdown {
+  task: string;
+  steps: TaskStep[];
+}
+
+export function isBreakdown(v: unknown): v is Breakdown {
+  return isObj(v) && typeof v.task === 'string' && Array.isArray(v.steps) && v.steps.every(isTaskStep);
+}
+
+/**
+ * Same id on every device, so a breakdown converted on two devices becomes one task
+ * when their data meets in your account.
+ */
+export const LEGACY_TASK_ID = 'tlegacy';
+
+/** The old breakdown as a task, or null if it was empty. */
+export function breakdownToTask(b: Breakdown, now = Date.now()): Task | null {
+  if (!b.task.trim() && !b.steps.length) return null;
+  return {
+    id: LEGACY_TASK_ID,
+    title: cleanTitle(b.task),
+    steps: b.steps.map((s) => ({ id: s.id, text: s.text, done: s.done })),
+    status: 'active',
+    createdAt: now,
+    // Older than any real edit, so a copy another device has already changed wins.
+    updatedAt: 1,
+  };
+}
+
+/** One-time: move the old single breakdown into the tasks store. */
+function migrateBreakdown(): void {
+  const legacy = safeParse(getRaw(storageKey('breakdown')));
+  if (legacy === undefined) return;
+  const task = isBreakdown(legacy) ? breakdownToTask(legacy) : null;
+  const store = getTaskStore();
+  if (task && !store.items.some((t) => t.id === task.id)) {
+    writeTasks({ items: [...store.items, task], current: store.current ?? task.id, currentAt: store.currentAt || 1 });
+  }
+  remove('breakdown');
+  // Make sure both changes reach your account even though the sync code isn't listening yet.
+  const meta = getSyncMeta();
+  if (meta.uid) setSyncMeta({ ...meta, dirty: [...meta.dirty, 'tasks', 'breakdown'] });
 }
 
 // ---------- Export / import ----------
@@ -494,7 +706,7 @@ export interface BackupData {
   sessions: FocusSession[];
   done: DoneItem[];
   chain: Chain;
-  breakdown: Breakdown;
+  tasks: TaskStore;
   timerPrefs: unknown;
   theme: ThemeChoice;
   appearance: Appearance;
@@ -516,7 +728,7 @@ export function exportBackup(): Backup {
       sessions: getSessions(),
       done: getDone(),
       chain: getChain(),
-      breakdown: getBreakdown(),
+      tasks: getTaskStore(),
       timerPrefs: read<unknown>('timer-prefs', null),
       theme: getTheme(),
       appearance: getAppearance(),
@@ -559,12 +771,23 @@ export function parseBackup(text: string): ParseResult {
     sessions: pick(d.sessions, isFocusSession),
     done: pick(d.done, isDoneItem),
     chain: isChain(d.chain) ? d.chain : EMPTY_CHAIN,
-    breakdown: isBreakdown(d.breakdown) ? d.breakdown : EMPTY_BREAKDOWN,
+    tasks: parseBackupTasks(d, (n) => (skipped += n)),
     timerPrefs: isObj(d.timerPrefs) ? d.timerPrefs : null,
     theme: d.theme === 'dark' || d.theme === 'auto' ? d.theme : 'light',
     appearance: isAppearance(d.appearance) ? d.appearance : DEFAULT_APPEARANCE,
   };
   return { ok: true, data, skipped };
+}
+
+/** Tasks from a backup; exports made before tasks existed carry a single `breakdown`. */
+function parseBackupTasks(d: Record<string, unknown>, skip: (n: number) => void): TaskStore {
+  if (isTaskStore(d.tasks)) {
+    const store = normaliseTasks(d.tasks);
+    skip(d.tasks.items.length - store.items.length);
+    return store;
+  }
+  const legacy = isBreakdown(d.breakdown) ? breakdownToTask(d.breakdown) : null;
+  return legacy ? { items: [legacy], current: legacy.id, currentAt: 1 } : EMPTY_TASKS;
 }
 
 /**
@@ -576,7 +799,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
     write('sessions', [...data.sessions].sort((a, b) => a.start - b.start));
     write('done', data.done);
     setChain(data.chain);
-    setBreakdown(data.breakdown);
+    writeTasks(data.tasks);
     if (data.timerPrefs) write('timer-prefs', data.timerPrefs);
     setTheme(data.theme);
     setAppearance(data.appearance);
@@ -594,8 +817,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
   const chain = getChain();
   setChain({ habit: chain.habit || data.chain.habit, days: [...chain.days, ...data.chain.days] });
 
-  const breakdown = getBreakdown();
-  if (!breakdown.task && !breakdown.steps.length) setBreakdown(data.breakdown);
+  writeTasks(mergeTaskStores(getTaskStore(), data.tasks));
 }
 
 /** Remove everything this site stores under the current schema version (including the live timer). */

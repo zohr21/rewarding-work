@@ -1,13 +1,27 @@
 ---
 /**
  * Task breakdown: split a big task into small steps and tick them off.
+ * Edits the *current* task (tasks in src/lib/storage.ts); /tasks lists them all.
  * Ticked steps are also logged in the Done list (unticking removes them again).
  */
+import { url } from '../lib/paths';
+
+interface Props {
+  heading?: string;
+  intro?: string;
+  /** Off on the tasks page itself. */
+  linkToTasks?: boolean;
+}
+const {
+  heading = 'Try it: break it down',
+  linkToTasks = true,
+  intro = 'Make each step small enough that you could start it in two minutes.',
+} = Astro.props;
 ---
 
 <section class="card breakdown" data-breakdown aria-labelledby="bd-heading">
-  <h2 id="bd-heading" class="panel-title">Try it: break it down</h2>
-  <p class="muted bd__intro">Make each step small enough that you could start it in two minutes.</p>
+  <h2 id="bd-heading" class="panel-title">{heading}</h2>
+  <p class="muted bd__intro">{intro}</p>
 
   <label class="bd__label" for="bd-task">The big task</label>
   <input id="bd-task" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Write the project report" data-bd-task />
@@ -23,15 +37,24 @@
   <p class="bd__progress" data-bd-progress hidden></p>
   <ol class="bd__steps" data-bd-steps></ol>
 
+  <div class="bd__finish" data-bd-finish hidden>
+    <button type="button" class="btn" data-bd-done>Mark the whole task done</button>
+  </div>
+  <div class="bd__finish" data-bd-finished hidden>
+    <p class="bd__finished-text">Finished — it's in your Done list.</p>
+    <button type="button" class="btn btn--ghost btn--small" data-bd-reopen>Reopen</button>
+  </div>
+
   <div class="bd__footer" data-bd-footer hidden>
     <button type="button" class="btn btn--ghost btn--small" data-bd-clear>Start a new task</button>
-    <span class="muted bd__note">Ticked steps also appear in your Done list.</span>
+    <span class="muted bd__note">Ticked steps also appear in your Done list. {linkToTasks && <a href={url('/tasks')}>All your tasks</a>}</span>
   </div>
   <p class="visually-hidden" aria-live="polite" data-bd-live></p>
 </section>
 
 <script>
-  import { addDone, getBreakdown, newId, removeDoneBySource, setBreakdown, subscribe, type Breakdown } from '../lib/storage';
+  import { createTask, getCurrentTask, setCurrentTask, subscribe, updateTask } from '../lib/storage';
+  import { addStep, ensureCurrentTask, finishTask, removeStep, reopenTask, setStepDone } from '../lib/tasks';
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
 
@@ -42,13 +65,15 @@
     const c = cleanups();
     document.querySelectorAll<HTMLElement>('[data-breakdown]').forEach((root) => {
       const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
-      const task = $<HTMLInputElement>('[data-bd-task]');
+      const title = $<HTMLInputElement>('[data-bd-task]');
       const form = $<HTMLFormElement>('[data-bd-form]');
       const stepInput = $<HTMLInputElement>('[data-bd-step]');
       const progress = $<HTMLElement>('[data-bd-progress]');
       const list = $<HTMLOListElement>('[data-bd-steps]');
+      const finish = $<HTMLElement>('[data-bd-finish]');
+      const finished = $<HTMLElement>('[data-bd-finished]');
+      const reopen = $<HTMLButtonElement>('[data-bd-reopen]');
       const footer = $<HTMLElement>('[data-bd-footer]');
-      const clear = $<HTMLButtonElement>('[data-bd-clear]');
       const live = $<HTMLElement>('[data-bd-live]');
 
       const announce = (t: string) => {
@@ -56,20 +81,21 @@
         window.setTimeout(() => (live.textContent = t), 50);
       };
 
-      function save(b: Breakdown): void {
-        setBreakdown(b);
-      }
-
       function render(): void {
-        const b = getBreakdown();
-        if (document.activeElement !== task) task.value = b.task;
-        const done = b.steps.filter((s) => s.done).length;
-        progress.hidden = b.steps.length === 0;
-        progress.textContent = `${done} of ${b.steps.length} step${b.steps.length === 1 ? '' : 's'} done${done === b.steps.length && done > 0 ? ' — the whole thing. Well done.' : ''}`;
-        footer.hidden = !b.task && b.steps.length === 0;
+        const task = getCurrentTask();
+        const steps = task?.steps ?? [];
+        if (document.activeElement !== title) title.value = task?.title ?? '';
+        const done = steps.filter((s) => s.done).length;
+        const isDone = task?.status === 'done';
+        progress.hidden = steps.length === 0;
+        progress.textContent = `${done} of ${steps.length} step${steps.length === 1 ? '' : 's'} done${done === steps.length && done > 0 ? ' — the whole thing. Well done.' : ''}`;
+        // Offer to finish the task once every step is ticked.
+        finish.hidden = !task || isDone || steps.length === 0 || done < steps.length;
+        finished.hidden = !isDone;
+        footer.hidden = !task;
 
         list.replaceChildren(
-          ...b.steps.map((step) => {
+          ...steps.map((step) => {
             const li = document.createElement('li');
             li.className = `bd__step${step.done ? ' is-done' : ''}`;
             const id = `bd-${step.id}`;
@@ -79,16 +105,10 @@
             cb.id = id;
             cb.checked = step.done;
             cb.addEventListener('change', () => {
-              const cur = getBreakdown();
-              const s = cur.steps.find((x) => x.id === step.id);
-              if (!s) return;
-              s.done = cb.checked;
-              if (cb.checked) {
-                addDone(cur.task ? `${s.text} (${cur.task})` : s.text, s.id);
-                celebrate();
-              } else removeDoneBySource(s.id);
-              save(cur);
-              announce(`${s.text}: ${cb.checked ? 'done' : 'not done'}`);
+              if (!task) return;
+              setStepDone(task.id, step.id, cb.checked);
+              if (cb.checked) celebrate();
+              announce(`${step.text}: ${cb.checked ? 'done' : 'not done'}`);
               root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`)?.focus();
             });
 
@@ -102,8 +122,7 @@
             del.setAttribute('aria-label', `Remove step “${step.text}”`);
             del.innerHTML = X_SVG;
             del.addEventListener('click', () => {
-              const cur = getBreakdown();
-              save({ ...cur, steps: cur.steps.filter((x) => x.id !== step.id) });
+              if (task) removeStep(task.id, step.id);
               announce(`Removed step: ${step.text}`);
               stepInput.focus();
             });
@@ -114,27 +133,47 @@
         );
       }
 
-      task.addEventListener('input', () => save({ ...getBreakdown(), task: task.value.slice(0, 120) }));
+      title.addEventListener('input', () => {
+        const task = getCurrentTask();
+        if (task) updateTask(task.id, () => ({ title: title.value }));
+        else if (title.value.trim()) createTask(title.value);
+      });
 
       form.addEventListener('submit', (e) => {
         e.preventDefault();
         const text = stepInput.value.trim();
         if (!text) return;
-        const cur = getBreakdown();
-        save({ ...cur, steps: [...cur.steps, { id: newId('st'), text, done: false }] });
+        addStep(ensureCurrentTask().id, text);
         stepInput.value = '';
         stepInput.focus();
         announce(`Step added: ${text}`);
       });
 
-      clear.addEventListener('click', () => {
-        save({ task: '', steps: [] });
-        task.focus();
-        announce('Cleared. Ticked steps stay in your Done list.');
+      $<HTMLButtonElement>('[data-bd-done]').addEventListener('click', () => {
+        const task = getCurrentTask();
+        if (!task) return;
+        finishTask(task.id);
+        celebrate();
+        announce('Task finished and logged in your Done list.');
+        reopen.focus();
+      });
+
+      reopen.addEventListener('click', () => {
+        const task = getCurrentTask();
+        if (!task) return;
+        reopenTask(task.id);
+        announce('Task reopened.');
+        stepInput.focus();
+      });
+
+      $<HTMLButtonElement>('[data-bd-clear]').addEventListener('click', () => {
+        setCurrentTask(null);
+        title.focus();
+        announce('Ready for a new task. The last one is kept with your other tasks.');
       });
 
       render();
-      c.add(subscribe('breakdown', render));
+      c.add(subscribe('tasks', render));
     });
     return c.run;
   });
@@ -211,6 +250,7 @@
     text-decoration-thickness: 1.5px;
   }
 
+  .bd__finish,
   .bd__footer {
     display: flex;
     flex-wrap: wrap;
@@ -219,8 +259,14 @@
     margin-top: var(--space-4);
   }
 
+  .bd__finish[hidden],
   .bd__footer[hidden] {
     display: none;
+  }
+
+  .bd__finished-text {
+    font-weight: 600;
+    color: var(--color-accent);
   }
 
   .bd__note {
