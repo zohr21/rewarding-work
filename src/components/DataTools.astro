@@ -94,8 +94,9 @@ import { url } from '../lib/paths';
           a.remove();
           window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           const d = backup.data;
+          const done = d.done.filter((x) => x.deletedAt === undefined).length;
           const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
-          say(`Exported ${d.sessions.length} sessions, ${d.done.length} done items, ${tasks} tasks and ${d.chain.days.length} chain days.`);
+          say(`Exported ${d.sessions.length} sessions, ${done} done items, ${tasks} tasks and ${d.chain.days.length} chain days.`);
         } catch {
           say('Export failed in this browser.');
         }
@@ -118,7 +119,7 @@ import { url } from '../lib/paths';
         pending = result.data;
         const d = result.data;
         summary.textContent =
-          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.length} done items, ` +
+          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.filter((x) => x.deletedAt === undefined).length} done items, ` +
           `${d.tasks.items.filter((t) => t.deletedAt === undefined).length} tasks` +
           `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
           `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;

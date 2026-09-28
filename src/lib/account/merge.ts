@@ -1,15 +1,16 @@
 /**
  * How this device's data and your account's data are combined when both changed
  * (first sign-in on a device with data, or edits made while offline). Nothing is lost:
- * lists are joined by id / day; for single settings this device's value wins.
+ * lists are joined by id / day (a removal on either side wins); for single settings
+ * this device's value wins.
  */
 import {
   isChain,
   isDoneItem,
   isFocusSession,
+  mergeDoneLists,
   mergeTaskStores,
   normaliseTasks,
-  type DoneItem,
   type FocusSession,
   type SyncedStore,
 } from '../storage';
@@ -46,8 +47,7 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
       return JSON.stringify(all.sort((x, y) => x.start - y.start));
     }
     case 'done': {
-      const all = unionById<DoneItem>(list(local, isDoneItem), list(remote, isDoneItem));
-      return JSON.stringify(all.sort((x, y) => y.doneAt - x.doneAt));
+      return JSON.stringify(mergeDoneLists(list(local, isDoneItem), list(remote, isDoneItem)));
     }
     case 'chain': {
       if (!isChain(local)) return remoteJson;
