@@ -550,9 +550,21 @@ export const NOTES_MAX = 5000;
 export const LOG_MAX = 30;
 export const LOG_TEXT_MAX = 200;
 
+/**
+ * Which list an open task is on. `inbox` holds thoughts jotted on the timer's scratchpad,
+ * waiting to be sorted. Tasks from before lists existed have none and count as `next`.
+ */
+export const TASK_LISTS = ['inbox', 'today', 'next', 'someday'] as const;
+export type TaskList = (typeof TASK_LISTS)[number];
+
 export interface Task {
   id: string;
   title: string;
+  list?: TaskList;
+  /** When the task was put on Today (epoch ms): shows when it was planned for an earlier day. */
+  todayAt?: number;
+  /** Position on Today, lowest first ("first up"); falls back to `todayAt`. */
+  todayOrder?: number;
   steps: TaskStep[];
   /** Free-form notes. */
   notes?: string;
@@ -604,6 +616,9 @@ export function isTask(v: unknown): v is Task {
     Array.isArray(v.steps) &&
     v.steps.every(isTaskStep) &&
     (v.notes === undefined || typeof v.notes === 'string') &&
+    (v.list === undefined || (TASK_LISTS as readonly unknown[]).includes(v.list)) &&
+    (v.todayAt === undefined || typeof v.todayAt === 'number') &&
+    (v.todayOrder === undefined || typeof v.todayOrder === 'number') &&
     (v.log === undefined || (Array.isArray(v.log) && v.log.every(isTaskLogEntry))) &&
     (v.status === 'active' || v.status === 'done') &&
     typeof v.createdAt === 'number' &&
@@ -668,9 +683,11 @@ export function setCurrentTask(id: string | null): void {
   writeTasks({ ...store, current: id, currentAt: Math.max(Date.now(), store.currentAt + 1) });
 }
 
-export function createTask(title: string, { makeCurrent = true } = {}): Task {
+export function createTask(title: string, { makeCurrent = true, list }: { makeCurrent?: boolean; list?: TaskList } = {}): Task {
   const now = Date.now();
   const task: Task = { id: newId('t'), title: cleanTitle(title), steps: [], status: 'active', createdAt: now, updatedAt: now };
+  if (list && list !== 'next') task.list = list;
+  if (list === 'today') task.todayAt = now;
   const store = getTaskStore();
   writeTasks({
     items: [...store.items, task],

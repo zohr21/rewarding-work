@@ -6,6 +6,7 @@
 import {
   addDone,
   createTask,
+  deleteTask,
   getCurrentTask,
   getTask,
   LOG_MAX,
@@ -16,8 +17,10 @@ import {
   updateTask,
   type FocusSession,
   type Task,
+  type TaskList,
   type TaskLogEntry,
 } from './storage';
+import { startOfDay } from './dates';
 
 export const UNTITLED = 'Untitled task';
 
@@ -102,4 +105,65 @@ export function logSession({ taskId, did, next, focusSeconds }: SessionLog): voi
   if (cleanNext && task.status === 'active') addStep(task.id, cleanNext);
   const entry: TaskLogEntry = { id: newId('lg'), at: Date.now(), did: cleanDid, next: cleanNext, focusSeconds };
   updateTask(task.id, (t) => ({ log: [...(t.log ?? []), entry].slice(-LOG_MAX) }));
+}
+
+// ---------- Lists: Inbox, Today, Next, Someday ----------
+
+export const LIST_LABELS: Record<TaskList, string> = { inbox: 'Inbox', today: 'Today', next: 'Next', someday: 'Someday' };
+
+/** Today works best short; past this the list nudges you to move some on. */
+export const TODAY_SOFT_MAX = 3;
+
+export const listOf = (task: Pick<Task, 'list'>): TaskList => task.list ?? 'next';
+
+export function moveTask(id: string, list: TaskList): void {
+  updateTask(id, (t) => {
+    if (listOf(t) === list) return {};
+    return { list: list === 'next' ? undefined : list, todayAt: list === 'today' ? Date.now() : undefined, todayOrder: undefined };
+  });
+}
+
+const todayKey = (t: Task) => t.todayOrder ?? t.todayAt ?? t.createdAt;
+
+/** Open tasks on Today, first up first. */
+export function todayTasks(tasks: Task[]): Task[] {
+  return tasks.filter((t) => t.status === 'active' && listOf(t) === 'today').sort((a, b) => todayKey(a) - todayKey(b));
+}
+
+/** Put a Today task first. */
+export function moveToTop(id: string, tasks: Task[]): void {
+  const first = todayTasks(tasks)[0];
+  if (!first || first.id === id) return;
+  updateTask(id, () => ({ todayOrder: todayKey(first) - 1 }));
+}
+
+/** Keep tasks carried over from an earlier day on Today, in the same places. */
+export function keepForToday(tasks: Task[], now = Date.now()): void {
+  for (const t of todayTasks(tasks)) {
+    if (isCarriedOver(t, now)) updateTask(t.id, () => ({ todayAt: now, todayOrder: todayKey(t) }));
+  }
+}
+
+/** On Today since before today (planned for an earlier day and not finished). */
+export function isCarriedOver(task: Task, now = Date.now()): boolean {
+  return listOf(task) === 'today' && task.todayAt !== undefined && task.todayAt < startOfDay(now).getTime();
+}
+
+// ---------- Scratchpad ----------
+
+/** Catch a stray thought during focus: it waits in the Inbox to be sorted later. */
+export function jot(text: string): Task | null {
+  const clean = text.trim();
+  if (!clean) return null;
+  return createTask(clean, { makeCurrent: false, list: 'inbox' });
+}
+
+/** Turn an Inbox thought into a line in another task's notes (and remove it from the Inbox). */
+export function jotToNotes(jotId: string, taskId: string): void {
+  const thought = getTask(jotId);
+  const target = getTask(taskId);
+  if (!thought || !target || jotId === taskId) return;
+  const notes = target.notes ? `${target.notes.trimEnd()}\n${thought.title}` : thought.title;
+  setTaskNotes(taskId, notes);
+  deleteTask(jotId);
 }

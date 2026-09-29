@@ -9,7 +9,7 @@ import { addSession, getSessions, getTask, getTasks, read, subscribe, write, typ
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
-import { logSession, taskName, type SessionLog } from '../lib/tasks';
+import { jot, listOf, logSession, taskName, type SessionLog } from '../lib/tasks';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -110,6 +110,10 @@ function mountTimer(root: HTMLElement): () => void {
     logNext: q<HTMLInputElement>('[data-log-next]'),
     logHint: q<HTMLElement>('[data-log-hint]'),
     logSkip: q<HTMLButtonElement>('[data-log-skip]'),
+    jotOpen: q<HTMLButtonElement>('[data-jot-open]'),
+    jotForm: q<HTMLFormElement>('[data-jot-form]'),
+    jotInput: q<HTMLInputElement>('[data-jot-input]'),
+    jotStatus: q<HTMLElement>('[data-jot-status]'),
     today: q<HTMLAnchorElement>('[data-today]'),
     live: q<HTMLElement>('[data-live]'),
   };
@@ -312,6 +316,7 @@ function mountTimer(root: HTMLElement): () => void {
     if (document.activeElement !== els.volume) els.volume.value = String(Math.round(prefs.volume * 100));
 
     renderNotifyStatus();
+    renderJotStatus();
     renderToday();
     lastTimeText = '';
     renderTime();
@@ -460,19 +465,71 @@ function mountTimer(root: HTMLElement): () => void {
   /** The open task whose title is exactly this label (ignoring case and spaces). */
   function taskForLabel(label: string): Task | undefined {
     const key = label.trim().toLowerCase();
-    return key ? getTasks().find((t) => t.status === 'active' && t.title.toLowerCase() === key) : undefined;
+    return key ? getTasks().find((t) => t.status === 'active' && listOf(t) !== 'inbox' && t.title.toLowerCase() === key) : undefined;
   }
 
   function renderTasks(): void {
     els.taskOptions.replaceChildren(
       ...getTasks()
-        .filter((t) => t.status === 'active' && t.title)
+        .filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox')
         .map((t) => Object.assign(document.createElement('option'), { value: t.title })),
     );
     const task = state.taskId ? getTask(state.taskId) : null;
     els.taskLink.hidden = !task;
     els.taskLink.textContent = task ? 'Linked to your task — this session will show on it.' : '';
+    renderJotStatus();
   }
+
+  // ---- Scratchpad: catch a stray thought without leaving the session ----
+
+  /** Where focus was before the scratchpad opened, to hand it back afterwards. */
+  let beforeJot: HTMLElement | null = null;
+
+  function renderJotStatus(): void {
+    const n = getTasks().filter((t) => t.status === 'active' && listOf(t) === 'inbox').length;
+    els.jotStatus.hidden = n === 0;
+    if (!n) return;
+    const things = n === 1 ? '1 thought' : `${n} thoughts`;
+    const focusing = state.phase === 'work' && state.status === 'running';
+    els.jotStatus.replaceChildren(
+      focusing ? `${things} in your Inbox — sort them on your break.` : `${things} in your Inbox. `,
+    );
+    if (!focusing) {
+      const a = document.createElement('a');
+      a.href = root.dataset.tasksUrl ?? '#';
+      a.textContent = 'Sort them now';
+      els.jotStatus.append(a);
+    }
+  }
+
+  function openJot(): void {
+    beforeJot = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
+    els.jotForm.hidden = false;
+    els.jotOpen.setAttribute('aria-expanded', 'true');
+    els.jotInput.focus();
+  }
+
+  function closeJot(): void {
+    els.jotForm.hidden = true;
+    els.jotOpen.setAttribute('aria-expanded', 'false');
+    els.jotInput.value = '';
+    (beforeJot?.isConnected ? beforeJot : els.jotOpen).focus();
+    beforeJot = null;
+  }
+
+  els.jotOpen.addEventListener('click', () => (els.jotForm.hidden ? openJot() : closeJot()));
+  els.jotForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const saved = jot(els.jotInput.value);
+    closeJot();
+    announce(saved ? 'Jotted. It is in your Inbox for later.' : 'Nothing jotted.');
+  });
+  els.jotInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeJot();
+    }
+  });
 
   els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
   els.label.setAttribute('list', els.taskOptions.id);
@@ -527,6 +584,9 @@ function mountTimer(root: HTMLElement): () => void {
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault();
         onReset();
+      } else if (e.key === 'j' || e.key === 'J') {
+        e.preventDefault();
+        openJot();
       }
     }));
   }

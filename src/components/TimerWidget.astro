@@ -28,6 +28,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   data-default-mode={defaultMode}
   data-shortcuts={standalone ? '' : undefined}
   data-icon={url('/favicon.svg')}
+  data-tasks-url={url('/tasks')}
   data-phase="work"
   data-status="idle"
   aria-labelledby="timer-heading">
@@ -113,6 +114,18 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   </label>
   <p class="timer__task muted" data-task-link hidden></p>
 
+  <div class="timer__jot">
+    <button type="button" class="btn btn--ghost btn--small" aria-expanded="false" aria-controls="timer-jot-form" data-jot-open>
+      Jot a thought
+    </button>
+    <form id="timer-jot-form" class="timer__jot-form" data-jot-form hidden>
+      <label for="timer-jot" class="visually-hidden">A thought to deal with later</label>
+      <input id="timer-jot" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Something to deal with later…" data-jot-input />
+      <button type="submit" class="btn btn--small">Save</button>
+    </form>
+    <p class="timer__jot-status muted" data-jot-status hidden></p>
+  </div>
+
   <div class="timer__footer">
     <label class="timer__sound">
       <input type="checkbox" data-sound checked />
@@ -133,7 +146,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   {
     standalone && (
       <p class="timer__keys muted">
-        Keyboard: <kbd>Space</kbd> start / pause · <kbd>R</kbd> reset
+        Keyboard: <kbd>Space</kbd> start / pause · <kbd>R</kbd> reset · <kbd>J</kbd> jot a thought
       </p>
     )
   }
@@ -525,6 +538,32 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   .timer__today:empty {
     display: none;
+  }
+
+  .timer__jot {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+  }
+
+  .timer__jot-form {
+    display: flex;
+    gap: var(--space-2);
+    inline-size: min(100%, 26rem);
+  }
+
+  .timer__jot-form[hidden],
+  .timer__jot-status[hidden] {
+    display: none;
+  }
+
+  .timer__jot-form .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .timer__jot-status {
+    font-size: var(--text-sm);
   }
 
   .timer__keys {
