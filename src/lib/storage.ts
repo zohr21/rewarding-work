@@ -504,21 +504,52 @@ export interface Chain {
   habit: string;
   /** Local YYYY-MM-DD keys of days marked done. */
   days: string[];
+  /**
+   * When the chain was last deleted (epoch ms). Merging keeps the copy with the later
+   * reset whole, so a deleted chain's days don't come back from another device.
+   */
+  resetAt?: number;
 }
 
 export const EMPTY_CHAIN: Chain = { habit: '', days: [] };
 
 export function isChain(v: unknown): v is Chain {
-  return isObj(v) && typeof v.habit === 'string' && Array.isArray(v.days) && v.days.every(isDayKey);
+  return (
+    isObj(v) &&
+    typeof v.habit === 'string' &&
+    Array.isArray(v.days) &&
+    v.days.every(isDayKey) &&
+    (v.resetAt === undefined || typeof v.resetAt === 'number')
+  );
 }
 
 export function getChain(): Chain {
   const c = read<Chain>('chain', EMPTY_CHAIN, isChain);
-  return { habit: c.habit, days: [...new Set(c.days)].sort() };
+  return { habit: c.habit, days: [...new Set(c.days)].sort(), ...(c.resetAt ? { resetAt: c.resetAt } : {}) };
 }
 
 export function setChain(chain: Chain): void {
-  write('chain', { habit: chain.habit.trim().slice(0, 80), days: [...new Set(chain.days)].sort() });
+  write('chain', {
+    habit: chain.habit.trim().slice(0, 80),
+    days: [...new Set(chain.days)].sort(),
+    ...(chain.resetAt ? { resetAt: chain.resetAt } : {}),
+  });
+}
+
+/** Delete the habit and every marked day. */
+export function resetChain(): void {
+  setChain({ ...EMPTY_CHAIN, resetAt: Math.max(Date.now(), (getChain().resetAt ?? 0) + 1) });
+}
+
+/**
+ * Combine two copies of the chain (account sync, backup import): marked days are joined,
+ * unless one copy was deleted more recently than the other — then that copy wins whole.
+ */
+export function mergeChains(a: Chain, b: Chain): Chain {
+  const ra = a.resetAt ?? 0;
+  const rb = b.resetAt ?? 0;
+  if (ra !== rb) return ra > rb ? a : b;
+  return { habit: a.habit || b.habit, days: [...new Set([...a.days, ...b.days])].sort(), ...(ra ? { resetAt: ra } : {}) };
 }
 
 export function toggleChainDay(key: string): boolean {
@@ -905,8 +936,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
 
   writeDone(mergeDoneLists(getDoneStore(), data.done));
 
-  const chain = getChain();
-  setChain({ habit: chain.habit || data.chain.habit, days: [...chain.days, ...data.chain.days] });
+  setChain(mergeChains(getChain(), data.chain));
 
   writeTasks(mergeTaskStores(getTaskStore(), data.tasks));
 }

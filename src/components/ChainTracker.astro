@@ -20,7 +20,10 @@ const Heading = headingLevel;
       <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
       <button type="submit" class="btn">Save</button>
     </div>
-    <button type="button" class="btn btn--ghost btn--small chain__cancel" data-chain-cancel hidden>Cancel</button>
+    <div class="chain__edit-actions" data-chain-edit-actions hidden>
+      <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
+      <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
+    </div>
   </form>
 
   <!-- Tracker -->
@@ -58,7 +61,8 @@ const Heading = headingLevel;
 </section>
 
 <script>
-  import { getChain, setChain, subscribe, toggleChainDay } from '../lib/storage';
+  import { EMPTY_CHAIN, getChain, resetChain, setChain, subscribe, toggleChainDay } from '../lib/storage';
+  import { offerUndo } from '../lib/undo';
   import { chainStats } from '../lib/stats';
   import { addDays, dayKey, formatDay, startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
@@ -71,6 +75,8 @@ const Heading = headingLevel;
       const form = $<HTMLFormElement>('[data-chain-form]');
       const input = $<HTMLInputElement>('[data-chain-input]');
       const cancel = $<HTMLButtonElement>('[data-chain-cancel]');
+      const editActions = $<HTMLElement>('[data-chain-edit-actions]');
+      const del = $<HTMLButtonElement>('[data-chain-delete]');
       const body = $<HTMLElement>('[data-chain-body]');
       const name = $<HTMLElement>('[data-chain-name]');
       const edit = $<HTMLButtonElement>('[data-chain-edit]');
@@ -84,6 +90,9 @@ const Heading = headingLevel;
       const live = $<HTMLElement>('[data-chain-live]');
       let editing = false;
       let pulseKey: string | null = null;
+      /** Deleted, but still offered for Undo (src/lib/undo.ts): shown as empty until then. */
+      let deleting = false;
+      const shownChain = () => (deleting ? EMPTY_CHAIN : getChain());
 
       const announce = (t: string) => {
         live.textContent = '';
@@ -100,11 +109,11 @@ const Heading = headingLevel;
       }
 
       function render(): void {
-        const chain = getChain();
+        const chain = shownChain();
         const hasHabit = chain.habit.length > 0;
         form.hidden = hasHabit && !editing;
         body.hidden = !hasHabit || editing;
-        cancel.hidden = !(hasHabit && editing);
+        editActions.hidden = !(hasHabit && editing);
         if (!hasHabit || editing) {
           if (document.activeElement !== input) input.value = chain.habit;
           return;
@@ -177,6 +186,11 @@ const Heading = headingLevel;
           return;
         }
         editing = false;
+        // Starting a new habit while the old one's Undo is still offered: make the deletion final first.
+        if (deleting) {
+          deleting = false;
+          resetChain();
+        }
         setChain({ ...getChain(), habit });
         announce(`Habit saved: ${habit}`);
         today.focus();
@@ -187,6 +201,32 @@ const Heading = headingLevel;
         input.focus();
         input.select();
       });
+      del.addEventListener('click', () => {
+        const old = getChain();
+        const n = old.days.length;
+        editing = false;
+        deleting = true;
+        render();
+        input.value = '';
+        input.focus();
+        offerUndo({
+          message: `Deleted “${old.habit}”${n ? ` and ${days(n)}` : ''}`,
+          commit: () => {
+            if (!deleting) return; // already made final by saving a new habit
+            deleting = false;
+            resetChain();
+          },
+          undo: () => {
+            if (!deleting) return;
+            deleting = false;
+            render();
+            announce(`Restored your chain: ${old.habit}.`);
+            edit.focus();
+          },
+        });
+        announce(`Deleted your chain “${old.habit}”. Press Undo to bring it back.`);
+      });
+
       cancel.addEventListener('click', () => {
         editing = false;
         render();
@@ -225,11 +265,14 @@ const Heading = headingLevel;
     min-width: 0;
   }
 
-  .chain__cancel {
-    justify-self: start;
+  .chain__edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2);
   }
 
-  .chain__cancel[hidden] {
+  .chain__edit-actions[hidden] {
     display: none;
   }
 
