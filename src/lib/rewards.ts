@@ -62,6 +62,8 @@ export interface RewardInput {
   sessions: FocusSession[];
   done: DoneItem[];
   chainDays: DayKey[];
+  /** Best-run records of deleted chains (Chain.pastBests). */
+  pastBests?: [DayKey, number][];
 }
 
 export interface TrackProgress {
@@ -100,22 +102,32 @@ function series(input: RewardInput, id: TrackId): Point[] {
       return [...input.done].sort((a, b) => a.doneAt - b.doneAt).map((d) => ({ t: d.doneAt, v: ++n }));
     }
     case 'streak': {
+      // The current chain's records and those of deleted chains, as one "best ever" line.
+      const records = [...streakRecords(input.chainDays), ...(input.pastBests ?? [])]
+        .map(([key, v]) => ({ t: fromDayKey(key).getTime(), v }))
+        .sort((a, b) => a.t - b.t || a.v - b.v);
       const points: Point[] = [];
-      let run = 0;
-      let best = 0;
-      let prev: DayKey | null = null;
-      for (const key of [...new Set(input.chainDays)].sort()) {
-        const date = fromDayKey(key);
-        run = prev && dayKey(addDays(fromDayKey(prev), 1)) === key ? run + 1 : 1;
-        prev = key;
-        if (run > best) {
-          best = run;
-          points.push({ t: date.getTime(), v: best });
-        }
-      }
+      for (const p of records) if (p.v > (points.at(-1)?.v ?? 0)) points.push(p);
       return points;
     }
   }
+}
+
+/** [day, length] for each day the chain's best run grew, oldest first. */
+export function streakRecords(days: DayKey[]): [DayKey, number][] {
+  const records: [DayKey, number][] = [];
+  let run = 0;
+  let best = 0;
+  let prev: DayKey | null = null;
+  for (const key of [...new Set(days)].sort()) {
+    run = prev && dayKey(addDays(fromDayKey(prev), 1)) === key ? run + 1 : 1;
+    prev = key;
+    if (run > best) {
+      best = run;
+      records.push([key, best]);
+    }
+  }
+  return records;
 }
 
 export function trackProgress(input: RewardInput, track: Track): TrackProgress {

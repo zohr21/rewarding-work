@@ -509,6 +509,20 @@ export interface Chain {
    * reset whole, so a deleted chain's days don't come back from another device.
    */
   resetAt?: number;
+  /**
+   * Best-run records of deleted chains: [day, length] for each day a new best was set.
+   * Kept so the Best chain tier (which counts your best run ever) survives a delete.
+   */
+  pastBests?: [string, number][];
+}
+
+const isBestRecord = (v: unknown): v is [string, number] =>
+  Array.isArray(v) && v.length === 2 && isDayKey(v[0]) && typeof v[1] === 'number';
+
+/** Records from both lists, oldest first, without repeats. */
+function joinBests(a: [string, number][] = [], b: [string, number][] = []): [string, number][] {
+  const seen = new Map([...a, ...b].map((r) => [`${r[0]}:${r[1]}`, r] as const));
+  return [...seen.values()].sort((x, y) => (x[0] === y[0] ? x[1] - y[1] : x[0] < y[0] ? -1 : 1));
 }
 
 export const EMPTY_CHAIN: Chain = { habit: '', days: [] };
@@ -519,13 +533,19 @@ export function isChain(v: unknown): v is Chain {
     typeof v.habit === 'string' &&
     Array.isArray(v.days) &&
     v.days.every(isDayKey) &&
-    (v.resetAt === undefined || typeof v.resetAt === 'number')
+    (v.resetAt === undefined || typeof v.resetAt === 'number') &&
+    (v.pastBests === undefined || (Array.isArray(v.pastBests) && v.pastBests.every(isBestRecord)))
   );
 }
 
 export function getChain(): Chain {
   const c = read<Chain>('chain', EMPTY_CHAIN, isChain);
-  return { habit: c.habit, days: [...new Set(c.days)].sort(), ...(c.resetAt ? { resetAt: c.resetAt } : {}) };
+  return {
+    habit: c.habit,
+    days: [...new Set(c.days)].sort(),
+    ...(c.resetAt ? { resetAt: c.resetAt } : {}),
+    ...(c.pastBests?.length ? { pastBests: c.pastBests } : {}),
+  };
 }
 
 export function setChain(chain: Chain): void {
@@ -533,12 +553,17 @@ export function setChain(chain: Chain): void {
     habit: chain.habit.trim().slice(0, 80),
     days: [...new Set(chain.days)].sort(),
     ...(chain.resetAt ? { resetAt: chain.resetAt } : {}),
+    ...(chain.pastBests?.length ? { pastBests: chain.pastBests } : {}),
   });
 }
 
-/** Delete the habit and every marked day. */
-export function resetChain(): void {
-  setChain({ ...EMPTY_CHAIN, resetAt: Math.max(Date.now(), (getChain().resetAt ?? 0) + 1) });
+/**
+ * Delete the habit and every marked day. `bests` are the deleted chain's best-run
+ * records (see Chain.pastBests), kept so its tier isn't lost.
+ */
+export function resetChain(bests: [string, number][] = []): void {
+  const old = getChain();
+  setChain({ ...EMPTY_CHAIN, resetAt: Math.max(Date.now(), (old.resetAt ?? 0) + 1), pastBests: joinBests(old.pastBests, bests) });
 }
 
 /**
@@ -548,8 +573,10 @@ export function resetChain(): void {
 export function mergeChains(a: Chain, b: Chain): Chain {
   const ra = a.resetAt ?? 0;
   const rb = b.resetAt ?? 0;
-  if (ra !== rb) return ra > rb ? a : b;
-  return { habit: a.habit || b.habit, days: [...new Set([...a.days, ...b.days])].sort(), ...(ra ? { resetAt: ra } : {}) };
+  const pastBests = joinBests(a.pastBests, b.pastBests);
+  const withBests = (c: Chain): Chain => (pastBests.length ? { ...c, pastBests } : c);
+  if (ra !== rb) return withBests(ra > rb ? a : b);
+  return withBests({ habit: a.habit || b.habit, days: [...new Set([...a.days, ...b.days])].sort(), ...(ra ? { resetAt: ra } : {}) });
 }
 
 export function toggleChainDay(key: string): boolean {

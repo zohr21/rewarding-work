@@ -63,6 +63,7 @@ const Heading = headingLevel;
 <script>
   import { EMPTY_CHAIN, getChain, resetChain, setChain, subscribe, toggleChainDay } from '../lib/storage';
   import { offerUndo } from '../lib/undo';
+  import { streakRecords } from '../lib/rewards';
   import { chainStats } from '../lib/stats';
   import { addDays, dayKey, formatDay, startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
@@ -189,7 +190,7 @@ const Heading = headingLevel;
         // Starting a new habit while the old one's Undo is still offered: make the deletion final first.
         if (deleting) {
           deleting = false;
-          resetChain();
+          resetChain(streakRecords(getChain().days));
         }
         setChain({ ...getChain(), habit });
         announce(`Habit saved: ${habit}`);
@@ -214,7 +215,7 @@ const Heading = headingLevel;
           commit: () => {
             if (!deleting) return; // already made final by saving a new habit
             deleting = false;
-            resetChain();
+            resetChain(streakRecords(getChain().days));
           },
           undo: () => {
             if (!deleting) return;
