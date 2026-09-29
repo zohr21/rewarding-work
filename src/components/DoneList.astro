@@ -2,6 +2,7 @@
 /**
  * "Done" list: log finished tasks. One tap to add from today's timer labels,
  * or type and press Enter. Each new item gets a small check-off animation.
+ * Long groups show their newest few with "Show more"; removing offers Undo.
  */
 ---
 
@@ -29,7 +30,12 @@
   import { addDone, getDone, getSessions, removeDone, subscribe, type DoneItem } from '../lib/storage';
   import { startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
+  import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
+
+  /** Items a group shows before "Show more", and how many more each click reveals. */
+  const PREVIEW = 5;
+  const PAGE = 20;
 
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11"></circle><path d="M7 12.5l3.2 3.2L17 9"></path></svg>';
@@ -50,6 +56,10 @@
       const empty = root.querySelector<HTMLElement>('[data-done-empty]')!;
       const live = root.querySelector<HTMLElement>('[data-done-live]')!;
       let justAdded: string | null = null;
+      /** Removed, but still undoable (src/lib/undo.ts): hidden until the removal is final. */
+      const removing = new Set<string>();
+      /** How many items each group shows, by group title; groups not listed show PREVIEW. */
+      const shown = new Map<string, number>();
 
       function announce(text: string): void {
         live.textContent = '';
@@ -88,9 +98,25 @@
         del.setAttribute('aria-label', `Remove “${item.text}”`);
         del.innerHTML = X_SVG;
         del.addEventListener('click', () => {
-          removeDone(item.id);
-          announce(`Removed: ${item.text}`);
-          input.focus();
+          // Move focus to a neighbour first, so keyboard users don't lose their place.
+          const next = li.nextElementSibling ?? li.previousElementSibling;
+          (next?.querySelector<HTMLElement>('.done__remove') ?? input).focus();
+          removing.add(item.id);
+          render();
+          offerUndo({
+            message: `Removed “${item.text}”`,
+            commit: () => {
+              removeDone(item.id);
+              removing.delete(item.id);
+            },
+            undo: () => {
+              removing.delete(item.id);
+              justAdded = item.id;
+              render();
+              announce(`Restored: ${item.text}`);
+            },
+          });
+          announce(`Removed: ${item.text}. Press Undo to bring it back.`);
         });
 
         li.append(check, body, when, del);
@@ -98,13 +124,13 @@
       }
 
       function render(): void {
-        const items = getDone();
+        const items = getDone().filter((i) => !removing.has(i.id));
         const today = startOfDay(new Date()).getTime();
         const week = startOfWeek(new Date()).getTime();
         const buckets: [string, DoneItem[], boolean][] = [
           ['Today', items.filter((i) => i.doneAt >= today), false],
           ['Earlier this week', items.filter((i) => i.doneAt < today && i.doneAt >= week), true],
-          ['Before that', items.filter((i) => i.doneAt < week).slice(0, 30), true],
+          ['Before that', items.filter((i) => i.doneAt < week), true],
         ];
 
         const frag = document.createDocumentFragment();
@@ -115,8 +141,40 @@
           h.textContent = `${title} · ${list.length}`;
           const ul = document.createElement('ul');
           ul.className = 'done__items';
-          ul.append(...list.map((i) => renderItem(i, showDay)));
+          ul.dataset.group = title;
+          const limit = shown.get(title) ?? PREVIEW;
+          ul.append(...list.slice(0, limit).map((i) => renderItem(i, showDay)));
           frag.append(h, ul);
+
+          const more = list.length - limit;
+          if (more > 0 || limit > PREVIEW) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn btn--ghost btn--small done__more';
+            if (more > 0) {
+              const n = Math.min(more, PAGE);
+              b.textContent = `Show ${n === more ? `all ${list.length}` : `${n} more`}`;
+              b.addEventListener('click', () => {
+                shown.set(title, limit + n);
+                render();
+                // Focus the first newly shown item, so keyboard users carry on from there.
+                groups
+                  .querySelector(`[data-group="${title}"]`)
+                  ?.children[limit]?.querySelector<HTMLElement>('.done__remove')
+                  ?.focus();
+              });
+            } else {
+              b.textContent = 'Show fewer';
+              b.addEventListener('click', () => {
+                shown.delete(title);
+                render();
+                const ul = groups.querySelector<HTMLElement>(`[data-group="${title}"]`);
+                ul?.scrollIntoView({ block: 'nearest' });
+                ul?.nextElementSibling instanceof HTMLButtonElement && ul.nextElementSibling.focus();
+              });
+            }
+            frag.append(b);
+          }
         }
         groups.replaceChildren(frag);
         empty.hidden = items.length > 0;
@@ -292,6 +350,10 @@
   @keyframes done-row {
     0% { background: var(--color-accent-soft); }
     100% { background: transparent; }
+  }
+
+  .done :global(.done__more) {
+    margin-top: var(--space-2);
   }
 
   .done__empty {

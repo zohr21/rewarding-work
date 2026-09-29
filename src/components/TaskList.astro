@@ -32,6 +32,7 @@ const timerUrl = url('/timer');
   import { createTask, deleteTask, getCurrentTask, getSessions, getTasks, setCurrentTask, subscribe, type Task } from '../lib/storage';
   import { finishTask, focusByTask, formatFocus, reopenTask, taskName } from '../lib/tasks';
   import { celebrate } from '../lib/appearance';
+  import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
 
   const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
@@ -49,9 +50,8 @@ const timerUrl = url('/timer');
       const finishedList = $<HTMLUListElement>('[data-tl-finished]');
       const live = $<HTMLElement>('[data-tl-live]');
       const timerUrl = root.dataset.timerUrl!;
-      /** Delete asks for a second click; this is the task waiting for it. */
-      let armed: string | null = null;
-      let armTimer = 0;
+      /** Deleted tasks still offered for Undo (src/lib/undo.ts). */
+      const removing = new Set<string>();
 
       const announce = (t: string) => {
         live.textContent = '';
@@ -127,25 +127,25 @@ const timerUrl = url('/timer');
             }),
           );
         }
-        const del = button(armed === task.id ? 'Really delete?' : 'Delete', () => {
-          if (armed !== task.id) {
-            armed = task.id;
-            window.clearTimeout(armTimer);
-            armTimer = window.setTimeout(() => {
-              armed = null;
-              render();
-            }, 4000);
-            render();
-            root.querySelector<HTMLButtonElement>(`[data-del="${CSS.escape(task.id)}"]`)?.focus();
-            return;
-          }
-          armed = null;
-          deleteTask(task.id);
-          announce(`Deleted: ${name}. Its focus sessions and Done entries stay in your history.`);
+        const del = button('Delete', () => {
           input.focus();
-        }, `btn btn--small ${armed === task.id ? 'btn--danger' : 'btn--ghost'}`);
-        del.dataset.del = task.id;
-        del.setAttribute('aria-label', armed === task.id ? `Confirm deleting “${name}”` : `Delete “${name}”`);
+          removing.add(task.id);
+          render();
+          offerUndo({
+            message: `Deleted “${name}”`,
+            commit: () => {
+              deleteTask(task.id);
+              removing.delete(task.id);
+            },
+            undo: () => {
+              removing.delete(task.id);
+              render();
+              announce(`Restored: ${name}`);
+            },
+          });
+          announce(`Deleted: ${name}. Press Undo to bring it back. Its focus sessions and Done entries stay in your history.`);
+        });
+        del.setAttribute('aria-label', `Delete “${name}”`);
         actions.append(del);
 
         li.append(body, actions);
@@ -153,7 +153,7 @@ const timerUrl = url('/timer');
       }
 
       function render(): void {
-        const tasks = getTasks();
+        const tasks = getTasks().filter((t) => !removing.has(t.id));
         const currentId = getCurrentTask()?.id ?? null;
         const focus = focusByTask(getSessions());
         const open = tasks.filter((t) => t.status === 'active');
@@ -180,7 +180,6 @@ const timerUrl = url('/timer');
       render();
       c.add(subscribe('tasks', render));
       c.add(subscribe('sessions', render));
-      c.add(() => window.clearTimeout(armTimer));
     });
     return c.run;
   });

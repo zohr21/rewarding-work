@@ -1,0 +1,166 @@
+---
+/**
+ * "Removed … · Undo" toast for src/lib/undo.ts, on every page. One offer at a time:
+ * a new removal makes the previous one final. Leaving or closing the page makes it final too.
+ */
+---
+
+<div class="undo" data-undo transition:persist="undo-toast">
+  <div class="undo__card" role="status" data-undo-card hidden>
+    <span class="undo__text" data-undo-text></span>
+    <button type="button" class="undo__btn" data-undo-btn>Undo</button>
+  </div>
+</div>
+
+<script>
+  import { setUndoHandler, type Undoable } from '../lib/undo';
+  import { onPage } from '../lib/page';
+
+  const SHOW_MS = 6000;
+
+  // Module state outlives page swaps, so a pending removal survives navigating away.
+  let current: Undoable | null = null;
+  let timer = 0;
+
+  function finish(): void {
+    window.clearTimeout(timer);
+    const u = current;
+    current = null;
+    u?.commit();
+  }
+
+  window.addEventListener('pagehide', finish);
+
+  onPage('undo-toast', () => {
+    const root = document.querySelector<HTMLElement>('[data-undo]');
+    if (!root) return;
+    const card = root.querySelector<HTMLElement>('[data-undo-card]')!;
+    const text = root.querySelector<HTMLElement>('[data-undo-text]')!;
+    const btn = root.querySelector<HTMLButtonElement>('[data-undo-btn]')!;
+
+    const hide = () => {
+      card.hidden = true;
+    };
+    const expire = () => {
+      finish();
+      hide();
+    };
+    const start = (ms: number) => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(expire, ms);
+    };
+
+    setUndoHandler((u) => {
+      finish();
+      current = u;
+      text.textContent = u.message;
+      card.hidden = false;
+      start(SHOW_MS);
+    });
+
+    const onUndo = () => {
+      window.clearTimeout(timer);
+      const u = current;
+      current = null;
+      hide();
+      u?.undo();
+    };
+    // Hovering or focusing the toast keeps it open.
+    const hold = () => window.clearTimeout(timer);
+    const release = () => {
+      if (current && !card.matches(':hover, :focus-within')) start(SHOW_MS / 2);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Ctrl/Cmd+Z undoes, unless you're typing in a field (where it undoes the typing).
+      if (!current || !(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return;
+      if ((e.target as HTMLElement | null)?.closest('input, textarea, [contenteditable="true"]')) return;
+      e.preventDefault();
+      onUndo();
+    };
+
+    btn.addEventListener('click', onUndo);
+    card.addEventListener('pointerenter', hold);
+    card.addEventListener('pointerleave', release);
+    card.addEventListener('focusin', hold);
+    card.addEventListener('focusout', release);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      btn.removeEventListener('click', onUndo);
+      card.removeEventListener('pointerenter', hold);
+      card.removeEventListener('pointerleave', release);
+      card.removeEventListener('focusin', hold);
+      card.removeEventListener('focusout', release);
+      document.removeEventListener('keydown', onKey);
+    };
+  });
+</script>
+
+<style>
+  .undo {
+    position: fixed;
+    inset-inline: var(--gutter);
+    inset-block-end: var(--space-4);
+    z-index: 49;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .undo__card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-inline-size: min(100%, 28rem);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    background: var(--color-text);
+    color: var(--color-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    pointer-events: auto;
+    animation: undo-in var(--duration-slow) var(--ease-out);
+  }
+
+  .undo__card[hidden] {
+    display: none;
+  }
+
+  .undo__text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+
+  .undo__btn {
+    flex: none;
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: var(--radius-md, 8px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .undo__btn:hover {
+    background: color-mix(in srgb, var(--color-bg) 15%, transparent);
+  }
+
+  @keyframes undo-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.75rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .undo__card {
+      animation: none;
+    }
+  }
+</style>

@@ -536,10 +536,28 @@ export interface TaskStep {
   done: boolean;
 }
 
+/** A note left when a focus session on the task ended ("what I did / what's next"). */
+export interface TaskLogEntry {
+  id: string;
+  /** Epoch ms. */
+  at: number;
+  did: string;
+  next: string;
+  focusSeconds: number;
+}
+
+export const NOTES_MAX = 5000;
+export const LOG_MAX = 30;
+export const LOG_TEXT_MAX = 200;
+
 export interface Task {
   id: string;
   title: string;
   steps: TaskStep[];
+  /** Free-form notes. */
+  notes?: string;
+  /** Session log, oldest first, at most LOG_MAX entries. */
+  log?: TaskLogEntry[];
   status: 'active' | 'done';
   /** Epoch ms. */
   createdAt: number;
@@ -567,6 +585,17 @@ export function isTaskStep(v: unknown): v is TaskStep {
   return isObj(v) && typeof v.id === 'string' && typeof v.text === 'string' && typeof v.done === 'boolean';
 }
 
+export function isTaskLogEntry(v: unknown): v is TaskLogEntry {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    typeof v.at === 'number' &&
+    typeof v.did === 'string' &&
+    typeof v.next === 'string' &&
+    typeof v.focusSeconds === 'number'
+  );
+}
+
 export function isTask(v: unknown): v is Task {
   return (
     isObj(v) &&
@@ -574,6 +603,8 @@ export function isTask(v: unknown): v is Task {
     typeof v.title === 'string' &&
     Array.isArray(v.steps) &&
     v.steps.every(isTaskStep) &&
+    (v.notes === undefined || typeof v.notes === 'string') &&
+    (v.log === undefined || (Array.isArray(v.log) && v.log.every(isTaskLogEntry))) &&
     (v.status === 'active' || v.status === 'done') &&
     typeof v.createdAt === 'number' &&
     typeof v.updatedAt === 'number' &&
@@ -665,7 +696,8 @@ export function deleteTask(id: string): void {
   const old = store.items.find((t) => t.id === id);
   if (!old || old.deletedAt !== undefined) return;
   const now = Date.now();
-  const marker: Task = { ...touched(old, { deletedAt: now }), title: '', steps: [] };
+  const { notes: _notes, log: _log, ...rest } = touched(old, { deletedAt: now });
+  const marker: Task = { ...rest, title: '', steps: [] };
   writeTasks({
     items: store.items.map((t) => (t.id === id ? marker : t)),
     current: store.current === id ? null : store.current,

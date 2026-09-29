@@ -3,8 +3,10 @@
  * Task breakdown: split a big task into small steps and tick them off.
  * Edits the *current* task (tasks in src/lib/storage.ts); /tasks lists them all.
  * Ticked steps are also logged in the Done list (unticking removes them again).
+ * Also the task's notes (saved as you type) and its session log from the timer.
  */
 import { url } from '../lib/paths';
+import { NOTES_MAX } from '../lib/storage';
 
 interface Props {
   heading?: string;
@@ -45,6 +47,25 @@ const {
     <button type="button" class="btn btn--ghost btn--small" data-bd-reopen>Reopen</button>
   </div>
 
+  <div class="bd__notes" data-bd-notes-wrap hidden>
+    <div class="bd__notes-head">
+      <label class="bd__label" for="bd-notes">Notes</label>
+      <span class="muted bd__saved" data-bd-saved></span>
+    </div>
+    <textarea
+      id="bd-notes"
+      class="input bd__notes-input"
+      rows="4"
+      maxlength={NOTES_MAX}
+      placeholder="Links, ideas, where you left off…"
+      data-bd-notes></textarea>
+  </div>
+
+  <details class="disclosure bd__log" data-bd-log-wrap hidden>
+    <summary data-bd-log-summary>Session log</summary>
+    <ol class="bd__log-list" data-bd-log></ol>
+  </details>
+
   <div class="bd__footer" data-bd-footer hidden>
     <button type="button" class="btn btn--ghost btn--small" data-bd-clear>Start a new task</button>
     <span class="muted bd__note">Ticked steps also appear in your Done list. {linkToTasks && <a href={url('/tasks')}>All your tasks</a>}</span>
@@ -54,12 +75,16 @@ const {
 
 <script>
   import { createTask, getCurrentTask, setCurrentTask, subscribe, updateTask } from '../lib/storage';
-  import { addStep, ensureCurrentTask, finishTask, removeStep, reopenTask, setStepDone } from '../lib/tasks';
+  import { addStep, ensureCurrentTask, finishTask, formatFocus, removeStep, reopenTask, setStepDone, setTaskNotes } from '../lib/tasks';
   import { celebrate } from '../lib/appearance';
+  import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
 
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  const logFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  const NOTES_SAVE_MS = 500;
 
   onPage('breakdown', () => {
     const c = cleanups();
@@ -75,6 +100,28 @@ const {
       const reopen = $<HTMLButtonElement>('[data-bd-reopen]');
       const footer = $<HTMLElement>('[data-bd-footer]');
       const live = $<HTMLElement>('[data-bd-live]');
+      const notesWrap = $<HTMLElement>('[data-bd-notes-wrap]');
+      const notes = $<HTMLTextAreaElement>('[data-bd-notes]');
+      const saved = $<HTMLElement>('[data-bd-saved]');
+      const logWrap = $<HTMLDetailsElement>('[data-bd-log-wrap]');
+      const logSummary = $<HTMLElement>('[data-bd-log-summary]');
+      const logList = $<HTMLOListElement>('[data-bd-log]');
+
+      /** Notes save shortly after you stop typing; this is the task they belong to. */
+      let notesFor: string | null = null;
+      let shownTask: string | null = null;
+      let notesTimer = 0;
+      function saveNotes(): void {
+        window.clearTimeout(notesTimer);
+        if (!notesFor) return;
+        const id = notesFor;
+        notesFor = null;
+        setTaskNotes(id, notes.value);
+        saved.textContent = 'Saved';
+      }
+
+      /** Removed steps still offered for Undo (src/lib/undo.ts). */
+      const removing = new Set<string>();
 
       const announce = (t: string) => {
         live.textContent = '';
@@ -83,7 +130,7 @@ const {
 
       function render(): void {
         const task = getCurrentTask();
-        const steps = task?.steps ?? [];
+        const steps = (task?.steps ?? []).filter((s) => !removing.has(s.id));
         if (document.activeElement !== title) title.value = task?.title ?? '';
         const done = steps.filter((s) => s.done).length;
         const isDone = task?.status === 'done';
@@ -93,6 +140,39 @@ const {
         finish.hidden = !task || isDone || steps.length === 0 || done < steps.length;
         finished.hidden = !isDone;
         footer.hidden = !task;
+
+        // Switching task mid-typing: save the old task's notes first.
+        if (notesFor && notesFor !== task?.id) saveNotes();
+        if (shownTask !== (task?.id ?? null)) saved.textContent = '';
+        shownTask = task?.id ?? null;
+        notesWrap.hidden = !task;
+        if (document.activeElement !== notes) notes.value = task?.notes ?? '';
+
+        const log = [...(task?.log ?? [])].reverse();
+        logWrap.hidden = log.length === 0;
+        logSummary.textContent = `Session log · ${log.length}`;
+        logList.replaceChildren(
+          ...log.map((entry) => {
+            const li = document.createElement('li');
+            li.className = 'bd__log-item';
+            const when = document.createElement('p');
+            when.className = 'bd__log-when muted';
+            const time = document.createElement('time');
+            time.dateTime = new Date(entry.at).toISOString();
+            time.textContent = logFmt.format(entry.at);
+            when.append(time, entry.focusSeconds >= 60 ? ` · ${formatFocus(entry.focusSeconds)} focus` : '');
+            li.append(when);
+            for (const [label, text] of [['Did', entry.did], ['Next', entry.next]] as const) {
+              if (!text) continue;
+              const p = document.createElement('p');
+              const b = document.createElement('strong');
+              b.textContent = `${label}: `;
+              p.append(b, text);
+              li.append(p);
+            }
+            return li;
+          }),
+        );
 
         list.replaceChildren(
           ...steps.map((step) => {
@@ -122,9 +202,23 @@ const {
             del.setAttribute('aria-label', `Remove step “${step.text}”`);
             del.innerHTML = X_SVG;
             del.addEventListener('click', () => {
-              if (task) removeStep(task.id, step.id);
-              announce(`Removed step: ${step.text}`);
+              if (!task) return;
               stepInput.focus();
+              removing.add(step.id);
+              render();
+              offerUndo({
+                message: `Removed step “${step.text}”`,
+                commit: () => {
+                  removeStep(task.id, step.id);
+                  removing.delete(step.id);
+                },
+                undo: () => {
+                  removing.delete(step.id);
+                  render();
+                  announce(`Restored step: ${step.text}`);
+                },
+              });
+              announce(`Removed step: ${step.text}. Press Undo to bring it back.`);
             });
 
             li.append(cb, label, del);
@@ -132,6 +226,17 @@ const {
           }),
         );
       }
+
+      notes.addEventListener('input', () => {
+        const task = getCurrentTask();
+        if (!task) return;
+        notesFor = task.id;
+        saved.textContent = '';
+        window.clearTimeout(notesTimer);
+        notesTimer = window.setTimeout(saveNotes, NOTES_SAVE_MS);
+      });
+      notes.addEventListener('blur', saveNotes);
+      c.add(saveNotes); // leaving the page mid-typing
 
       title.addEventListener('input', () => {
         const task = getCurrentTask();
@@ -270,6 +375,58 @@ const {
   }
 
   .bd__note {
+    font-size: var(--text-xs);
+  }
+
+  .bd__notes {
+    margin-top: var(--space-5);
+  }
+
+  .bd__notes[hidden],
+  .bd__log[hidden] {
+    display: none;
+  }
+
+  .bd__notes-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .bd__saved {
+    font-size: var(--text-xs);
+  }
+
+  .bd__notes-input {
+    display: block;
+    inline-size: 100%;
+    min-block-size: 6rem;
+    field-sizing: content;
+    max-block-size: 24rem;
+    resize: vertical;
+    line-height: 1.5;
+  }
+
+  .bd__log {
+    margin-top: var(--space-3);
+  }
+
+  .bd__log-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .breakdown :global(.bd__log-item) {
+    padding-block: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+    max-width: none;
+  }
+
+  .breakdown :global(.bd__log-when) {
     font-size: var(--text-xs);
   }
 </style>
