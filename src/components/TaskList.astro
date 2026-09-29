@@ -1,8 +1,9 @@
 ---
 /**
- * All your tasks: add one, pick which one the breakdown tool shows, start a focus
- * session on it, finish, reopen or delete it. Focus time comes from timer sessions
- * whose label matched the task.
+ * All your tasks, in lists: Today (a short plan for the day, first up first), Next,
+ * and Someday, plus an Inbox of thoughts jotted on the timer's scratchpad to sort.
+ * Add, move, break down, start a focus session on, finish, reopen or delete tasks.
+ * Focus time comes from timer sessions whose label matched the task.
  */
 import { url } from '../lib/paths';
 
@@ -15,11 +16,44 @@ const timerUrl = url('/timer');
   <form class="tasks__form" data-tl-form>
     <label for="tl-new" class="visually-hidden">New task</label>
     <input id="tl-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…" data-tl-input />
+    <label for="tl-new-list" class="visually-hidden">Add to</label>
+    <select id="tl-new-list" class="input tasks__list-select" data-tl-new-list>
+      <option value="today">Today</option>
+      <option value="next" selected>Next</option>
+      <option value="someday">Someday</option>
+    </select>
     <button type="submit" class="btn">Add</button>
   </form>
 
-  <ul class="tasks__items" data-tl-open></ul>
-  <p class="muted tasks__empty" data-tl-empty>No open tasks. Add one above, or break one down below.</p>
+  <section class="tasks__section tasks__inbox" data-tl-inbox-wrap hidden aria-labelledby="tl-inbox-head">
+    <h3 class="tasks__heading" id="tl-inbox-head" data-tl-inbox-head>Inbox</h3>
+    <p class="muted tasks__hint">Thoughts you jotted on the timer. Sort each one into a list, add it to a task's notes, or clear it.</p>
+    <ul class="tasks__items" data-tl-inbox></ul>
+  </section>
+
+  <section class="tasks__section" aria-labelledby="tl-today-head">
+    <h3 class="tasks__heading" id="tl-today-head" data-tl-today-head>Today</h3>
+    <div class="tasks__carry" data-tl-carry hidden>
+      <p data-tl-carry-text></p>
+      <div class="tasks__carry-actions">
+        <button type="button" class="btn btn--small" data-tl-carry-keep>Keep for today</button>
+        <button type="button" class="btn btn--ghost btn--small" data-tl-carry-move>Move to Next</button>
+      </div>
+    </div>
+    <ul class="tasks__items" data-tl-today></ul>
+    <p class="muted tasks__hint" data-tl-today-hint></p>
+  </section>
+
+  <section class="tasks__section" aria-labelledby="tl-next-head">
+    <h3 class="tasks__heading" id="tl-next-head" data-tl-next-head>Next</h3>
+    <ul class="tasks__items" data-tl-next></ul>
+    <p class="muted tasks__hint" data-tl-next-empty>Nothing here. Add a task above, or break one down below.</p>
+  </section>
+
+  <details class="disclosure tasks__section tasks__someday" data-tl-someday-wrap hidden>
+    <summary class="tasks__heading" data-tl-someday-head>Someday</summary>
+    <ul class="tasks__items" data-tl-someday></ul>
+  </details>
 
   <details class="disclosure tasks__finished" data-tl-finished-wrap hidden>
     <summary data-tl-finished-summary>Finished</summary>
@@ -29,13 +63,32 @@ const timerUrl = url('/timer');
 </section>
 
 <script>
-  import { createTask, deleteTask, getCurrentTask, getSessions, getTasks, setCurrentTask, subscribe, type Task } from '../lib/storage';
-  import { finishTask, focusByTask, formatFocus, reopenTask, taskName } from '../lib/tasks';
+  import { createTask, deleteTask, getCurrentTask, getSessions, getTasks, setCurrentTask, subscribe, type Task, type TaskList } from '../lib/storage';
+  import {
+    finishTask,
+    focusByTask,
+    formatFocus,
+    isCarriedOver,
+    jotToNotes,
+    keepForToday,
+    LIST_LABELS,
+    listOf,
+    moveTask,
+    moveToTop,
+    reopenTask,
+    taskName,
+    todayTasks,
+    TODAY_SOFT_MAX,
+  } from '../lib/tasks';
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
 
   const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
+  const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const MOVABLE: TaskList[] = ['today', 'next', 'someday'];
+  const X_SVG =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
   onPage('task-list', () => {
     const c = cleanups();
@@ -43,8 +96,21 @@ const timerUrl = url('/timer');
       const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
       const form = $<HTMLFormElement>('[data-tl-form]');
       const input = $<HTMLInputElement>('[data-tl-input]');
-      const openList = $<HTMLUListElement>('[data-tl-open]');
-      const empty = $<HTMLElement>('[data-tl-empty]');
+      const newList = $<HTMLSelectElement>('[data-tl-new-list]');
+      const inboxWrap = $<HTMLElement>('[data-tl-inbox-wrap]');
+      const inboxHead = $<HTMLElement>('[data-tl-inbox-head]');
+      const inboxList = $<HTMLUListElement>('[data-tl-inbox]');
+      const todayHead = $<HTMLElement>('[data-tl-today-head]');
+      const todayList = $<HTMLUListElement>('[data-tl-today]');
+      const todayHint = $<HTMLElement>('[data-tl-today-hint]');
+      const carry = $<HTMLElement>('[data-tl-carry]');
+      const carryText = $<HTMLElement>('[data-tl-carry-text]');
+      const nextHead = $<HTMLElement>('[data-tl-next-head]');
+      const nextList = $<HTMLUListElement>('[data-tl-next]');
+      const nextEmpty = $<HTMLElement>('[data-tl-next-empty]');
+      const somedayWrap = $<HTMLDetailsElement>('[data-tl-someday-wrap]');
+      const somedayHead = $<HTMLElement>('[data-tl-someday-head]');
+      const somedayList = $<HTMLUListElement>('[data-tl-someday]');
       const finishedWrap = $<HTMLDetailsElement>('[data-tl-finished-wrap]');
       const finishedSummary = $<HTMLElement>('[data-tl-finished-summary]');
       const finishedList = $<HTMLUListElement>('[data-tl-finished]');
@@ -67,7 +133,116 @@ const timerUrl = url('/timer');
         return b;
       }
 
-      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>): HTMLLIElement {
+      function iconButton(label: string, onClick: () => void): HTMLButtonElement {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'icon-btn task__remove';
+        b.setAttribute('aria-label', label);
+        b.title = label.replace(/ “.*”$/, '');
+        b.innerHTML = X_SVG;
+        b.addEventListener('click', onClick);
+        return b;
+      }
+
+      /** Title and meta on the left; the list picker and remove button on the right. */
+      function head(body: HTMLElement, ...side: HTMLElement[]): HTMLDivElement {
+        const row = document.createElement('div');
+        row.className = 'task__head';
+        const tools = document.createElement('div');
+        tools.className = 'task__tools';
+        tools.append(...side);
+        row.append(body, tools);
+        return row;
+      }
+
+      function badge(text: string, cls = ''): HTMLSpanElement {
+        const b = document.createElement('span');
+        b.className = `badge task__badge ${cls}`;
+        b.textContent = text;
+        return b;
+      }
+
+      /** Delete with Undo (src/lib/undo.ts): hidden now, removed for real once the offer ends. */
+      function remove(task: Task, verb: string, extra = ''): void {
+        const name = taskName(task);
+        input.focus();
+        removing.add(task.id);
+        render();
+        offerUndo({
+          message: `${verb} “${name}”`,
+          commit: () => {
+            deleteTask(task.id);
+            removing.delete(task.id);
+          },
+          undo: () => {
+            removing.delete(task.id);
+            render();
+            announce(`Restored: ${name}`);
+          },
+        });
+        announce(`${verb}: ${name}. Press Undo to bring it back.${extra}`);
+      }
+
+      function moveSelect(task: Task): HTMLSelectElement {
+        const name = taskName(task);
+        const sel = document.createElement('select');
+        sel.className = 'input tasks__list-select';
+        sel.setAttribute('aria-label', `List for “${name}”`);
+        for (const list of MOVABLE) {
+          const o = document.createElement('option');
+          o.value = list;
+          o.textContent = LIST_LABELS[list];
+          o.selected = listOf(task) === list;
+          sel.append(o);
+        }
+        sel.addEventListener('change', () => {
+          const list = sel.value as TaskList;
+          moveTask(task.id, list);
+          announce(`Moved “${name}” to ${LIST_LABELS[list]}.`);
+          if (list === 'someday') somedayWrap.open = true;
+        });
+        return sel;
+      }
+
+      /** An Inbox thought: sort it into a list, file it in the current task's notes, or clear it. */
+      function renderJot(task: Task, current: Task | null): HTMLLIElement {
+        const li = document.createElement('li');
+        li.className = 'task task--jot';
+        const body = document.createElement('div');
+        body.className = 'task__body';
+        const title = document.createElement('p');
+        title.className = 'task__title';
+        title.textContent = task.title;
+        const meta = document.createElement('p');
+        meta.className = 'task__meta muted';
+        meta.textContent = `jotted ${dayFmt.format(task.createdAt)}`;
+        body.append(title, meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'task__actions';
+        for (const list of MOVABLE) {
+          const b = button(LIST_LABELS[list], () => {
+            moveTask(task.id, list);
+            announce(`“${task.title}” is now a task on ${LIST_LABELS[list]}.`);
+          });
+          b.setAttribute('aria-label', `Make “${task.title}” a task on ${LIST_LABELS[list]}`);
+          actions.append(b);
+        }
+        if (current && current.status === 'active' && current.id !== task.id) {
+          const b = button('To notes', () => {
+            jotToNotes(task.id, current.id);
+            announce(`Added to the notes of “${taskName(current)}”.`);
+          });
+          b.setAttribute('aria-label', `Add “${task.title}” to the notes of “${taskName(current)}”`);
+          b.title = `Add to the notes of “${taskName(current)}”`;
+          actions.append(b);
+        }
+        const clear = iconButton(`Clear “${task.title}”`, () => remove(task, 'Cleared'));
+        li.append(head(body, clear), actions);
+        return li;
+      }
+
+      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, firstUp = false): HTMLLIElement {
         const li = document.createElement('li');
         li.className = `task${task.id === currentId ? ' is-current' : ''}${task.status === 'done' ? ' is-done' : ''}`;
         const name = taskName(task);
@@ -77,12 +252,9 @@ const timerUrl = url('/timer');
         const title = document.createElement('p');
         title.className = 'task__title';
         title.textContent = name;
-        if (task.id === currentId) {
-          const badge = document.createElement('span');
-          badge.className = 'badge task__badge';
-          badge.textContent = 'Current';
-          title.append(' ', badge);
-        }
+        if (firstUp) title.append(' ', badge('First up', 'task__badge--first'));
+        if (task.id === currentId) title.append(' ', badge('Current'));
+        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(`from ${weekdayFmt.format(task.todayAt)}`, 'task__badge--old'));
         const meta = document.createElement('p');
         meta.className = 'task__meta muted';
         const parts: string[] = [];
@@ -103,6 +275,14 @@ const timerUrl = url('/timer');
                 setCurrentTask(task.id);
                 announce(`Showing “${name}” in the breakdown below.`);
                 document.querySelector<HTMLInputElement>('[data-bd-step]')?.focus();
+              }),
+            );
+          }
+          if (listOf(task) === 'today' && !firstUp) {
+            actions.append(
+              button('Do first', () => {
+                moveToTop(task.id, getTasks());
+                announce(`“${name}” is first up today.`);
               }),
             );
           }
@@ -127,39 +307,48 @@ const timerUrl = url('/timer');
             }),
           );
         }
-        const del = button('Delete', () => {
-          input.focus();
-          removing.add(task.id);
-          render();
-          offerUndo({
-            message: `Deleted “${name}”`,
-            commit: () => {
-              deleteTask(task.id);
-              removing.delete(task.id);
-            },
-            undo: () => {
-              removing.delete(task.id);
-              render();
-              announce(`Restored: ${name}`);
-            },
-          });
-          announce(`Deleted: ${name}. Press Undo to bring it back. Its focus sessions and Done entries stay in your history.`);
-        });
-        del.setAttribute('aria-label', `Delete “${name}”`);
-        actions.append(del);
+        const del = iconButton(`Delete “${name}”`, () => remove(task, 'Deleted', ' Its focus sessions and Done entries stay in your history.'));
+        const side = task.status === 'active' ? [moveSelect(task), del] : [del];
 
-        li.append(body, actions);
+        li.append(head(body, ...side), actions);
         return li;
       }
 
       function render(): void {
         const tasks = getTasks().filter((t) => !removing.has(t.id));
-        const currentId = getCurrentTask()?.id ?? null;
+        const current = getCurrentTask();
+        const currentId = current?.id ?? null;
         const focus = focusByTask(getSessions());
         const open = tasks.filter((t) => t.status === 'active');
+        const on = (list: TaskList) => open.filter((t) => listOf(t) === list);
         const finished = tasks.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
-        openList.replaceChildren(...open.map((t) => renderTask(t, currentId, focus)));
-        empty.hidden = open.length > 0;
+
+        const inbox = on('inbox').sort((a, b) => a.createdAt - b.createdAt);
+        inboxWrap.hidden = inbox.length === 0;
+        inboxHead.textContent = `Inbox · ${inbox.length}`;
+        inboxList.replaceChildren(...inbox.map((t) => renderJot(t, current)));
+
+        const today = todayTasks(open);
+        todayHead.textContent = today.length ? `Today · ${today.length}` : 'Today';
+        todayList.replaceChildren(...today.map((t, i) => renderTask(t, currentId, focus, i === 0)));
+        todayHint.hidden = today.length > 0 && today.length <= TODAY_SOFT_MAX;
+        todayHint.textContent = today.length
+          ? `That's ${today.length} for today. A short list is easier to finish — consider moving some to Next.`
+          : "Nothing planned yet. Pick 1–3 tasks for today, and put the one you'd most like to put off first.";
+        const carried = today.filter((t) => isCarriedOver(t));
+        carry.hidden = carried.length === 0;
+        carryText.textContent = `${carried.length === 1 ? '1 task was' : `${carried.length} tasks were`} planned for an earlier day. Still for today?`;
+
+        const next = on('next');
+        nextHead.textContent = next.length ? `Next · ${next.length}` : 'Next';
+        nextList.replaceChildren(...next.map((t) => renderTask(t, currentId, focus)));
+        nextEmpty.hidden = next.length > 0;
+
+        const someday = on('someday');
+        somedayWrap.hidden = someday.length === 0;
+        somedayHead.textContent = `Someday · ${someday.length}`;
+        somedayList.replaceChildren(...someday.map((t) => renderTask(t, currentId, focus)));
+
         finishedWrap.hidden = finished.length === 0;
         finishedSummary.textContent = `Finished · ${finished.length}`;
         finishedList.replaceChildren(...finished.map((t) => renderTask(t, currentId, focus)));
@@ -171,10 +360,22 @@ const timerUrl = url('/timer');
         if (!text) return;
         // Becomes the current task only if the breakdown has nothing open to show.
         const current = getCurrentTask();
-        createTask(text, { makeCurrent: !current || current.status === 'done' });
+        const list = newList.value as TaskList;
+        createTask(text, { makeCurrent: !current || current.status === 'done', list });
         input.value = '';
         input.focus();
-        announce(`Added: ${text}`);
+        announce(`Added to ${LIST_LABELS[list]}: ${text}`);
+      });
+
+      // Carried over from an earlier day: keep them (in the same order) or move them on.
+      $<HTMLButtonElement>('[data-tl-carry-keep]').addEventListener('click', () => {
+        keepForToday(getTasks());
+        announce('Kept on Today.');
+      });
+      $<HTMLButtonElement>('[data-tl-carry-move]').addEventListener('click', () => {
+        const carried = todayTasks(getTasks()).filter((t) => isCarriedOver(t));
+        carried.forEach((t) => moveTask(t.id, 'next'));
+        announce(`Moved ${carried.length} to Next.`);
       });
 
       render();
@@ -202,14 +403,77 @@ const timerUrl = url('/timer');
     list-style: none;
   }
 
-  .tasks__empty {
-    margin-top: var(--space-3);
+  .tasks__section {
+    margin-top: var(--space-5);
+  }
+
+  .tasks__heading {
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+  }
+
+  .tasks__hint {
+    margin-top: var(--space-2);
     font-size: var(--text-sm);
   }
 
-  .tasks__empty[hidden],
+  .tasks__section[hidden],
+  .tasks__hint[hidden],
+  .tasks__carry[hidden],
   .tasks__finished[hidden] {
     display: none;
+  }
+
+  .tasks__inbox {
+    padding: var(--space-3) var(--space-4) var(--space-1);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-lg);
+  }
+
+  .tasks__inbox .tasks__hint {
+    margin-top: var(--space-1);
+  }
+
+  .tasks__carry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-lg);
+    background: var(--color-accent-soft);
+    font-size: var(--text-sm);
+  }
+
+  .tasks__carry-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .tasks :global(.tasks__list-select) {
+    inline-size: auto;
+    min-height: 36px;
+    padding-block: 0;
+    font-size: var(--text-sm);
+  }
+
+  .tasks__form .tasks__list-select {
+    flex: none;
+    min-height: 44px;
+  }
+
+  .tasks :global(.task__badge.task__badge--first) {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .tasks :global(.task__badge.task__badge--old) {
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
   }
 
   .tasks__finished {
@@ -217,17 +481,32 @@ const timerUrl = url('/timer');
   }
 
   .tasks :global(.task) {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
+    display: grid;
+    gap: var(--space-2);
     padding-block: var(--space-3);
     border-bottom: 1px solid var(--color-border);
   }
 
+  .tasks :global(.task__head) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .tasks :global(.task__tools) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    flex: none;
+  }
+
+  .tasks :global(.task__remove) {
+    color: var(--color-text-muted);
+  }
+
   .tasks :global(.task__body) {
-    flex: 1 1 14rem;
+    flex: 1;
     min-width: 0;
   }
 
