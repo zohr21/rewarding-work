@@ -8,6 +8,7 @@
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
 import { url } from '../lib/paths';
+import { TONES, TONE_LABELS } from '../lib/timer/cues';
 
 interface Props {
   /** Mode shown when no session is in progress. Standalone uses the user's last mode. */
@@ -100,6 +101,14 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
       <input type="checkbox" data-sound checked />
       <span>Sound</span>
     </label>
+    <span class="timer__sound-options" data-sound-options>
+      <label class="visually-hidden" for="timer-tone">End sound</label>
+      <select id="timer-tone" class="input timer__tone" data-tone>
+        {TONES.map((t) => <option value={t}>{TONE_LABELS[t]}</option>)}
+      </select>
+      <label class="visually-hidden" for="timer-volume">Volume</label>
+      <input id="timer-volume" class="timer__volume" type="range" min="5" max="100" step="5" value="70" data-volume />
+    </span>
     <span class="muted" data-notify-status></span>
     <a href={url('/progress')} class="timer__today" data-today></a>
   </div>
@@ -423,6 +432,28 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   .timer__sound input {
     width: 1.1rem;
     height: 1.1rem;
+    accent-color: var(--color-accent);
+  }
+
+  .timer__sound-options {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .timer__sound-options[hidden] {
+    display: none;
+  }
+
+  .timer__tone {
+    inline-size: auto;
+    min-height: 36px;
+    padding-block: 0;
+    font-size: var(--text-sm);
+  }
+
+  .timer__volume {
+    inline-size: 5.5rem;
     accent-color: var(--color-accent);
   }
 
