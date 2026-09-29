@@ -6,17 +6,20 @@ import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
 import { addSession, getSessions, getTask, getTasks, read, subscribe, write, type Task } from '../lib/storage';
-import { notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio } from '../lib/timer/cues';
+import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
 
 interface TimerPrefs {
   mode: TimerMode;
   sound: boolean;
+  /** Added later than the rest, so older stored prefs lack them; filled in on load. */
+  tone: Tone;
+  volume: number;
   custom: CustomDurations;
 }
 
-const DEFAULT_PREFS: TimerPrefs = { mode: 'pomodoro', sound: true, custom: T.DEFAULT_CUSTOM };
+const DEFAULT_PREFS: TimerPrefs = { mode: 'pomodoro', sound: true, tone: 'chime', volume: 0.7, custom: T.DEFAULT_CUSTOM };
 
 function isPrefs(v: unknown): v is TimerPrefs {
   if (typeof v !== 'object' || v === null) return false;
@@ -97,6 +100,9 @@ function mountTimer(root: HTMLElement): () => void {
     taskOptions: q<HTMLDataListElement>('[data-task-options]'),
     taskLink: q<HTMLElement>('[data-task-link]'),
     sound: q<HTMLInputElement>('[data-sound]'),
+    tone: q<HTMLSelectElement>('[data-tone]'),
+    volume: q<HTMLInputElement>('[data-volume]'),
+    soundOptions: q<HTMLElement>('[data-sound-options]'),
     notifyStatus: q<HTMLElement>('[data-notify-status]'),
     today: q<HTMLAnchorElement>('[data-today]'),
     live: q<HTMLElement>('[data-live]'),
@@ -108,6 +114,8 @@ function mountTimer(root: HTMLElement): () => void {
 
   let prefs = { ...DEFAULT_PREFS, ...read<TimerPrefs>('timer-prefs', DEFAULT_PREFS, isPrefs) };
   prefs.custom = T.clampCustom(prefs.custom);
+  if (!isTone(prefs.tone)) prefs.tone = DEFAULT_PREFS.tone;
+  if (typeof prefs.volume !== 'number' || !(prefs.volume >= 0 && prefs.volume <= 1)) prefs.volume = DEFAULT_PREFS.volume;
   let state = loadState();
   let interval: number | undefined;
   let endTimer: number | undefined;
@@ -193,7 +201,7 @@ function mountTimer(root: HTMLElement): () => void {
 
     setMessage(text);
     announce(text);
-    if (prefs.sound) playChime(e.from === 'work' ? 'focus-end' : 'break-end');
+    if (prefs.sound) playChime(e.from === 'work' ? 'focus-end' : 'break-end', prefs.tone, prefs.volume);
     void notify(title, text, icon);
     celebrate();
   }
@@ -289,6 +297,9 @@ function mountTimer(root: HTMLElement): () => void {
 
     if (document.activeElement !== els.label) els.label.value = state.label;
     els.sound.checked = prefs.sound;
+    els.soundOptions.hidden = !prefs.sound;
+    els.tone.value = prefs.tone;
+    if (document.activeElement !== els.volume) els.volume.value = String(Math.round(prefs.volume * 100));
 
     renderNotifyStatus();
     renderToday();
@@ -435,10 +446,23 @@ function mountTimer(root: HTMLElement): () => void {
 
   els.sound.addEventListener('change', () => {
     savePrefs({ sound: els.sound.checked });
-    if (els.sound.checked) {
-      unlockAudio();
-      playChime('focus-end'); // preview so people know what to expect
-    }
+    els.soundOptions.hidden = !prefs.sound;
+    if (els.sound.checked) preview();
+  });
+
+  /** Let people hear what they picked. */
+  function preview(): void {
+    unlockAudio();
+    playChime('break-end', prefs.tone, prefs.volume);
+  }
+
+  els.tone.addEventListener('change', () => {
+    if (isTone(els.tone.value)) savePrefs({ tone: els.tone.value });
+    preview();
+  });
+  els.volume.addEventListener('change', () => {
+    savePrefs({ volume: Number(els.volume.value) / 100 });
+    preview();
   });
 
   // Keyboard shortcuts (standalone page only, so Space still scrolls long technique pages).
