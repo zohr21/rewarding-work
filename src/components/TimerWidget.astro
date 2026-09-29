@@ -82,6 +82,23 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   <p class="timer__message" data-message></p>
 
+  <form class="timer__log" data-log hidden>
+    <p class="timer__log-title">Before you move on <span class="muted">(optional)</span></p>
+    <label class="timer__log-field">
+      <span>What did you get done?</span>
+      <input class="input" type="text" maxlength="200" autocomplete="off" data-log-did />
+    </label>
+    <label class="timer__log-field">
+      <span>What's next?</span>
+      <input class="input" type="text" maxlength="200" autocomplete="off" data-log-next />
+    </label>
+    <p class="timer__log-hint muted" data-log-hint></p>
+    <div class="timer__log-actions">
+      <button type="submit" class="btn btn--small">Save</button>
+      <button type="button" class="btn btn--ghost btn--small" data-log-skip>Skip</button>
+    </div>
+  </form>
+
   <div class="timer__controls">
     <button type="button" class="btn timer__main" data-action="toggle">Start</button>
     <button type="button" class="btn btn--ghost" data-action="stop" hidden>Stop &amp; take a break</button>
@@ -408,8 +425,57 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     font-size: var(--text-xs);
   }
 
-  .timer__task[hidden] {
+  .timer__task[hidden],
+  .timer__log[hidden] {
     display: none;
+  }
+
+  .timer__log {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface-2);
+    text-align: start;
+    animation: log-in var(--duration-slow) var(--ease-out);
+  }
+
+  .timer__log-title {
+    font-weight: 700;
+  }
+
+  .timer__log-field {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .timer__log-field .input {
+    font-weight: 400;
+  }
+
+  .timer__log-hint {
+    font-size: var(--text-xs);
+  }
+
+  .timer__log-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  @keyframes log-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .timer__log {
+      animation: none;
+    }
   }
 
   .timer__footer {

@@ -8,11 +8,15 @@ import {
   createTask,
   getCurrentTask,
   getTask,
+  LOG_MAX,
+  LOG_TEXT_MAX,
   newId,
+  NOTES_MAX,
   removeDoneBySource,
   updateTask,
   type FocusSession,
   type Task,
+  type TaskLogEntry,
 } from './storage';
 
 export const UNTITLED = 'Untitled task';
@@ -69,4 +73,33 @@ export function formatFocus(seconds: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+export function setTaskNotes(id: string, notes: string): void {
+  const clean = notes.slice(0, NOTES_MAX);
+  if ((getTask(id)?.notes ?? '') === clean) return;
+  updateTask(id, () => ({ notes: clean || undefined }));
+}
+
+export interface SessionLog {
+  taskId?: string;
+  did: string;
+  next: string;
+  focusSeconds: number;
+}
+
+/**
+ * Save the note left after a focus session: "did" goes to the Done list, "next" becomes
+ * the task's next step, and both are kept in the task's session log.
+ */
+export function logSession({ taskId, did, next, focusSeconds }: SessionLog): void {
+  const cleanDid = did.trim().slice(0, LOG_TEXT_MAX);
+  const cleanNext = next.trim().slice(0, LOG_TEXT_MAX);
+  if (!cleanDid && !cleanNext) return;
+  const task = taskId ? getTask(taskId) : null;
+  if (cleanDid) addDone(task?.title ? `${cleanDid} (${task.title})` : cleanDid, { taskId: task?.id });
+  if (!task) return;
+  if (cleanNext && task.status === 'active') addStep(task.id, cleanNext);
+  const entry: TaskLogEntry = { id: newId('lg'), at: Date.now(), did: cleanDid, next: cleanNext, focusSeconds };
+  updateTask(task.id, (t) => ({ log: [...(t.log ?? []), entry].slice(-LOG_MAX) }));
 }

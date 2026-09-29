@@ -9,6 +9,7 @@ import { addSession, getSessions, getTask, getTasks, read, subscribe, write, typ
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
+import { logSession, taskName, type SessionLog } from '../lib/tasks';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -104,6 +105,11 @@ function mountTimer(root: HTMLElement): () => void {
     volume: q<HTMLInputElement>('[data-volume]'),
     soundOptions: q<HTMLElement>('[data-sound-options]'),
     notifyStatus: q<HTMLElement>('[data-notify-status]'),
+    log: q<HTMLFormElement>('[data-log]'),
+    logDid: q<HTMLInputElement>('[data-log-did]'),
+    logNext: q<HTMLInputElement>('[data-log-next]'),
+    logHint: q<HTMLElement>('[data-log-hint]'),
+    logSkip: q<HTMLButtonElement>('[data-log-skip]'),
     today: q<HTMLAnchorElement>('[data-today]'),
     live: q<HTMLElement>('[data-live]'),
   };
@@ -121,6 +127,8 @@ function mountTimer(root: HTMLElement): () => void {
   let endTimer: number | undefined;
   let announcedLastMinute = false;
   let lastTimeText = '';
+  /** The focus session waiting for its "what did you do / what's next" note. */
+  let pendingLog: Omit<SessionLog, 'did' | 'next'> | null = null;
 
   // ---- State lifecycle ----
 
@@ -199,8 +207,10 @@ function mountTimer(root: HTMLElement): () => void {
       text = 'Break over. Start the next focus session when you are ready.';
     }
 
+    if (e.from === 'work' && e.session) offerLog(e.session.taskId, e.session.focusSeconds);
+
     setMessage(text);
-    announce(text);
+    announce(pendingLog ? `${text} You can note what you did and what's next below.` : text);
     if (prefs.sound) playChime(e.from === 'work' ? 'focus-end' : 'break-end', prefs.tone, prefs.volume);
     void notify(title, text, icon);
     celebrate();
@@ -330,6 +340,46 @@ function mountTimer(root: HTMLElement): () => void {
     const done = today.filter((s) => s.completed).length;
     els.today.textContent = `Today: ${done} session${done === 1 ? '' : 's'} · ${mins} min focused`;
   }
+
+  // ---- Session log ----
+
+  function offerLog(taskId: string | undefined, focusSeconds: number): void {
+    const task = taskId ? getTask(taskId) : null;
+    pendingLog = { taskId: task?.id, focusSeconds };
+    els.logDid.value = '';
+    els.logNext.value = '';
+    els.logHint.textContent = task
+      ? `Saved in the Done list and on “${taskName(task)}”; what's next becomes its next step.`
+      : "Saved in the Done list; what's next becomes the label for your next session.";
+    els.log.hidden = false;
+  }
+
+  function closeLog(): void {
+    pendingLog = null;
+    els.log.hidden = true;
+  }
+
+  els.log.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!pendingLog) return closeLog();
+    const did = els.logDid.value;
+    const next = els.logNext.value.trim();
+    const hadTask = Boolean(pendingLog.taskId);
+    logSession({ ...pendingLog, did, next });
+    // No task: carry "what's next" into the label, unless a new focus session is already under way.
+    if (!hadTask && next && !(state.phase === 'work' && state.status !== 'idle')) {
+      state = T.setLabel(state, next, taskForLabel(next)?.id);
+      write('timer', state);
+      render();
+    }
+    closeLog();
+    announce(did.trim() || next ? 'Saved.' : 'Nothing to save.');
+    els.toggle.focus();
+  });
+  els.logSkip.addEventListener('click', () => {
+    closeLog();
+    els.toggle.focus();
+  });
 
   function setMessage(text: string): void {
     els.message.textContent = text;
