@@ -89,7 +89,8 @@
     document.querySelectorAll<HTMLElement>('[data-reward-tiers]').forEach((root) => {
       const list = root.querySelector<HTMLElement>('[data-tiers-list]')!;
       const render = () => {
-        const progress = allProgress({ sessions: getSessions(), done: getDone(), chainDays: getChain().days });
+        const chain = getChain();
+        const progress = allProgress({ sessions: getSessions(), done: getDone(), chainDays: chain.days, pastBests: chain.pastBests });
         list.replaceChildren(...progress.map(renderTrack));
       };
       render();

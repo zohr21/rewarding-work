@@ -7,6 +7,7 @@
 import {
   isChain,
   isDoneItem,
+  mergeChains,
   isFocusSession,
   mergeDoneLists,
   mergeTaskStores,
@@ -52,7 +53,7 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
     case 'chain': {
       if (!isChain(local)) return remoteJson;
       if (!isChain(remote)) return localJson;
-      return JSON.stringify({ habit: local.habit || remote.habit, days: [...new Set([...local.days, ...remote.days])].sort() });
+      return JSON.stringify(mergeChains(local, remote));
     }
     case 'tasks':
       return JSON.stringify(mergeTaskStores(normaliseTasks(local), normaliseTasks(remote)));
