@@ -49,11 +49,25 @@ const Heading = headingLevel;
     <button type="button" class="btn chain__today" data-chain-today aria-pressed="false">Mark today done</button>
 
     <div class="chain__cal-wrap">
-      <p class="chain__cal-title muted" id="chain-cal-label">Last 5 weeks — tap a day to mark or unmark it</p>
+      <div class="chain__month">
+        <button type="button" class="icon-btn chain__nav" aria-label="Previous month" data-chain-prev>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+            ><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg
+          >
+        </button>
+        <p class="chain__month-name" id="chain-cal-label" aria-live="polite" data-chain-month></p>
+        <button type="button" class="icon-btn chain__nav" aria-label="Next month" data-chain-next>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
+            ><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg
+          >
+        </button>
+        <button type="button" class="btn btn--ghost btn--small chain__this-month" data-chain-this-month hidden>Today</button>
+      </div>
       <div class="chain__weekdays" aria-hidden="true">
         <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
       </div>
       <div class="chain__cal" role="group" aria-labelledby="chain-cal-label" data-chain-cal></div>
+      <p class="chain__cal-hint muted" data-chain-hint></p>
     </div>
   </div>
 
@@ -65,9 +79,18 @@ const Heading = headingLevel;
   import { offerUndo } from '../lib/undo';
   import { streakRecords } from '../lib/rewards';
   import { chainStats } from '../lib/stats';
-  import { addDays, dayKey, formatDay, startOfDay, startOfWeek } from '../lib/dates';
+  import { addDays, dayKey, formatDay, fromDayKey, startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
+
+  /** Days you can still mark or unmark, counting today. Older days are read-only. */
+  const EDIT_DAYS = 7;
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const shortMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+
+  const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+  const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
   onPage('chain', () => {
     const c = cleanups();
@@ -88,6 +111,13 @@ const Heading = headingLevel;
       const message = $<HTMLElement>('[data-chain-message]');
       const today = $<HTMLButtonElement>('[data-chain-today]');
       const cal = $<HTMLElement>('[data-chain-cal]');
+      const monthName = $<HTMLElement>('[data-chain-month]');
+      const prev = $<HTMLButtonElement>('[data-chain-prev]');
+      const next = $<HTMLButtonElement>('[data-chain-next]');
+      const thisMonth = $<HTMLButtonElement>('[data-chain-this-month]');
+      const hint = $<HTMLElement>('[data-chain-hint]');
+      /** First day of the month on show. */
+      let viewMonth = monthStart(new Date());
       const live = $<HTMLElement>('[data-chain-live]');
       let editing = false;
       let pulseKey: string | null = null;
@@ -132,40 +162,84 @@ const Heading = headingLevel;
         today.setAttribute('aria-pressed', String(s.doneToday));
         today.classList.toggle('is-done', s.doneToday);
 
-        // 5-week calendar, Monday first, ending with this week.
-        const set = new Set(chain.days);
+        renderCalendar(chain.days);
+        pulseKey = null;
+      }
+
+      /** Month grid, Monday first, with the neighbouring months' days dimmed. */
+      function renderCalendar(marked: string[]): void {
+        const set = new Set(marked);
         const now = startOfDay(new Date());
-        const first = addDays(startOfWeek(now), -28);
+        const todayKey = dayKey(now);
+        const editFrom = addDays(now, -(EDIT_DAYS - 1));
+        // Browse back as far as the first marked day (or just this month when there are none).
+        const earliest = monthStart(marked.length ? fromDayKey(marked[0]!) : now);
+        const current = monthStart(now);
+        if (viewMonth > current) viewMonth = current;
+        if (viewMonth < earliest) viewMonth = earliest;
+
+        monthName.textContent = monthFmt.format(viewMonth);
+        prev.disabled = viewMonth <= earliest;
+        next.disabled = viewMonth >= current;
+        thisMonth.hidden = sameMonth(viewMonth, now);
+
+        const first = startOfWeek(viewMonth);
+        const last = addDays(startOfWeek(addDays(addMonths(viewMonth, 1), -1)), 6);
+        const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
         const buttons: HTMLElement[] = [];
-        for (let i = 0; i < 35; i++) {
-          const date = addDays(first, i);
+        for (let date = first, i = 0; date <= last; date = addDays(date, 1), i++) {
           const key = dayKey(date);
-          const marked = set.has(key);
+          const isMarked = set.has(key);
           const future = date > now;
+          const editable = !future && date >= editFrom;
+          const outside = !sameMonth(date, viewMonth);
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'chain__day';
-          b.textContent = String(date.getDate());
+          b.dataset.key = key;
+          // The 1st of a neighbouring month carries its name, so the change of month is visible.
+          b.textContent = outside && date.getDate() === 1 ? `${shortMonthFmt.format(date)} 1` : String(date.getDate());
           b.disabled = future;
-          b.setAttribute('aria-pressed', String(marked));
-          b.setAttribute('aria-label', `${formatDay(date)}${key === dayKey(now) ? ' (today)' : ''}`);
-          if (marked) {
+          // Read-only past days stay focusable, so their state can still be read out.
+          if (!future && !editable) b.setAttribute('aria-disabled', 'true');
+          b.setAttribute('aria-pressed', String(isMarked));
+          b.setAttribute('aria-label', `${formatDay(date)}${key === todayKey ? ' (today)' : ''}${!future && !editable ? ', read only' : ''}`);
+          b.classList.toggle('is-outside', outside);
+          b.classList.toggle('is-locked', !future && !editable);
+          if (isMarked) {
             b.classList.add('is-marked');
             // Visually link consecutive days within a week row.
-            if (i % 7 !== 0 && set.has(dayKey(addDays(date, -1)))) b.classList.add('link-left');
             if (i % 7 !== 6 && set.has(dayKey(addDays(date, 1)))) b.classList.add('link-right');
           }
-          if (key === dayKey(now)) b.classList.add('is-today');
+          if (key === todayKey) b.classList.add('is-today');
           if (key === pulseKey) b.classList.add('is-pulse');
-          b.addEventListener('click', () => toggle(key, date));
+          b.addEventListener('click', () => {
+            if (!editable) {
+              announce(`Only the last ${EDIT_DAYS} days can be changed.`);
+              hint.classList.remove('is-nudged');
+              void hint.offsetWidth; // restart the nudge animation
+              hint.classList.add('is-nudged');
+              return;
+            }
+            toggle(key, date);
+          });
           buttons.push(b);
         }
-        const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
-        buttons.forEach((b, i) => (b.dataset.key = dayKey(addDays(first, i))));
         cal.replaceChildren(...buttons);
         if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
-        pulseKey = null;
+        hint.textContent = `Tap a day in the last ${EDIT_DAYS} days to mark or unmark it. Older days are kept as they are.`;
       }
+
+      function show(month: Date): void {
+        viewMonth = month;
+        render();
+      }
+      prev.addEventListener('click', () => show(addMonths(viewMonth, -1)));
+      next.addEventListener('click', () => show(addMonths(viewMonth, 1)));
+      thisMonth.addEventListener('click', () => {
+        show(monthStart(new Date()));
+        (next.disabled ? prev : next).focus();
+      });
 
       function toggle(key: string, date: Date): void {
         const nowMarked = toggleChainDay(key);
@@ -349,9 +423,41 @@ const Heading = headingLevel;
     max-width: 22rem;
   }
 
-  .chain__cal-title {
-    font-size: var(--text-xs);
+  .chain__month {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
     margin-bottom: var(--space-2);
+  }
+
+  .chain__month-name {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .chain__nav:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .chain__this-month[hidden] {
+    display: none;
+  }
+
+  .chain__cal-hint {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .chain__cal-hint.is-nudged {
+    animation: chain-nudge 400ms var(--ease-out);
+  }
+
+  @keyframes chain-nudge {
+    0%, 100% { transform: none; }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
   }
 
   .chain__weekdays,
@@ -394,6 +500,27 @@ const Heading = headingLevel;
     cursor: default;
   }
 
+  /* Neighbouring months' days: there for orientation, quieter than this month's. */
+  .chain :global(.chain__day.is-outside) {
+    border-style: dashed;
+    opacity: 0.55;
+  }
+
+  /* Past the editable window: shown as they are, but not changeable. */
+  .chain :global(.chain__day.is-locked) {
+    cursor: not-allowed;
+  }
+
+  /* Flatter than the editable days, so the last-7-days window stands out. */
+  .chain :global(.chain__day.is-locked:not(.is-marked)) {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .chain :global(.chain__day.is-locked:not(.is-marked):hover) {
+    border-color: var(--color-border);
+  }
+
   .chain :global(.chain__day.is-today) {
     border: 2px solid var(--color-text);
     color: var(--color-text);
@@ -417,6 +544,12 @@ const Heading = headingLevel;
     height: 4px;
     transform: translateY(-50%);
     background: var(--color-accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chain__cal-hint.is-nudged {
+      animation: none;
+    }
   }
 
   .chain :global(.chain__day.is-pulse) {
