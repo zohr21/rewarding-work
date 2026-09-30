@@ -1,14 +1,15 @@
 ---
 /**
- * Sound menu: background sounds generated in the browser (rain, waves, noise, calm
- * music …) or a YouTube link. Playback lives in src/lib/sound/player.ts and carries
+ * Sound menu: background sounds — 3D nature recordings, noise and calm music generated in
+ * the browser — or a YouTube link. Playback lives in src/lib/sound/player.ts and carries
  * on across page navigations; this is only the UI.
  */
 import type { SoundId } from '../lib/storage';
 
-const GROUPS: { title: string; items: { value: SoundId; label: string }[] }[] = [
+const GROUPS: { title: string; note?: string; items: { value: SoundId; label: string }[] }[] = [
   {
     title: 'Nature',
+    note: 'Rain, waves and fireplace are binaural recordings with sounds placed around you. Put on headphones to hear them in 3D.',
     items: [
       { value: 'rain', label: 'Rain' },
       { value: 'waves', label: 'Ocean waves' },
@@ -101,6 +102,7 @@ NAMES.youtube = 'YouTube';
               </label>
             ))}
           </div>
+          {g.note && <p class="sound__note">{g.note}</p>}
         </fieldset>
       ))
     }
@@ -116,7 +118,7 @@ NAMES.youtube = 'YouTube';
       <p class="sound__note">Plays in a small player in the corner — YouTube requires the video to stay visible. Needs an internet connection.</p>
     </fieldset>
 
-    <p class="sound__note">Everything above YouTube is generated in your browser and works offline. Sound keeps playing as you move between pages.</p>
+    <p class="sound__note">Rain, waves and fireplace download the first time you play them (a few MB each), then work offline; the rest is generated in your browser. Sound keeps playing as you move between pages.</p>
     <p class="visually-hidden" aria-live="polite" data-sound-live></p>
   </div>
 </details>
