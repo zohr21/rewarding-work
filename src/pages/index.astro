@@ -4,13 +4,44 @@ import ProblemCards from '../components/ProblemCards.astro';
 import Quiz from '../components/Quiz.astro';
 import { SITE } from '../config/site';
 import { url } from '../lib/paths';
+
+// Decorative 3D block field for the hero: 7 × 5 "days", taller and brighter = more focus.
+// Purely illustrative (aria-hidden) — the real heatmap lives on /progress.
+const LEVELS = [0, 1, 0, 2, 1, 0, 1, 1, 2, 3, 1, 2, 2, 0, 0, 3, 4, 2, 3, 1, 2, 2, 1, 3, 4, 4, 3, 1, 1, 2, 2, 3, 4, 4, 3];
 ---
 
 <BaseLayout>
   <div class="container">
     <header class="hero">
-      <h1>Make the work feel worth doing.</h1>
-      <p class="hero__lead">{SITE.tagline}</p>
+      <div class="hero__text">
+        <p class="hero__eyebrow">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle>
+            <path d="M8.5 12.5l2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          Honest evidence notes on every technique
+        </p>
+        <h1>Make the work feel <span class="hero__accent">worth doing.</span></h1>
+        <p class="hero__lead">{SITE.tagline}</p>
+        <div class="hero__actions">
+          <a class="btn" href="#quiz-heading">Find my technique</a>
+          <a class="btn btn--ghost" href={url('/timer')}>Start a focus session</a>
+        </div>
+      </div>
+      <div class="hero__scene" aria-hidden="true">
+        <div class="hero__shadow"></div>
+        <div class="iso">
+          {
+            LEVELS.map((l) => (
+              <div class={`iso__cube l${l}`} style={`--h:${6 + l * 20}px`}>
+                <span class="iso__s" />
+                <span class="iso__e" />
+                <span class="iso__t" />
+              </div>
+            ))
+          }
+        </div>
+      </div>
     </header>
 
     <section class="section" aria-labelledby="problems-heading">
@@ -30,14 +61,23 @@ import { url } from '../lib/paths';
     <section class="section tools" aria-labelledby="tools-heading">
       <h2 id="tools-heading" class="visually-hidden">Tools</h2>
       <a class="tool-link" href={url('/timer')}>
+        <span class="tool-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M12 9v4l2.5 2.5M10 2h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </span>
         <strong>Focus timer</strong>
         <span class="muted">Pomodoro, 52/17, Flowtime or your own rhythm.</span>
       </a>
       <a class="tool-link" href={url('/progress')}>
+        <span class="tool-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </span>
         <strong>Your progress</strong>
         <span class="muted">Focus heatmap, done list and a habit chain.</span>
       </a>
       <a class="tool-link" href={url('/techniques')}>
+        <span class="tool-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path d="M4 19V5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM8 7h7M8 11h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </span>
         <strong>All techniques</strong>
         <span class="muted">Filter by problem or type, with honest evidence notes.</span>
       </a>
@@ -47,18 +87,135 @@ import { url } from '../lib/paths';
 
 <style>
   .hero {
+    display: grid;
+    gap: var(--space-6);
+    align-items: center;
     padding-block: var(--space-7) var(--space-5);
-    max-width: 44rem;
   }
-
+  @media (min-width: 56rem) {
+    .hero {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      padding-block: var(--space-8) var(--space-6);
+    }
+  }
+  .hero__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 6px 14px;
+    border-radius: 14px;
+    background: var(--color-accent-soft);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
   .hero h1 {
-    font-size: clamp(2rem, 1.5rem + 2.5vw, 3rem);
+    margin-top: var(--space-5);
+    font-size: clamp(2.6rem, 1.6rem + 4.2vw, 5rem);
+    line-height: 0.98;
+    letter-spacing: -0.035em;
   }
-
+  .hero__accent {
+    color: var(--color-accent);
+  }
   .hero__lead {
-    margin-top: var(--space-3);
+    margin-top: var(--space-4);
+    max-width: 34rem;
     font-size: var(--text-lg);
     color: var(--color-text-muted);
+  }
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3) var(--space-4);
+    margin-top: var(--space-6);
+  }
+  .hero__actions .btn {
+    min-height: 52px;
+    font-size: var(--text-base);
+  }
+
+  /* Decorative isometric block field. Each cube = a top face and two visible sides. */
+  .hero__scene {
+    position: relative;
+    display: grid;
+    place-items: center;
+    min-height: 22rem;
+    perspective: 1400px;
+  }
+  /* Phones: the block field is decoration, so it gives the space back to content. */
+  @media (max-width: 34rem) {
+    .hero__scene {
+      display: none;
+    }
+    .hero__eyebrow {
+      font-size: var(--text-xs);
+    }
+  }
+  .hero__shadow {
+    position: absolute;
+    left: 50%;
+    bottom: 12%;
+    width: 70%;
+    height: 22%;
+    translate: -50% 0;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgb(0 0 0 / 0.35), transparent);
+  }
+  .iso {
+    --c: 30px;
+    display: grid;
+    grid-template-columns: repeat(7, var(--c));
+    gap: 6px;
+    transform-style: preserve-3d;
+    transform: rotateX(58deg) rotateZ(-42deg);
+  }
+  @media (min-width: 30rem) {
+    .iso {
+      --c: 38px;
+      gap: 8px;
+    }
+  }
+  .iso__cube {
+    --top: var(--heat-0);
+    --side: var(--heat-edge-0);
+    position: relative;
+    width: var(--c);
+    height: var(--c);
+    transform-style: preserve-3d;
+  }
+  .iso__cube.l1 { --top: var(--heat-1); --side: var(--heat-edge-1); }
+  .iso__cube.l2 { --top: var(--heat-2); --side: var(--heat-edge-2); }
+  .iso__cube.l3 { --top: var(--heat-3); --side: var(--heat-edge-3); }
+  .iso__cube.l4 { --top: var(--heat-4); --side: var(--heat-edge-4); }
+  .iso__cube > span {
+    position: absolute;
+  }
+  .iso__t {
+    inset: 0;
+    border-radius: 4px;
+    background: var(--top);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
+    transform: translateZ(var(--h));
+  }
+  .iso__s {
+    left: 0;
+    top: var(--c);
+    width: var(--c);
+    height: var(--h);
+    background: var(--side);
+    transform-origin: top;
+    transform: rotateX(90deg);
+  }
+  .iso__e {
+    left: var(--c);
+    top: 0;
+    width: var(--h);
+    height: var(--c);
+    background: color-mix(in srgb, var(--side) 75%, black);
+    transform-origin: left;
+    transform: rotateY(-90deg);
   }
 
   .section {
@@ -83,27 +240,51 @@ import { url } from '../lib/paths';
 
   .tools {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-4);
     grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
   }
 
   .tool-link {
     display: grid;
     gap: var(--space-1);
-    padding: var(--space-4);
+    padding: var(--space-5);
+    background: var(--surface-grad);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
     color: var(--color-text);
     text-decoration: none;
-    transition: border-color var(--duration-fast) var(--ease-out);
+    transition:
+      border-color var(--duration-fast) var(--ease-out),
+      transform var(--duration-base) var(--ease-out),
+      box-shadow var(--duration-base) var(--ease-out);
   }
-
   .tool-link:hover {
     color: var(--color-text);
-    border-color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-4px);
+  }
+  .tool-link strong {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+  }
+  .tool-link__icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: var(--space-2);
+    border-radius: 14px;
+    background: var(--raised-grad);
+    border: 1px solid var(--color-border);
+    color: var(--color-accent);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 4px 0 var(--edge);
   }
 
-  .tool-link span {
+  .tool-link .muted {
     font-size: var(--text-sm);
   }
 </style>

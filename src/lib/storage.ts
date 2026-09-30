@@ -255,10 +255,10 @@ export function subscribe(name: StoreName, callback: () => void, { otherTabsOnly
 
 export type ThemeChoice = 'auto' | 'light' | 'dark';
 
-/** Light unless the user picked dark or auto (follow the system). */
+/** Dark unless the user picked light or auto (follow the system). */
 export function getTheme(): ThemeChoice {
-  const v = read<unknown>('theme', 'light');
-  return v === 'dark' || v === 'auto' ? v : 'light';
+  const v = read<unknown>('theme', 'dark');
+  return v === 'light' || v === 'auto' ? v : 'dark';
 }
 
 export function setTheme(choice: ThemeChoice): void {
@@ -923,7 +923,7 @@ export function parseBackup(text: string): ParseResult {
     chain: isChain(d.chain) ? d.chain : EMPTY_CHAIN,
     tasks: parseBackupTasks(d, (n) => (skipped += n)),
     timerPrefs: isObj(d.timerPrefs) ? d.timerPrefs : null,
-    theme: d.theme === 'dark' || d.theme === 'auto' ? d.theme : 'light',
+    theme: d.theme === 'light' || d.theme === 'auto' ? d.theme : 'dark',
     appearance: isAppearance(d.appearance) ? d.appearance : DEFAULT_APPEARANCE,
   };
   return { ok: true, data, skipped };

@@ -9,6 +9,15 @@ const counts = Object.fromEntries(
 ) as Record<ProblemSlug, number>;
 
 // Simple 24px line icons (stroke = currentColor).
+// Each problem gets its own tile colour (category tokens, so both themes work).
+const TILE: Record<ProblemSlug, string> = {
+  'cant-start': 'var(--cat-reward)',
+  'lose-focus': 'var(--cat-time)',
+  'no-progress': 'var(--cat-visual)',
+  'too-much': 'var(--cat-structure)',
+  'burn-out': 'var(--cat-rest)',
+};
+
 const ICONS: Record<ProblemSlug, string> = {
   'cant-start': 'M5 4l14 8-14 8z',
   'lose-focus': 'M12 3v3M12 18v3M3 12h3M18 12h3M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
@@ -23,7 +32,7 @@ const ICONS: Record<ProblemSlug, string> = {
     PROBLEM_SLUGS.map((slug) => (
       <li>
         <a class="problem" href={url(`/problems/${slug}`)}>
-          <span class="problem__icon" aria-hidden="true">
+          <span class="problem__icon" aria-hidden="true" style={`--tile:${TILE[slug]}`}>
             <svg viewBox="0 0 24 24" width="24" height="24">
               <path d={ICONS[slug]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
@@ -54,15 +63,16 @@ const ICONS: Record<ProblemSlug, string> = {
 
   .problem {
     display: flex;
-    gap: var(--space-3);
+    flex-direction: column;
+    gap: var(--space-4);
     height: 100%;
-    padding: var(--space-4);
-    background: var(--color-surface);
+    padding: var(--space-5);
+    background: var(--surface-grad);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     color: var(--color-text);
     text-decoration: none;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-card);
     transition:
       border-color var(--duration-fast) var(--ease-out),
       transform var(--duration-base) var(--ease-out),
@@ -71,20 +81,25 @@ const ICONS: Record<ProblemSlug, string> = {
 
   .problem:hover {
     color: var(--color-text);
-    border-color: var(--color-accent);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-4px);
   }
 
+  /* A raised, coloured tile: light top, solid darker edge underneath. */
   .problem__icon {
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    background: linear-gradient(160deg, color-mix(in srgb, var(--tile) 70%, white), var(--tile));
+    color: var(--color-bg);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 4px 0 color-mix(in srgb, var(--tile) 55%, black),
+      0 12px 20px -10px color-mix(in srgb, var(--tile) 60%, transparent);
   }
 
   .problem__body {
@@ -94,6 +109,7 @@ const ICONS: Record<ProblemSlug, string> = {
   }
 
   .problem__title {
+    font-family: var(--font-display);
     font-weight: 700;
     font-size: var(--text-lg);
     line-height: var(--leading-tight);
