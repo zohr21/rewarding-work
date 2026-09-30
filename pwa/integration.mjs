@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 
 // The Firebase chunk (src/lib/account/firebase.ts) is only needed by people who sign in,
 // so it isn't precached for everyone; the worker caches it the first time it's used.
-const SKIP = [/\.map$/, /^sw\.js$/, /^\.nojekyll$/, /^_astro\/firebase\.[^/]+\.js$/];
+// Same for the sound recordings (a few MB each): only the ones someone plays are cached.
+const SKIP = [/\.map$/, /^sw\.js$/, /^\.nojekyll$/, /^_astro\/firebase\.[^/]+\.js$/, /^sounds\//];
 
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });

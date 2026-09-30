@@ -84,6 +84,36 @@ export function pan(ctx: BaseAudioContext, value: number): AudioNode {
   return p;
 }
 
+export type Point = readonly [x: number, y: number, z: number];
+
+/**
+ * A point in 3D space around the listener, heard through HRTF: the filtering done by the
+ * shape of the head and ears, which lets headphones place a sound above, behind or far
+ * away rather than just left or right. The listener sits at the origin facing -z, y is up.
+ * Distances are in metres.
+ */
+export function place(ctx: BaseAudioContext, at: Point): PannerNode {
+  const p = ctx.createPanner();
+  p.panningModel = 'HRTF';
+  p.distanceModel = 'inverse';
+  p.refDistance = 1;
+  p.rolloffFactor = 1;
+  move(p, at, 0, 0);
+  return p;
+}
+
+/** Glide a placed sound towards `to`, starting at audio time `at` (0 = jump there now). */
+export function move(p: PannerNode, to: Point, at: number, seconds: number): void {
+  if (!p.positionX) {
+    p.setPosition(...to); // Safari < 14.1 / Firefox < 90
+    return;
+  }
+  [p.positionX, p.positionY, p.positionZ].forEach((param, i) => {
+    if (seconds > 0) param.setTargetAtTime(to[i]!, at, seconds / 3);
+    else param.value = to[i]!;
+  });
+}
+
 /** A soft room: generated stereo impulse response with an exponential tail. */
 export function reverb(ctx: BaseAudioContext, seconds = 4, decay = 3): ConvolverNode {
   const length = Math.floor(ctx.sampleRate * seconds);
@@ -97,7 +127,10 @@ export function reverb(ctx: BaseAudioContext, seconds = 4, decay = 3): Convolver
   return conv;
 }
 
-/** A short burst of noise (a drop, a crackle): filtered, panned, with a fast decay. */
+/**
+ * A short burst of noise (a drop, a crackle): filtered, with a fast decay. Panned if `pan`
+ * is given; for a position in 3D, send it to a `place()` node instead.
+ */
 export function burst(
   ctx: AudioContext,
   dest: AudioNode,
@@ -110,7 +143,7 @@ export function burst(
   env.gain.setValueAtTime(0.0001, at);
   env.gain.exponentialRampToValueAtTime(o.peak, at + Math.min(0.004, o.length / 4));
   env.gain.exponentialRampToValueAtTime(0.0001, at + o.length);
-  chain(src, filter(ctx, o.type, o.freq, o.Q ?? 1), env, pan(ctx, o.pan ?? 0), dest);
+  chain(src, filter(ctx, o.type, o.freq, o.Q ?? 1), env, ...(o.pan === undefined ? [] : [pan(ctx, o.pan)]), dest);
   src.start(at, Math.random() * 7, o.length + 0.05);
 }
 

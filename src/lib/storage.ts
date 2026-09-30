@@ -303,7 +303,7 @@ export function setAppearance(a: Appearance): void {
 
 // ---------- Background sound ----------
 
-/** Sounds synthesised in the browser (src/lib/sound) — no audio files, work offline. */
+/** Built-in sounds (src/lib/sound): recordings with 3D details, or synthesised in the browser. */
 export const SOUNDS = ['rain', 'waves', 'wind', 'fire', 'brown', 'pink', 'pads', 'piano'] as const;
 export type SoundId = (typeof SOUNDS)[number];
 export type SoundSource = SoundId | 'youtube';

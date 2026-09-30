@@ -8,6 +8,9 @@
  *  - pages:    network first (you get updates when online), cached copy when offline.
  *              Includes the client-side router's fetch() of pages, not just navigations.
  *  - assets:   cache first (file names are content-hashed, so they never go stale).
+ *  - sounds:   the recordings in /sounds/ are cached the first time they're played, in a
+ *              cache of their own that survives deploys (they're large and rarely change;
+ *              bump SOUNDS when one is replaced).
  *  - activate: delete caches from older builds, but keep the previous one. For a few
  *              minutes after a deploy a browser can still show the old page (GitHub
  *              Pages lets it cache HTML for 10 minutes), and that page needs the old
@@ -16,6 +19,7 @@
 const VERSION = '__VERSION__';
 const PRECACHE = /* __PRECACHE__ */ [];
 const CACHE = `rw-${VERSION}`;
+const SOUNDS = 'sounds-v1';
 const SCOPE = self.registration.scope; // e.g. https://user.github.io/rewarding-work/
 const toUrl = (path) => new URL(path, SCOPE).href;
 
@@ -35,7 +39,8 @@ self.addEventListener('activate', (event) => {
       .then((keys) => {
         // keys() lists caches oldest first: keep this build's and the one before it.
         const older = keys.filter((k) => k.startsWith('rw-') && k !== CACHE);
-        return Promise.all(older.slice(0, -1).map((k) => caches.delete(k)));
+        const oldSounds = keys.filter((k) => k.startsWith('sounds-') && k !== SOUNDS);
+        return Promise.all([...older.slice(0, -1), ...oldSounds].map((k) => caches.delete(k)));
       })
       .then(() => self.clients.claim()),
   );
@@ -88,6 +93,15 @@ async function handleAsset(request) {
   return response;
 }
 
+async function handleSound(request) {
+  const cache = await caches.open(SOUNDS);
+  const hit = await cache.match(request, { ignoreSearch: true, ignoreVary: true });
+  if (hit) return hit;
+  const response = await fetch(request);
+  if (response.ok && response.type === 'basic') cache.put(request, response.clone());
+  return response;
+}
+
 /** Page requests: real navigations, and the client-side router's fetch() of a page URL. */
 function isPage(request) {
   if (request.mode === 'navigate') return true;
@@ -100,7 +114,8 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (!request.url.startsWith(SCOPE)) return; // other origins / paths: let the browser handle it
-  event.respondWith(isPage(request) ? handlePage(request) : handleAsset(request));
+  if (request.url.startsWith(toUrl('sounds/'))) event.respondWith(handleSound(request));
+  else event.respondWith(isPage(request) ? handlePage(request) : handleAsset(request));
 });
 
 // Clicking a timer notification focuses the open app (or opens the timer).
