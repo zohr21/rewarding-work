@@ -13,7 +13,7 @@ const current = Astro.url.pathname;
 {
   ACCOUNTS_ENABLED && (
     <a
-      class="account-btn"
+      class="account-btn tool-btn"
       href={url('/account')}
       data-account-btn
       data-state="signed-out"
@@ -76,24 +76,12 @@ const current = Astro.url.pathname;
 <style>
   .account-btn {
     position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
     text-decoration: none;
   }
 
   .account-btn:hover,
   .account-btn[aria-current='page'] {
     color: var(--color-text);
-    border-color: var(--color-border-strong);
   }
 
   .account-btn__avatar {

@@ -31,12 +31,24 @@ const GROUPS: { title: string; items: { value: SoundId; label: string }[] }[] = 
     ],
   },
 ];
+// 24px line icons for the sound tiles (stroke = currentColor).
+const ICONS: Record<SoundId, string> = {
+  rain: 'M7 14a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 14zM8 18l-1 2M12 18l-1 2M16 18l-1 2',
+  waves: 'M2 9c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0M2 15c2.5-2 4.5-2 7 0s4.5 2 7 0 4.5-2 6 0',
+  wind: 'M3 8h10a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7',
+  fire: 'M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5.5.5 1.5 1.5 2.5 2.5 3 0-3-.5-5.5 0-7.5z',
+  brown: 'M3 12h2l2-5 3 10 3-12 3 9 2-4h3',
+  pink: 'M3 12h3l1.5-3 3 6 3-7 3 6 1.5-2H21',
+  pads: 'M9 18V6l10-2v12M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM19 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  piano: 'M4 5h16v14H4zM9 5v8M15 5v8M12 13v6M7.5 13h3M13.5 13h3',
+};
+
 const NAMES: Record<string, string> = Object.fromEntries(GROUPS.flatMap((g) => g.items.map((i) => [i.value, i.label])));
 NAMES.youtube = 'YouTube';
 ---
 
 <details class="sound" data-sound-menu data-names={JSON.stringify(NAMES)}>
-  <summary class="sound__button" aria-label="Background sound">
+  <summary class="sound__button tool-btn" aria-label="Background sound">
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
       <path
         d="M4 14v-2a8 8 0 0 1 16 0v2"
@@ -80,7 +92,12 @@ NAMES.youtube = 'YouTube';
             {g.items.map((i) => (
               <label class="sound__option">
                 <input type="radio" name="rw-sound" value={i.value} />
-                <span>{i.label}</span>
+                <span>
+                  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                    <path d={ICONS[i.value]} fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  {i.label}
+                </span>
               </label>
             ))}
           </div>
@@ -197,35 +214,21 @@ NAMES.youtube = 'YouTube';
     position: relative;
   }
 
-  .sound__button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  .sound__button::-webkit-details-marker {
-    display: none;
-  }
-
-  .sound__button:hover,
-  .sound[open] .sound__button {
-    color: var(--color-text);
-    border-color: var(--color-border-strong);
-  }
-
+  /* Base look: .tool-btn (global.css). While playing it glows with the accent. */
   .sound.is-playing .sound__button {
     color: var(--color-accent);
-    border-color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 4px 0 var(--edge),
+      0 0 18px -4px var(--accent-glow);
+  }
+
+  .sound.is-playing[open] .sound__button {
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 55%, transparent),
+      0 1px 0 var(--edge);
   }
 
   /* Three little equaliser bars, shown while playing. */
@@ -274,16 +277,16 @@ NAMES.youtube = 'YouTube';
     right: 0;
     top: calc(100% + var(--space-2));
     z-index: 50;
-    width: min(20rem, calc(100vw - 2rem));
+    width: min(23rem, calc(100vw - 2rem));
     max-height: calc(100vh - 6rem);
     overflow-y: auto;
     display: grid;
     gap: var(--space-4);
-    padding: var(--space-4);
-    background: var(--color-surface-solid);
+    padding: var(--space-5);
+    background: var(--popover-bg);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--popover-shadow);
     animation: panel-in var(--duration-base) var(--ease-out);
   }
 
@@ -306,13 +309,23 @@ NAMES.youtube = 'YouTube';
     height: 48px;
     border: 0;
     border-radius: 50%;
-    background: var(--color-accent);
+    background: var(--accent-grad);
     color: var(--color-on-accent);
     cursor: pointer;
+    box-shadow:
+      inset 0 2px 0 rgb(255 255 255 / 0.45),
+      0 4px 0 var(--accent-edge),
+      0 10px 18px -8px var(--accent-glow);
+    transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
   }
 
   .sound__play:hover {
-    background: var(--color-accent-hover);
+    filter: brightness(1.05);
+  }
+
+  .sound__play:active {
+    transform: translateY(4px);
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.3), 0 0 0 var(--accent-edge);
   }
 
   .sound__play:focus-visible {
@@ -330,7 +343,9 @@ NAMES.youtube = 'YouTube';
   }
 
   .sound__name {
-    font-weight: 600;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 700;
   }
 
   .sound__status {
@@ -371,7 +386,7 @@ NAMES.youtube = 'YouTube';
 
   .sound__options {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: var(--space-2);
   }
 
@@ -388,15 +403,28 @@ NAMES.youtube = 'YouTube';
     cursor: pointer;
   }
 
+  /* Tactile tiles: raised when off, lit and green when chosen. */
   .sound__option span {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    min-height: 40px;
-    padding: 0 var(--space-3);
+    justify-content: center;
+    gap: 6px;
+    min-height: 72px;
+    padding: var(--space-2) 2px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-sm);
+    border-radius: 14px;
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 4px 0 var(--edge);
+    font-size: var(--text-xs);
+    line-height: 1.2;
+    text-align: center;
     color: var(--color-text-muted);
+    transition:
+      transform var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
   }
 
   .sound__option:hover span {
@@ -404,11 +432,22 @@ NAMES.youtube = 'YouTube';
     color: var(--color-text);
   }
 
+  .sound__option:active span {
+    transform: translateY(3px);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 1px 0 var(--edge);
+  }
+
   .sound__option input:checked + span {
-    border-color: var(--color-accent);
-    background: var(--color-accent-soft);
-    color: var(--color-text);
+    border-color: transparent;
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
     font-weight: 600;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 4px 0 var(--accent-edge),
+      0 10px 18px -8px var(--accent-glow);
   }
 
   .sound__option input:focus-visible + span {

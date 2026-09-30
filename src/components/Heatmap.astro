@@ -4,6 +4,8 @@
  * (data lives in localStorage). Columns = weeks, rows = Mon…Sun.
  * Sequential single-hue scale; hover/tap tooltip per cell; a side panel with
  * the key numbers; a table view for screen readers and anyone who prefers numbers.
+ * A Flat / 3D switch shows the same weeks as an isometric block field (decorative:
+ * the flat grid stays the readable view and is the default).
  *
  * Note: cells, labels and table rows are created by JS, so their styles use
  * :global() — Astro's scoped styles only reach elements written in this template.
@@ -20,8 +22,14 @@ const LEGEND = [
 ];
 ---
 
-<section class="card heat" data-heatmap aria-labelledby="heat-heading">
-  <h2 id="heat-heading" class="panel-title">Focus, last 12 weeks</h2>
+<section class="card heat" data-heatmap data-view="flat" aria-labelledby="heat-heading">
+  <div class="heat__head">
+    <h2 id="heat-heading" class="panel-title">Focus, last 12 weeks</h2>
+    <div class="heat__views well" role="group" aria-label="Heatmap view">
+      <button type="button" class="heat__view" data-heat-view="flat" aria-pressed="true">Flat</button>
+      <button type="button" class="heat__view" data-heat-view="3d" aria-pressed="false">3D</button>
+    </div>
+  </div>
 
   <div class="heat__layout">
     <div class="heat__main">
@@ -29,6 +37,11 @@ const LEGEND = [
         <div class="heat__grid" data-heat-grid aria-hidden="true"></div>
         <div class="heat__tip" data-heat-tip aria-hidden="true" hidden></div>
       </div>
+
+      <div class="heat__iso-wrap" aria-hidden="true">
+        <div class="heat__iso" data-heat-iso></div>
+      </div>
+      <p class="muted heat__iso-note">The 3D view is for the big picture — switch to Flat to read each day.</p>
 
       <div class="heat__legend" aria-hidden="true">
         <span class="heat__legend-end">Less</span>
@@ -105,6 +118,15 @@ const LEGEND = [
       const tbody = root.querySelector<HTMLElement>('[data-heat-table]')!;
       const tfoot = root.querySelector<HTMLElement>('[data-heat-foot]')!;
       const empty = root.querySelector<HTMLElement>('[data-heat-empty]')!;
+      const iso = root.querySelector<HTMLElement>('[data-heat-iso]')!;
+      const viewButtons = root.querySelectorAll<HTMLButtonElement>('[data-heat-view]');
+      viewButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          root.dataset.view = btn.dataset.heatView;
+          viewButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+          hideTip();
+        });
+      });
       const fact = (name: string, text: string) => {
         const node = root.querySelector(`[data-fact="${name}"]`);
         if (node) node.textContent = text;
@@ -153,6 +175,19 @@ const LEGEND = [
           });
         }
         grid.replaceChildren(frag);
+
+        // 3D field: same weeks, row by row (Mon…Sun), each day a block whose height is its level.
+        const isoFrag = document.createDocumentFragment();
+        for (let row = 0; row < 7; row++) {
+          weeks.forEach((col) => {
+            const c = col[row]!;
+            const cube = el('div', `iso__cube l${c.future ? 0 : c.level}${c.future ? ' is-future' : ''}`);
+            cube.style.setProperty('--h', `${c.future ? 1 : 3 + c.level * 13}px`);
+            cube.append(el('span', 'iso__s'), el('span', 'iso__e'), el('span', 'iso__t'));
+            isoFrag.append(cube);
+          });
+        }
+        iso.replaceChildren(isoFrag);
 
         // Facts panel
         const days = weeks.flat().filter((c) => !c.future);
@@ -241,6 +276,134 @@ const LEGEND = [
 </script>
 
 <style>
+  .heat__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .heat__head .panel-title {
+    margin-bottom: 0;
+  }
+
+  .heat__views {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+
+  .heat__view {
+    min-width: 56px;
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .heat__view:hover {
+    color: var(--color-text);
+  }
+
+  .heat__view[aria-pressed='true'] {
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 3px 0 var(--accent-edge);
+  }
+
+  /* One view at a time. */
+  .heat[data-view='3d'] .heat__wrap,
+  .heat[data-view='flat'] .heat__iso-wrap,
+  .heat[data-view='flat'] .heat__iso-note {
+    display: none;
+  }
+
+  .heat__iso-wrap {
+    display: grid;
+    place-items: center;
+    min-height: 17rem;
+    perspective: 1400px;
+    overflow: hidden;
+  }
+
+  .heat__iso {
+    --c: 16px;
+    display: grid;
+    grid-template-columns: repeat(12, var(--c));
+    gap: 4px;
+    transform-style: preserve-3d;
+    transform: rotateX(58deg) rotateZ(-38deg);
+  }
+
+  @media (min-width: 30rem) {
+    .heat__iso {
+      --c: 22px;
+      gap: 5px;
+    }
+  }
+
+  .heat__iso-note {
+    font-size: var(--text-xs);
+    text-align: center;
+  }
+
+  .heat :global(.iso__cube) {
+    --top: var(--heat-0);
+    --side: var(--heat-edge-0);
+    position: relative;
+    width: var(--c);
+    height: var(--c);
+    transform-style: preserve-3d;
+  }
+
+  .heat :global(.iso__cube.l1) { --top: var(--heat-1); --side: var(--heat-edge-1); }
+  .heat :global(.iso__cube.l2) { --top: var(--heat-2); --side: var(--heat-edge-2); }
+  .heat :global(.iso__cube.l3) { --top: var(--heat-3); --side: var(--heat-edge-3); }
+  .heat :global(.iso__cube.l4) { --top: var(--heat-4); --side: var(--heat-edge-4); }
+  .heat :global(.iso__cube.is-future) { opacity: 0.35; }
+
+  .heat :global(.iso__cube > span) {
+    position: absolute;
+  }
+
+  .heat :global(.iso__t) {
+    inset: 0;
+    border-radius: 3px;
+    background: var(--top);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12);
+    transform: translateZ(var(--h));
+  }
+
+  .heat :global(.iso__s) {
+    left: 0;
+    top: var(--c);
+    width: var(--c);
+    height: var(--h);
+    background: var(--side);
+    transform-origin: top;
+    transform: rotateX(90deg);
+  }
+
+  .heat :global(.iso__e) {
+    left: var(--c);
+    top: 0;
+    width: var(--h);
+    height: var(--c);
+    background: color-mix(in srgb, var(--side) 75%, black);
+    transform-origin: left;
+    transform: rotateY(-90deg);
+  }
+
   .heat__layout {
     display: grid;
     gap: var(--space-5);
@@ -282,18 +445,20 @@ const LEGEND = [
     line-height: 1;
   }
 
+  /* Empty days are sunken; days with focus are small raised tiles with a darker edge. */
   .heat :global(.cell) {
     display: block;
     aspect-ratio: 1;
-    border-radius: 4px;
+    border-radius: 5px;
     background: var(--heat-0);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
     transition: transform var(--duration-fast) var(--ease-out);
   }
 
-  .heat :global(.cell.l1) { background: var(--heat-1); }
-  .heat :global(.cell.l2) { background: var(--heat-2); }
-  .heat :global(.cell.l3) { background: var(--heat-3); }
-  .heat :global(.cell.l4) { background: var(--heat-4); }
+  .heat :global(.cell.l1) { background: var(--heat-1); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 2px 0 var(--heat-edge-1); }
+  .heat :global(.cell.l2) { background: var(--heat-2); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 2px 0 var(--heat-edge-2); }
+  .heat :global(.cell.l3) { background: var(--heat-3); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 2px 0 var(--heat-edge-3); }
+  .heat :global(.cell.l4) { background: var(--heat-4); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.2), 0 2px 0 var(--heat-edge-4); }
 
   .heat :global(.heat__grid .cell[data-key]:hover) {
     transform: scale(1.12);

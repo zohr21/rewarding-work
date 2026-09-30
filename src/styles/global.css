@@ -50,12 +50,13 @@ h1,
 h2,
 h3,
 h4 {
+  font-family: var(--font-display);
   line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
-h1 { font-size: var(--text-2xl); letter-spacing: -0.01em; }
-h2 { font-size: var(--text-xl); }
+h1 { font-size: var(--text-2xl); font-weight: 800; letter-spacing: -0.03em; }
+h2 { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.015em; }
 h3 { font-size: var(--text-lg); }
 
 p,
@@ -144,15 +145,19 @@ a:hover {
 }
 
 /* ---------- Shared components ---------- */
+/* Card: a raised surface — top highlight, hairline border, soft ambient shadow. */
 .card {
-  background: var(--color-surface);
+  background: var(--surface-grad);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   padding: var(--space-5);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-card);
 }
 
+/* Buttons are tactile: a solid edge underneath that the button sinks into when pressed. */
 .btn {
+  --btn-edge: var(--accent-edge);
+  --btn-depth: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -160,44 +165,72 @@ a:hover {
   min-height: 44px; /* comfortable touch target */
   padding: var(--space-2) var(--space-5);
   border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
+  border-radius: var(--radius-btn);
+  background: var(--accent-grad);
   color: var(--color-on-accent);
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    0 var(--btn-depth) 0 var(--btn-edge),
+    0 12px 22px -10px var(--accent-glow);
   transition:
-    background-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
 }
 
 .btn:hover {
-  background: var(--color-accent-hover);
   color: var(--color-on-accent);
+  filter: brightness(1.05);
 }
 
 .btn:active {
-  transform: scale(0.97);
+  transform: translateY(var(--btn-depth));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 0 0 var(--btn-edge),
+    0 4px 10px -6px var(--accent-glow);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
 }
 
 .btn--ghost {
-  background: transparent;
+  --btn-edge: var(--edge);
+  background: var(--raised-grad);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  box-shadow:
+    inset 0 1px 0 var(--raised-hl),
+    0 var(--btn-depth) 0 var(--btn-edge),
+    var(--raised-shadow);
+}
+
+.btn--ghost:hover {
   color: var(--color-text);
   border-color: var(--color-border-strong);
 }
 
-.btn--ghost:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+.btn--ghost:active {
+  box-shadow:
+    inset 0 1px 0 var(--raised-hl),
+    0 0 0 var(--btn-edge);
 }
 
+/* Inputs sit in a "well": sunken, with an inner shadow. */
 .input {
   width: 100%;
   min-height: 44px;
   padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
 }
 
 .input::placeholder {
@@ -206,18 +239,24 @@ a:hover {
 }
 
 .btn--small {
+  --btn-depth: 3px;
   min-height: 36px;
   padding: var(--space-1) var(--space-4);
+  border-radius: 11px;
   font-size: var(--text-sm);
 }
 
 .btn--danger {
-  background: #b3261e;
+  --btn-edge: #6e1510;
+  background: linear-gradient(180deg, #c42e25, #b3261e);
   color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 var(--btn-depth) 0 var(--btn-edge),
+    0 12px 22px -12px rgb(179 38 30 / 0.6);
 }
 
 .btn--danger:hover {
-  background: #8f1d17;
   color: #fff;
 }
 
@@ -266,6 +305,65 @@ a:hover {
 
 .disclosure[open] > summary::before {
   transform: rotate(45deg);
+}
+
+/* Round tactile icon button for toolbars and the header (Sound, Look, Account). */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--raised-grad);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+  box-shadow:
+    inset 0 1px 0 var(--raised-hl),
+    0 4px 0 var(--edge),
+    var(--raised-shadow);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.tool-btn::-webkit-details-marker {
+  display: none;
+}
+
+.tool-btn:hover {
+  color: var(--color-text);
+}
+
+.tool-btn:active,
+details[open] > .tool-btn {
+  transform: translateY(3px);
+  color: var(--color-text);
+  box-shadow:
+    inset 0 1px 0 var(--raised-hl),
+    inset 0 0 0 1px var(--color-border-strong),
+    0 1px 0 var(--edge);
+}
+
+/* A popover panel (Sound, Look, Account menus). */
+.popover {
+  background: var(--popover-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--popover-shadow);
+}
+
+/* A sunken "well" that holds a segmented control. */
+.well {
+  background: var(--well-bg);
+  box-shadow: var(--well-shadow);
 }
 
 .panel-title {
