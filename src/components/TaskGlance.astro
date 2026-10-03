@@ -232,18 +232,10 @@ const progressUrl = url('/progress');
     height: auto;
   }
 
+  /* Bar colours: global.css. */
   .glance :global(.bar) {
-    fill: var(--heat-2);
     transform-box: fill-box;
     transform-origin: bottom;
-  }
-
-  .glance :global(.bar--today) {
-    fill: var(--color-accent);
-  }
-
-  .glance :global(.bar--none) {
-    fill: var(--color-border-strong);
   }
 
   .glance :global(.bar__day) {

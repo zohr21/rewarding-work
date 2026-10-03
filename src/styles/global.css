@@ -474,3 +474,94 @@ details[open] > .tool-btn {
 html[data-motion='off'] .is-entering .ring__value {
   animation: none;
 }
+
+/* Bars: past days soft, today solid, nothing (or still to come) a stub. */
+.bar {
+  fill: var(--heat-2);
+}
+
+.bar--today {
+  fill: var(--color-accent);
+}
+
+.bar--none {
+  fill: var(--color-border-strong);
+}
+
+.mini,
+.spark {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+}
+
+.spark__line {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.spark__dot {
+  fill: var(--color-accent);
+}
+
+.donut circle {
+  fill: none;
+  stroke-width: 18;
+}
+
+.donut__track {
+  stroke: var(--heat-0);
+}
+
+/* One fixed colour per category; the legend adds a shape, so colour is never the only cue. */
+.donut__s0 {
+  stroke: var(--heat-4);
+  fill: var(--heat-4);
+}
+
+.donut__s1 {
+  stroke: var(--heat-2);
+  fill: var(--heat-2);
+}
+
+.donut__s2 {
+  stroke: var(--cat-visual);
+  fill: var(--cat-visual);
+}
+
+.donut__s3 {
+  stroke: var(--cat-reward);
+  fill: var(--cat-reward);
+}
+
+.donut__s4 {
+  stroke: var(--cat-time);
+  fill: var(--cat-time);
+}
+
+.donut__mark {
+  flex: none;
+  stroke: none;
+}
+
+.donut__big,
+.donut__small {
+  text-anchor: middle;
+  fill: var(--color-text);
+}
+
+.donut__big {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.donut__small {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}

@@ -117,3 +117,42 @@ export function chainStats(days: DayKey[], now = new Date()): ChainStats {
 
   return { current, best, total: set.size, doneToday };
 }
+
+// ---------- Series for charts ----------
+
+export interface SeriesPoint {
+  /** The day, or the Monday of the week. */
+  date: Date;
+  value: number;
+}
+
+/** Focus minutes for each of the last `days` days, oldest first, ending today. */
+export function dailyMinutes(sessions: FocusSession[], days: number, now = new Date()): SeriesPoint[] {
+  const byDay = minutesByDay(sessions);
+  const first = addDays(startOfDay(now), -(days - 1));
+  return Array.from({ length: days }, (_, i) => {
+    const date = addDays(first, i);
+    return { date, value: Math.round(byDay.get(dayKey(date)) ?? 0) };
+  });
+}
+
+/** Sums `amount` per week (Mon–Sun) for the last `weeks` weeks, oldest first, ending with this week. */
+export function weeklySums<T>(items: T[], time: (item: T) => number, amount: (item: T) => number, weeks: number, now = new Date()): SeriesPoint[] {
+  const sums = new Map<number, number>();
+  for (const item of items) {
+    const week = startOfWeek(time(item)).getTime();
+    sums.set(week, (sums.get(week) ?? 0) + amount(item));
+  }
+  const first = addDays(startOfWeek(now), -7 * (weeks - 1));
+  return Array.from({ length: weeks }, (_, i) => {
+    const date = addDays(first, i * 7);
+    return { date, value: Math.round(sums.get(date.getTime()) ?? 0) };
+  });
+}
+
+/** Focus seconds per timer mode. */
+export function secondsByMode(sessions: FocusSession[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const s of sessions) map.set(s.mode, (map.get(s.mode) ?? 0) + s.focusSeconds);
+  return map;
+}

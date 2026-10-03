@@ -1,5 +1,5 @@
 ---
-/** Three stat tiles: focus today, focus this week, sessions completed. */
+/** Three stat tiles: focus today, focus this week, sessions completed — each with a small graphic. */
 ---
 
 <section class="stats" data-progress-stats aria-label="Focus totals">
@@ -7,23 +7,32 @@
     <p class="stat__label">Today</p>
     <p class="stat__value"><span data-stat="today">0</span> <span class="stat__unit">min</span></p>
     <p class="stat__sub muted">focused</p>
+    <div class="stat__meter" data-stat-meter role="img"><span></span></div>
+    <p class="stat__sub muted" data-stat="today-sub"></p>
   </div>
   <div class="stat">
     <p class="stat__label">This week</p>
     <p class="stat__value"><span data-stat="week">0</span> <span class="stat__unit">min</span></p>
     <p class="stat__sub muted" data-stat="week-sub">Mon–Sun</p>
+    <div class="stat__chart" data-stat-week></div>
   </div>
   <div class="stat">
     <p class="stat__label">Sessions completed</p>
     <p class="stat__value"><span data-stat="sessions">0</span></p>
     <p class="stat__sub muted">all time</p>
+    <div class="stat__chart" data-stat-trend></div>
   </div>
 </section>
 
 <script>
   import { getSessions, subscribe } from '../lib/storage';
-  import { totals } from '../lib/stats';
+  import { dailyMinutes, HEAT_THRESHOLDS, totals, weeklySums } from '../lib/stats';
+  import { miniBars, sparkline } from '../lib/charts';
   import { cleanups, onPage } from '../lib/page';
+
+  /** A full day on the heatmap's scale (its darkest colour). */
+  const FULL_DAY_MIN = HEAT_THRESHOLDS[3];
+  const TREND_WEEKS = 8;
 
   onPage('progress-stats', () => {
     const c = cleanups();
@@ -32,12 +41,30 @@
         const el = root.querySelector(`[data-stat="${name}"]`);
         if (el) el.textContent = text;
       };
+      const meter = root.querySelector<HTMLElement>('[data-stat-meter]')!;
+      const week = root.querySelector<HTMLElement>('[data-stat-week]')!;
+      const trend = root.querySelector<HTMLElement>('[data-stat-trend]')!;
       const render = () => {
-        const t = totals(getSessions());
+        const sessions = getSessions();
+        const now = new Date();
+        const t = totals(sessions, now);
         set('today', t.todayMin.toLocaleString());
         set('week', t.weekMin.toLocaleString());
         set('sessions', t.completedSessions.toLocaleString());
         set('week-sub', `${t.weekSessions} session${t.weekSessions === 1 ? '' : 's'} this week`);
+
+        const pct = Math.round((t.todayMin / FULL_DAY_MIN) * 100);
+        (meter.firstElementChild as HTMLElement).style.inlineSize = `${Math.min(100, pct)}%`;
+        meter.setAttribute('aria-label', `${t.todayMin} of ${FULL_DAY_MIN} minutes`);
+        set('today-sub', pct >= 100 ? `A full ${FULL_DAY_MIN / 60} h day` : `${pct}% of a ${FULL_DAY_MIN / 60} h day`);
+
+        // Monday to Sunday; days still to come are stubs.
+        const days = dailyMinutes(sessions, ((now.getDay() + 6) % 7) + 1, now).map((d) => d.value);
+        const padded = [...days, ...Array<number>(7 - days.length).fill(0)];
+        week.innerHTML = miniBars(padded, days.length - 1, `Focus minutes Monday to today: ${days.join(', ')}`);
+
+        const perWeek = weeklySums(sessions.filter((s) => s.completed), (s) => s.start, () => 1, TREND_WEEKS, now).map((w) => w.value);
+        trend.innerHTML = sparkline(perWeek, `Sessions completed per week, last ${TREND_WEEKS} weeks: ${perWeek.join(', ')}`);
       };
       render();
       c.add(subscribe('sessions', render));
@@ -84,6 +111,27 @@
   .stat__sub {
     margin-top: var(--space-1);
     font-size: var(--text-xs);
+  }
+
+  .stat__meter {
+    height: 10px;
+    margin-top: var(--space-3);
+    border-radius: 5px;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    overflow: hidden;
+  }
+
+  .stat__meter span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent-grad);
+    transition: inline-size var(--duration-slow) var(--ease-out);
+  }
+
+  .stat__chart {
+    margin-top: var(--space-3);
   }
 
   @media (max-width: 30rem) {

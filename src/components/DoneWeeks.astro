@@ -1,0 +1,93 @@
+---
+/** Things done per week for the last 8 weeks, from the Done list. Each bar carries its count. */
+---
+
+<section class="card done-weeks" data-done-weeks aria-labelledby="done-weeks-heading">
+  <h2 id="done-weeks-heading" class="panel-title">Things done per week</h2>
+  <p class="muted done-weeks__caption">From your Done list, last 8 weeks.</p>
+  <div class="done-weeks__chart" data-done-weeks-chart></div>
+</section>
+
+<script>
+  import { getDone, subscribe } from '../lib/storage';
+  import { weeklySums } from '../lib/stats';
+  import { formatShort } from '../lib/dates';
+  import { cleanups, onPage } from '../lib/page';
+
+  const WEEKS = 8;
+
+  onPage('done-weeks', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-done-weeks]').forEach((root) => {
+      const chart = root.querySelector<HTMLElement>('[data-done-weeks-chart]')!;
+
+      function render(): void {
+        const weeks = weeklySums(getDone(), (d) => d.doneAt, () => 1, WEEKS);
+        const max = Math.max(1, ...weeks.map((w) => w.value));
+        const last = weeks.length - 1;
+        let out = '<line class="done-weeks__base" x1="0" y1="120" x2="400" y2="120" />';
+        weeks.forEach((w, i) => {
+          const x = 8 + i * 50;
+          const now = i === last;
+          const h = w.value ? Math.max(6, Math.round((w.value / max) * 100)) : 0;
+          out += w.value
+            ? `<rect class="bar${now ? ' bar--today' : ''}" x="${x}" y="${120 - h}" width="34" height="${h}" rx="5" />`
+            : `<rect class="bar bar--none" x="${x}" y="117" width="34" height="3" rx="1.5" />`;
+          out += `<text class="done-weeks__n${now ? ' is-now' : ''}" x="${x + 17}" y="${114 - h}">${w.value}</text>`;
+          // Month on the first bar and whenever it changes; just the day otherwise.
+          const prev = weeks[i - 1];
+          const label = now ? 'This wk' : !prev || prev.date.getMonth() !== w.date.getMonth() ? formatShort(w.date) : String(w.date.getDate());
+          out += `<text class="done-weeks__wk${now ? ' is-now' : ''}" x="${x + 17}" y="140">${label}</text>`;
+        });
+        const said = weeks.map((w) => w.value).join(', ');
+        chart.innerHTML = `<svg viewBox="0 0 400 146" role="img" aria-label="Things done per week over ${WEEKS} weeks, ending this week: ${said}">${out}</svg>`;
+      }
+
+      render();
+      c.add(subscribe('done', render));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .done-weeks .panel-title {
+    margin-bottom: var(--space-1);
+  }
+
+  .done-weeks__caption {
+    margin-bottom: var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .done-weeks__chart :global(svg) {
+    display: block;
+    width: 100%;
+    max-width: 30rem;
+    height: auto;
+  }
+
+  .done-weeks__chart :global(.done-weeks__base) {
+    stroke: var(--color-border-strong);
+  }
+
+  .done-weeks__chart :global(text) {
+    font-family: var(--font-sans);
+    text-anchor: middle;
+  }
+
+  .done-weeks__chart :global(.done-weeks__n) {
+    fill: var(--color-text);
+    font-size: 12px;
+  }
+
+  .done-weeks__chart :global(.done-weeks__wk) {
+    fill: var(--color-text-muted);
+    font-size: 11px;
+  }
+
+  .done-weeks__chart :global(.is-now) {
+    fill: var(--color-text);
+    font-weight: 700;
+  }
+</style>

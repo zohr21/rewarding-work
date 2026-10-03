@@ -1,0 +1,122 @@
+---
+/**
+ * Focus time by timer mode, as a donut. Each mode keeps one colour and one legend
+ * shape, and its share is written next to it.
+ */
+---
+
+<section class="card donut-card" data-technique-donut aria-labelledby="technique-heading">
+  <h2 id="technique-heading" class="panel-title">Time by technique</h2>
+  <p class="muted donut-card__empty" data-donut-empty hidden>No focus time yet. Run a timer session and it shows up here.</p>
+  <div class="donut-card__body" data-donut-body>
+    <div class="donut-card__chart" data-donut-chart></div>
+    <ul class="donut-card__legend" data-donut-legend></ul>
+  </div>
+</section>
+
+<script>
+  import { getSessions, subscribe } from '../lib/storage';
+  import { secondsByMode } from '../lib/stats';
+  import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
+  import { donut, sliceMark, type Slice } from '../lib/charts';
+  import { cleanups, onPage } from '../lib/page';
+
+  const OTHER_SLOT = TIMER_MODES.length;
+
+  onPage('technique-donut', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-technique-donut]').forEach((root) => {
+      const empty = root.querySelector<HTMLElement>('[data-donut-empty]')!;
+      const body = root.querySelector<HTMLElement>('[data-donut-body]')!;
+      const chart = root.querySelector<HTMLElement>('[data-donut-chart]')!;
+      const legend = root.querySelector<HTMLElement>('[data-donut-legend]')!;
+
+      function render(): void {
+        const byMode = secondsByMode(getSessions());
+        // Known modes in their usual order; anything else (an old or imported mode) as "Other".
+        const rows: (Slice & { name: string })[] = TIMER_MODES.map((mode, slot) => ({ name: TIMER_MODE_LABELS[mode], value: byMode.get(mode) ?? 0, slot }));
+        let other = 0;
+        for (const [mode, seconds] of byMode) if (!(TIMER_MODES as readonly string[]).includes(mode as TimerMode)) other += seconds;
+        rows.push({ name: 'Other', value: other, slot: OTHER_SLOT });
+        const shown = rows.filter((r) => r.value >= 30);
+        const total = shown.reduce((sum, r) => sum + r.value, 0);
+
+        empty.hidden = total > 0;
+        body.hidden = total === 0;
+        if (!total) return;
+
+        // Whole percentages that add up to 100: round down, then hand the leftover points
+        // to the shares that lost the most.
+        const exact = shown.map((r) => (r.value / total) * 100);
+        const whole = exact.map(Math.floor);
+        const byLoss = exact.map((e, i) => [e - whole[i]!, i] as const).sort((a, b) => b[0] - a[0]);
+        const leftover = 100 - whole.reduce((a, b) => a + b, 0);
+        for (let k = 0; k < leftover; k++) whole[byLoss[k]![1]]!++;
+        const shares = new Map(shown.map((r, i) => [r.slot, whole[i]!]));
+        const pct = (r: Slice) => shares.get(r.slot)!;
+        const min = Math.round(total / 60);
+        const big = min >= 60 ? `${Math.floor(min / 60)} h` : `${min} min`;
+        const small = min >= 60 && min % 60 ? `${min % 60} min` : '';
+        chart.innerHTML = donut(shown, big, small, `Focus time by timer mode: ${shown.map((r) => `${r.name} ${pct(r)}%`).join(', ')}`);
+        legend.replaceChildren(
+          ...shown.map((r) => {
+            const li = document.createElement('li');
+            li.innerHTML = sliceMark(r.slot);
+            const share = document.createElement('b');
+            share.textContent = `${pct(r)}%`;
+            li.append(r.name, share);
+            return li;
+          }),
+        );
+      }
+
+      render();
+      c.add(subscribe('sessions', render));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .donut-card__body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-5);
+  }
+
+  .donut-card__body[hidden],
+  .donut-card__empty[hidden] {
+    display: none;
+  }
+
+  .donut-card__chart {
+    flex: none;
+    width: 150px;
+  }
+
+  .donut-card__chart :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .donut-card__legend {
+    flex: 1 1 10rem;
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .donut-card__legend :global(li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .donut-card__legend :global(b) {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

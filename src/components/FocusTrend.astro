@@ -1,0 +1,221 @@
+---
+/**
+ * Focus over time as an area chart: minutes per day for the last 14 or 30 days, or
+ * per week for the last 12 weeks, with your average as a dashed line. The numbers a
+ * chart can't say at a glance (average, best, latest) are written out next to it.
+ */
+---
+
+<section class="card trend" data-focus-trend aria-labelledby="trend-heading">
+  <div class="trend__head">
+    <div>
+      <h2 id="trend-heading" class="panel-title">Focus over time</h2>
+      <p class="muted trend__caption" data-trend-caption aria-live="polite"></p>
+    </div>
+    <div class="trend__ranges well" role="group" aria-label="Range">
+      <button type="button" class="trend__range" data-trend-range="14" aria-pressed="true">14 days</button>
+      <button type="button" class="trend__range" data-trend-range="30" aria-pressed="false">30 days</button>
+      <button type="button" class="trend__range" data-trend-range="12w" aria-pressed="false">12 weeks</button>
+    </div>
+  </div>
+  <div class="trend__chart" data-trend-chart></div>
+  <div class="trend__axis" data-trend-axis aria-hidden="true"></div>
+</section>
+
+<script>
+  import { getSessions, subscribe } from '../lib/storage';
+  import { dailyMinutes, weeklySums, type SeriesPoint } from '../lib/stats';
+  import { formatShort } from '../lib/dates';
+  import { formatFocus } from '../lib/tasks';
+  import { cleanups, onPage } from '../lib/page';
+
+  type Range = '14' | '30' | '12w';
+  const W = 1000;
+  const BASE = 180;
+  const TOP = 18;
+
+  onPage('focus-trend', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-focus-trend]').forEach((root) => {
+      const caption = root.querySelector<HTMLElement>('[data-trend-caption]')!;
+      const chart = root.querySelector<HTMLElement>('[data-trend-chart]')!;
+      const axis = root.querySelector<HTMLElement>('[data-trend-axis]')!;
+      const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-trend-range]')];
+      let range: Range = '14';
+
+      function render(): void {
+        const sessions = getSessions();
+        const weekly = range === '12w';
+        const points: SeriesPoint[] = weekly
+          ? weeklySums(sessions, (s) => s.start, (s) => s.focusSeconds / 60, 12)
+          : dailyMinutes(sessions, Number(range));
+        const values = points.map((p) => p.value);
+        const per = weekly ? 'week' : 'day';
+        const span = weekly ? 'last 12 weeks' : `last ${range} days`;
+        const total = values.reduce((a, b) => a + b, 0);
+        const avg = total / values.length;
+        const best = Math.max(...values);
+        const latest = values.at(-1) ?? 0;
+        const min = (n: number) => formatFocus(Math.round(n) * 60);
+
+        caption.textContent = total
+          ? `Minutes per ${per}, ${span}. Dashed line is your average, ${min(avg)}; your best ${per} was ${min(best)}.`
+          : `Minutes per ${per}, ${span}. No focus sessions in this range yet.`;
+
+        // Leave headroom above the tallest point so the line never touches the top.
+        const max = Math.max(30, best) * 1.08;
+        const x = (i: number) => Math.round((i / (values.length - 1)) * W * 10) / 10;
+        const y = (v: number) => Math.round((BASE - (v / max) * (BASE - TOP)) * 10) / 10;
+        const line = values.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' ');
+        const grid = [0.25, 0.5, 0.75, 1].map((f) => `<line class="trend__grid" x1="0" x2="${W}" y1="${y(max * f * 0.92)}" y2="${y(max * f * 0.92)}" />`).join('');
+        chart.innerHTML =
+          `<svg viewBox="0 0 ${W} 190" preserveAspectRatio="none" role="img" aria-label="Focus minutes per ${per}, ${span}: ${values.join(', ')}">` +
+          `${grid}<line class="trend__base" x1="0" x2="${W}" y1="${BASE}" y2="${BASE}" />` +
+          `<path class="trend__area" d="${line} L${W},${BASE} L0,${BASE} Z" />` +
+          `<path class="trend__line" d="${line}" />` +
+          (total ? `<line class="trend__avg" x1="0" x2="${W}" y1="${y(avg)}" y2="${y(avg)}" />` : '') +
+          '</svg>';
+
+        // Five labels along the bottom; the last one says what the latest point is.
+        const marks = [0, 0.25, 0.5, 0.75].map((f) => points[Math.round(f * (points.length - 1))]!);
+        axis.replaceChildren(
+          ...marks.map((p) => {
+            const s = document.createElement('span');
+            s.textContent = formatShort(p.date);
+            return s;
+          }),
+        );
+        const end = document.createElement('span');
+        end.className = 'trend__now';
+        end.textContent = `${weekly ? 'This week' : 'Today'} · ${min(latest)}`;
+        axis.append(end);
+      }
+
+      buttons.forEach((b) =>
+        b.addEventListener('click', () => {
+          range = b.dataset.trendRange as Range;
+          buttons.forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+          render();
+        }),
+      );
+
+      render();
+      c.add(subscribe('sessions', render));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .trend__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .trend__head .panel-title {
+    margin-bottom: var(--space-1);
+  }
+
+  .trend__caption {
+    font-size: var(--text-sm);
+  }
+
+  .trend__ranges {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+
+  .trend__range {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .trend__range:hover {
+    color: var(--color-text);
+  }
+
+  .trend__range[aria-pressed='true'] {
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 3px 0 var(--accent-edge);
+  }
+
+  /* The chart stretches to the card's width; strokes keep their thickness. */
+  .trend__chart :global(svg) {
+    display: block;
+    width: 100%;
+    height: clamp(9rem, 22vw, 14rem);
+  }
+
+  .trend__chart :global(line),
+  .trend__chart :global(path) {
+    vector-effect: non-scaling-stroke;
+  }
+
+  .trend__chart :global(.trend__grid) {
+    stroke: var(--color-border);
+    stroke-dasharray: 3 5;
+  }
+
+  .trend__chart :global(.trend__base) {
+    stroke: var(--color-border-strong);
+  }
+
+  .trend__chart :global(.trend__area) {
+    fill: var(--heat-1);
+    opacity: 0.75;
+  }
+
+  .trend__chart :global(.trend__line) {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 3;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .trend__chart :global(.trend__avg) {
+    stroke: var(--cat-visual);
+    stroke-width: 2;
+    stroke-dasharray: 8 6;
+  }
+
+  .trend__axis {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .trend__axis :global(.trend__now) {
+    font-weight: 700;
+    color: var(--color-text);
+    white-space: nowrap;
+  }
+
+  /* On a phone there's room for the ends and the middle only. */
+  @media (max-width: 30rem) {
+    .trend__axis :global(span:nth-child(2)),
+    .trend__axis :global(span:nth-child(4)) {
+      display: none;
+    }
+  }
+</style>
