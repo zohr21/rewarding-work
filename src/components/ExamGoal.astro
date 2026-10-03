@@ -346,11 +346,8 @@ const timerUrl = url('/timer');
     gap: var(--space-5);
   }
 
-  .goal-form[hidden],
-  .goal[hidden],
-  .goal-stats[hidden],
-  .goal-finish[hidden],
-  .goal-form__field[hidden] {
+  /* Also beats .btn's own display, for the buttons that come and go. */
+  .exam-goal [hidden] {
     display: none;
   }
 
