@@ -847,16 +847,41 @@ export interface Exam {
   createdAt: number;
 }
 
+export const EXAM_RESULTS = ['passed', 'failed', 'finished'] as const;
+export type ExamResult = (typeof EXAM_RESULTS)[number];
+
+/** An exam you've taken: a short record of how the preparation went. */
+export interface PastExam {
+  id: string;
+  title: string;
+  date?: string;
+  result: ExamResult;
+  /** Epoch ms. */
+  finishedAt: number;
+  studiedSeconds: number;
+  chaptersDone: number;
+  chaptersTotal: number;
+  /**
+   * Kept when you didn't pass, so "Prepare again" can start a new plan with the same
+   * chapters and questions. Dropped once used.
+   */
+  retry?: { chapters: ExamChapter[]; questions: ExamQuestion[] };
+}
+
 export interface ExamStore {
+  /** The exam you're preparing for now. */
   exam: Exam | null;
+  /** Exams you've taken, oldest first, at most PAST_MAX. */
+  past: PastExam[];
   /** Bumped on every change; account sync keeps the newer copy whole. */
   updatedAt: number;
 }
 
-export const EMPTY_EXAM: ExamStore = { exam: null, updatedAt: 0 };
+export const EMPTY_EXAM: ExamStore = { exam: null, past: [], updatedAt: 0 };
 export const CHAPTERS_MAX = 60;
 export const QUESTIONS_MAX = 2000;
 export const ROUNDS_MAX = 50;
+export const PAST_MAX = 30;
 
 const isHours = (v: unknown) => v === undefined || (typeof v === 'number' && v > 0 && v <= 10000);
 
@@ -893,11 +918,32 @@ export function isExamQuestion(v: unknown): v is ExamQuestion {
 const isExamRound = (v: unknown): v is ExamRound =>
   isObj(v) && typeof v.at === 'number' && typeof v.total === 'number' && typeof v.correct === 'number';
 
-/** Tolerant: malformed chapters, questions and rounds are dropped, not the whole exam. */
+export function isPastExam(v: unknown): v is PastExam {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    typeof v.title === 'string' &&
+    (v.date === undefined || isDayKey(v.date)) &&
+    (EXAM_RESULTS as readonly unknown[]).includes(v.result) &&
+    typeof v.finishedAt === 'number' &&
+    typeof v.studiedSeconds === 'number' &&
+    typeof v.chaptersDone === 'number' &&
+    typeof v.chaptersTotal === 'number' &&
+    (v.retry === undefined ||
+      (isObj(v.retry) &&
+        Array.isArray(v.retry.chapters) &&
+        v.retry.chapters.every(isExamChapter) &&
+        Array.isArray(v.retry.questions) &&
+        v.retry.questions.every(isExamQuestion)))
+  );
+}
+
+/** Tolerant: malformed chapters, questions, rounds and past exams are dropped, not the whole store. */
 export function normaliseExam(v: unknown): ExamStore {
   if (!isObj(v) || typeof v.updatedAt !== 'number') return EMPTY_EXAM;
+  const past = Array.isArray(v.past) ? v.past.filter(isPastExam) : [];
   const e = v.exam;
-  if (!isObj(e) || typeof e.title !== 'string' || typeof e.createdAt !== 'number') return { exam: null, updatedAt: v.updatedAt };
+  if (!isObj(e) || typeof e.title !== 'string' || typeof e.createdAt !== 'number') return { exam: null, past, updatedAt: v.updatedAt };
   return {
     exam: {
       title: e.title,
@@ -908,6 +954,7 @@ export function normaliseExam(v: unknown): ExamStore {
       rounds: Array.isArray(e.rounds) ? e.rounds.filter(isExamRound) : [],
       createdAt: e.createdAt,
     },
+    past,
     updatedAt: v.updatedAt,
   };
 }
@@ -920,9 +967,15 @@ export function getExam(): Exam | null {
   return getExamStore().exam;
 }
 
-/** Replace the exam (null deletes it; the empty store stays so the deletion reaches your other devices). */
+/** Change the current exam, the past exams, or both. */
+export function setExamStore(patch: Partial<Pick<ExamStore, 'exam' | 'past'>>): void {
+  const old = getExamStore();
+  write('exam', { exam: old.exam, past: old.past, ...patch, updatedAt: Math.max(Date.now(), old.updatedAt + 1) });
+}
+
+/** Replace the exam (null deletes it; the store stays so the deletion reaches your other devices). */
 export function setExam(exam: Exam | null): void {
-  write('exam', { exam, updatedAt: Math.max(Date.now(), getExamStore().updatedAt + 1) });
+  setExamStore({ exam });
 }
 
 /** Apply `change` to the exam. Returns the updated exam, or null if there isn't one. */

@@ -7,16 +7,21 @@
  */
 import {
   CHAPTERS_MAX,
+  PAST_MAX,
   QUESTIONS_MAX,
   ROUNDS_MAX,
   getExam,
+  getExamStore,
   newId,
   setExam,
+  setExamStore,
   updateExam,
   type Exam,
   type ExamChapter,
   type ExamQuestion,
+  type ExamResult,
   type FocusSession,
+  type PastExam,
 } from './storage';
 import { addDays, fromDayKey, isDayKey, startOfDay, startOfWeek } from './dates';
 
@@ -83,6 +88,65 @@ export function saveGoal(goal: GoalDraft): void {
 
 export function deleteExam(): void {
   setExam(null);
+}
+
+// ---------- Finishing ----------
+
+export const RESULT_LABELS: Record<ExamResult, string> = { passed: 'Passed', failed: "Didn't pass", finished: 'Finished' };
+
+/**
+ * You took the exam: the plan becomes a record under Past exams and the page is free
+ * for the next goal. `studiedSeconds` is the focus time on its chapters (examTime).
+ */
+export function finishExam(result: ExamResult, studiedSeconds: number): PastExam | null {
+  const { exam, past } = getExamStore();
+  if (!exam) return null;
+  const record: PastExam = {
+    id: newId('px'),
+    title: exam.title,
+    ...(exam.date ? { date: exam.date } : {}),
+    result,
+    finishedAt: Date.now(),
+    studiedSeconds: Math.round(studiedSeconds),
+    chaptersDone: exam.chapters.filter((c) => c.done).length,
+    chaptersTotal: exam.chapters.length,
+    ...(result === 'failed' ? { retry: { chapters: exam.chapters, questions: exam.questions } } : {}),
+  };
+  setExamStore({ exam: null, past: [...past, record].slice(-PAST_MAX) });
+  return record;
+}
+
+/**
+ * Start a new plan from an exam you didn't pass: same chapters and questions, with the
+ * time, the finished marks and the practice results starting again. Needs the page to be free.
+ */
+export function retryExam(pastId: string): boolean {
+  const { exam, past } = getExamStore();
+  const record = past.find((p) => p.id === pastId);
+  if (exam || !record?.retry) return false;
+  const newIds = new Map(record.retry.chapters.map((c) => [c.id, newId('ch')] as const));
+  const { retry, ...rest } = record;
+  setExamStore({
+    exam: {
+      title: record.title,
+      chapters: retry.chapters.map((c) => ({ ...c, id: newIds.get(c.id)!, done: false })),
+      questions: retry.questions.map((q) => ({
+        ...q,
+        chapterId: q.chapterId ? newIds.get(q.chapterId) : undefined,
+        seen: 0,
+        correct: 0,
+        again: undefined,
+      })),
+      rounds: [],
+      createdAt: Date.now(),
+    },
+    past: past.map((p) => (p.id === pastId ? rest : p)),
+  });
+  return true;
+}
+
+export function removePastExam(id: string): void {
+  setExamStore({ past: getExamStore().past.filter((p) => p.id !== id) });
 }
 
 export function addChapter(name: string, plannedHours?: number): ExamChapter | null {
