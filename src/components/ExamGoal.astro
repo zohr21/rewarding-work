@@ -35,9 +35,21 @@ const timerUrl = url('/timer');
     <div class="goal-form__actions">
       <button type="submit" class="btn" data-eg-submit>Create exam plan</button>
       <button type="button" class="btn btn--ghost" data-eg-cancel hidden>Cancel</button>
+      <button type="button" class="btn btn--ghost" data-eg-took hidden>I took the exam</button>
       <button type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this exam plan</button>
     </div>
   </form>
+
+  <section class="card goal-finish" data-eg-finish hidden aria-labelledby="eg-finish-title">
+    <h2 id="eg-finish-title" class="panel-title" tabindex="-1" data-eg-finish-title>How did it go?</h2>
+    <p class="muted" data-eg-finish-text></p>
+    <div class="goal-finish__choices">
+      <button type="button" class="btn" data-eg-result="passed">I passed</button>
+      <button type="button" class="btn btn--ghost" data-eg-result="failed">I didn't pass</button>
+      <button type="button" class="btn btn--ghost" data-eg-result="finished">Just mark it finished</button>
+    </div>
+    <button type="button" class="btn btn--ghost btn--small" data-eg-finish-cancel>Not yet</button>
+  </section>
 
   <section class="card goal" data-eg-hero hidden aria-labelledby="eg-name">
     <div class="goal__main">
@@ -46,6 +58,7 @@ const timerUrl = url('/timer');
       <p class="goal__chips" data-eg-chips></p>
       <div class="goal__actions">
         <a class="btn goal__continue" data-eg-continue hidden></a>
+        <button type="button" class="btn goal__continue" data-eg-took-now hidden>I took the exam</button>
         <button type="button" class="btn btn--ghost" data-eg-edit>Edit goal</button>
       </div>
     </div>
@@ -76,8 +89,22 @@ const timerUrl = url('/timer');
 </div>
 
 <script>
-  import { getExam, getSessions, subscribe } from '../lib/storage';
-  import { cleanHours, createExam, daysLeft, deleteExam, examTime, formatHM, nextChapter, pacePerDay, parseChapterLines, saveGoal, weekMinutes } from '../lib/exam';
+  import { getExam, getSessions, subscribe, type ExamResult } from '../lib/storage';
+  import {
+    cleanHours,
+    createExam,
+    daysLeft,
+    deleteExam,
+    examTime,
+    finishExam,
+    formatHM,
+    nextChapter,
+    pacePerDay,
+    parseChapterLines,
+    saveGoal,
+    weekMinutes,
+  } from '../lib/exam';
+  import { celebrate } from '../lib/appearance';
   import { miniBars } from '../lib/charts';
   import { fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
@@ -102,11 +129,16 @@ const timerUrl = url('/timer');
     const submit = $<HTMLButtonElement>('[data-eg-submit]');
     const cancel = $<HTMLButtonElement>('[data-eg-cancel]');
     const del = $<HTMLButtonElement>('[data-eg-delete]');
+    const took = $<HTMLButtonElement>('[data-eg-took]');
+    const tookNow = $<HTMLButtonElement>('[data-eg-took-now]');
+    const finish = $<HTMLElement>('[data-eg-finish]');
     const hero = $<HTMLElement>('[data-eg-hero]');
     const stats = $<HTMLElement>('[data-eg-stats]');
     const live = $<HTMLElement>('[data-eg-live]');
     const timerUrl = root.dataset.timerUrl!;
     let editing = false;
+    /** Asking how the exam went. */
+    let finishing = false;
     let deleteArmed = false;
 
     const announce = (t: string) => {
@@ -141,16 +173,22 @@ const timerUrl = url('/timer');
 
     function render(): void {
       const exam = getExam();
-      const showForm = !exam || editing;
+      if (!exam) editing = finishing = false;
+      const showForm = (!exam || editing) && !finishing;
       form.hidden = !showForm;
-      hero.hidden = stats.hidden = showForm;
+      finish.hidden = !finishing;
+      hero.hidden = stats.hidden = showForm || finishing;
       formTitle.textContent = exam ? 'Edit your goal' : 'Set your goal';
       submit.textContent = exam ? 'Save' : 'Create exam plan';
       chaptersField.hidden = Boolean(exam);
-      cancel.hidden = del.hidden = !exam;
+      cancel.hidden = del.hidden = took.hidden = !exam;
       if (!exam) {
-        editing = false;
         renderPlan();
+        return;
+      }
+      if (finishing) {
+        $<HTMLElement>('[data-eg-finish-text]').textContent =
+          `“${exam.title}” moves to Past exams with the time you studied, and this page is free for your next goal.`;
         return;
       }
       if (showForm) return;
@@ -166,9 +204,13 @@ const timerUrl = url('/timer');
       if (days !== null) chips.append(chip(days > 0 ? `${plural(days, 'day')} left` : days === 0 ? 'Exam is today' : 'Exam date has passed', 'goal__chip--days'));
       if (exam.targetHours) chips.append(chip(`Target ${exam.targetHours} h of study`));
 
+      // From exam day on, the main button asks how it went; Continue stays available as a plain one.
+      const examDay = days !== null && days <= 0;
+      tookNow.hidden = !examDay;
       const next = nextChapter(exam, time);
       const go = $<HTMLAnchorElement>('[data-eg-continue]');
       go.hidden = !next;
+      go.classList.toggle('btn--ghost', examDay);
       if (next) {
         go.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
         go.textContent = `${time.byChapter.has(next.id) ? 'Continue' : 'Start'}: ${next.name}`;
@@ -225,6 +267,42 @@ const timerUrl = url('/timer');
       render();
     });
 
+    function askResult(): void {
+      editing = false;
+      finishing = true;
+      disarmDelete();
+      render();
+      $<HTMLElement>('[data-eg-finish-title]').focus();
+    }
+    took.addEventListener('click', askResult);
+    tookNow.addEventListener('click', askResult);
+
+    $<HTMLButtonElement>('[data-eg-finish-cancel]').addEventListener('click', () => {
+      finishing = false;
+      render();
+      $<HTMLButtonElement>('[data-eg-edit]').focus();
+    });
+
+    root.querySelectorAll<HTMLButtonElement>('[data-eg-result]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const exam = getExam();
+        if (!exam) return;
+        const result = b.dataset.egResult as ExamResult;
+        finishing = false;
+        form.reset();
+        finishExam(result, examTime(exam, getSessions()).total);
+        if (result === 'passed') celebrate();
+        announce(
+          result === 'passed'
+            ? `Passed: ${exam.title}. Well done. It is now under Past exams.`
+            : result === 'failed'
+              ? `${exam.title} is under Past exams. You can prepare again from there.`
+              : `Finished: ${exam.title}. It is now under Past exams.`,
+        );
+        title.focus();
+      }),
+    );
+
     // Press twice to delete: the first press says what will happen.
     del.addEventListener('click', () => {
       if (!deleteArmed) {
@@ -268,11 +346,26 @@ const timerUrl = url('/timer');
     gap: var(--space-5);
   }
 
-  .goal-form[hidden],
-  .goal[hidden],
-  .goal-stats[hidden],
-  .goal-form__field[hidden] {
+  /* Also beats .btn's own display, for the buttons that come and go. */
+  .exam-goal [hidden] {
     display: none;
+  }
+
+  .goal-finish {
+    display: grid;
+    gap: var(--space-4);
+    justify-items: start;
+  }
+
+  .goal-finish .panel-title {
+    margin-bottom: 0;
+    font-size: var(--text-xl);
+  }
+
+  .goal-finish__choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 
   .goal-form__grid {

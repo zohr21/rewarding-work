@@ -1,0 +1,165 @@
+---
+/**
+ * Exams you've taken: the result, when, and how the preparation went. An exam you
+ * didn't pass can be prepared again with the same chapters and questions.
+ */
+---
+
+<section class="card past" data-exam-past hidden aria-labelledby="past-heading">
+  <h2 id="past-heading" class="panel-title">Past exams</h2>
+  <ul class="past__items" data-px-list></ul>
+  <p class="visually-hidden" aria-live="polite" data-px-live></p>
+</section>
+
+<script>
+  import { getExamStore, subscribe, type PastExam } from '../lib/storage';
+  import { formatHM, removePastExam, RESULT_LABELS, retryExam } from '../lib/exam';
+  import { offerUndo } from '../lib/undo';
+  import { el } from '../lib/dom';
+  import { cleanups, onPage } from '../lib/page';
+
+  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+
+  onPage('exam-past', () => {
+    const root = document.querySelector<HTMLElement>('[data-exam-past]');
+    if (!root) return;
+    const c = cleanups();
+    const list = root.querySelector<HTMLUListElement>('[data-px-list]')!;
+    const live = root.querySelector<HTMLElement>('[data-px-live]')!;
+    /** Removed records still offered for Undo (src/lib/undo.ts). */
+    const removing = new Set<string>();
+
+    const announce = (t: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = t), 50);
+    };
+
+    function button(text: string, onClick: () => void): HTMLButtonElement {
+      const b = el('button', 'btn btn--ghost btn--small', text);
+      b.type = 'button';
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function remove(record: PastExam): void {
+      removing.add(record.id);
+      render();
+      offerUndo({
+        message: `Removed “${record.title}”`,
+        commit: () => {
+          removePastExam(record.id);
+          removing.delete(record.id);
+        },
+        undo: () => {
+          removing.delete(record.id);
+          render();
+          announce(`Restored: ${record.title}`);
+        },
+      });
+      announce(`Removed: ${record.title}. Press Undo to bring it back.`);
+    }
+
+    function renderRecord(record: PastExam, free: boolean): HTMLLIElement {
+      const li = el('li', 'past__item');
+      const body = el('div', 'past__body');
+      const title = el('p', 'past__title', record.title);
+      title.append(' ', el('span', `badge past__result past__result--${record.result}`, RESULT_LABELS[record.result]));
+      const parts = [dateFmt.format(record.finishedAt), `${formatHM(record.studiedSeconds)} studied`];
+      if (record.chaptersTotal) parts.push(`${record.chaptersDone} of ${record.chaptersTotal} chapters finished`);
+      body.append(title, el('p', 'past__meta muted', parts.join(' · ')));
+
+      const actions = el('div', 'past__actions');
+      if (record.retry) {
+        const again = button('Prepare again', () => {
+          if (retryExam(record.id)) announce(`New plan started for ${record.title}, with the same chapters and questions.`);
+        });
+        again.disabled = !free;
+        if (!free) again.title = 'Finish or delete your current exam plan first';
+        actions.append(again);
+      }
+      const del = button('Remove', () => remove(record));
+      del.setAttribute('aria-label', `Remove “${record.title}” from past exams`);
+      actions.append(del);
+      li.append(body, actions);
+      return li;
+    }
+
+    function render(): void {
+      const { exam, past } = getExamStore();
+      const shown = past.filter((p) => !removing.has(p.id)).sort((a, b) => b.finishedAt - a.finishedAt);
+      root!.hidden = shown.length === 0;
+      list.replaceChildren(...shown.map((p) => renderRecord(p, !exam)));
+    }
+
+    render();
+    c.add(subscribe('exam', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .past[hidden] {
+    display: none;
+  }
+
+  .past__items {
+    display: grid;
+    gap: var(--space-3);
+    padding: 0;
+    list-style: none;
+  }
+
+  .past :global(.past__item) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+  }
+
+  .past :global(.past__body) {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .past :global(.past__title) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .past :global(.past__meta) {
+    font-size: var(--text-xs);
+  }
+
+  .past :global(.past__result) {
+    vertical-align: middle;
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+  }
+
+  .past :global(.past__result--passed) {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .past :global(.past__result--failed) {
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+  }
+
+  .past :global(.past__actions) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .past :global(.past__actions .btn) {
+    min-height: 44px;
+  }
+</style>
