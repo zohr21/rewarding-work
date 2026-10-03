@@ -1,0 +1,426 @@
+---
+/**
+ * The chapters (or parts) of the exam. Each shows the focus time spent against the time
+ * planned and has its own Focus button, which starts a timer session linked to it.
+ * "Edit" opens the chapter's name, planned hours, notes, order and removal.
+ */
+import { url } from '../lib/paths';
+
+const timerUrl = url('/timer');
+---
+
+<section class="card chapters" data-exam-chapters data-timer-url={timerUrl} hidden aria-labelledby="chapters-heading">
+  <h2 id="chapters-heading" class="panel-title">Chapters</h2>
+  <p class="muted chapters__intro">Time spent against the time you planned for each part. Press Focus to work on one.</p>
+
+  <ol class="chapters__items" data-ec-list></ol>
+  <p class="muted chapters__empty" data-ec-empty>No chapters yet. Add the parts you need to study below.</p>
+
+  <form class="chapters__form" data-ec-form>
+    <label for="ec-new" class="visually-hidden">New chapter name</label>
+    <input id="ec-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a chapter or part…" data-ec-name />
+    <label for="ec-new-hours" class="visually-hidden">Planned hours</label>
+    <input id="ec-new-hours" class="input chapters__hours" type="number" min="0.5" max="10000" step="0.5" inputmode="decimal" placeholder="Hours" data-ec-hours />
+    <button type="submit" class="btn btn--ghost">Add chapter</button>
+  </form>
+  <p class="visually-hidden" aria-live="polite" data-ec-live></p>
+</section>
+
+<script>
+  import { getExam, getSessions, subscribe, type ExamChapter } from '../lib/storage';
+  import { addChapter, EXAM_NOTES_MAX, examTime, formatHM, moveChapter, nextChapter, removeChapter, updateChapter } from '../lib/exam';
+  import { celebrate } from '../lib/appearance';
+  import { offerUndo } from '../lib/undo';
+  import { el } from '../lib/dom';
+  import { cleanups, onPage } from '../lib/page';
+
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const CHECK_SVG =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  onPage('exam-chapters', () => {
+    const root = document.querySelector<HTMLElement>('[data-exam-chapters]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const list = $<HTMLOListElement>('[data-ec-list]');
+    const empty = $<HTMLElement>('[data-ec-empty]');
+    const form = $<HTMLFormElement>('[data-ec-form]');
+    const nameInput = $<HTMLInputElement>('[data-ec-name]');
+    const hoursInput = $<HTMLInputElement>('[data-ec-hours]');
+    const live = $<HTMLElement>('[data-ec-live]');
+    const timerUrl = root.dataset.timerUrl!;
+    /** Removed chapters still offered for Undo (src/lib/undo.ts). */
+    const removing = new Set<string>();
+    /** Chapters whose Edit panel is open, kept across re-renders. */
+    const open = new Set<string>();
+    /** A change arrived while a field in the list had focus; drawn once it loses it. */
+    let stale = false;
+
+    const announce = (t: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = t), 50);
+    };
+
+    function button(text: string, onClick: () => void, cls = 'btn btn--ghost btn--small'): HTMLButtonElement {
+      const b = el('button', cls, text);
+      b.type = 'button';
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function field(label: string, control: HTMLElement, cls = ''): HTMLLabelElement {
+      const wrap = el('label', `chapter__field ${cls}`);
+      wrap.append(el('span', '', label), control);
+      return wrap;
+    }
+
+    function remove(chapter: ExamChapter): void {
+      removing.add(chapter.id);
+      nameInput.focus();
+      render();
+      offerUndo({
+        message: `Removed “${chapter.name}”`,
+        commit: () => {
+          removeChapter(chapter.id);
+          removing.delete(chapter.id);
+        },
+        undo: () => {
+          removing.delete(chapter.id);
+          render();
+          announce(`Restored: ${chapter.name}`);
+        },
+      });
+      announce(`Removed: ${chapter.name}. Press Undo to bring it back. Its focus sessions stay in your history.`);
+    }
+
+    function editPanel(chapter: ExamChapter, index: number, count: number): HTMLDetailsElement {
+      const details = el('details', 'disclosure chapter__edit');
+      details.open = open.has(chapter.id);
+      details.addEventListener('toggle', () => (details.open ? open.add(chapter.id) : open.delete(chapter.id)));
+      const summary = el('summary', '', 'Edit');
+      summary.setAttribute('aria-label', `Edit “${chapter.name}”`);
+
+      const name = el('input', 'input');
+      name.type = 'text';
+      name.maxLength = 120;
+      name.value = chapter.name;
+      name.addEventListener('change', () => updateChapter(chapter.id, { name: name.value }));
+
+      const hours = el('input', 'input');
+      hours.type = 'number';
+      hours.min = '0.5';
+      hours.max = '10000';
+      hours.step = '0.5';
+      hours.inputMode = 'decimal';
+      hours.value = chapter.plannedHours ? String(chapter.plannedHours) : '';
+      hours.addEventListener('change', () => {
+        const n = Number(hours.value);
+        updateChapter(chapter.id, { plannedHours: n > 0 ? Math.round(n * 10) / 10 : undefined });
+      });
+
+      const notes = el('textarea', 'input');
+      notes.rows = 3;
+      notes.maxLength = EXAM_NOTES_MAX;
+      notes.value = chapter.notes ?? '';
+      notes.addEventListener('change', () => updateChapter(chapter.id, { notes: notes.value }));
+
+      const tools = el('div', 'chapter__tools');
+      const up = button('Move up', () => moveChapter(chapter.id, -1));
+      up.disabled = index === 0;
+      const down = button('Move down', () => moveChapter(chapter.id, 1));
+      down.disabled = index === count - 1;
+      const del = button('Remove', () => remove(chapter));
+      del.classList.add('chapter__remove');
+      tools.append(up, down, del);
+
+      const body = el('div', 'chapter__edit-body');
+      body.append(field('Name', name), field('Planned hours', hours, 'chapter__field--short'), field('Notes', notes, 'chapter__field--wide'), tools);
+      details.append(summary, body);
+      return details;
+    }
+
+    function renderChapter(chapter: ExamChapter, index: number, count: number, seconds: number, questions: number, isNext: boolean): HTMLLIElement {
+      const li = el('li', `chapter${chapter.done ? ' is-done' : ''}`);
+
+      const num = el('span', 'chapter__num');
+      if (chapter.done) num.innerHTML = CHECK_SVG;
+      else num.textContent = String(index + 1);
+      num.setAttribute('aria-hidden', 'true');
+
+      const body = el('div', 'chapter__body');
+      const status = chapter.done ? 'Finished' : seconds >= 60 ? 'In progress' : 'To do';
+      body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', `${status} · ${questions ? plural(questions, 'question') : 'No questions yet'}`));
+
+      const progress = el('div', 'chapter__progress');
+      const line = el('p', 'chapter__time');
+      line.append(el('strong', '', seconds >= 60 ? formatHM(seconds) : 'Not started'));
+      if (chapter.plannedHours) line.append(el('span', 'muted', `of ${chapter.plannedHours} h planned`));
+      progress.append(line);
+      if (chapter.plannedHours) {
+        const meter = el('div', 'chapter__meter');
+        meter.setAttribute('aria-hidden', 'true');
+        const fill = el('span');
+        fill.style.inlineSize = `${Math.min(100, Math.round((seconds / (chapter.plannedHours * 3600)) * 100))}%`;
+        meter.append(fill);
+        progress.append(meter);
+      }
+
+      const actions = el('div', 'chapter__actions');
+      const focus = el('a', `btn btn--small${isNext ? '' : ' btn--ghost'}`, chapter.done ? 'Review' : seconds >= 60 ? 'Focus' : 'Start');
+      focus.href = `${timerUrl}?chapter=${encodeURIComponent(chapter.id)}`;
+      focus.setAttribute('aria-label', `Start a focus session on “${chapter.name}”`);
+      actions.append(
+        focus,
+        chapter.done
+          ? button('Reopen', () => {
+              updateChapter(chapter.id, { done: false });
+              announce(`Reopened: ${chapter.name}`);
+            })
+          : button('Done', () => {
+              updateChapter(chapter.id, { done: true });
+              celebrate();
+              announce(`Finished: ${chapter.name}`);
+            }),
+      );
+
+      li.append(num, body, progress, actions, editPanel(chapter, index, count));
+      return li;
+    }
+
+    function render(): void {
+      const exam = getExam();
+      root!.hidden = !exam;
+      if (!exam) return;
+      const active = document.activeElement;
+      if (active && list.contains(active) && active.matches('input, textarea')) {
+        stale = true;
+        return;
+      }
+      stale = false;
+      const chapters = exam.chapters.filter((ch) => !removing.has(ch.id));
+      const time = examTime(exam, getSessions());
+      const next = nextChapter(exam, time);
+      const counts = new Map<string, number>();
+      for (const q of exam.questions) if (q.chapterId) counts.set(q.chapterId, (counts.get(q.chapterId) ?? 0) + 1);
+      empty.hidden = chapters.length > 0;
+      list.replaceChildren(
+        ...chapters.map((ch, i) => renderChapter(ch, i, chapters.length, time.byChapter.get(ch.id) ?? 0, counts.get(ch.id) ?? 0, ch.id === next?.id)),
+      );
+    }
+
+    list.addEventListener('focusout', () => {
+      // After the field's own change handler has saved.
+      window.setTimeout(() => stale && render(), 0);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const added = addChapter(nameInput.value, hoursInput.value ? Number(hoursInput.value) : undefined);
+      if (!added) return;
+      nameInput.value = '';
+      hoursInput.value = '';
+      nameInput.focus();
+      announce(`Added: ${added.name}`);
+    });
+
+    render();
+    c.add(subscribe('exam', render));
+    c.add(subscribe('sessions', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .chapters[hidden],
+  .chapters__empty[hidden] {
+    display: none;
+  }
+
+  .chapters__intro {
+    margin-top: calc(-1 * var(--space-2));
+    font-size: var(--text-sm);
+  }
+
+  .chapters__items {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
+    padding: 0;
+    list-style: none;
+  }
+
+  .chapters__empty {
+    font-size: var(--text-sm);
+  }
+
+  .chapters__form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    padding: var(--space-3);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+  }
+
+  .chapters__form .input {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  .chapters__form .chapters__hours {
+    flex: 0 1 6.5rem;
+  }
+
+  /* A chapter is a small raised card: number, name, time against plan, actions. */
+  .chapters :global(.chapter) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3) var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+  }
+
+  .chapters :global(.chapter__num) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-weight: 700;
+  }
+
+  .chapters :global(.chapter.is-done .chapter__num) {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .chapters :global(.chapter__body) {
+    flex: 1 1 12rem;
+    min-width: 0;
+  }
+
+  .chapters :global(.chapter__name) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .chapters :global(.chapter__meta) {
+    font-size: var(--text-xs);
+  }
+
+  .chapters :global(.chapter__progress) {
+    flex: 1 1 11rem;
+    min-width: 0;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .chapters :global(.chapter__time) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chapters :global(.chapter__meter) {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--heat-0);
+  }
+
+  .chapters :global(.chapter__meter > span) {
+    display: block;
+    height: 100%;
+    border-radius: 4px;
+    background: var(--color-accent);
+  }
+
+  .chapters :global(.chapter.is-done .chapter__meter > span) {
+    background: var(--heat-2);
+  }
+
+  .chapters :global(.chapter__actions) {
+    flex: none;
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .chapters :global(.chapter__actions .btn) {
+    min-height: 44px;
+  }
+
+  /* Closed, "Edit" sits beside the actions; open, its fields take a row of their own. */
+  .chapters :global(.chapter__edit) {
+    flex: none;
+    font-size: var(--text-sm);
+  }
+
+  .chapters :global(.chapter__edit[open]) {
+    flex: 1 1 100%;
+  }
+
+  .chapters :global(.chapter__edit > summary) {
+    width: max-content;
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .chapters :global(.chapter__edit-body) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+  }
+
+  .chapters :global(.chapter__field) {
+    flex: 1 1 14rem;
+    min-width: 0;
+    display: grid;
+    gap: var(--space-1);
+    font-weight: 600;
+  }
+
+  .chapters :global(.chapter__field--short) {
+    flex: 0 1 9rem;
+  }
+
+  .chapters :global(.chapter__field--wide),
+  .chapters :global(.chapter__tools) {
+    flex: 1 1 100%;
+  }
+
+  .chapters :global(.chapter__field .input) {
+    font-weight: 400;
+  }
+
+  .chapters :global(.chapter__field textarea) {
+    resize: vertical;
+  }
+
+  .chapters :global(.chapter__tools) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .chapters :global(.chapter__tools .btn) {
+    min-height: 44px;
+  }
+
+  .chapters :global(.chapter__remove) {
+    margin-inline-start: auto;
+    color: var(--cat-rest);
+  }
+</style>

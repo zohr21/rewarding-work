@@ -21,5 +21,6 @@ export function downloadBackup(): Backup {
 export function backupSummary({ data: d }: Backup): string {
   const done = d.done.filter((x) => x.deletedAt === undefined).length;
   const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
-  return `${d.sessions.length} sessions, ${done} done items, ${tasks} tasks and ${d.chain.days.length} chain days`;
+  const exam = d.exam.exam ? ', your exam plan' : '';
+  return `${d.sessions.length} sessions, ${done} done items, ${tasks} tasks${exam} and ${d.chain.days.length} chain days`;
 }

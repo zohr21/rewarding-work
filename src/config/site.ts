@@ -16,5 +16,6 @@ export const NAV: NavItem[] = [
   { label: 'Techniques', href: '/techniques' },
   { label: 'Timer', href: '/timer' },
   { label: 'Tasks', href: '/tasks' },
+  { label: 'Exam prep', href: '/exam' },
   { label: 'Progress', href: '/progress' },
 ];

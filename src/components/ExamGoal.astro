@@ -1,0 +1,468 @@
+---
+/**
+ * The exam goal: a short form to set it (name, date, target hours, chapters), then a
+ * summary of where you stand: days left, time studied against the target, the pace
+ * that gets you there, and a button that resumes the chapter you were last on.
+ */
+import { url } from '../lib/paths';
+
+const timerUrl = url('/timer');
+---
+
+<div class="exam-goal" data-exam-goal data-timer-url={timerUrl}>
+  <form class="card goal-form" data-eg-form hidden aria-labelledby="eg-form-title">
+    <h2 id="eg-form-title" class="panel-title" data-eg-form-title>Set your goal</h2>
+    <div class="goal-form__grid">
+      <label class="goal-form__field goal-form__field--wide">
+        <span>Exam or certification</span>
+        <input class="input" type="text" maxlength="120" autocomplete="off" required placeholder="e.g. AWS Solutions Architect – Associate" data-eg-title />
+      </label>
+      <label class="goal-form__field">
+        <span>Exam date <span class="muted">(optional)</span></span>
+        <input class="input" type="date" data-eg-date />
+      </label>
+      <label class="goal-form__field">
+        <span>Study hours you're aiming for <span class="muted">(optional)</span></span>
+        <input class="input" type="number" min="1" max="10000" step="1" inputmode="numeric" placeholder="A rough guess is fine" data-eg-hours />
+      </label>
+      <label class="goal-form__field goal-form__field--wide" data-eg-chapters-field>
+        <span>Chapters or parts <span class="muted">(one per line; you can add more later)</span></span>
+        <textarea class="input" rows="6" placeholder="Networking, 14&#10;Storage, 10&#10;Databases" data-eg-chapters></textarea>
+        <span class="muted goal-form__hint">Planned hours can follow a comma, as in “Networking, 14”.</span>
+      </label>
+    </div>
+    <p class="goal-form__plan" data-eg-plan aria-live="polite"></p>
+    <div class="goal-form__actions">
+      <button type="submit" class="btn" data-eg-submit>Create exam plan</button>
+      <button type="button" class="btn btn--ghost" data-eg-cancel hidden>Cancel</button>
+      <button type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this exam plan</button>
+    </div>
+  </form>
+
+  <section class="card goal" data-eg-hero hidden aria-labelledby="eg-name">
+    <div class="goal__main">
+      <p class="goal__eyebrow">Your goal</p>
+      <h2 id="eg-name" class="goal__title" data-eg-name></h2>
+      <p class="goal__chips" data-eg-chips></p>
+      <div class="goal__actions">
+        <a class="btn goal__continue" data-eg-continue hidden></a>
+        <button type="button" class="btn btn--ghost" data-eg-edit>Edit goal</button>
+      </div>
+    </div>
+    <div class="goal__time well">
+      <p class="goal__time-head muted"><span>Time studied</span><span data-eg-pct></span></p>
+      <p class="goal__big" data-eg-time></p>
+      <div class="goal__bar" data-eg-bar aria-hidden="true"><span></span></div>
+      <p class="goal__pace" data-eg-pace></p>
+    </div>
+  </section>
+
+  <div class="goal-stats" data-eg-stats hidden>
+    <div class="card goal-stat">
+      <p class="muted">Chapters finished</p>
+      <p class="goal-stat__value" data-eg-done></p>
+    </div>
+    <div class="card goal-stat">
+      <p class="muted">This week</p>
+      <p class="goal-stat__value" data-eg-week></p>
+      <div data-eg-week-bars></div>
+    </div>
+    <div class="card goal-stat">
+      <p class="muted">Last practice round</p>
+      <p class="goal-stat__value" data-eg-round></p>
+    </div>
+  </div>
+  <p class="visually-hidden" aria-live="polite" data-eg-live></p>
+</div>
+
+<script>
+  import { getExam, getSessions, subscribe } from '../lib/storage';
+  import { cleanHours, createExam, daysLeft, deleteExam, examTime, formatHM, nextChapter, pacePerDay, parseChapterLines, saveGoal, weekMinutes } from '../lib/exam';
+  import { miniBars } from '../lib/charts';
+  import { fromDayKey } from '../lib/dates';
+  import { el } from '../lib/dom';
+  import { cleanups, onPage } from '../lib/page';
+
+  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  onPage('exam-goal', () => {
+    const root = document.querySelector<HTMLElement>('[data-exam-goal]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const form = $<HTMLFormElement>('[data-eg-form]');
+    const formTitle = $<HTMLElement>('[data-eg-form-title]');
+    const title = $<HTMLInputElement>('[data-eg-title]');
+    const date = $<HTMLInputElement>('[data-eg-date]');
+    const hours = $<HTMLInputElement>('[data-eg-hours]');
+    const chaptersField = $<HTMLElement>('[data-eg-chapters-field]');
+    const chapters = $<HTMLTextAreaElement>('[data-eg-chapters]');
+    const plan = $<HTMLElement>('[data-eg-plan]');
+    const submit = $<HTMLButtonElement>('[data-eg-submit]');
+    const cancel = $<HTMLButtonElement>('[data-eg-cancel]');
+    const del = $<HTMLButtonElement>('[data-eg-delete]');
+    const hero = $<HTMLElement>('[data-eg-hero]');
+    const stats = $<HTMLElement>('[data-eg-stats]');
+    const live = $<HTMLElement>('[data-eg-live]');
+    const timerUrl = root.dataset.timerUrl!;
+    let editing = false;
+    let deleteArmed = false;
+
+    const announce = (t: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = t), 50);
+    };
+
+    const draft = () => ({
+      title: title.value,
+      date: date.value || undefined,
+      targetHours: hours.value ? cleanHours(Number(hours.value)) : undefined,
+    });
+
+    /** What the numbers in the form add up to, before saving. */
+    function renderPlan(): void {
+      const d = draft();
+      const parts: string[] = [];
+      const days = daysLeft(d);
+      if (days !== null) parts.push(days > 0 ? `${plural(days, 'day')} until the exam` : days === 0 ? 'The exam is today' : 'That date has passed');
+      if (days !== null && days > 0 && d.targetHours) parts.push(`about ${formatHM((d.targetHours * 3600) / days)} a day to reach ${d.targetHours} h`);
+      if (!editing) {
+        const list = parseChapterLines(chapters.value);
+        const planned = list.reduce((sum, ch) => sum + (ch.plannedHours ?? 0), 0);
+        if (list.length) parts.push(plural(list.length, 'chapter') + (planned ? `, ${planned} h planned` : ''));
+      }
+      plan.textContent = parts.join(' · ');
+    }
+
+    function chip(text: string, cls = ''): HTMLSpanElement {
+      return el('span', `badge goal__chip ${cls}`, text);
+    }
+
+    function render(): void {
+      const exam = getExam();
+      const showForm = !exam || editing;
+      form.hidden = !showForm;
+      hero.hidden = stats.hidden = showForm;
+      formTitle.textContent = exam ? 'Edit your goal' : 'Set your goal';
+      submit.textContent = exam ? 'Save' : 'Create exam plan';
+      chaptersField.hidden = Boolean(exam);
+      cancel.hidden = del.hidden = !exam;
+      if (!exam) {
+        editing = false;
+        renderPlan();
+        return;
+      }
+      if (showForm) return;
+
+      const sessions = getSessions();
+      const time = examTime(exam, sessions);
+      $<HTMLElement>('[data-eg-name]').textContent = exam.title;
+
+      const chips = $<HTMLElement>('[data-eg-chips]');
+      chips.replaceChildren();
+      const days = daysLeft(exam);
+      if (exam.date) chips.append(chip(`Exam on ${dateFmt.format(fromDayKey(exam.date))}`));
+      if (days !== null) chips.append(chip(days > 0 ? `${plural(days, 'day')} left` : days === 0 ? 'Exam is today' : 'Exam date has passed', 'goal__chip--days'));
+      if (exam.targetHours) chips.append(chip(`Target ${exam.targetHours} h of study`));
+
+      const next = nextChapter(exam, time);
+      const go = $<HTMLAnchorElement>('[data-eg-continue]');
+      go.hidden = !next;
+      if (next) {
+        go.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
+        go.textContent = `${time.byChapter.has(next.id) ? 'Continue' : 'Start'}: ${next.name}`;
+      }
+
+      const target = exam.targetHours ? exam.targetHours * 3600 : 0;
+      const pct = target ? Math.min(100, Math.round((time.total / target) * 100)) : 0;
+      $<HTMLElement>('[data-eg-pct]').textContent = target ? `${pct}% of target` : '';
+      const big = $<HTMLElement>('[data-eg-time]');
+      big.replaceChildren(formatHM(time.total));
+      if (target) big.append(' ', el('span', 'goal__of', `of ${exam.targetHours} h`));
+      const bar = $<HTMLElement>('[data-eg-bar]');
+      bar.hidden = !target;
+      (bar.firstElementChild as HTMLElement).style.inlineSize = `${pct}%`;
+      const pace = pacePerDay(exam, time.total);
+      $<HTMLElement>('[data-eg-pace]').textContent =
+        pace === null
+          ? target
+            ? ''
+            : 'Time from focus sessions on your chapters adds up here.'
+          : pace === 0
+            ? `You've reached your ${exam.targetHours} h target.`
+            : `About ${formatHM(pace)} a day gets you to ${exam.targetHours} h by exam day.`;
+
+      const done = exam.chapters.filter((ch) => ch.done).length;
+      $<HTMLElement>('[data-eg-done]').textContent = exam.chapters.length ? `${done} of ${exam.chapters.length}` : 'No chapters yet';
+      const week = weekMinutes(exam, sessions);
+      $<HTMLElement>('[data-eg-week]').textContent = formatHM(week.total);
+      $<HTMLElement>('[data-eg-week-bars]').innerHTML = miniBars(week.values, week.today, `Focus minutes on this exam, Monday to Sunday: ${week.values.join(', ')}`);
+      const round = exam.rounds.at(-1);
+      $<HTMLElement>('[data-eg-round]').textContent = round ? `${round.correct} of ${round.total} correct` : 'None yet';
+    }
+
+    function disarmDelete(): void {
+      deleteArmed = false;
+      del.textContent = 'Delete this exam plan';
+    }
+
+    $<HTMLButtonElement>('[data-eg-edit]').addEventListener('click', () => {
+      const exam = getExam();
+      if (!exam) return;
+      editing = true;
+      title.value = exam.title;
+      date.value = exam.date ?? '';
+      hours.value = exam.targetHours ? String(exam.targetHours) : '';
+      render();
+      renderPlan();
+      title.focus();
+    });
+
+    cancel.addEventListener('click', () => {
+      editing = false;
+      disarmDelete();
+      render();
+    });
+
+    // Press twice to delete: the first press says what will happen.
+    del.addEventListener('click', () => {
+      if (!deleteArmed) {
+        deleteArmed = true;
+        del.textContent = 'Press again to delete';
+        announce('Press again to delete the exam plan, its chapters and its questions. Your focus sessions stay in your history.');
+        window.setTimeout(disarmDelete, 6000);
+        return;
+      }
+      disarmDelete();
+      editing = false;
+      deleteExam();
+      form.reset();
+      announce('Exam plan deleted.');
+      title.focus();
+    });
+
+    form.addEventListener('input', renderPlan);
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!title.value.trim()) return;
+      const wasEditing = Boolean(getExam());
+      if (wasEditing) saveGoal(draft());
+      else createExam(draft(), parseChapterLines(chapters.value));
+      editing = false;
+      form.reset();
+      render();
+      announce(wasEditing ? 'Goal saved.' : 'Exam plan created.');
+    });
+
+    render();
+    c.add(subscribe('exam', render));
+    c.add(subscribe('sessions', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .exam-goal {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .goal-form[hidden],
+  .goal[hidden],
+  .goal-stats[hidden],
+  .goal-form__field[hidden] {
+    display: none;
+  }
+
+  .goal-form__grid {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  @media (min-width: 40rem) {
+    .goal-form__grid {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .goal-form__field--wide {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .goal-form__field {
+    display: grid;
+    gap: var(--space-1);
+    align-content: start;
+    font-weight: 600;
+  }
+
+  .goal-form__field .input {
+    font-weight: 400;
+  }
+
+  .goal-form__field textarea {
+    resize: vertical;
+  }
+
+  .goal-form__hint {
+    font-size: var(--text-xs);
+    font-weight: 400;
+  }
+
+  .goal-form__plan {
+    min-height: 1.6em;
+    margin-top: var(--space-4);
+    color: var(--cat-reward);
+    font-weight: 600;
+  }
+
+  .goal-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  .goal-form__delete {
+    margin-inline-start: auto;
+    color: var(--cat-rest);
+  }
+
+  .goal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-5);
+  }
+
+  .goal__main {
+    flex: 999 1 22rem;
+    min-width: 0;
+    display: grid;
+    gap: var(--space-3);
+    align-content: start;
+  }
+
+  .goal__eyebrow {
+    color: var(--cat-reward);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .goal__title {
+    font-size: var(--text-2xl);
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+  }
+
+  .goal__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .goal :global(.goal__chip) {
+    padding-block: var(--space-1);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  .goal :global(.goal__chip--days) {
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+    box-shadow: none;
+    font-weight: 600;
+  }
+
+  .goal__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+
+  .goal__continue {
+    min-height: 52px;
+    font-size: var(--text-base);
+    overflow-wrap: anywhere;
+  }
+
+  .goal__time {
+    flex: 1 1 19rem;
+    min-width: 0;
+    display: grid;
+    gap: var(--space-3);
+    align-content: start;
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-md);
+  }
+
+  .goal__time-head {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .goal__big {
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .goal :global(.goal__of) {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .goal__bar {
+    height: 14px;
+    border-radius: var(--radius-pill);
+    background: var(--heat-0);
+  }
+
+  .goal__bar[hidden] {
+    display: none;
+  }
+
+  .goal__bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent-grad);
+  }
+
+  .goal__pace:empty {
+    display: none;
+  }
+
+  .goal-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-4);
+  }
+
+  .goal-stat {
+    padding: var(--space-4) var(--space-5);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+
+  .goal-stat__value {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+  }
+
+  .goal-stat :global(.mini) {
+    margin-top: var(--space-2);
+  }
+</style>
