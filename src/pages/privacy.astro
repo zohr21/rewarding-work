@@ -1,0 +1,91 @@
+---
+/**
+ * Privacy policy. Keep it true to the code: if a feature starts storing or sending
+ * something new, say so here in the same change.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE } from '../config/site';
+import { url } from '../lib/paths';
+
+const CONTACT = 'babazadezohr@gmail.com';
+const UPDATED = '3 October 2026';
+---
+
+<BaseLayout title="Privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
+  <div class="container">
+    <header class="page-header">
+      <h1>Privacy</h1>
+      <p>What {SITE.name} stores, where it goes, and how to delete it. Last updated {UPDATED}.</p>
+    </header>
+
+    <div class="prose privacy">
+      <h2>The short version</h2>
+      <ul>
+        <li>Your tasks, focus sessions, done list, chain and settings are stored in your own browser.</li>
+        <li>They leave your browser only if you choose to: by signing in to an account, or by sending an export to Google.</li>
+        <li>There is no advertising and no analytics or tracking on this site.</li>
+      </ul>
+
+      <h2>What is stored in your browser</h2>
+      <p>
+        Everything you enter (tasks and their steps and notes, focus sessions, the done list, your chain, and your look,
+        sound and timer settings) is kept in your browser's local storage on this device. The site also keeps a copy of
+        its own pages on the device so it works offline. None of this is sent to us.
+      </p>
+      <p>
+        You can save a backup file, or delete everything, under <a href={url('/progress')}>Progress → Your data</a>.
+        Clearing this site's data in your browser removes it too.
+      </p>
+
+      <h2>If you create an account</h2>
+      <p>
+        Accounts are optional. If you sign in (with email and password, with Google, or as a guest), your data is also
+        stored in Google Firebase so it can sync between your devices. Firebase then holds:
+      </p>
+      <ul>
+        <li>your sign-in details: your email address if you gave one (your password is stored by Firebase in hashed form and is never visible to us), or your Google account's name and email if you signed in with Google;</li>
+        <li>the same data listed above: tasks, sessions, done list, chain and settings.</li>
+      </ul>
+      <p>
+        Each account can read and write only its own data. You can delete your account, and everything stored in it, at
+        any time on the <a href={url('/account')}>Account</a> page.
+      </p>
+
+      <h2>If you use Send to Google</h2>
+      <p>
+        Send to Google creates a Google Sheet or a Google Doc in your own Google Drive, containing the data you ticked
+        in the export dialog. When you use it:
+      </p>
+      <ul>
+        <li>you sign in in Google's own window, and are asked for one permission: to create files, and to open the files this site created. The site cannot see, change or delete any other file in your Drive;</li>
+        <li>the file is built in your browser and sent directly to Google. It does not pass through any server of ours;</li>
+        <li>the access Google gives is used for that one export and is not stored. We keep no copy of the file and cannot open it;</li>
+        <li>the file belongs to you. Delete it in Google Drive whenever you like, and remove the site's access at any time in your Google Account under Security → Third-party access.</li>
+      </ul>
+      <p>
+        {SITE.name}'s use of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>,
+        including the Limited Use requirements.
+      </p>
+
+      <h2>Other services the site talks to</h2>
+      <ul>
+        <li><strong>GitHub Pages</strong> hosts the site. Like any web host, GitHub receives your IP address when your browser loads the pages.</li>
+        <li><strong>YouTube</strong>, only if you choose a YouTube link as background sound. The player is loaded from YouTube's privacy-enhanced address (youtube-nocookie.com), and YouTube then receives the usual information a video player does.</li>
+        <li><strong>Google</strong>, only if you sign in to an account or use Send to Google, as described above.</li>
+      </ul>
+
+      <h2>What we don't do</h2>
+      <p>We don't sell or share your data, show ads, or use it for anything other than showing it back to you.</p>
+
+      <h2>Questions</h2>
+      <p>Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .privacy {
+    padding-bottom: var(--space-7);
+  }
+</style>
