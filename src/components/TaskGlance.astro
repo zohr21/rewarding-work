@@ -1,0 +1,288 @@
+---
+/**
+ * Today at a glance, above the task list: steps done on today's plan, focus per day
+ * this week, and the chain's last two weeks. Read-only: it draws the same tasks,
+ * sessions and chain the rest of the site stores, and redraws when they change.
+ */
+import { url } from '../lib/paths';
+
+const progressUrl = url('/progress');
+---
+
+<section class="glance" data-glance aria-label="Today at a glance">
+  <div class="card glance__card glance__plan">
+    <span data-gl-ring></span>
+    <div>
+      <p class="glance__label">Today's plan</p>
+      <p class="glance__big" data-gl-steps></p>
+      <div class="glance__slots" data-gl-slots aria-hidden="true"></div>
+      <p class="glance__note" data-gl-slots-text></p>
+    </div>
+  </div>
+
+  <div class="card glance__card">
+    <p class="glance__label">Focus this week</p>
+    <p class="glance__big" data-gl-week></p>
+    <div data-gl-bars></div>
+  </div>
+
+  <div class="card glance__card">
+    <p class="glance__label">Chain</p>
+    <p class="glance__big" data-gl-chain></p>
+    <div data-gl-dots></div>
+    <p class="glance__note"><span data-gl-chain-text></span> <a href={progressUrl} data-gl-chain-link>Open the chain</a></p>
+  </div>
+</section>
+
+<script>
+  import { getChain, getSessions, getTasks, subscribe } from '../lib/storage';
+  import { formatFocus, todayTasks, TODAY_SOFT_MAX } from '../lib/tasks';
+  import { chainStats, minutesByDay } from '../lib/stats';
+  import { addDays, dayKey, startOfDay, startOfWeek } from '../lib/dates';
+  import { ring } from '../lib/charts';
+  import { cleanups, onPage } from '../lib/page';
+
+  const letterFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
+  const nameFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  /** Mon–Sun bars: past days soft, today solid, days with nothing (or still to come) a stub. */
+  function weekBars(minutes: number[], todayIndex: number, monday: Date): string {
+    const max = Math.max(1, ...minutes);
+    let out = '';
+    const said: string[] = [];
+    minutes.forEach((m, i) => {
+      const x = 6 + i * 31;
+      const date = addDays(monday, i);
+      if (i <= todayIndex) said.push(`${nameFmt.format(date)} ${m}`);
+      if (m > 0) {
+        const h = Math.max(4, Math.round((m / max) * 54));
+        out += `<rect class="bar${i === todayIndex ? ' bar--today' : ''}" x="${x}" y="${60 - h}" width="22" height="${h}" rx="4" />`;
+      } else {
+        out += `<rect class="bar bar--none" x="${x}" y="57" width="22" height="3" rx="1.5" />`;
+      }
+      out += `<text class="bar__day${i === todayIndex ? ' bar__day--today' : ''}" x="${x + 11}" y="73">${letterFmt.format(date)}</text>`;
+    });
+    return `<svg class="glance__chart" viewBox="0 0 220 76" role="img" aria-label="Focus minutes so far this week: ${said.join(', ')}">${out}</svg>`;
+  }
+
+  /** The last 14 days as a row of dots; today is the larger one at the end. */
+  function chainDots(marked: boolean[]): string {
+    const count = marked.filter(Boolean).length;
+    const last = marked.length - 1;
+    let out = '<line class="dots__line" x1="12" y1="17" x2="212" y2="17" />';
+    marked.forEach((on, i) => {
+      const today = i === last;
+      const cx = today ? 212 : 12 + i * 14;
+      out += `<circle class="dot${on ? ' dot--on' : ''}${today ? ' dot--today' : ''}" cx="${cx}" cy="17" r="${today ? 9 : 6}" />`;
+    });
+    const todayText = marked[last] ? 'today included' : 'today still open';
+    return `<svg class="glance__chart" viewBox="0 0 224 34" role="img" aria-label="${count} of the last 14 days marked, ${todayText}">${out}</svg>`;
+  }
+
+  onPage('task-glance', () => {
+    const c = cleanups();
+    document.querySelectorAll<HTMLElement>('[data-glance]').forEach((root) => {
+      const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+      const ringSlot = $<HTMLElement>('[data-gl-ring]');
+      const steps = $<HTMLElement>('[data-gl-steps]');
+      const slots = $<HTMLElement>('[data-gl-slots]');
+      const slotsText = $<HTMLElement>('[data-gl-slots-text]');
+      const week = $<HTMLElement>('[data-gl-week]');
+      const bars = $<HTMLElement>('[data-gl-bars]');
+      const chain = $<HTMLElement>('[data-gl-chain]');
+      const dots = $<HTMLElement>('[data-gl-dots]');
+      const chainText = $<HTMLElement>('[data-gl-chain-text]');
+      const chainLink = $<HTMLAnchorElement>('[data-gl-chain-link]');
+
+      function render(): void {
+        const now = new Date();
+
+        // Today's plan
+        const today = todayTasks(getTasks());
+        const all = today.flatMap((t) => t.steps);
+        const done = all.filter((s) => s.done).length;
+        ringSlot.replaceChildren(ring(done, all.length, 84));
+        steps.textContent = all.length ? `${done} of ${plural(all.length, 'step')}` : today.length ? 'No steps yet' : 'Nothing planned';
+        slots.replaceChildren(
+          ...Array.from({ length: Math.max(TODAY_SOFT_MAX, today.length) }, (_, i) => {
+            const s = document.createElement('span');
+            if (i < today.length) s.className = i < TODAY_SOFT_MAX ? 'is-used' : 'is-over';
+            return s;
+          }),
+        );
+        slotsText.textContent = `${today.length} of ${TODAY_SOFT_MAX} Today slots${today.length > TODAY_SOFT_MAX ? ' — over a short day' : ''}`;
+
+        // Focus this week
+        const byDay = minutesByDay(getSessions());
+        const monday = startOfWeek(now);
+        const minutes = Array.from({ length: 7 }, (_, i) => Math.round(byDay.get(dayKey(addDays(monday, i))) ?? 0));
+        const todayIndex = (now.getDay() + 6) % 7;
+        week.textContent = formatFocus(minutes.reduce((a, b) => a + b, 0) * 60);
+        bars.innerHTML = weekBars(minutes, todayIndex, monday);
+
+        // Chain
+        const days = getChain().days;
+        const s = chainStats(days, now);
+        const set = new Set(days);
+        const start = addDays(startOfDay(now), -13);
+        chain.replaceChildren(plural(s.current, 'day'));
+        if (s.best > 0) {
+          const best = document.createElement('span');
+          best.className = 'glance__aside';
+          best.textContent = ` · best ${s.best}`;
+          chain.append(best);
+        }
+        dots.innerHTML = chainDots(Array.from({ length: 14 }, (_, i) => set.has(dayKey(addDays(start, i)))));
+        chainText.textContent = !days.length ? 'No days marked yet.' : s.doneToday ? 'Today is marked.' : 'Today is still open.';
+        chainLink.textContent = !days.length ? 'Start a chain' : s.doneToday ? 'See the month' : 'Mark it to keep the chain';
+      }
+
+      root.classList.add('is-entering');
+      const entered = window.setTimeout(() => root.classList.remove('is-entering'), 700);
+      c.add(() => window.clearTimeout(entered));
+
+      render();
+      c.add(subscribe('tasks', render));
+      c.add(subscribe('sessions', render));
+      c.add(subscribe('chain', render));
+    });
+    return c.run;
+  });
+</script>
+
+<style>
+  .glance {
+    display: grid;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  @media (min-width: 52rem) {
+    .glance {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .glance__card {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .glance__plan {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .glance__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .glance__big {
+    margin-bottom: var(--space-2);
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: var(--leading-tight);
+  }
+
+  .glance :global(.glance__aside) {
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .glance__note {
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .glance__slots {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .glance__slots :global(span) {
+    width: 28px;
+    height: 10px;
+    border-radius: 5px;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .glance__slots :global(.is-used) {
+    background: var(--color-accent);
+    box-shadow: none;
+  }
+
+  .glance__slots :global(.is-over) {
+    background: var(--cat-reward);
+    box-shadow: none;
+  }
+
+  .glance :global(.glance__chart) {
+    display: block;
+    width: 100%;
+    max-width: 22rem;
+    height: auto;
+  }
+
+  /* Bar colours: global.css. */
+  .glance :global(.bar) {
+    transform-box: fill-box;
+    transform-origin: bottom;
+  }
+
+  .glance :global(.bar__day) {
+    fill: var(--color-text-muted);
+    font-family: var(--font-sans);
+    font-size: 11px;
+    text-anchor: middle;
+  }
+
+  .glance :global(.bar__day--today) {
+    fill: var(--color-text);
+    font-weight: 700;
+  }
+
+  .glance :global(.dots__line) {
+    stroke: var(--heat-1);
+    stroke-width: 3;
+  }
+
+  .glance :global(.dot) {
+    fill: var(--color-surface-solid);
+    stroke: var(--color-border-strong);
+    stroke-width: 2;
+  }
+
+  .glance :global(.dot--on) {
+    fill: var(--color-accent);
+    stroke: none;
+  }
+
+  .glance :global(.dot--today) {
+    stroke: var(--color-accent);
+    stroke-width: 2.5;
+  }
+
+  /* Bars grow once when the page opens (rings: see global.css). */
+  .glance:global(.is-entering) :global(.bar:not(.bar--none)) {
+    animation: bar-grow 600ms var(--ease-out) backwards;
+  }
+
+  @keyframes bar-grow {
+    from {
+      transform: scaleY(0);
+    }
+  }
+
+  :global(html[data-motion='off']) .glance :global(.bar) {
+    animation: none;
+  }
+</style>

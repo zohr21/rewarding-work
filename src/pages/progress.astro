@@ -1,7 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProgressStats from '../components/ProgressStats.astro';
+import FocusTrend from '../components/FocusTrend.astro';
 import Heatmap from '../components/Heatmap.astro';
+import TechniqueDonut from '../components/TechniqueDonut.astro';
+import DoneWeeks from '../components/DoneWeeks.astro';
 import RewardTiers from '../components/RewardTiers.astro';
 import DoneList from '../components/DoneList.astro';
 import ChainTracker from '../components/ChainTracker.astro';
@@ -21,7 +24,12 @@ import { url } from '../lib/paths';
 
     <div class="progress">
       <ProgressStats />
+      <FocusTrend />
       <Heatmap />
+      <div class="progress__pair progress__pair--even">
+        <TechniqueDonut />
+        <DoneWeeks />
+      </div>
       <RewardTiers />
       <div class="progress__pair">
         <DoneList />
@@ -42,6 +50,11 @@ import { url } from '../lib/paths';
     display: grid;
     gap: var(--space-5);
     align-items: start;
+  }
+
+  /* The two charts are a matched pair, so they share a height. */
+  .progress__pair--even {
+    align-items: stretch;
   }
 
   @media (min-width: 52rem) {

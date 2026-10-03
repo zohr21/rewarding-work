@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import TaskGlance from '../components/TaskGlance.astro';
 import TaskList from '../components/TaskList.astro';
 import BreakdownTool from '../components/BreakdownTool.astro';
 import { url } from '../lib/paths';
@@ -15,6 +16,7 @@ import { url } from '../lib/paths';
       </p>
     </header>
 
+    <TaskGlance />
     <div class="tasks-page">
       <TaskList />
       <BreakdownTool heading="Break it down" linkToTasks={false} intro="Steps for your current task. Make each one small enough to start in two minutes." />

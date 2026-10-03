@@ -392,3 +392,176 @@ details[open] > .tool-btn {
   color: var(--color-text-muted);
   font-size: var(--text-lg);
 }
+
+/* ---------- Small graphics (src/lib/charts.ts) ---------- */
+.ring {
+  flex: none;
+  display: block;
+}
+
+.ring circle,
+.ring__mark {
+  fill: none;
+}
+
+.ring__track {
+  stroke: var(--heat-0);
+  stroke-width: 7;
+}
+
+.ring__value {
+  stroke: var(--color-accent);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.ring__dash {
+  stroke: var(--color-border-strong);
+  stroke-width: 3;
+  stroke-dasharray: 5 6;
+}
+
+.ring .ring__disc {
+  fill: var(--color-accent);
+}
+
+.ring__mark {
+  stroke: var(--color-text-muted);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ring--full .ring__mark {
+  stroke: var(--color-on-accent);
+  stroke-width: 5;
+}
+
+.ring__text {
+  fill: var(--color-text);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  text-anchor: middle;
+}
+
+.segs {
+  display: flex;
+  gap: 3px;
+}
+
+.segs > span {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--heat-0);
+}
+
+.segs > .is-done {
+  background: var(--color-accent);
+}
+
+/* Rings fill once when the page opens; later updates just show the new state. */
+.is-entering .ring__value {
+  animation: ring-fill 600ms var(--ease-out) backwards;
+}
+
+@keyframes ring-fill {
+  from {
+    stroke-dasharray: 0 100;
+  }
+}
+
+html[data-motion='off'] .is-entering .ring__value {
+  animation: none;
+}
+
+/* Bars: past days soft, today solid, nothing (or still to come) a stub. */
+.bar {
+  fill: var(--heat-2);
+}
+
+.bar--today {
+  fill: var(--color-accent);
+}
+
+.bar--none {
+  fill: var(--color-border-strong);
+}
+
+.mini,
+.spark {
+  display: block;
+  width: 100%;
+  max-width: 14rem;
+  height: auto;
+}
+
+.spark__line {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.spark__dot {
+  fill: var(--color-accent);
+}
+
+.donut circle {
+  fill: none;
+  stroke-width: 18;
+}
+
+.donut__track {
+  stroke: var(--heat-0);
+}
+
+/* One fixed colour per category; the legend adds a shape, so colour is never the only cue. */
+.donut__s0 {
+  stroke: var(--heat-4);
+  fill: var(--heat-4);
+}
+
+.donut__s1 {
+  stroke: var(--heat-2);
+  fill: var(--heat-2);
+}
+
+.donut__s2 {
+  stroke: var(--cat-visual);
+  fill: var(--cat-visual);
+}
+
+.donut__s3 {
+  stroke: var(--cat-reward);
+  fill: var(--cat-reward);
+}
+
+.donut__s4 {
+  stroke: var(--cat-time);
+  fill: var(--cat-time);
+}
+
+.donut__mark {
+  flex: none;
+  stroke: none;
+}
+
+.donut__big,
+.donut__small {
+  text-anchor: middle;
+  fill: var(--color-text);
+}
+
+.donut__big {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.donut__small {
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
