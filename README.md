@@ -218,6 +218,37 @@ npx firebase-tools emulators:start --only auth,firestore --project demo-rw
 `PUBLIC_FIREBASE_EMULATOR=true`. The emulators show a fake Google sign-in and print
 confirmation/reset emails instead of sending them.
 
+## Send to Google
+
+Optional. With a Google OAuth client id configured, **Progress → Your data → Send to
+Google…** opens an export dialog that creates a Google Sheet (one tab per kind of data,
+plus a Dashboard tab of formulas and charts) or a Google Doc report in the visitor's own
+Drive. Without the id the button isn't shown and nothing else changes.
+
+- The visitor signs in in Google's own pop-up and grants one permission, `drive.file`:
+  the site can create files and open the ones it created, and can't see anything else in
+  their Drive. The access token is used for that one export and is never stored.
+- The file is built in the browser (`src/lib/export/`) and sent straight to Google's
+  Sheets or Docs API. Nothing passes through any server of ours.
+- It's a snapshot: the Sheet or Doc isn't updated when the data changes.
+
+### Setting it up (one time)
+
+Use the same Google Cloud project as Firebase (Firebase projects are Google Cloud
+projects), or any other.
+
+1. [Google Cloud console](https://console.cloud.google.com) → pick the project →
+   **APIs & Services → Library** → enable **Google Sheets API** and **Google Docs API**.
+2. **APIs & Services → OAuth consent screen**: fill in the app name and support email,
+   and add the scope `.../auth/drive.file`. While the app is in *Testing*, add yourself
+   under **Test users**; publish it when others should be able to use it.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID → Web
+   application**. Under **Authorized JavaScript origins** add `http://localhost:4321`
+   (or whichever port you run the dev server on) and your site's origin, e.g.
+   `https://<user>.github.io`. No redirect URI is needed.
+4. Locally: put the client id in `.env` as `PUBLIC_GOOGLE_CLIENT_ID`. Deployed: add it as
+   the repository variable `GOOGLE_CLIENT_ID`, then push or re-run the deploy workflow.
+
 ## Adding a technique
 
 1. Create `src/content/techniques/<slug>.md`. The file name doesn't matter; the

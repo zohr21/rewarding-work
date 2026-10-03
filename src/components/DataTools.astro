@@ -1,6 +1,11 @@
 ---
-/** Export / import all data as JSON, and delete everything. No pop-ups: confirmations are inline. */
+/**
+ * Export / import all data as JSON, send a readable copy to Google (when a Google client
+ * is configured), and delete everything. Confirmations are inline.
+ */
+import ExportDialog from './ExportDialog.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { GOOGLE_EXPORT_ENABLED } from '../config/google';
 import { url } from '../lib/paths';
 ---
 
@@ -21,7 +26,15 @@ import { url } from '../lib/paths';
       Import from JSON
       <input type="file" accept="application/json,.json" class="visually-hidden" data-import />
     </label>
+    {
+      GOOGLE_EXPORT_ENABLED && (
+        <button type="button" class="btn btn--ghost" data-export-open>
+          Send to Google…
+        </button>
+      )
+    }
   </div>
+  {GOOGLE_EXPORT_ENABLED && <p class="muted data__hint">Send to Google makes a Sheet with charts, or a Doc report, in your own Drive.</p>}
 
   <div class="data__confirm" data-import-panel hidden>
     <p data-import-summary></p>
@@ -47,11 +60,12 @@ import { url } from '../lib/paths';
   <p class="data__status" role="status" data-data-status></p>
 </section>
 
+{GOOGLE_EXPORT_ENABLED && <ExportDialog />}
+
 <script>
   import {
     applyBackup,
     clearAll,
-    exportBackup,
     getAppearance,
     getTheme,
     isPersistent,
@@ -59,7 +73,7 @@ import { url } from '../lib/paths';
     type BackupData,
   } from '../lib/storage';
   import { applyAppearance, applyTheme } from '../lib/appearance';
-  import { dayKey } from '../lib/dates';
+  import { backupSummary, downloadBackup } from '../lib/export/backup';
   import { onPage } from '../lib/page';
 
   onPage('data-tools', () => {
@@ -84,19 +98,7 @@ import { url } from '../lib/paths';
 
       $<HTMLButtonElement>('[data-export]').addEventListener('click', () => {
         try {
-          const backup = exportBackup();
-          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = `rewarding-work-${dayKey(new Date())}.json`;
-          document.body.append(a);
-          a.click();
-          a.remove();
-          window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-          const d = backup.data;
-          const done = d.done.filter((x) => x.deletedAt === undefined).length;
-          const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
-          say(`Exported ${d.sessions.length} sessions, ${done} done items, ${tasks} tasks and ${d.chain.days.length} chain days.`);
+          say(`Exported ${backupSummary(downloadBackup())}.`);
         } catch {
           say('Export failed in this browser.');
         }
