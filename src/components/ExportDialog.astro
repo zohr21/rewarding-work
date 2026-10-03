@@ -1,0 +1,519 @@
+---
+/**
+ * Export dialog: send a copy of your data to a Google Sheet or a Google Doc in your own
+ * Drive, or save the backup file. Opened by any [data-export-open] button.
+ *
+ * Nothing leaves the browser until the final button is pressed. For Google, that button
+ * opens Google's own permission window (src/lib/export/google.ts); the right-hand side
+ * shows what will be in the file before you send it.
+ */
+---
+
+<dialog class="export popover" data-export-dialog aria-labelledby="export-heading">
+  <div class="export__head">
+    <div>
+      <h2 id="export-heading" class="export__title">Export your data</h2>
+      <p class="muted export__sub">Your data stays in this browser until you send it somewhere.</p>
+    </div>
+    <button type="button" class="icon-btn" aria-label="Close" data-export-close>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+    </button>
+  </div>
+
+  <div class="export__body">
+    <div class="export__choices">
+      <div role="group" aria-labelledby="export-dest-label">
+        <p class="export__label" id="export-dest-label">Send it to</p>
+        <div class="export__dests">
+          <button type="button" class="export__dest" data-export-dest="sheets" aria-pressed="true">
+            <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="3" width="20" height="24" rx="3" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M5 11h20M5 17h20M13 11v16" stroke="currentColor" stroke-width="2"></path></svg>
+            Google Sheets
+          </button>
+          <button type="button" class="export__dest" data-export-dest="docs" aria-pressed="false">
+            <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M7 3h11l6 6v18H7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M11 14h10M11 18h10M11 22h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+            Google Docs
+          </button>
+          <button type="button" class="export__dest" data-export-dest="backup" aria-pressed="false">
+            <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M12 6c-3 0-3 2-3 4s0 3-3 5c3 2 3 3 3 5s0 4 3 4M18 6c3 0 3 2 3 4s0 3 3 5c-3 2-3 3-3 5s0 4-3 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+            Backup file
+          </button>
+        </div>
+      </div>
+
+      <fieldset class="export__include" data-export-include>
+        <legend class="export__label">Include</legend>
+        <label class="export__check"><input type="checkbox" data-export-opt="tasks" checked />Tasks and their steps</label>
+        <label class="export__check"><input type="checkbox" data-export-opt="notes" checked />Notes and session logs</label>
+        <label class="export__check"><input type="checkbox" data-export-opt="sessions" checked />Focus sessions</label>
+        <label class="export__check"><input type="checkbox" data-export-opt="done" checked />Done list</label>
+        <label class="export__check"><input type="checkbox" data-export-opt="chain" />Chain days</label>
+      </fieldset>
+
+      <div class="export__field">
+        <label class="export__label" for="export-range">Time range</label>
+        <select id="export-range" class="input" data-export-range>
+          <option value="week">This week</option>
+          <option value="30d" selected>Last 30 days</option>
+          <option value="all">All time</option>
+        </select>
+      </div>
+
+      <div class="export__trust">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M9 12l2.2 2.2L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"></path></svg>
+        <p data-export-trust></p>
+      </div>
+    </div>
+
+    <div class="export__preview">
+      <p class="export__label">What goes in <span class="export__aside" data-export-caption></span></p>
+      <ul class="export__parts" data-export-parts></ul>
+      <p class="muted export__note" data-export-note></p>
+      <div class="export__field export__name">
+        <label class="export__label" for="export-name">File name</label>
+        <input id="export-name" class="input" type="text" maxlength="120" autocomplete="off" data-export-name />
+      </div>
+    </div>
+  </div>
+
+  <div class="export__foot">
+    <p class="export__status" role="status" data-export-status></p>
+    <div class="export__buttons">
+      <button type="button" class="btn btn--ghost" data-export-close>Cancel</button>
+      <button type="button" class="btn" data-export-go>Create Google Sheet</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import { getChain, getDoneStore, getSessions, getTasks } from '../lib/storage';
+  import { collect, RANGE_LABELS, type ExportData, type ExportOptions, type ExportRange } from '../lib/export/collect';
+  import { buildSheet } from '../lib/export/sheets';
+  import { buildDoc } from '../lib/export/docs';
+  import { backupFileName, backupSummary, downloadBackup } from '../lib/export/backup';
+  import { createDoc, createSheet, googleReady, loadGoogle, requestToken } from '../lib/export/google';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  type Dest = 'sheets' | 'docs' | 'backup';
+
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+  const COPY: Record<Dest, { go: string; trust: string; caption: string; note: string }> = {
+    sheets: {
+      go: 'Create Google Sheet',
+      trust: 'Creates one new Sheet in your Drive. Rewarding Work can make files but cannot read your other Drive files.',
+      caption: '· one tab per kind',
+      note: "The Dashboard's numbers are formulas over the other tabs, so it keeps working if you add rows of your own.",
+    },
+    docs: {
+      go: 'Create Google Doc',
+      trust: 'Creates one new Doc in your Drive. Rewarding Work can make files but cannot read your other Drive files.',
+      caption: '· a readable report',
+      note: 'Good for a weekly review, or to share with a coach. It is a snapshot: it does not update itself.',
+    },
+    backup: {
+      go: 'Download file',
+      trust: 'Downloads a file to this device. Nothing is sent anywhere.',
+      caption: '· everything',
+      note: 'A backup always holds all your data, so it can be imported again on any device with Merge or Replace.',
+    },
+  };
+
+  onPage('export-dialog', () => {
+    const dialog = document.querySelector<HTMLDialogElement>('[data-export-dialog]');
+    if (!dialog) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => dialog.querySelector<E>(s)!;
+    const dests = [...dialog.querySelectorAll<HTMLButtonElement>('[data-export-dest]')];
+    const include = $<HTMLFieldSetElement>('[data-export-include]');
+    const opts = [...dialog.querySelectorAll<HTMLInputElement>('[data-export-opt]')];
+    const rangeSelect = $<HTMLSelectElement>('[data-export-range]');
+    const trust = $<HTMLElement>('[data-export-trust]');
+    const caption = $<HTMLElement>('[data-export-caption]');
+    const parts = $<HTMLElement>('[data-export-parts]');
+    const note = $<HTMLElement>('[data-export-note]');
+    const name = $<HTMLInputElement>('[data-export-name]');
+    const status = $<HTMLElement>('[data-export-status]');
+    const go = $<HTMLButtonElement>('[data-export-go]');
+
+    let dest: Dest = 'sheets';
+    let nameEdited = false;
+    let busy = false;
+
+    const options = (): ExportOptions => {
+      const on = (key: string) => opts.find((o) => o.dataset.exportOpt === key)!.checked;
+      // Notes belong to tasks, so they go only when tasks do.
+      return { tasks: on('tasks'), notes: on('tasks') && on('notes'), sessions: on('sessions'), done: on('done'), chain: on('chain'), range: rangeSelect.value as ExportRange };
+    };
+
+    const gather = (): ExportData => collect({ tasks: getTasks(), sessions: getSessions(), done: getDoneStore(), chain: getChain() }, options());
+
+    function defaultName(data: ExportData): string {
+      if (dest === 'backup') return backupFileName();
+      if (dest === 'sheets') return `Rewarding Work · ${monthFmt.format(data.now)}`;
+      return data.options.range === 'week' ? `Weekly report · ${data.rangeLabel}` : `Report · ${RANGE_LABELS[data.options.range]}`;
+    }
+
+    function say(text: string, link?: { href: string; label: string }): void {
+      status.replaceChildren(text);
+      if (!link) return;
+      const a = document.createElement('a');
+      a.href = link.href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = link.label;
+      status.append(' ', a);
+    }
+
+    function refresh(): void {
+      const copy = COPY[dest];
+      const data = gather();
+      dests.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.exportDest === dest)));
+      const backup = dest === 'backup';
+      include.disabled = backup;
+      rangeSelect.disabled = backup;
+      opts.find((o) => o.dataset.exportOpt === 'notes')!.disabled = !opts.find((o) => o.dataset.exportOpt === 'tasks')!.checked;
+      trust.textContent = copy.trust;
+      caption.textContent = copy.caption;
+      note.textContent = copy.note;
+      go.textContent = copy.go;
+      name.readOnly = backup;
+      if (backup || !nameEdited) name.value = defaultName(data);
+
+      const rows: [string, string][] =
+        dest === 'sheets'
+          ? buildSheet(data, name.value).tabs.map((t) => [t.title, t.title === 'Dashboard' ? 'totals and charts' : plural(t.rows, 'row')])
+          : dest === 'docs'
+            ? buildDoc(data).outline.map((s) => [s.title, s.detail])
+            : [
+                ['Tasks', plural(getTasks().length, 'task')],
+                ['Focus sessions', plural(getSessions().length, 'session')],
+                ['Done list', plural(getDoneStore().filter((d) => d.deletedAt === undefined).length, 'item')],
+                ['Chain', plural(getChain().days.length, 'day')],
+                ['Settings', 'theme, look, timer'],
+              ];
+      parts.replaceChildren(
+        ...rows.map(([title, detail]) => {
+          const li = document.createElement('li');
+          const b = document.createElement('b');
+          b.textContent = title;
+          const s = document.createElement('span');
+          s.textContent = detail;
+          li.append(b, s);
+          return li;
+        }),
+      );
+      const empty = !backup && rows.length <= (dest === 'sheets' ? 1 : 0);
+      go.disabled = busy || empty;
+      if (empty) say('Tick at least one thing to include.');
+      else if (status.textContent === 'Tick at least one thing to include.') say('');
+    }
+
+    function open(): void {
+      nameEdited = false;
+      say('');
+      refresh();
+      dialog!.showModal();
+      // Fetch Google's script now, so the pop-up can open straight from the button press.
+      loadGoogle().catch((err: Error) => {
+        if (dest !== 'backup') say(err.message);
+      });
+    }
+
+    async function send(): Promise<void> {
+      if (dest === 'backup') {
+        try {
+          say(`Saved ${backupSummary(downloadBackup())}.`);
+        } catch {
+          say('The download failed in this browser.');
+        }
+        return;
+      }
+      // Ask for the token first, with nothing awaited before it: browsers only allow
+      // the pop-up while the click is still "live".
+      const token = requestToken();
+      const data = gather();
+      const title = name.value.trim() || defaultName(data);
+      const kind = dest === 'sheets' ? 'Sheet' : 'Doc';
+      busy = true;
+      go.disabled = true;
+      say('Waiting for Google…');
+      try {
+        const access = await token;
+        say(`Creating your ${kind}…`);
+        const href = dest === 'sheets' ? await createSheet(access, buildSheet(data, title)) : await createDoc(access, title, buildDoc(data));
+        say(`Your ${kind} is ready.`, { href, label: `Open “${title}”` });
+      } catch (err) {
+        say(err instanceof Error ? err.message : 'Something went wrong. Nothing was created.');
+      } finally {
+        busy = false;
+        refresh();
+      }
+    }
+
+    dests.forEach((b) =>
+      b.addEventListener('click', () => {
+        dest = b.dataset.exportDest as Dest;
+        say('');
+        refresh();
+        if (dest !== 'backup' && !googleReady()) loadGoogle().catch((err: Error) => say(err.message));
+      }),
+    );
+    opts.forEach((o) => o.addEventListener('change', refresh));
+    rangeSelect.addEventListener('change', refresh);
+    name.addEventListener('input', () => (nameEdited = true));
+    go.addEventListener('click', () => void send());
+    dialog.querySelectorAll('[data-export-close]').forEach((b) => b.addEventListener('click', () => dialog.close()));
+    // A click on the backdrop (the dialog element itself, outside its content) closes it.
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) dialog.close();
+    });
+
+    c.add(
+      listen(document, 'click', (e) => {
+        if ((e.target as Element).closest?.('[data-export-open]')) open();
+      }),
+    );
+    c.add(() => dialog.close());
+    return c.run;
+  });
+</script>
+
+<style>
+  .export {
+    width: min(60rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    padding: 0;
+    color: var(--color-text);
+    overflow: hidden;
+  }
+
+  .export[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .export::backdrop {
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(3px);
+  }
+
+  .export__head,
+  .export__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .export__head {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .export__foot {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .export__title {
+    font-size: var(--text-xl);
+  }
+
+  .export__sub {
+    font-size: var(--text-sm);
+  }
+
+  .export__body {
+    display: grid;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  @media (min-width: 48rem) {
+    .export__body {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .export__choices {
+      border-inline-end: 1px solid var(--color-border);
+    }
+  }
+
+  .export__choices,
+  .export__preview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    min-width: 0;
+  }
+
+  .export__preview {
+    background: var(--well-bg);
+  }
+
+  .export__label {
+    margin-bottom: var(--space-2);
+    padding: 0;
+    font-weight: 700;
+  }
+
+  .export__aside {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text-muted);
+  }
+
+  .export__dests {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  /* A destination is a raised tile; the chosen one is outlined in the accent and pressed in. */
+  .export__dest {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: 92px;
+    padding: var(--space-2);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+  }
+
+  .export__dest svg {
+    color: var(--color-text-muted);
+  }
+
+  .export__dest[aria-pressed='true'] {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent-soft) 70%, var(--color-surface-solid));
+    box-shadow: 0 1px 0 var(--accent-edge);
+    transform: translateY(2px);
+  }
+
+  .export__dest[aria-pressed='true'] svg {
+    color: var(--color-accent);
+  }
+
+  .export__include {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .export__include:disabled {
+    opacity: 0.5;
+  }
+
+  .export__check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .export__check input {
+    width: 22px;
+    height: 22px;
+    accent-color: var(--color-accent);
+  }
+
+  .export__field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .export__name {
+    margin-top: auto;
+  }
+
+  .export__trust {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--color-accent-soft);
+    font-size: var(--text-sm);
+  }
+
+  .export__trust svg {
+    flex: none;
+    margin-top: 1px;
+    color: var(--color-accent);
+  }
+
+  .export__parts {
+    display: grid;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    overflow: hidden;
+  }
+
+  .export__parts :global(li) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .export__parts :global(li + li) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .export__parts :global(span) {
+    color: var(--color-text-muted);
+    text-align: end;
+  }
+
+  .export__note {
+    font-size: var(--text-sm);
+  }
+
+  .export__status {
+    flex: 1 1 14rem;
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  /* Takes no room until there is something to say (it stays in the page for screen readers). */
+  .export__status:empty {
+    flex-basis: 0;
+  }
+
+  .export__buttons {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .export__buttons .btn {
+    padding-inline: var(--space-4);
+    white-space: nowrap;
+  }
+
+  .export__buttons {
+    display: flex;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+</style>
