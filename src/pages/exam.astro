@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ExamGoal from '../components/ExamGoal.astro';
+import ExamChapters from '../components/ExamChapters.astro';
+import ExamBank from '../components/ExamBank.astro';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Exam prep" description="Prepare for an exam or certification: set the goal, list the chapters, focus on one at a time and practise test questions.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Exam prep</h1>
+      <p>
+        Set the goal, list the parts, and work through them one at a time. Focus opens the <a href={url('/timer')}>timer</a>{' '}
+        on a chapter, and the time shows up here.
+      </p>
+    </header>
+
+    <div class="exam-page">
+      <ExamGoal />
+      <div class="exam-page__grid">
+        <ExamChapters />
+        <ExamBank />
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .exam-page,
+  .exam-page__grid {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  @media (min-width: 56rem) {
+    .exam-page__grid {
+      grid-template-columns: minmax(0, 1fr) 20rem;
+    }
+  }
+</style>

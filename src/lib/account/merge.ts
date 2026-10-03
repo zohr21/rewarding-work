@@ -10,7 +10,9 @@ import {
   mergeChains,
   isFocusSession,
   mergeDoneLists,
+  mergeExamStores,
   mergeTaskStores,
+  normaliseExam,
   normaliseTasks,
   type FocusSession,
   type SyncedStore,
@@ -57,6 +59,8 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
     }
     case 'tasks':
       return JSON.stringify(mergeTaskStores(normaliseTasks(local), normaliseTasks(remote)));
+    case 'exam':
+      return JSON.stringify(mergeExamStores(normaliseExam(local), normaliseExam(remote)));
     default:
       return localJson;
   }

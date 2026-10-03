@@ -24,19 +24,20 @@ export type StoreName =
   | 'done'
   | 'chain'
   | 'tasks'
+  | 'exam'
   | 'breakdown' // legacy: moved into `tasks` on first load (see migrateBreakdown)
   | 'sound'
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'breakdown', 'sound'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
  * The live timer and sound settings stay per device. `breakdown` stays listed only so
  * its removal (after moving into `tasks`) reaches the account too.
  */
-export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
 export type SyncedStore = (typeof SYNCED_STORES)[number];
 
 export function isSyncedStore(name: string): name is SyncedStore {
@@ -801,6 +802,143 @@ export function mergeTaskStores(a: TaskStore, b: TaskStore): TaskStore {
   };
 }
 
+// ---------- Exam prep ----------
+
+/** A chapter or part of the exam. Focus sessions are linked to it through `FocusSession.taskId`. */
+export interface ExamChapter {
+  id: string;
+  name: string;
+  plannedHours?: number;
+  done: boolean;
+  notes?: string;
+}
+
+export interface ExamQuestion {
+  id: string;
+  chapterId?: string;
+  text: string;
+  options: string[];
+  /** Indexes into `options` of the right answer(s). */
+  answer: number[];
+  explanation?: string;
+  /** Times answered in practice, and how many of those were right. */
+  seen: number;
+  correct: number;
+  /** "Ask me again": comes first in the next round. */
+  again?: boolean;
+}
+
+export interface ExamRound {
+  /** Epoch ms. */
+  at: number;
+  total: number;
+  correct: number;
+}
+
+export interface Exam {
+  title: string;
+  /** Local YYYY-MM-DD of the exam, when known. */
+  date?: string;
+  targetHours?: number;
+  chapters: ExamChapter[];
+  questions: ExamQuestion[];
+  /** Practice rounds, oldest first, at most ROUNDS_MAX. */
+  rounds: ExamRound[];
+  createdAt: number;
+}
+
+export interface ExamStore {
+  exam: Exam | null;
+  /** Bumped on every change; account sync keeps the newer copy whole. */
+  updatedAt: number;
+}
+
+export const EMPTY_EXAM: ExamStore = { exam: null, updatedAt: 0 };
+export const CHAPTERS_MAX = 60;
+export const QUESTIONS_MAX = 2000;
+export const ROUNDS_MAX = 50;
+
+const isHours = (v: unknown) => v === undefined || (typeof v === 'number' && v > 0 && v <= 10000);
+
+export function isExamChapter(v: unknown): v is ExamChapter {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    typeof v.name === 'string' &&
+    isHours(v.plannedHours) &&
+    typeof v.done === 'boolean' &&
+    (v.notes === undefined || typeof v.notes === 'string')
+  );
+}
+
+export function isExamQuestion(v: unknown): v is ExamQuestion {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    (v.chapterId === undefined || typeof v.chapterId === 'string') &&
+    typeof v.text === 'string' &&
+    Array.isArray(v.options) &&
+    v.options.length >= 2 &&
+    v.options.every((o) => typeof o === 'string') &&
+    Array.isArray(v.answer) &&
+    v.answer.length >= 1 &&
+    v.answer.every((a) => Number.isInteger(a) && a >= 0 && a < (v.options as unknown[]).length) &&
+    (v.explanation === undefined || typeof v.explanation === 'string') &&
+    typeof v.seen === 'number' &&
+    typeof v.correct === 'number' &&
+    (v.again === undefined || typeof v.again === 'boolean')
+  );
+}
+
+const isExamRound = (v: unknown): v is ExamRound =>
+  isObj(v) && typeof v.at === 'number' && typeof v.total === 'number' && typeof v.correct === 'number';
+
+/** Tolerant: malformed chapters, questions and rounds are dropped, not the whole exam. */
+export function normaliseExam(v: unknown): ExamStore {
+  if (!isObj(v) || typeof v.updatedAt !== 'number') return EMPTY_EXAM;
+  const e = v.exam;
+  if (!isObj(e) || typeof e.title !== 'string' || typeof e.createdAt !== 'number') return { exam: null, updatedAt: v.updatedAt };
+  return {
+    exam: {
+      title: e.title,
+      ...(isDayKey(e.date) ? { date: e.date } : {}),
+      ...(typeof e.targetHours === 'number' && isHours(e.targetHours) ? { targetHours: e.targetHours } : {}),
+      chapters: Array.isArray(e.chapters) ? e.chapters.filter(isExamChapter) : [],
+      questions: Array.isArray(e.questions) ? e.questions.filter(isExamQuestion) : [],
+      rounds: Array.isArray(e.rounds) ? e.rounds.filter(isExamRound) : [],
+      createdAt: e.createdAt,
+    },
+    updatedAt: v.updatedAt,
+  };
+}
+
+export function getExamStore(): ExamStore {
+  return normaliseExam(read<unknown>('exam', null));
+}
+
+export function getExam(): Exam | null {
+  return getExamStore().exam;
+}
+
+/** Replace the exam (null deletes it; the empty store stays so the deletion reaches your other devices). */
+export function setExam(exam: Exam | null): void {
+  write('exam', { exam, updatedAt: Math.max(Date.now(), getExamStore().updatedAt + 1) });
+}
+
+/** Apply `change` to the exam. Returns the updated exam, or null if there isn't one. */
+export function updateExam(change: (exam: Exam) => Partial<Exam>): Exam | null {
+  const old = getExam();
+  if (!old) return null;
+  const next = { ...old, ...change(old) };
+  setExam(next);
+  return next;
+}
+
+/** Combine two copies (account sync, backup import): the one changed last wins whole. */
+export function mergeExamStores(a: ExamStore, b: ExamStore): ExamStore {
+  return b.updatedAt > a.updatedAt ? b : a;
+}
+
 // ---------- Legacy: the single task breakdown (before tasks existed) ----------
 
 export interface Breakdown {
@@ -857,6 +995,7 @@ export interface BackupData {
   done: DoneItem[];
   chain: Chain;
   tasks: TaskStore;
+  exam: ExamStore;
   timerPrefs: unknown;
   theme: ThemeChoice;
   appearance: Appearance;
@@ -879,6 +1018,7 @@ export function exportBackup(): Backup {
       done: getDoneStore(),
       chain: getChain(),
       tasks: getTaskStore(),
+      exam: getExamStore(),
       timerPrefs: read<unknown>('timer-prefs', null),
       theme: getTheme(),
       appearance: getAppearance(),
@@ -922,6 +1062,8 @@ export function parseBackup(text: string): ParseResult {
     done: pick(d.done, isDoneItem),
     chain: isChain(d.chain) ? d.chain : EMPTY_CHAIN,
     tasks: parseBackupTasks(d, (n) => (skipped += n)),
+    // Exports made before exam prep existed have none.
+    exam: normaliseExam(d.exam),
     timerPrefs: isObj(d.timerPrefs) ? d.timerPrefs : null,
     theme: d.theme === 'light' || d.theme === 'auto' ? d.theme : 'dark',
     appearance: isAppearance(d.appearance) ? d.appearance : DEFAULT_APPEARANCE,
@@ -951,6 +1093,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
     writeDone(data.done);
     setChain(data.chain);
     writeTasks(data.tasks);
+    write('exam', data.exam);
     if (data.timerPrefs) write('timer-prefs', data.timerPrefs);
     setTheme(data.theme);
     setAppearance(data.appearance);
@@ -966,6 +1109,9 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
   setChain(mergeChains(getChain(), data.chain));
 
   writeTasks(mergeTaskStores(getTaskStore(), data.tasks));
+
+  const exam = mergeExamStores(getExamStore(), data.exam);
+  if (exam.updatedAt) write('exam', exam);
 }
 
 /** Remove everything this site stores under the current schema version (including the live timer). */

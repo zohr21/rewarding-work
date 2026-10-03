@@ -5,7 +5,7 @@
 import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import { addSession, getSessions, getTask, getTasks, read, subscribe, write, type Task } from '../lib/storage';
+import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type Task } from '../lib/storage';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
@@ -468,15 +468,31 @@ function mountTimer(root: HTMLElement): () => void {
     return key ? getTasks().find((t) => t.status === 'active' && listOf(t) !== 'inbox' && t.title.toLowerCase() === key) : undefined;
   }
 
+  /** Exam chapters link the same way (src/lib/exam.ts): the session's taskId is the chapter's id. */
+  const openChapters = (): ExamChapter[] => (getExam()?.chapters ?? []).filter((ch) => !ch.done);
+
+  function chapterForLabel(label: string): ExamChapter | undefined {
+    const key = label.trim().toLowerCase();
+    return key ? openChapters().find((ch) => ch.name.toLowerCase() === key) : undefined;
+  }
+
   function renderTasks(): void {
     els.taskOptions.replaceChildren(
-      ...getTasks()
-        .filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox')
-        .map((t) => Object.assign(document.createElement('option'), { value: t.title })),
+      ...[
+        ...getTasks()
+          .filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox')
+          .map((t) => t.title),
+        ...openChapters().map((ch) => ch.name),
+      ].map((value) => Object.assign(document.createElement('option'), { value })),
     );
     const task = state.taskId ? getTask(state.taskId) : null;
-    els.taskLink.hidden = !task;
-    els.taskLink.textContent = task ? 'Linked to your task — this session will show on it.' : '';
+    const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
+    els.taskLink.hidden = !task && !chapter;
+    els.taskLink.textContent = task
+      ? 'Linked to your task — this session will show on it.'
+      : chapter
+        ? 'Linked to your exam chapter — this session counts towards it.'
+        : '';
     renderJotStatus();
   }
 
@@ -535,7 +551,7 @@ function mountTimer(root: HTMLElement): () => void {
   els.label.setAttribute('list', els.taskOptions.id);
 
   els.label.addEventListener('input', () => {
-    state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id);
+    state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id ?? chapterForLabel(els.label.value)?.id);
     write('timer', state);
     renderTasks();
   });
@@ -546,6 +562,17 @@ function mountTimer(root: HTMLElement): () => void {
     const task = getTask(wantedTask);
     if (task && state.status === 'idle' && state.phase === 'work') {
       state = T.setLabel(state, task.title, task.id);
+      write('timer', state);
+    }
+    history.replaceState(history.state, '', location.pathname);
+  }
+
+  // Arriving from "Focus" on the exam page: /timer?chapter=<id>
+  const wantedChapter = standalone ? new URLSearchParams(location.search).get('chapter') : null;
+  if (wantedChapter) {
+    const chapter = getExam()?.chapters.find((ch) => ch.id === wantedChapter);
+    if (chapter && state.status === 'idle' && state.phase === 'work') {
+      state = T.setLabel(state, chapter.name, chapter.id);
       write('timer', state);
     }
     history.replaceState(history.state, '', location.pathname);
@@ -613,6 +640,7 @@ function mountTimer(root: HTMLElement): () => void {
   ));
   c.add(subscribe('sessions', renderToday));
   c.add(subscribe('tasks', renderTasks));
+  c.add(subscribe('exam', renderTasks));
 
   // Leaving the page (client-side navigation): stop ticking and restore the tab title.
   c.add(() => {

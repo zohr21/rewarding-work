@@ -1,0 +1,987 @@
+---
+/**
+ * The exam's question bank: import multiple-choice questions from a .csv or .json file
+ * (matching the file's chapters to yours, and showing which rows can't be used before
+ * anything is added), then practise them a round at a time. The answer and its
+ * explanation show after each question; questions you flag or miss come back first.
+ */
+---
+
+<section class="card bank" data-exam-bank hidden aria-labelledby="bank-heading">
+  <h2 id="bank-heading" class="panel-title">Question bank</h2>
+  <p data-eb-count></p>
+  <p class="bank__weak" data-eb-weak hidden></p>
+  <div class="bank__practice" data-eb-practice-row hidden>
+    <label for="eb-scope" class="visually-hidden">Practise questions from</label>
+    <select id="eb-scope" class="input" data-eb-scope></select>
+    <button type="button" class="btn" data-eb-start>Practice</button>
+  </div>
+  <button type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
+  <p class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
+  <button type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
+  <p class="visually-hidden" aria-live="polite" data-eb-live></p>
+</section>
+
+<dialog class="exam-dialog popover" data-eb-import aria-labelledby="eb-import-title">
+  <div class="exam-dialog__head">
+    <div>
+      <h2 id="eb-import-title" class="exam-dialog__title">Import test questions</h2>
+      <p class="muted exam-dialog__sub">Choose a file, match its chapters to yours, then import.</p>
+    </div>
+    <button type="button" class="icon-btn" aria-label="Close" data-ei-close>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+    </button>
+  </div>
+
+  <div class="exam-dialog__body import">
+    <div class="import__file">
+      <label class="btn btn--ghost import__pick">
+        <input type="file" class="visually-hidden" accept=".csv,.json,.txt,text/csv,application/json" data-ei-file />
+        Choose a file
+      </label>
+      <span class="muted" data-ei-filename>No file chosen</span>
+    </div>
+    <p class="import__error" role="alert" data-ei-error hidden></p>
+
+    <section class="import__result" data-ei-result hidden>
+      <p class="import__counts" data-ei-counts></p>
+      <div data-ei-map-wrap>
+        <h3 class="import__heading">Match chapters</h3>
+        <p class="muted import__hint">Where the questions for each chapter named in the file should go.</p>
+        <div class="import__map" data-ei-map></div>
+      </div>
+      <details class="disclosure" data-ei-problems-wrap>
+        <summary data-ei-problems-summary></summary>
+        <div class="import__table-wrap">
+          <table class="import__table">
+            <thead>
+              <tr><th scope="col">Row</th><th scope="col">Question</th><th scope="col">Why it's skipped</th></tr>
+            </thead>
+            <tbody data-ei-problems></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <details class="disclosure import__format" open data-ei-format>
+      <summary>File format</summary>
+      <p>One question per row. The first row names the columns:</p>
+      <dl class="import__cols">
+        <div><dt>chapter</dt><dd>Optional. Matched to your chapters.</dd></div>
+        <div><dt>question</dt><dd>Required.</dd></div>
+        <div><dt>option_a … option_h</dt><dd>Two to eight options.</dd></div>
+        <div><dt>answer</dt><dd>The letter of the right option, or several: A,C</dd></div>
+        <div><dt>explanation</dt><dd>Optional. Shown after you answer.</dd></div>
+      </dl>
+      <button type="button" class="btn btn--ghost btn--small" data-ei-template>Download CSV template</button>
+      <p class="muted import__hint">JSON works too: a list of objects with the same names, where <code>options</code> is a list.</p>
+    </details>
+  </div>
+
+  <div class="exam-dialog__foot">
+    <p class="muted exam-dialog__trust">Questions stay in this browser, and in your account if you're signed in. Only import material you're allowed to use.</p>
+    <button type="button" class="btn" data-ei-go disabled>Import</button>
+  </div>
+</dialog>
+
+<dialog class="exam-dialog exam-dialog--practice popover" data-eb-practice aria-labelledby="eb-practice-title">
+  <div class="exam-dialog__head">
+    <div class="practice__top">
+      <h2 id="eb-practice-title" class="exam-dialog__title" data-ep-title>Practice</h2>
+      <div class="practice__dots" data-ep-dots aria-hidden="true"></div>
+    </div>
+    <button type="button" class="icon-btn" aria-label="End practice" data-ep-close>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+    </button>
+  </div>
+
+  <div class="exam-dialog__body practice">
+    <div class="practice__view" data-ep-question>
+      <p class="badge practice__chapter" data-ep-chapter hidden></p>
+      <p class="practice__text" data-ep-text></p>
+      <p class="muted practice__hint" data-ep-hint hidden>Choose every answer that applies, then press Check answer.</p>
+      <div class="practice__options" role="group" aria-label="Answer options" data-ep-options></div>
+      <div class="practice__why well" data-ep-why hidden>
+        <p class="practice__verdict" data-ep-verdict></p>
+        <p data-ep-explanation></p>
+      </div>
+    </div>
+    <div class="practice__view" data-ep-summary hidden>
+      <p class="practice__score" data-ep-score></p>
+      <p data-ep-summary-text></p>
+    </div>
+  </div>
+
+  <div class="exam-dialog__foot">
+    <button type="button" class="btn btn--ghost" aria-pressed="false" data-ep-again hidden>Ask me this again</button>
+    <button type="button" class="btn btn--ghost" data-ep-more hidden>Another round</button>
+    <span class="practice__spacer"></span>
+    <button type="button" class="btn" data-ep-check hidden>Check answer</button>
+    <button type="button" class="btn" data-ep-next hidden>Next question</button>
+    <button type="button" class="btn" data-ep-done hidden>Done</button>
+  </div>
+  <p class="visually-hidden" aria-live="polite" data-ep-live></p>
+</dialog>
+
+<script>
+  import { getExam, subscribe, type ExamQuestion } from '../lib/storage';
+  import {
+    CHOICE_NEW,
+    CHOICE_NONE,
+    clearQuestions,
+    guessChapter,
+    importQuestions,
+    isRight,
+    parseQuestionFile,
+    pickRound,
+    recordAnswer,
+    recordRound,
+    ROUND_SIZE,
+    setAgain,
+    TEMPLATE_CSV,
+    weakestChapter,
+    type ChapterChoice,
+    type ParsedFile,
+  } from '../lib/exam';
+  import { celebrate } from '../lib/appearance';
+  import { el } from '../lib/dom';
+  import { cleanups, onPage } from '../lib/page';
+
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const letter = (i: number) => String.fromCharCode(65 + i);
+  const CHECK_SVG =
+    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const X_SVG =
+    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>';
+
+  onPage('exam-bank', () => {
+    const root = document.querySelector<HTMLElement>('[data-exam-bank]');
+    const importDialog = document.querySelector<HTMLDialogElement>('[data-eb-import]');
+    const practiceDialog = document.querySelector<HTMLDialogElement>('[data-eb-practice]');
+    if (!root || !importDialog || !practiceDialog) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => document.querySelector<E>(s)!;
+
+    // ---------- The card ----------
+
+    const count = $<HTMLElement>('[data-eb-count]');
+    const weak = $<HTMLElement>('[data-eb-weak]');
+    const practiceRow = $<HTMLElement>('[data-eb-practice-row]');
+    const scope = $<HTMLSelectElement>('[data-eb-scope]');
+    const start = $<HTMLButtonElement>('[data-eb-start]');
+    const clear = $<HTMLButtonElement>('[data-eb-clear]');
+    const live = $<HTMLElement>('[data-eb-live]');
+    let clearArmed = false;
+
+    const announce = (node: HTMLElement, t: string) => {
+      node.textContent = '';
+      window.setTimeout(() => (node.textContent = t), 50);
+    };
+
+    const poolSize = (questions: ExamQuestion[], chapterId: string) =>
+      chapterId === 'all' ? questions.length : questions.filter((q) => q.chapterId === chapterId).length;
+
+    function renderStart(): void {
+      const n = Math.min(ROUND_SIZE, poolSize(getExam()?.questions ?? [], scope.value));
+      start.textContent = `Practice ${plural(n, 'question')}`;
+      start.disabled = n === 0;
+    }
+
+    function render(): void {
+      const exam = getExam();
+      root!.hidden = !exam;
+      if (!exam) return;
+      const n = exam.questions.length;
+      const withQuestions = exam.chapters.filter((ch) => exam.questions.some((q) => q.chapterId === ch.id));
+      count.textContent = n
+        ? `${plural(n, 'question')}${withQuestions.length ? ` across ${plural(withQuestions.length, 'chapter')}` : ''}`
+        : 'No questions yet.';
+      const worst = n ? weakestChapter(exam) : null;
+      weak.hidden = !worst;
+      if (worst) weak.textContent = `Weakest so far: ${worst.chapter.name}, ${worst.correct} of ${worst.seen} correct`;
+
+      practiceRow.hidden = clear.hidden = n === 0;
+      const before = scope.value || 'all';
+      const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
+      scope.replaceChildren(option('all', `All chapters (${n})`), ...withQuestions.map((ch) => option(ch.id, `${ch.name} (${poolSize(exam.questions, ch.id)})`)));
+      scope.value = [...scope.options].some((o) => o.value === before) ? before : 'all';
+      scope.hidden = withQuestions.length === 0;
+      renderStart();
+    }
+
+    scope.addEventListener('change', renderStart);
+
+    // Press twice to remove: the first press says what will happen.
+    function disarmClear(): void {
+      clearArmed = false;
+      clear.textContent = 'Remove all questions';
+    }
+    clear.addEventListener('click', () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clear.textContent = 'Press again to remove them all';
+        announce(live, 'Press again to remove every question and your practice results.');
+        window.setTimeout(disarmClear, 6000);
+        return;
+      }
+      disarmClear();
+      clearQuestions();
+      announce(live, 'All questions removed.');
+    });
+
+    // ---------- Import ----------
+
+    const file = $<HTMLInputElement>('[data-ei-file]');
+    const fileName = $<HTMLElement>('[data-ei-filename]');
+    const error = $<HTMLElement>('[data-ei-error]');
+    const result = $<HTMLElement>('[data-ei-result]');
+    const counts = $<HTMLElement>('[data-ei-counts]');
+    const mapWrap = $<HTMLElement>('[data-ei-map-wrap]');
+    const map = $<HTMLElement>('[data-ei-map]');
+    const problemsWrap = $<HTMLDetailsElement>('[data-ei-problems-wrap]');
+    const problemsSummary = $<HTMLElement>('[data-ei-problems-summary]');
+    const problems = $<HTMLElement>('[data-ei-problems]');
+    const format = $<HTMLDetailsElement>('[data-ei-format]');
+    const go = $<HTMLButtonElement>('[data-ei-go]');
+    let parsed: Extract<ParsedFile, { ok: true }> | null = null;
+    const choices = new Map<string, ChapterChoice>();
+
+    function resetImport(): void {
+      parsed = null;
+      choices.clear();
+      file.value = '';
+      fileName.textContent = 'No file chosen';
+      error.hidden = result.hidden = true;
+      format.open = true;
+      go.disabled = true;
+      go.textContent = 'Import';
+    }
+
+    function renderImport(): void {
+      const exam = getExam();
+      if (!parsed || !exam) return;
+      const ready = parsed.questions.length;
+      result.hidden = false;
+      format.open = false;
+      counts.replaceChildren(el('span', 'badge import__ready', `${ready} ready`));
+      if (parsed.problems.length) counts.append(' ', el('span', 'badge import__skipped', `${parsed.problems.length} skipped`));
+
+      mapWrap.hidden = parsed.chapters.length === 0;
+      map.replaceChildren(
+        ...parsed.chapters.map((label) => {
+          const n = parsed!.questions.filter((q) => q.chapter === label).length;
+          const row = el('div', 'import__row');
+          const from = el('p', 'import__from');
+          from.append(el('strong', '', label), el('span', 'muted', ` · ${plural(n, 'question')}`));
+          const select = el('select', 'input');
+          select.setAttribute('aria-label', `Your chapter for “${label}”`);
+          const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
+          select.append(
+            ...exam.chapters.map((ch) => option(ch.id, ch.name)),
+            option(CHOICE_NEW, `Add “${label}” as a new chapter`),
+            option(CHOICE_NONE, 'No chapter'),
+          );
+          select.value = choices.get(label)!;
+          select.addEventListener('change', () => choices.set(label, select.value));
+          row.append(from, select);
+          return row;
+        }),
+      );
+
+      problemsWrap.hidden = parsed.problems.length === 0;
+      problemsSummary.textContent = `${plural(parsed.problems.length, 'row')} can't be used`;
+      problems.replaceChildren(
+        ...parsed.problems.slice(0, 200).map((p) => {
+          const tr = el('tr');
+          tr.append(el('td', 'muted', String(p.row)), el('td', '', p.text || '(empty)'), el('td', 'import__reason', p.reason));
+          return tr;
+        }),
+      );
+
+      go.disabled = ready === 0;
+      go.textContent = ready ? `Import ${plural(ready, 'question')}` : 'Nothing to import';
+    }
+
+    file.addEventListener('change', async () => {
+      const picked = file.files?.[0];
+      if (!picked) return;
+      const exam = getExam();
+      parsed = null;
+      choices.clear();
+      result.hidden = error.hidden = true;
+      go.disabled = true;
+      fileName.textContent = picked.name;
+      let text: string;
+      try {
+        if (picked.size > 5_000_000) throw new Error('too big');
+        text = await picked.text();
+      } catch {
+        error.textContent = "This file couldn't be read. It may be too large (the limit is 5 MB).";
+        error.hidden = false;
+        return;
+      }
+      const outcome = parseQuestionFile(text, exam?.questions ?? []);
+      if (!outcome.ok) {
+        error.textContent = outcome.error;
+        error.hidden = false;
+        return;
+      }
+      parsed = outcome;
+      outcome.chapters.forEach((label) => choices.set(label, guessChapter(label, exam?.chapters ?? [])));
+      renderImport();
+    });
+
+    $<HTMLButtonElement>('[data-ei-template]').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([TEMPLATE_CSV], { type: 'text/csv' }));
+      a.download = 'exam-questions-template.csv';
+      document.body.append(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    go.addEventListener('click', () => {
+      if (!parsed) return;
+      const added = importQuestions(parsed.questions, choices);
+      importDialog.close();
+      announce(live, `Imported ${plural(added, 'question')}.`);
+    });
+
+    $<HTMLButtonElement>('[data-eb-import-open]').addEventListener('click', () => {
+      resetImport();
+      importDialog.showModal();
+    });
+
+    // ---------- Practice ----------
+
+    const title = $<HTMLElement>('[data-ep-title]');
+    const dots = $<HTMLElement>('[data-ep-dots]');
+    const questionView = $<HTMLElement>('[data-ep-question]');
+    const summaryView = $<HTMLElement>('[data-ep-summary]');
+    const chapter = $<HTMLElement>('[data-ep-chapter]');
+    const text = $<HTMLElement>('[data-ep-text]');
+    const hint = $<HTMLElement>('[data-ep-hint]');
+    const options = $<HTMLElement>('[data-ep-options]');
+    const why = $<HTMLElement>('[data-ep-why]');
+    const verdict = $<HTMLElement>('[data-ep-verdict]');
+    const explanation = $<HTMLElement>('[data-ep-explanation]');
+    const score = $<HTMLElement>('[data-ep-score]');
+    const summaryText = $<HTMLElement>('[data-ep-summary-text]');
+    const again = $<HTMLButtonElement>('[data-ep-again]');
+    const more = $<HTMLButtonElement>('[data-ep-more]');
+    const check = $<HTMLButtonElement>('[data-ep-check]');
+    const next = $<HTMLButtonElement>('[data-ep-next]');
+    const done = $<HTMLButtonElement>('[data-ep-done]');
+    const practiceLive = $<HTMLElement>('[data-ep-live]');
+
+    let round: ExamQuestion[] = [];
+    let index = 0;
+    let picked = new Set<number>();
+    let answered = false;
+    /** Right or wrong for each question answered so far. */
+    let results: boolean[] = [];
+    /** The round has been added to the exam's practice rounds. */
+    let saved = false;
+
+    function saveRound(): void {
+      if (saved || !results.length) return;
+      saved = true;
+      recordRound(results.length, results.filter(Boolean).length);
+    }
+
+    function renderDots(): void {
+      dots.replaceChildren(
+        ...round.map((_, i) => el('span', i < results.length ? (results[i] ? 'is-right' : 'is-miss') : i === index ? 'is-now' : '')),
+      );
+    }
+
+    function renderQuestion(): void {
+      const q = round[index]!;
+      const multi = q.answer.length > 1;
+      const exam = getExam();
+      questionView.hidden = false;
+      summaryView.hidden = true;
+      title.textContent = `Question ${index + 1} of ${round.length}`;
+      renderDots();
+      const name = exam?.chapters.find((ch) => ch.id === q.chapterId)?.name;
+      chapter.hidden = !name;
+      chapter.textContent = name ?? '';
+      text.textContent = q.text;
+      hint.hidden = !multi || answered;
+
+      options.replaceChildren(
+        ...q.options.map((label, i) => {
+          const isAnswer = q.answer.includes(i);
+          const isPicked = picked.has(i);
+          const b = el('button', 'practice__option');
+          b.type = 'button';
+          b.append(el('span', 'practice__letter', letter(i)), el('span', 'practice__label', label));
+          if (answered) {
+            b.disabled = true;
+            if (isAnswer) b.classList.add('is-answer');
+            else if (isPicked) b.classList.add('is-miss');
+            if (isAnswer || isPicked) {
+              const mark = el('span', 'practice__mark');
+              mark.innerHTML = isAnswer ? CHECK_SVG : X_SVG;
+              mark.append(isAnswer ? (isPicked ? 'Your answer, correct' : 'Correct answer') : 'Your answer');
+              b.append(mark);
+            }
+          } else {
+            b.setAttribute('aria-pressed', String(isPicked));
+            b.addEventListener('click', () => {
+              if (multi) {
+                if (picked.has(i)) picked.delete(i);
+                else picked.add(i);
+                renderQuestion();
+                (options.children[i] as HTMLElement).focus();
+              } else {
+                picked = new Set([i]);
+                answer();
+              }
+            });
+          }
+          return b;
+        }),
+      );
+
+      why.hidden = !answered;
+      if (answered) {
+        const right = results[index]!;
+        verdict.textContent = right ? 'Correct.' : 'Not quite.';
+        verdict.classList.toggle('is-right', right);
+        explanation.textContent = q.explanation ?? '';
+        explanation.hidden = !q.explanation;
+      }
+      again.hidden = next.hidden = !answered;
+      again.setAttribute('aria-pressed', 'false');
+      check.hidden = answered || !multi;
+      check.disabled = picked.size === 0;
+      more.hidden = done.hidden = true;
+      next.textContent = index === round.length - 1 ? 'See results' : 'Next question';
+    }
+
+    function answer(): void {
+      const q = round[index]!;
+      const right = isRight(q, [...picked]);
+      answered = true;
+      results.push(right);
+      recordAnswer(q.id, right);
+      renderQuestion();
+      next.focus();
+      announce(
+        practiceLive,
+        `${right ? 'Correct.' : `Not quite. The answer is ${q.answer.map(letter).join(' and ')}.`} ${q.explanation ?? ''}`,
+      );
+    }
+
+    function renderSummary(): void {
+      saveRound();
+      const correct = results.filter(Boolean).length;
+      questionView.hidden = true;
+      summaryView.hidden = false;
+      title.textContent = 'Round finished';
+      index = round.length;
+      renderDots();
+      score.textContent = `${correct} of ${round.length} correct`;
+      const exam = getExam();
+      const misses = new Map<string, number>();
+      round.forEach((q, i) => {
+        const name = exam?.chapters.find((ch) => ch.id === q.chapterId)?.name;
+        if (!results[i] && name) misses.set(name, (misses.get(name) ?? 0) + 1);
+      });
+      const top = [...misses.entries()].sort((a, b) => b[1] - a[1])[0];
+      summaryText.textContent =
+        correct === round.length
+          ? 'Every one right.'
+          : top
+            ? `Most misses were in ${top[0]} (${top[1]}). Missed questions come back first next time.`
+            : 'Missed questions come back first next time.';
+      again.hidden = check.hidden = next.hidden = true;
+      more.hidden = done.hidden = false;
+      done.focus();
+      if (correct === round.length) celebrate();
+    }
+
+    function startRound(): void {
+      const exam = getExam();
+      if (!exam) return;
+      round = pickRound(exam, scope.value || 'all');
+      if (!round.length) return;
+      index = 0;
+      picked = new Set();
+      answered = false;
+      results = [];
+      saved = false;
+      renderQuestion();
+      if (!practiceDialog!.open) practiceDialog!.showModal();
+    }
+
+    start.addEventListener('click', startRound);
+    more.addEventListener('click', startRound);
+    check.addEventListener('click', answer);
+    done.addEventListener('click', () => practiceDialog.close());
+    next.addEventListener('click', () => {
+      if (index >= round.length - 1) return renderSummary();
+      index++;
+      picked = new Set();
+      answered = false;
+      renderQuestion();
+      (options.firstElementChild as HTMLElement | null)?.focus();
+    });
+    again.addEventListener('click', () => {
+      const on = again.getAttribute('aria-pressed') !== 'true';
+      again.setAttribute('aria-pressed', String(on));
+      setAgain(round[index]!.id, on);
+    });
+    // Ending part-way still counts the questions answered.
+    practiceDialog.addEventListener('close', saveRound);
+
+    for (const [dialog, close] of [
+      [importDialog, '[data-ei-close]'],
+      [practiceDialog, '[data-ep-close]'],
+    ] as const) {
+      $<HTMLButtonElement>(close).addEventListener('click', () => dialog.close());
+      // A click on the backdrop (the dialog element itself, outside its content) closes it.
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) dialog.close();
+      });
+      c.add(() => dialog.close());
+    }
+
+    render();
+    c.add(subscribe('exam', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .bank {
+    display: grid;
+    gap: var(--space-3);
+    align-content: start;
+  }
+
+  .bank[hidden],
+  .bank__practice[hidden],
+  .bank__weak[hidden],
+  .bank__clear[hidden] {
+    display: none;
+  }
+
+  .bank .panel-title {
+    margin-bottom: 0;
+  }
+
+  .bank__weak {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+    font-size: var(--text-sm);
+  }
+
+  .bank__practice {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .bank__note {
+    margin-top: calc(-1 * var(--space-1));
+    font-size: var(--text-xs);
+  }
+
+  .bank__clear {
+    justify-self: start;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cat-rest);
+    font-size: var(--text-sm);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* Dialogs: same build as the export dialog (head, scrolling body, foot). */
+  .exam-dialog {
+    width: min(46rem, calc(100% - 2rem));
+    max-height: calc(100dvh - 2rem);
+    margin: auto;
+    padding: 0;
+    color: var(--color-text);
+    overflow: hidden;
+  }
+
+  .exam-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .exam-dialog::backdrop {
+    background: rgb(0 0 0 / 0.55);
+    backdrop-filter: blur(3px);
+  }
+
+  .exam-dialog__head,
+  .exam-dialog__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .exam-dialog__head {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .exam-dialog__foot {
+    flex-wrap: wrap;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .exam-dialog__title {
+    font-size: var(--text-xl);
+  }
+
+  .exam-dialog__sub,
+  .exam-dialog__trust {
+    font-size: var(--text-sm);
+  }
+
+  .exam-dialog__trust {
+    flex: 1 1 16rem;
+  }
+
+  .exam-dialog__body {
+    display: grid;
+    gap: var(--space-4);
+    align-content: start;
+    min-height: 0;
+    padding: var(--space-5);
+    overflow-y: auto;
+  }
+
+  .exam-dialog [hidden] {
+    display: none;
+  }
+
+  /* Import */
+  .import__file {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+  }
+
+  .import__pick:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .import__error {
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+    font-weight: 600;
+  }
+
+  .import__result {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .import__heading {
+    font-size: var(--text-lg);
+  }
+
+  .import__hint {
+    font-size: var(--text-sm);
+  }
+
+  .import__map {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .import :global(.import__ready) {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .import :global(.import__skipped) {
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+  }
+
+  .import :global(.import__row) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .import :global(.import__from) {
+    flex: 1 1 10rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .import :global(.import__row .input) {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .import__table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .import__table {
+    width: 100%;
+    min-width: 30rem;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    text-align: left;
+  }
+
+  .import__table th,
+  .import__table :global(td) {
+    padding: var(--space-2) var(--space-3);
+    vertical-align: top;
+  }
+
+  .import__table th {
+    background: var(--well-bg);
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+
+  .import__table :global(tr + tr td) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .import__table :global(.import__reason) {
+    color: var(--cat-reward);
+    font-weight: 600;
+  }
+
+  .import__format {
+    font-size: var(--text-sm);
+  }
+
+  .import__format > summary {
+    font-weight: 700;
+  }
+
+  .import__format > * + * {
+    margin-top: var(--space-3);
+  }
+
+  .import__cols {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .import__cols > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .import__cols dt {
+    flex: none;
+    width: 10.5rem;
+    color: var(--color-accent);
+    font-family: var(--font-mono);
+  }
+
+  .import__cols dd {
+    flex: 1 1 12rem;
+    color: var(--color-text-muted);
+  }
+
+  /* Practice */
+  .practice__top {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .practice__dots {
+    display: flex;
+    gap: 3px;
+  }
+
+  .practice__dots :global(span) {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--heat-0);
+  }
+
+  .practice__dots :global(.is-right) {
+    background: var(--color-accent);
+  }
+
+  /* A miss is darker and thinner, so it isn't told apart by colour alone. */
+  .practice__dots :global(.is-miss) {
+    height: 4px;
+    margin-block: 2px;
+    background: var(--cat-rest);
+  }
+
+  .practice__dots :global(.is-now) {
+    background: var(--color-border-strong);
+  }
+
+  .practice__view {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .practice__chapter {
+    justify-self: start;
+    background: var(--cat-reward-bg);
+    color: var(--cat-reward);
+  }
+
+  .practice__text {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 500;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .practice__hint {
+    font-size: var(--text-sm);
+  }
+
+  .practice__options {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .practice :global(.practice__option) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .practice :global(.practice__option:hover:not(:disabled)),
+  .practice :global(.practice__option[aria-pressed='true']) {
+    border-color: var(--color-accent);
+  }
+
+  .practice :global(.practice__option:disabled) {
+    cursor: default;
+    color: var(--color-text-muted);
+    background: none;
+  }
+
+  .practice :global(.practice__option.is-answer) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+
+  .practice :global(.practice__option.is-miss) {
+    border-style: dashed;
+    border-color: var(--cat-rest);
+    color: var(--color-text);
+  }
+
+  .practice :global(.practice__letter) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--color-surface-2);
+    font-weight: 700;
+  }
+
+  .practice :global(.practice__option[aria-pressed='true'] .practice__letter),
+  .practice :global(.is-answer .practice__letter) {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .practice :global(.practice__label) {
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .practice :global(.practice__mark) {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .practice :global(.is-answer .practice__mark) {
+    color: var(--color-accent);
+  }
+
+  .practice :global(.is-miss .practice__mark) {
+    color: var(--cat-rest);
+  }
+
+  .practice__why {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .practice__verdict {
+    font-weight: 700;
+    color: var(--cat-rest);
+  }
+
+  .practice__verdict:global(.is-right) {
+    color: var(--color-accent);
+  }
+
+  .practice__score {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 700;
+  }
+
+  .practice__spacer {
+    flex: 1;
+  }
+
+  [data-ep-again][aria-pressed='true'] {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+</style>
