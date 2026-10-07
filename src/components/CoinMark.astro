@@ -1,0 +1,43 @@
+---
+/**
+ * The brand mark: a check struck on a coin, an accent face over a solid edge.
+ * Follows the theme through the accent tokens. The same shapes are drawn in
+ * public/favicon.svg and scripts/make-icons.mjs.
+ */
+interface Props {
+  /** Width and height in px. */
+  size?: number;
+  class?: string;
+}
+
+const { size = 36, class: className } = Astro.props;
+---
+
+<svg class:list={['coin-mark', className]} viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+  <path class="coin-mark__edge" d="M6 29a26 26 0 0 1 52 0v6a26 26 0 0 1-52 0z"></path>
+  <circle class="coin-mark__face" cx="32" cy="29" r="26"></circle>
+  <circle class="coin-mark__rim" cx="32" cy="29" r="24.75" fill="none" stroke-width="1.5"></circle>
+  <path class="coin-mark__check" d="M21.5 29.5l7.5 7.5 14-15.5" fill="none" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+
+<style>
+  .coin-mark {
+    flex-shrink: 0;
+  }
+
+  .coin-mark__edge {
+    fill: var(--accent-edge);
+  }
+
+  .coin-mark__face {
+    fill: var(--color-accent);
+  }
+
+  .coin-mark__rim {
+    stroke: rgb(255 255 255 / 0.35);
+  }
+
+  .coin-mark__check {
+    stroke: var(--color-on-accent);
+  }
+</style>
