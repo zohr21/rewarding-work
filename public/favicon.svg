@@ -1,4 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#2f6b4f"/>
-  <path d="M9.5 16.5l4.5 4.5 8.5-9" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .edge { fill: #1b4531; }
+    .face { fill: #2f6b4f; }
+    .check { stroke: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .edge { fill: #2e7a50; }
+      .face { fill: #84dba6; }
+      .check { stroke: #07170f; }
+    }
+  </style>
+  <path class="edge" d="M5 27a27 27 0 0 1 54 0v8a27 27 0 0 1-54 0z"/>
+  <circle class="face" cx="32" cy="27" r="27"/>
+  <path class="check" d="M20.5 27.5l8 8 15-16.5" fill="none" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

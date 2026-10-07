@@ -2,7 +2,9 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthPanel from '../components/AuthPanel.astro';
 import PasswordField from '../components/PasswordField.astro';
+import CoinMark from '../components/CoinMark.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 ---
 
@@ -27,11 +29,24 @@ import { url } from '../lib/paths';
       )
     }
 
-    <p class="muted" data-view="loading" hidden={!ACCOUNTS_ENABLED}>Loading your account…</p>
+    <div class="account__loading" data-view="loading" hidden={!ACCOUNTS_ENABLED}>
+      <span class="coin-loader" aria-hidden="true">
+        <svg class="coin-loader__ring" viewBox="0 0 120 120" width="96" height="96">
+          <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
+          <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
+        </svg>
+        <CoinMark size={54} />
+      </span>
+      <p class="muted">Loading your account…</p>
+    </div>
 
     <!-- Signed out -->
     <div class="account__grid" data-view="signed-out" hidden>
       <section class="card" aria-labelledby="acc-signin-h">
+        <p class="account__brand">
+          <CoinMark size={64} />
+          <span>{SITE.name}</span>
+        </p>
         <h2 id="acc-signin-h" class="panel-title">Sign in or create an account</h2>
         <AuthPanel id="acc" />
       </section>
@@ -190,6 +205,61 @@ import { url } from '../lib/paths';
 
   .account :global([hidden]) {
     display: none !important;
+  }
+
+  /* The coin inside a turning ring. */
+  .account__loading {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-7);
+  }
+
+  .coin-loader {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 96px;
+    height: 96px;
+  }
+
+  .coin-loader__ring {
+    position: absolute;
+    inset: 0;
+    animation: coin-loader-turn 1.1s linear infinite;
+  }
+
+  .coin-loader__track {
+    stroke: var(--color-surface-2);
+  }
+
+  .coin-loader__arc {
+    stroke: var(--color-accent);
+  }
+
+  @keyframes coin-loader-turn {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .coin-loader__ring {
+      animation: none;
+    }
+  }
+
+  /* The stacked lockup above the sign-in form. */
+  .account__brand {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-5);
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: var(--text-xl);
+    letter-spacing: -0.035em;
+    line-height: 1;
   }
 
   .account__grid {
