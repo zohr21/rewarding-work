@@ -114,7 +114,7 @@ const current = Astro.url.pathname;
     Small screens: the header follows you down the page. Once scrolled it folds to one
     row, the coin alone and the nav; the tools come back at the top of the page.
   */
-  @media (max-width: 39.99rem) {
+  @media (max-width: 51.99rem) {
     .site-header {
       position: sticky;
       top: 0;
@@ -202,8 +202,17 @@ const current = Astro.url.pathname;
     gap: var(--space-2);
   }
 
+  /* One row needs about 960px with the tool labels, so until there's room the tools are icons only. */
+  @media (min-width: 52rem) and (max-width: 63.99rem) {
+    .site-header__tools :global(.sound__text),
+    .site-header__tools :global(.appearance__text),
+    .site-header__tools :global(.account-btn__text) {
+      display: none;
+    }
+  }
+
   /* Wider screens: everything on one row. */
-  @media (min-width: 40rem) {
+  @media (min-width: 52rem) {
     .site-header__inner {
       grid-template-columns: auto 1fr auto;
       grid-template-areas: 'brand nav toggle';
