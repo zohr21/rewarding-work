@@ -2,7 +2,8 @@
 /**
  * "Done" list: log finished tasks. One tap to add from today's timer labels,
  * or type and press Enter. Each new item gets a small check-off animation.
- * Long groups show their newest few with "Show more"; removing offers Undo.
+ * Groups fold away (older ones start closed) and the list scrolls inside a fixed-height
+ * box. Long groups show their newest few with "Show more"; removing offers Undo.
  */
 ---
 
@@ -21,7 +22,12 @@
     <div class="done__chips" data-done-chips></div>
   </div>
 
-  <div data-done-groups></div>
+  <div class="done__bar" data-done-bar hidden>
+    <p class="muted" data-done-total></p>
+    <button type="button" class="btn btn--ghost btn--small" data-done-all></button>
+  </div>
+  <!-- Fixed height: a long list scrolls in here instead of stretching the page. -->
+  <div class="done__well" data-done-groups hidden></div>
   <p class="muted done__empty" data-done-empty>Nothing logged yet. Small things count.</p>
   <p class="visually-hidden" aria-live="polite" data-done-live></p>
 </section>
@@ -34,8 +40,11 @@
   import { cleanups, onPage } from '../lib/page';
 
   /** Items a group shows before "Show more", and how many more each click reveals. */
-  const PREVIEW = 5;
+  const PREVIEW = 10;
   const PAGE = 20;
+
+  const CHEVRON_SVG =
+    '<svg class="done__chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="12" r="11"></circle><path d="M7 12.5l3.2 3.2L17 9"></path></svg>';
@@ -60,6 +69,14 @@
       const removing = new Set<string>();
       /** How many items each group shows, by group title; groups not listed show PREVIEW. */
       const shown = new Map<string, number>();
+      const bar = root.querySelector<HTMLElement>('[data-done-bar]')!;
+      const totalEl = root.querySelector<HTMLElement>('[data-done-total]')!;
+      const allBtn = root.querySelector<HTMLButtonElement>('[data-done-all]')!;
+      /** Groups opened or closed by hand, by group title; otherwise only the newest group is open. */
+      const open = new Map<string, boolean>();
+      /** Titles of the groups on show and whether any is open, for "Collapse all". */
+      let titles: string[] = [];
+      let anyOpen = false;
 
       function announce(text: string): void {
         live.textContent = '';
@@ -133,18 +150,46 @@
           ['Before that', items.filter((i) => i.doneAt < week), true],
         ];
 
+        titles = buckets.filter(([, list]) => list.length).map(([title]) => title);
+        const isOpen = (title: string) => open.get(title) ?? title === titles[0];
+        anyOpen = titles.some(isOpen);
+        bar.hidden = groups.hidden = items.length === 0;
+        totalEl.textContent = `${items.length} logged`;
+        allBtn.textContent = anyOpen ? 'Collapse all' : 'Expand all';
+
         const frag = document.createDocumentFragment();
         for (const [title, list, showDay] of buckets) {
           if (!list.length) continue;
+          const expanded = isOpen(title);
           const h = document.createElement('h3');
           h.className = 'done__group';
-          h.textContent = `${title} · ${list.length}`;
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = 'done__toggle';
+          toggle.dataset.toggle = title;
+          toggle.setAttribute('aria-expanded', String(expanded));
+          toggle.innerHTML = CHEVRON_SVG;
+          const name = document.createElement('span');
+          name.className = 'done__group-name';
+          name.textContent = title;
+          const n = document.createElement('span');
+          n.className = 'done__count';
+          n.textContent = String(list.length);
+          toggle.append(name, n);
+          toggle.addEventListener('click', () => {
+            open.set(title, !expanded);
+            render();
+            groups.querySelector<HTMLElement>(`[data-toggle="${title}"]`)?.focus();
+          });
+          h.append(toggle);
+          frag.append(h);
+          if (!expanded) continue;
           const ul = document.createElement('ul');
           ul.className = 'done__items';
           ul.dataset.group = title;
           const limit = shown.get(title) ?? PREVIEW;
           ul.append(...list.slice(0, limit).map((i) => renderItem(i, showDay)));
-          frag.append(h, ul);
+          frag.append(ul);
 
           const more = list.length - limit;
           if (more > 0 || limit > PREVIEW) {
@@ -200,6 +245,12 @@
           }),
         );
       }
+
+      allBtn.addEventListener('click', () => {
+        const next = !anyOpen;
+        titles.forEach((t) => open.set(t, next));
+        render();
+      });
 
       form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -270,17 +321,97 @@
     border-style: solid;
   }
 
-  .done :global(.done__group) {
-    margin-top: var(--space-5);
+  .done__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-top: var(--space-4);
     font-size: var(--text-sm);
-    color: var(--color-text-muted);
+  }
+
+  .done__bar[hidden],
+  .done__well[hidden] {
+    display: none;
+  }
+
+  .done__well {
+    max-height: min(30rem, 70vh);
+    margin-top: var(--space-2);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  /* Group headers stay in view while their items scroll under them. */
+  .done :global(.done__group) {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    max-width: none;
+    font-size: var(--text-sm);
+    background: var(--color-surface-solid);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .done :global(.done__group:last-child) {
+    border-bottom: 0;
+  }
+
+  .done :global(.done__toggle) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
     font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .done :global(.done__toggle:hover) {
+    background: var(--color-surface-2);
+  }
+
+  .done :global(.done__chevron) {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .done :global(.done__toggle[aria-expanded='true'] .done__chevron) {
+    transform: rotate(90deg);
+  }
+
+  .done :global(.done__group-name) {
+    flex: 1;
+  }
+
+  .done :global(.done__count) {
+    min-width: 1.75rem;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    text-align: center;
+    font-variant-numeric: tabular-nums;
   }
 
   .done :global(.done__items) {
     list-style: none;
-    padding: 0;
-    margin-top: var(--space-2);
+    padding: 0 var(--space-1) 0 var(--space-3);
+  }
+
+  .done :global(.done__item:last-child) {
+    border-bottom: 0;
   }
 
   .done :global(.done__item) {
@@ -353,7 +484,7 @@
   }
 
   .done :global(.done__more) {
-    margin-top: var(--space-2);
+    margin: var(--space-2) var(--space-3) var(--space-3);
   }
 
   .done__empty {

@@ -16,7 +16,7 @@
 
 <script>
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
-  import { allProgress, TIER_NAMES, type TrackProgress } from '../lib/rewards';
+  import { allProgress, chainInput, TIER_NAMES, type TrackProgress } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
   import { cleanups, onPage } from '../lib/page';
 
@@ -98,8 +98,7 @@
     document.querySelectorAll<HTMLElement>('[data-reward-tiers]').forEach((root) => {
       const list = root.querySelector<HTMLElement>('[data-tiers-list]')!;
       const render = () => {
-        const chain = getChain();
-        const progress = allProgress({ sessions: getSessions(), done: getDone(), chainDays: chain.days, pastBests: chain.pastBests });
+        const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
         list.replaceChildren(...progress.map(renderTrack));
       };
       render();

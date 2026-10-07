@@ -18,7 +18,7 @@ import { url } from '../lib/paths';
 
 <script>
   import { getChain, getDone, getSessions, onWrite, subscribe, type StoreName } from '../lib/storage';
-  import { earnedTierIds, tierInfo, TIER_NAMES, type TierInfo } from '../lib/rewards';
+  import { chainInput, earnedTierIds, tierInfo, TIER_NAMES, type TierInfo } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
   import { armAudioUnlock, cueVolume, playAchievement } from '../lib/timer/cues';
   import { celebrate } from '../lib/appearance';
@@ -34,8 +34,7 @@ import { url } from '../lib/paths';
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
   const earnedNow = () => {
-    const chain = getChain();
-    return earnedTierIds({ sessions: getSessions(), done: getDone(), chainDays: chain.days, pastBests: chain.pastBests });
+    return earnedTierIds({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
   };
   const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

@@ -35,7 +35,7 @@ const progressUrl = url('/progress');
 </section>
 
 <script>
-  import { getChain, getSessions, getTasks, subscribe } from '../lib/storage';
+  import { getChains, getSessions, getTasks, subscribe } from '../lib/storage';
   import { formatFocus, todayTasks, TODAY_SOFT_MAX } from '../lib/tasks';
   import { chainStats, minutesByDay } from '../lib/stats';
   import { addDays, dayKey, startOfDay, startOfWeek } from '../lib/dates';
@@ -122,7 +122,8 @@ const progressUrl = url('/progress');
         bars.innerHTML = weekBars(minutes, todayIndex, monday);
 
         // Chain
-        const days = getChain().days;
+        // With several chains, the glance follows the first one.
+        const days = getChains()[0]?.days ?? [];
         const s = chainStats(days, now);
         const set = new Set(days);
         const start = addDays(startOfDay(now), -13);
