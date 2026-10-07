@@ -8,7 +8,7 @@
  * ever, so a missed day never takes a tier away.
  */
 import { addDays, dayKey, fromDayKey, type DayKey } from './dates';
-import type { DoneItem, FocusSession } from './storage';
+import type { Chain, DoneItem, FocusSession } from './storage';
 
 export const TIER_NAMES = ['Seedling', 'Sprout', 'Sapling', 'Tree', 'Grove'] as const;
 
@@ -111,6 +111,14 @@ function series(input: RewardInput, id: TrackId): Point[] {
       return points;
     }
   }
+}
+
+/** The chain part of a RewardInput. The best run counts across every chain, so further chains go in as records. */
+export function chainInput(chain: Chain): Pick<RewardInput, 'chainDays' | 'pastBests'> {
+  return {
+    chainDays: chain.days,
+    pastBests: [...(chain.pastBests ?? []), ...(chain.more ?? []).flatMap((m) => streakRecords(m.days))],
+  };
 }
 
 /** [day, length] for each day the chain's best run grew, oldest first. */

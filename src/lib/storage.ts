@@ -501,6 +501,18 @@ export function mergeDoneLists(a: DoneItem[], b: DoneItem[]): DoneItem[] {
 
 // ---------- Chain ----------
 
+/** A chain beyond the first one. */
+export interface ExtraChain {
+  id: string;
+  habit: string;
+  /** Local YYYY-MM-DD keys of days marked done. */
+  days: string[];
+  /** Index into the chain colours (ChainTracker.astro). */
+  color?: number;
+  /** When it was deleted (epoch ms). Kept as an empty marker, so it doesn't come back from another device. */
+  deletedAt?: number;
+}
+
 export interface Chain {
   habit: string;
   /** Local YYYY-MM-DD keys of days marked done. */
@@ -515,10 +527,34 @@ export interface Chain {
    * Kept so the Best chain tier (which counts your best run ever) survives a delete.
    */
   pastBests?: [string, number][];
+  /** Further chains. The first chain stays in `habit`/`days`, as it was before there could be several. */
+  more?: ExtraChain[];
 }
+
+/** One chain as the tracker shows it: the first chain (id MAIN_CHAIN) or one of `more`. */
+export interface ChainEntry {
+  id: string;
+  habit: string;
+  days: string[];
+  color: number;
+}
+
+export const MAIN_CHAIN = 'main';
+export const MAX_CHAINS = 8;
+/** How many chain colours there are to hand out. */
+export const CHAIN_COLORS = 5;
 
 const isBestRecord = (v: unknown): v is [string, number] =>
   Array.isArray(v) && v.length === 2 && isDayKey(v[0]) && typeof v[1] === 'number';
+
+const isExtraChain = (v: unknown): v is ExtraChain =>
+  isObj(v) &&
+  typeof v.id === 'string' &&
+  typeof v.habit === 'string' &&
+  Array.isArray(v.days) &&
+  v.days.every(isDayKey) &&
+  (v.color === undefined || typeof v.color === 'number') &&
+  (v.deletedAt === undefined || typeof v.deletedAt === 'number');
 
 /** Records from both lists, oldest first, without repeats. */
 function joinBests(a: [string, number][] = [], b: [string, number][] = []): [string, number][] {
@@ -535,36 +571,108 @@ export function isChain(v: unknown): v is Chain {
     Array.isArray(v.days) &&
     v.days.every(isDayKey) &&
     (v.resetAt === undefined || typeof v.resetAt === 'number') &&
-    (v.pastBests === undefined || (Array.isArray(v.pastBests) && v.pastBests.every(isBestRecord)))
+    (v.pastBests === undefined || (Array.isArray(v.pastBests) && v.pastBests.every(isBestRecord))) &&
+    (v.more === undefined || (Array.isArray(v.more) && v.more.every(isExtraChain)))
   );
 }
 
-export function getChain(): Chain {
-  const c = read<Chain>('chain', EMPTY_CHAIN, isChain);
+const cleanHabit = (habit: string) => habit.trim().slice(0, 80);
+const cleanDays = (days: string[]) => [...new Set(days)].sort();
+
+function cleanChain(c: Chain): Chain {
+  const more = (c.more ?? []).map(
+    (m): ExtraChain =>
+      m.deletedAt
+        ? { id: m.id, habit: '', days: [], deletedAt: m.deletedAt }
+        : { id: m.id, habit: cleanHabit(m.habit), days: cleanDays(m.days), ...(m.color === undefined ? {} : { color: m.color }) },
+  );
   return {
-    habit: c.habit,
-    days: [...new Set(c.days)].sort(),
+    habit: cleanHabit(c.habit),
+    days: cleanDays(c.days),
     ...(c.resetAt ? { resetAt: c.resetAt } : {}),
     ...(c.pastBests?.length ? { pastBests: c.pastBests } : {}),
+    ...(more.length ? { more } : {}),
   };
 }
 
+export function getChain(): Chain {
+  return cleanChain(read<Chain>('chain', EMPTY_CHAIN, isChain));
+}
+
 export function setChain(chain: Chain): void {
-  write('chain', {
-    habit: chain.habit.trim().slice(0, 80),
-    days: [...new Set(chain.days)].sort(),
-    ...(chain.resetAt ? { resetAt: chain.resetAt } : {}),
-    ...(chain.pastBests?.length ? { pastBests: chain.pastBests } : {}),
-  });
+  write('chain', cleanChain(chain));
+}
+
+/** Every chain that has a habit, the first chain first. */
+export function getChains(): ChainEntry[] {
+  const c = getChain();
+  return [
+    ...(c.habit ? [{ id: MAIN_CHAIN, habit: c.habit, days: c.days, color: 0 }] : []),
+    ...(c.more ?? []).filter((m) => !m.deletedAt).map((m) => ({ id: m.id, habit: m.habit, days: m.days, color: m.color ?? 1 })),
+  ];
+}
+
+/** Start a chain for a habit. Returns its id, or null when the name is empty or there are MAX_CHAINS already. */
+export function addChain(habit: string): string | null {
+  const name = cleanHabit(habit);
+  const c = getChain();
+  const live = getChains();
+  if (!name || live.length >= MAX_CHAINS) return null;
+  if (!c.habit) {
+    setChain({ ...c, habit: name });
+    return MAIN_CHAIN;
+  }
+  const used = new Set(live.map((l) => l.color));
+  const color = Array.from({ length: CHAIN_COLORS }, (_, i) => i).find((i) => !used.has(i)) ?? live.length % CHAIN_COLORS;
+  const id = newId('chain');
+  setChain({ ...c, more: [...(c.more ?? []), { id, habit: name, days: [], color }] });
+  return id;
+}
+
+export function renameChain(id: string, habit: string): void {
+  const name = cleanHabit(habit);
+  const c = getChain();
+  if (!name) return;
+  if (id === MAIN_CHAIN) setChain({ ...c, habit: name });
+  else setChain({ ...c, more: (c.more ?? []).map((m) => (m.id === id && !m.deletedAt ? { ...m, habit: name } : m)) });
 }
 
 /**
- * Delete the habit and every marked day. `bests` are the deleted chain's best-run
- * records (see Chain.pastBests), kept so its tier isn't lost.
+ * Delete the first chain's habit and every marked day. `bests` are the deleted chain's
+ * best-run records (see Chain.pastBests), kept so its tier isn't lost.
  */
 export function resetChain(bests: [string, number][] = []): void {
   const old = getChain();
-  setChain({ ...EMPTY_CHAIN, resetAt: Math.max(Date.now(), (old.resetAt ?? 0) + 1), pastBests: joinBests(old.pastBests, bests) });
+  setChain({
+    ...EMPTY_CHAIN,
+    resetAt: Math.max(Date.now(), (old.resetAt ?? 0) + 1),
+    pastBests: joinBests(old.pastBests, bests),
+    more: old.more,
+  });
+}
+
+/** Delete one chain and its marked days; `bests` as for resetChain. */
+export function deleteChain(id: string, bests: [string, number][] = []): void {
+  if (id === MAIN_CHAIN) return resetChain(bests);
+  const c = getChain();
+  setChain({
+    ...c,
+    pastBests: joinBests(c.pastBests, bests),
+    more: (c.more ?? []).map((m) => (m.id === id ? { id, habit: '', days: [], deletedAt: Date.now() } : m)),
+  });
+}
+
+/** Further chains from both copies, matched by id: days are joined, and a deletion on either side wins. */
+function mergeExtras(a: ExtraChain[] = [], b: ExtraChain[] = []): ExtraChain[] {
+  const byId = new Map(a.map((m) => [m.id, m]));
+  for (const m of b) {
+    const mine = byId.get(m.id);
+    if (!mine) byId.set(m.id, m);
+    else if (mine.deletedAt || m.deletedAt) {
+      byId.set(m.id, { id: m.id, habit: '', days: [], deletedAt: Math.max(mine.deletedAt ?? 0, m.deletedAt ?? 0) });
+    } else byId.set(m.id, { ...mine, habit: mine.habit || m.habit, days: cleanDays([...mine.days, ...m.days]) });
+  }
+  return [...byId.values()];
 }
 
 /**
@@ -575,16 +683,21 @@ export function mergeChains(a: Chain, b: Chain): Chain {
   const ra = a.resetAt ?? 0;
   const rb = b.resetAt ?? 0;
   const pastBests = joinBests(a.pastBests, b.pastBests);
-  const withBests = (c: Chain): Chain => (pastBests.length ? { ...c, pastBests } : c);
-  if (ra !== rb) return withBests(ra > rb ? a : b);
-  return withBests({ habit: a.habit || b.habit, days: [...new Set([...a.days, ...b.days])].sort(), ...(ra ? { resetAt: ra } : {}) });
+  const more = mergeExtras(a.more, b.more);
+  const withRest = (c: Chain): Chain => ({ ...c, ...(pastBests.length ? { pastBests } : {}), ...(more.length ? { more } : {}) });
+  if (ra !== rb) return withRest(ra > rb ? a : b);
+  return withRest({ habit: a.habit || b.habit, days: cleanDays([...a.days, ...b.days]), ...(ra ? { resetAt: ra } : {}) });
 }
 
-export function toggleChainDay(key: string): boolean {
-  const chain = getChain();
-  const has = chain.days.includes(key);
-  setChain({ ...chain, days: has ? chain.days.filter((d) => d !== key) : [...chain.days, key] });
-  return !has;
+/** Mark or unmark a day on one chain. Returns whether the day is now marked. */
+export function toggleChainDay(key: string, id: string = MAIN_CHAIN): boolean {
+  const c = getChain();
+  const flip = (days: string[]) => (days.includes(key) ? days.filter((d) => d !== key) : [...days, key]);
+  const days = id === MAIN_CHAIN ? c.days : c.more?.find((m) => m.id === id && !m.deletedAt)?.days;
+  if (!days) return false;
+  if (id === MAIN_CHAIN) setChain({ ...c, days: flip(c.days) });
+  else setChain({ ...c, more: (c.more ?? []).map((m) => (m.id === id ? { ...m, days: flip(m.days) } : m)) });
+  return !days.includes(key);
 }
 
 // ---------- Tasks ----------

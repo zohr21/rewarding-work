@@ -7,7 +7,7 @@
  * UTF-16 units the Docs API uses (a JavaScript string's length).
  */
 import { addDays, dayKey, formatShort, startOfDay, startOfWeek } from '../dates';
-import { allProgress, TIER_NAMES } from '../rewards';
+import { allProgress, chainInput, TIER_NAMES } from '../rewards';
 import { chainStats, minutesByDay } from '../stats';
 import { focusByTask, formatFocus, isCarriedOver, taskName, todayTasks } from '../tasks';
 import type { ExportData } from './collect';
@@ -180,7 +180,7 @@ export function buildDoc(data: ExportData): DocBuild {
 
   // Tiers count everything you've ever done, whatever the range.
   if (options.sessions || options.done || options.chain) {
-    const progress = allProgress({ sessions: data.allSessions, done: data.done, chainDays: data.chain.days, pastBests: data.chain.pastBests }).filter(
+    const progress = allProgress({ sessions: data.allSessions, done: data.done, ...chainInput(data.chain) }).filter(
       (p) => (p.track.id === 'done' ? options.done && options.range === 'all' : p.track.id === 'streak' ? options.chain : options.sessions) && p.level > 0,
     );
     if (progress.length) {

@@ -1,7 +1,9 @@
 ---
 /**
- * Don't-break-the-chain tracker for one habit. Best chain is the headline number;
- * a gap is never framed as failure. Used on /progress and the technique page.
+ * Don't-break-the-chain tracker. Each habit is a row: one tap marks today, its last
+ * seven days show as dots, and opening the row shows its best chain and month calendar.
+ * Best chain is the headline number; a gap is never framed as failure.
+ * Used on /progress and the technique page.
  */
 interface Props {
   headingLevel?: 'h2' | 'h3';
@@ -11,28 +13,39 @@ const Heading = headingLevel;
 ---
 
 <section class="card chain" data-chain aria-labelledby="chain-heading">
-  <Heading id="chain-heading" class="panel-title">Chain</Heading>
-
-  <!-- Setup / edit habit -->
-  <form class="chain__setup" data-chain-form hidden>
-    <label for="chain-habit">What small thing will you do every day?</label>
-    <div class="chain__row">
-      <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
-      <button type="submit" class="btn">Save</button>
+  <div class="chain__head">
+    <div>
+      <Heading id="chain-heading" class="panel-title">Chains</Heading>
+      <p class="muted chain__count" data-chain-count hidden></p>
     </div>
-    <div class="chain__edit-actions" data-chain-edit-actions hidden>
-      <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
-      <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
-    </div>
-  </form>
+    <button type="button" class="btn btn--ghost btn--small chain__new" data-chain-new hidden>
+      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+        ><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg
+      >
+      New chain
+    </button>
+  </div>
 
-  <!-- Tracker -->
-  <div data-chain-body hidden>
-    <div class="chain__habit">
-      <p><span class="muted">Habit:</span> <strong data-chain-name></strong></p>
-      <button type="button" class="btn btn--ghost btn--small" data-chain-edit>Edit</button>
-    </div>
+  <!-- One row per habit; the open row holds the tracker below (or the form, while renaming). -->
+  <ul class="chain__list" data-chain-list></ul>
 
+  <!-- Setup / new chain / rename -->
+  <div data-chain-form-home>
+    <form class="chain__setup" data-chain-form hidden>
+      <label for="chain-habit" data-chain-label>What small thing will you do every day?</label>
+      <div class="chain__row">
+        <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
+        <button type="submit" class="btn">Save</button>
+      </div>
+      <div class="chain__edit-actions" data-chain-edit-actions hidden>
+        <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
+        <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tracker for the open chain -->
+  <div class="chain__body" data-chain-body hidden>
     <div class="chain__stats">
       <div class="chain__best">
         <p class="chain__label">Best chain</p>
@@ -44,9 +57,10 @@ const Heading = headingLevel;
       </div>
     </div>
 
-    <p class="chain__message" data-chain-message></p>
-
-    <button type="button" class="btn chain__today" data-chain-today aria-pressed="false">Mark today done</button>
+    <div class="chain__habit">
+      <p class="chain__message" data-chain-message></p>
+      <button type="button" class="btn btn--ghost btn--small" data-chain-edit>Edit</button>
+    </div>
 
     <div class="chain__cal-wrap">
       <div class="chain__month">
@@ -75,7 +89,16 @@ const Heading = headingLevel;
 </section>
 
 <script>
-  import { EMPTY_CHAIN, getChain, resetChain, setChain, subscribe, toggleChainDay } from '../lib/storage';
+  import {
+    addChain,
+    deleteChain,
+    getChains,
+    MAX_CHAINS,
+    renameChain,
+    subscribe,
+    toggleChainDay,
+    type ChainEntry,
+  } from '../lib/storage';
   import { offerUndo } from '../lib/undo';
   import { streakRecords } from '../lib/rewards';
   import { chainStats } from '../lib/stats';
@@ -85,45 +108,70 @@ const Heading = headingLevel;
 
   /** Days you can still mark or unmark, counting today. Older days are read-only. */
   const EDIT_DAYS = 7;
+  /** Chain colours, by ChainEntry.color. The first chain keeps the accent green. */
+  const COLORS = ['var(--color-accent)', 'var(--cat-reward)', 'var(--cat-visual)', 'var(--cat-time)', 'var(--cat-rest)'];
   const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const shortMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+
+  const TICK_SVG =
+    '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 12.5l4 4L18 8" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CHEVRON_SVG =
+    '<svg class="chain__chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   const monthStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
   const addMonths = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth() + n, 1);
   const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 
+  interface Row {
+    el: HTMLLIElement;
+    tick: HTMLButtonElement;
+    open: HTMLButtonElement;
+    name: HTMLElement;
+    sub: HTMLElement;
+    dots: HTMLElement;
+    slot: HTMLElement;
+  }
+
   onPage('chain', () => {
     const c = cleanups();
     document.querySelectorAll<HTMLElement>('[data-chain]').forEach((root) => {
       const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+      const count = $<HTMLElement>('[data-chain-count]');
+      const newBtn = $<HTMLButtonElement>('[data-chain-new]');
+      const listEl = $<HTMLElement>('[data-chain-list]');
+      const formHome = $<HTMLElement>('[data-chain-form-home]');
       const form = $<HTMLFormElement>('[data-chain-form]');
+      const label = $<HTMLElement>('[data-chain-label]');
       const input = $<HTMLInputElement>('[data-chain-input]');
       const cancel = $<HTMLButtonElement>('[data-chain-cancel]');
       const editActions = $<HTMLElement>('[data-chain-edit-actions]');
       const del = $<HTMLButtonElement>('[data-chain-delete]');
       const body = $<HTMLElement>('[data-chain-body]');
-      const name = $<HTMLElement>('[data-chain-name]');
       const edit = $<HTMLButtonElement>('[data-chain-edit]');
       const best = $<HTMLElement>('[data-chain-best]');
       const bestUnit = $<HTMLElement>('[data-chain-best-unit]');
       const current = $<HTMLElement>('[data-chain-current]');
       const total = $<HTMLElement>('[data-chain-total]');
       const message = $<HTMLElement>('[data-chain-message]');
-      const today = $<HTMLButtonElement>('[data-chain-today]');
       const cal = $<HTMLElement>('[data-chain-cal]');
       const monthName = $<HTMLElement>('[data-chain-month]');
       const prev = $<HTMLButtonElement>('[data-chain-prev]');
       const next = $<HTMLButtonElement>('[data-chain-next]');
       const thisMonth = $<HTMLButtonElement>('[data-chain-this-month]');
       const hint = $<HTMLElement>('[data-chain-hint]');
+      const live = $<HTMLElement>('[data-chain-live]');
+
+      const rows = new Map<string, Row>();
+      /** The chain whose tracker is showing; undefined until the first render picks one. */
+      let openId: string | null | undefined;
+      /** What the form is for: a further chain, or renaming the open one. */
+      let mode: 'new' | 'edit' | null = null;
       /** First day of the month on show. */
       let viewMonth = monthStart(new Date());
-      const live = $<HTMLElement>('[data-chain-live]');
-      let editing = false;
       let pulseKey: string | null = null;
-      /** Deleted, but still offered for Undo (src/lib/undo.ts): shown as empty until then. */
-      let deleting = false;
-      const shownChain = () => (deleting ? EMPTY_CHAIN : getChain());
+      /** Deleted, but still offered for Undo (src/lib/undo.ts): hidden until then. */
+      const removing = new Set<string>();
+      const shown = () => getChains().filter((ch) => !removing.has(ch.id));
 
       const announce = (t: string) => {
         live.textContent = '';
@@ -139,35 +187,122 @@ const Heading = headingLevel;
         return `${days(s.current)} and counting.`;
       }
 
+      function makeRow(id: string): Row {
+        const el = document.createElement('li');
+        el.className = 'chain__item';
+        const head = document.createElement('div');
+        head.className = 'chain__item-head';
+
+        const tick = document.createElement('button');
+        tick.type = 'button';
+        tick.className = 'chain__tick';
+        tick.innerHTML = TICK_SVG;
+        tick.addEventListener('click', () => toggle(id, dayKey(new Date()), new Date()));
+
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'chain__open';
+        const names = document.createElement('span');
+        names.className = 'chain__names';
+        const name = document.createElement('span');
+        name.className = 'chain__name';
+        const sub = document.createElement('span');
+        sub.className = 'chain__sub';
+        names.append(name, sub);
+        const dots = document.createElement('span');
+        dots.className = 'chain__dots';
+        dots.setAttribute('aria-hidden', 'true');
+        dots.append(...Array.from({ length: EDIT_DAYS }, () => document.createElement('span')));
+        open.append(names, dots);
+        open.insertAdjacentHTML('beforeend', CHEVRON_SVG);
+        open.addEventListener('click', () => {
+          openId = openId === id ? null : id;
+          mode = null;
+          viewMonth = monthStart(new Date());
+          render();
+        });
+
+        const slot = document.createElement('div');
+        slot.className = 'chain__slot';
+        head.append(tick, open);
+        el.append(head, slot);
+        return { el, tick, open, name, sub, dots, slot };
+      }
+
+      function fillRow(r: Row, ch: ChainEntry, s: ReturnType<typeof chainStats>): void {
+        const isOpen = ch.id === openId;
+        const set = new Set(ch.days);
+        const now = startOfDay(new Date());
+        r.el.style.setProperty('--chain-color', COLORS[ch.color % COLORS.length]!);
+        r.el.classList.toggle('is-open', isOpen);
+        r.name.textContent = ch.habit;
+        r.sub.textContent =
+          s.total === 0 ? 'Not started yet' : `${s.current ? `${days(s.current)} running` : 'No chain right now'} · best ${s.best}`;
+        r.tick.setAttribute('aria-label', `Done today: ${ch.habit}`);
+        r.tick.setAttribute('aria-pressed', String(s.doneToday));
+        r.open.setAttribute('aria-expanded', String(isOpen));
+        [...r.dots.children].forEach((dot, i) => {
+          dot.classList.toggle('is-marked', set.has(dayKey(addDays(now, i - (EDIT_DAYS - 1)))));
+          dot.classList.toggle('is-today', i === EDIT_DAYS - 1);
+        });
+      }
+
       function render(): void {
-        const chain = shownChain();
-        const hasHabit = chain.habit.length > 0;
-        form.hidden = hasHabit && !editing;
-        body.hidden = !hasHabit || editing;
-        editActions.hidden = !(hasHabit && editing);
-        if (!hasHabit || editing) {
-          if (document.activeElement !== input) input.value = chain.habit;
-          return;
+        const list = shown();
+        const none = list.length === 0;
+        if (openId === undefined && !none) openId = list[0]!.id;
+        if (openId && !list.some((ch) => ch.id === openId)) openId = null;
+        const openChain = list.find((ch) => ch.id === openId);
+        if (mode === 'edit' && !openChain) mode = null;
+        const stats = new Map(list.map((ch) => [ch.id, chainStats(ch.days)]));
+
+        const doneToday = list.filter((ch) => stats.get(ch.id)!.doneToday).length;
+        count.hidden = none;
+        count.textContent = `${doneToday} of ${list.length} done today`;
+        newBtn.hidden = none || mode !== null || list.length >= MAX_CHAINS;
+
+        // Rows are kept and updated in place, so focus stays put while days are marked.
+        for (const [id, r] of rows) {
+          if (list.some((ch) => ch.id === id)) continue;
+          if (r.el.contains(body)) root.append(body);
+          if (r.el.contains(form)) formHome.append(form);
+          r.el.remove();
+          rows.delete(id);
         }
+        list.forEach((ch, i) => {
+          let r = rows.get(ch.id);
+          if (!r) rows.set(ch.id, (r = makeRow(ch.id)));
+          if (listEl.children[i] !== r.el) listEl.insertBefore(r.el, listEl.children[i] ?? null);
+          fillRow(r, ch, stats.get(ch.id)!);
+        });
 
-        const s = chainStats(chain.days);
-        name.textContent = chain.habit;
-        best.textContent = String(s.best);
-        bestUnit.textContent = s.best === 1 ? 'day' : 'days';
-        current.textContent = days(s.current);
-        total.textContent = String(s.total);
-        message.textContent = encouragement(s);
+        const openRow = openChain && rows.get(openChain.id);
+        const renaming = mode === 'edit' && openRow;
+        const formAt = renaming ? openRow.slot : formHome;
+        if (form.parentElement !== formAt) formAt.append(form);
+        form.hidden = !(none || mode !== null);
+        label.textContent = renaming ? 'Rename this habit' : none ? 'What small thing will you do every day?' : 'What else will you do every day?';
+        editActions.hidden = none;
+        del.hidden = !renaming;
 
-        today.textContent = s.doneToday ? '✓ Done today' : 'Mark today done';
-        today.setAttribute('aria-pressed', String(s.doneToday));
-        today.classList.toggle('is-done', s.doneToday);
-
-        renderCalendar(chain.days);
+        const tracking = openChain && openRow && !renaming;
+        if (tracking) {
+          if (body.parentElement !== openRow.slot) openRow.slot.append(body);
+          const s = stats.get(openChain.id)!;
+          best.textContent = String(s.best);
+          bestUnit.textContent = s.best === 1 ? 'day' : 'days';
+          current.textContent = days(s.current);
+          total.textContent = String(s.total);
+          message.textContent = encouragement(s);
+          renderCalendar(openChain);
+        }
+        body.hidden = !tracking;
         pulseKey = null;
       }
 
       /** Month grid, Monday first, with the neighbouring months' days dimmed. */
-      function renderCalendar(marked: string[]): void {
+      function renderCalendar(chain: ChainEntry): void {
+        const marked = chain.days;
         const set = new Set(marked);
         const now = startOfDay(new Date());
         const todayKey = dayKey(now);
@@ -185,7 +320,7 @@ const Heading = headingLevel;
 
         const first = startOfWeek(viewMonth);
         const last = addDays(startOfWeek(addDays(addMonths(viewMonth, 1), -1)), 6);
-        const focusedKey = (document.activeElement as HTMLElement | null)?.dataset?.key;
+        const focusedKey = cal.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.key : undefined;
         const buttons: HTMLElement[] = [];
         for (let date = first, i = 0; date <= last; date = addDays(date, 1), i++) {
           const key = dayKey(date);
@@ -213,6 +348,7 @@ const Heading = headingLevel;
           }
           if (key === todayKey) b.classList.add('is-today');
           if (key === pulseKey) b.classList.add('is-pulse');
+          const day = date;
           b.addEventListener('click', () => {
             if (!editable) {
               announce(`Only the last ${EDIT_DAYS} days can be changed.`);
@@ -221,7 +357,7 @@ const Heading = headingLevel;
               hint.classList.add('is-nudged');
               return;
             }
-            toggle(key, date);
+            toggle(chain.id, key, day);
           });
           buttons.push(b);
         }
@@ -241,17 +377,19 @@ const Heading = headingLevel;
         (next.disabled ? prev : next).focus();
       });
 
-      function toggle(key: string, date: Date): void {
-        const nowMarked = toggleChainDay(key);
-        if (nowMarked) {
-          pulseKey = key;
-          celebrate();
-        }
-        const s = chainStats(getChain().days);
-        announce(`${formatDay(date)} ${nowMarked ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`);
+      function toggle(id: string, key: string, date: Date): void {
+        const before = shown().find((ch) => ch.id === id);
+        if (!before) return;
+        // Set before the write: the storage subscription redraws straight away.
+        const marking = !before.days.includes(key);
+        if (marking && id === openId) pulseKey = key;
+        toggleChainDay(key, id);
+        if (marking) celebrate();
+        const s = chainStats(getChains().find((ch) => ch.id === id)?.days ?? []);
+        announce(
+          `${before.habit}: ${formatDay(date)} ${marking ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`,
+        );
       }
-
-      today.addEventListener('click', () => toggle(dayKey(new Date()), new Date()));
 
       form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -260,52 +398,76 @@ const Heading = headingLevel;
           input.focus();
           return;
         }
-        editing = false;
-        // Starting a new habit while the old one's Undo is still offered: make the deletion final first.
-        if (deleting) {
-          deleting = false;
-          resetChain(streakRecords(getChain().days));
+        if (mode === 'edit' && openId) {
+          mode = null;
+          renameChain(openId, habit);
+          render();
+          announce(`Habit saved: ${habit}`);
+          edit.focus();
+          return;
         }
-        setChain({ ...getChain(), habit });
-        announce(`Habit saved: ${habit}`);
-        today.focus();
+        const id = addChain(habit);
+        if (!id) return;
+        mode = null;
+        openId = id;
+        viewMonth = monthStart(new Date());
+        input.value = '';
+        render();
+        announce(`Chain started: ${habit}`);
+        rows.get(id)?.tick.focus();
       });
+
+      newBtn.addEventListener('click', () => {
+        mode = 'new';
+        input.value = '';
+        render();
+        input.focus();
+      });
+
       edit.addEventListener('click', () => {
-        editing = true;
+        const chain = shown().find((ch) => ch.id === openId);
+        if (!chain) return;
+        mode = 'edit';
+        input.value = chain.habit;
         render();
         input.focus();
         input.select();
       });
-      del.addEventListener('click', () => {
-        const old = getChain();
-        const n = old.days.length;
-        editing = false;
-        deleting = true;
-        render();
+
+      cancel.addEventListener('click', () => {
+        const wasEdit = mode === 'edit';
+        mode = null;
         input.value = '';
-        input.focus();
+        render();
+        (wasEdit ? edit : newBtn).focus();
+      });
+
+      del.addEventListener('click', () => {
+        const old = shown().find((ch) => ch.id === openId);
+        if (!old) return;
+        const n = old.days.length;
+        removing.add(old.id);
+        mode = null;
+        openId = undefined; // open the first of those left
+        input.value = '';
+        render();
+        (newBtn.hidden ? input : newBtn).focus();
         offerUndo({
           message: `Deleted “${old.habit}”${n ? ` and ${days(n)}` : ''}`,
           commit: () => {
-            if (!deleting) return; // already made final by saving a new habit
-            deleting = false;
-            resetChain(streakRecords(getChain().days));
+            if (!removing.delete(old.id)) return;
+            deleteChain(old.id, streakRecords(getChains().find((ch) => ch.id === old.id)?.days ?? []));
           },
           undo: () => {
-            if (!deleting) return;
-            deleting = false;
+            if (!removing.delete(old.id)) return;
+            mode = null;
+            openId = old.id;
             render();
             announce(`Restored your chain: ${old.habit}.`);
             edit.focus();
           },
         });
         announce(`Deleted your chain “${old.habit}”. Press Undo to bring it back.`);
-      });
-
-      cancel.addEventListener('click', () => {
-        editing = false;
-        render();
-        edit.focus();
       });
 
       render();
@@ -316,9 +478,168 @@ const Heading = headingLevel;
 </script>
 
 <style>
+  .chain__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .chain__count {
+    font-size: var(--text-sm);
+  }
+
+  .chain .btn[hidden] {
+    display: none;
+  }
+
+  .chain__list {
+    display: grid;
+    gap: var(--space-2);
+    list-style: none;
+    padding: 0;
+    margin-top: var(--space-3);
+  }
+
+  .chain__list:empty {
+    display: none;
+  }
+
+  .chain :global(.chain__item) {
+    --chain-color: var(--color-accent);
+    max-width: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+  }
+
+  /* The open row is raised; the closed ones sit flat beneath it. */
+  .chain :global(.chain__item.is-open) {
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+  }
+
+  .chain :global(.chain__item-head) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  }
+
+  /* One-tap "done today". */
+  .chain :global(.chain__tick) {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: 2px solid var(--chain-color);
+    border-radius: 50%;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: transparent;
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .chain :global(.chain__tick[aria-pressed='true']) {
+    background: var(--chain-color);
+    box-shadow: 0 3px 0 color-mix(in srgb, var(--chain-color) 55%, #000);
+    color: var(--color-on-accent);
+  }
+
+  .chain :global(.chain__tick:active) {
+    transform: translateY(2px);
+  }
+
+  .chain :global(.chain__open) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1;
+    min-width: 0;
+    min-height: 48px;
+    padding: 0 var(--space-2) 0 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .chain :global(.chain__names) {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chain :global(.chain__name) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .chain :global(.chain__sub) {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  /* The last seven days at a glance, today last. */
+  .chain :global(.chain__dots) {
+    display: flex;
+    gap: 5px;
+  }
+
+  .chain :global(.chain__dots span) {
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 50%;
+  }
+
+  .chain :global(.chain__dots .is-today) {
+    border: 2px solid var(--color-text);
+  }
+
+  .chain :global(.chain__dots .is-marked) {
+    border-color: var(--chain-color);
+    background: var(--chain-color);
+  }
+
+  .chain :global(.chain__chevron) {
+    flex-shrink: 0;
+    color: var(--color-text-muted);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .chain :global(.is-open .chain__chevron) {
+    transform: rotate(90deg);
+  }
+
+  .chain :global(.chain__slot:not(:empty)) {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  /* Hidden children leave the slot non-empty, so a closed row drops its padding here. */
+  .chain :global(.chain__item:not(.is-open) .chain__slot) {
+    padding: 0;
+  }
+
+  @media (max-width: 24rem) {
+    .chain :global(.chain__dots) {
+      display: none;
+    }
+  }
+
   .chain__setup {
     display: grid;
     gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .chain :global(.chain__slot) .chain__setup {
+    margin-top: 0;
   }
 
   .chain__setup[hidden] {
@@ -356,11 +677,7 @@ const Heading = headingLevel;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-  }
-
-  .chain__habit p {
-    min-width: 0;
-    overflow-wrap: anywhere;
+    margin-top: var(--space-3);
   }
 
   .chain__stats {
@@ -368,7 +685,6 @@ const Heading = headingLevel;
     align-items: flex-end;
     justify-content: space-between;
     gap: var(--space-4);
-    margin-top: var(--space-4);
     padding: var(--space-4);
     background: var(--color-accent-soft);
     border-radius: var(--radius-md);
@@ -386,7 +702,7 @@ const Heading = headingLevel;
     font-size: clamp(2.5rem, 2rem + 3vw, 3.5rem);
     font-weight: 800;
     line-height: 1;
-    color: var(--color-accent);
+    color: var(--chain-color);
     font-variant-numeric: tabular-nums;
   }
 
@@ -403,23 +719,12 @@ const Heading = headingLevel;
   }
 
   .chain__message {
-    margin-top: var(--space-3);
-    min-height: 1.6em;
-  }
-
-  .chain__today {
-    width: 100%;
-    margin-top: var(--space-3);
-  }
-
-  .chain__today.is-done {
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
-    border-color: var(--color-accent);
+    min-width: 0;
+    font-size: var(--text-sm);
   }
 
   .chain__cal-wrap {
-    margin-top: var(--space-5);
+    margin-top: var(--space-4);
     max-width: 22rem;
   }
 
@@ -528,8 +833,8 @@ const Heading = headingLevel;
   }
 
   .chain :global(.chain__day.is-marked) {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
+    background: var(--chain-color);
+    border-color: var(--chain-color);
     color: var(--color-on-accent);
     font-weight: 600;
   }
@@ -543,7 +848,7 @@ const Heading = headingLevel;
     width: 8px;
     height: 4px;
     transform: translateY(-50%);
-    background: var(--color-accent);
+    background: var(--chain-color);
   }
 
   @media (prefers-reduced-motion: reduce) {
