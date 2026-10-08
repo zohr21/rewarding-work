@@ -53,7 +53,8 @@ pwa/                    service worker template + the build step that generates 
 - Backgrounds come in two kinds:
   - **Soft glows** (Sunrise / Meadow / Lavender, or Plain): four CSS gradients that
     drift slowly and lean towards the pointer. Palettes are the `--amb-*` tokens.
-  - **Live scenes** (Aurora / Floating lights / Calm water / Rolling hills): WebGL
+  - **Live scenes** (Still lake / Rain ripples / Shallow water / Calm water / Aurora / Floating lights /
+    Rolling hills): WebGL
     fragment shaders in `src/lib/scene/scenes/`, drawn by `src/lib/scene/runner.ts`.
     Fully procedural (no images or models, a few KB each, loaded only when chosen),
     with a light and a dark palette each. To stay cheap on battery they render at

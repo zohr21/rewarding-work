@@ -14,6 +14,24 @@ export interface SceneInfo {
 }
 
 export const SCENE_INFO: Record<SceneId, SceneInfo> = {
+  lake: {
+    label: 'Still lake',
+    preview:
+      'radial-gradient(circle at 70% 22%, #c7ebd1 0 7%, transparent 9%), linear-gradient(#050b0a 0%, #162a22 54%, #030907 56%, #0a1a14 100%)',
+    load: () => import('./scenes/lake'),
+  },
+  ripples: {
+    label: 'Rain ripples',
+    preview:
+      'radial-gradient(circle at 35% 62%, transparent 0 14%, #99e6bf66 15% 17%, transparent 18% 27%, #99e6bf33 28% 29%, transparent 30%), radial-gradient(circle at 76% 30%, transparent 0 8%, #99e6bf66 9% 11%, transparent 12%), linear-gradient(#0d1d17, #040b09)',
+    load: () => import('./scenes/ripples'),
+  },
+  shallows: {
+    label: 'Shallow water',
+    preview:
+      'radial-gradient(60% 40% at 30% 30%, #73d9ad77 0%, transparent 70%), radial-gradient(50% 35% at 75% 62%, #73d9ad55 0%, transparent 70%), linear-gradient(#0f2b22, #030907)',
+    load: () => import('./scenes/shallows'),
+  },
   aurora: {
     label: 'Aurora',
     preview:
