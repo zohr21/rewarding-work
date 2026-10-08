@@ -8,9 +8,12 @@
  * Locally: PUBLIC_GOOGLE_CLIENT_ID in .env. On GitHub: repository variable
  * GOOGLE_CLIENT_ID. Without it the export dialog offers the backup file only.
  */
+import { NATIVE_APP } from './app';
+
 export const GOOGLE_CLIENT_ID = String(import.meta.env.PUBLIC_GOOGLE_CLIENT_ID ?? '');
 
-export const GOOGLE_EXPORT_ENABLED = GOOGLE_CLIENT_ID.length > 0;
+/** Off in the Android app: Google's sign-in window can't open inside it. */
+export const GOOGLE_EXPORT_ENABLED = GOOGLE_CLIENT_ID.length > 0 && !NATIVE_APP;
 
 /**
  * The narrowest Drive scope: the site can create files and open the ones it created,
