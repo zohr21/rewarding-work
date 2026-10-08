@@ -40,6 +40,7 @@ import {
   type User,
 } from 'firebase/auth';
 import { collection, connectFirestoreEmulator, deleteDoc, doc, getDocs, getFirestore, onSnapshot, setDoc, type Firestore } from 'firebase/firestore';
+import { NATIVE_APP } from '../../config/app';
 import { FIREBASE_CONFIG, USE_EMULATOR } from '../../config/firebase';
 import {
   SYNCED_STORES,
@@ -276,7 +277,11 @@ function clearLocal(): void {
 
 // ---------- Actions (used by the account page) ----------
 
-const google = () => new GoogleAuthProvider();
+const google = () => {
+  // Google's sign-in window can't open inside the Android app.
+  if (NATIVE_APP) throw new Error("Google sign-in isn't available in the app yet. Use your email and password.");
+  return new GoogleAuthProvider();
+};
 
 /**
  * Leave the current guest account for an existing one. The guest account and its
