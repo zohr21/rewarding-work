@@ -83,8 +83,10 @@ export function buildDoc(data: ExportData): DocBuild {
   if (options.sessions) summary.push(`Focus time: ${formatFocus(focusSeconds)}`, `Sessions: ${data.sessions.length}`);
   if (options.done) summary.push(`Things done: ${data.done.length}`);
   if (options.chain) {
-    const s = chainStats(data.chain.days, now);
-    summary.push(`Chain: ${plural(s.current, 'day')} (best ${s.best})`);
+    for (const c of data.chains) {
+      const s = chainStats(c.days, now);
+      summary.push(`Chain${data.chains.length > 1 ? ` “${c.habit}”` : ''}: ${plural(s.current, 'day')} (best ${s.best})`);
+    }
   }
   if (summary.length) {
     w.para('Summary', 'HEADING_1');

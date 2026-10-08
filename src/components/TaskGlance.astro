@@ -1,7 +1,8 @@
 ---
 /**
  * Today at a glance, above the task list: steps done on today's plan, focus per day
- * this week, and the chain's last two weeks. Read-only: it draws the same tasks,
+ * this week, and the chain's last two weeks (or, with several chains, each one's last
+ * week). Read-only: it draws the same tasks,
  * sessions and chain the rest of the site stores, and redraws when they change.
  */
 import { url } from '../lib/paths';
@@ -27,7 +28,7 @@ const progressUrl = url('/progress');
   </div>
 
   <div class="card glance__card">
-    <p class="glance__label">Chain</p>
+    <p class="glance__label" data-gl-chain-label>Chain</p>
     <p class="glance__big" data-gl-chain></p>
     <div data-gl-dots></div>
     <p class="glance__note"><span data-gl-chain-text></span> <a href={progressUrl} data-gl-chain-link>Open the chain</a></p>
@@ -35,7 +36,7 @@ const progressUrl = url('/progress');
 </section>
 
 <script>
-  import { getChains, getSessions, getTasks, subscribe } from '../lib/storage';
+  import { CHAIN_COLORS, getChains, getSessions, getTasks, subscribe, type ChainEntry } from '../lib/storage';
   import { formatFocus, todayTasks, TODAY_SOFT_MAX } from '../lib/tasks';
   import { chainStats, minutesByDay } from '../lib/stats';
   import { addDays, dayKey, startOfDay, startOfWeek } from '../lib/dates';
@@ -80,6 +81,50 @@ const progressUrl = url('/progress');
     return `<svg class="glance__chart" viewBox="0 0 224 34" role="img" aria-label="${count} of the last 14 days marked, ${todayText}">${out}</svg>`;
   }
 
+  /** Chains the glance lists before "+ n more". */
+  const CHAIN_ROWS = 4;
+
+  /** Several chains: one line each, with its last 7 days as dots (today last) and its current run. */
+  function chainRows(chains: ChainEntry[], now: Date): HTMLElement {
+    const start = addDays(startOfDay(now), -6);
+    const ul = document.createElement('ul');
+    ul.className = 'glance__chains';
+    for (const ch of chains.slice(0, CHAIN_ROWS)) {
+      const set = new Set(ch.days);
+      const s = chainStats(ch.days, now);
+      const marked = Array.from({ length: 7 }, (_, i) => set.has(dayKey(addDays(start, i))));
+      const li = document.createElement('li');
+      li.style.setProperty('--chain-color', CHAIN_COLORS[ch.color % CHAIN_COLORS.length]!);
+      const name = document.createElement('span');
+      name.className = 'glance__chain-name';
+      name.textContent = ch.habit;
+      const dots = document.createElement('span');
+      dots.className = 'glance__chain-dots';
+      dots.setAttribute('role', 'img');
+      dots.setAttribute('aria-label', `${marked.filter(Boolean).length} of the last 7 days marked, ${s.doneToday ? 'today included' : 'today still open'}`);
+      dots.append(
+        ...marked.map((on, i) => {
+          const d = document.createElement('span');
+          if (on) d.className = 'is-on';
+          if (i === 6) d.classList.add('is-today');
+          return d;
+        }),
+      );
+      const run = document.createElement('span');
+      run.className = 'glance__chain-run';
+      run.textContent = plural(s.current, 'day');
+      li.append(name, dots, run);
+      ul.append(li);
+    }
+    if (chains.length > CHAIN_ROWS) {
+      const more = document.createElement('li');
+      more.className = 'glance__chain-more';
+      more.textContent = `+ ${chains.length - CHAIN_ROWS} more`;
+      ul.append(more);
+    }
+    return ul;
+  }
+
   onPage('task-glance', () => {
     const c = cleanups();
     document.querySelectorAll<HTMLElement>('[data-glance]').forEach((root) => {
@@ -94,6 +139,7 @@ const progressUrl = url('/progress');
       const dots = $<HTMLElement>('[data-gl-dots]');
       const chainText = $<HTMLElement>('[data-gl-chain-text]');
       const chainLink = $<HTMLAnchorElement>('[data-gl-chain-link]');
+      const chainLabel = $<HTMLElement>('[data-gl-chain-label]');
 
       function render(): void {
         const now = new Date();
@@ -122,8 +168,17 @@ const progressUrl = url('/progress');
         bars.innerHTML = weekBars(minutes, todayIndex, monday);
 
         // Chain
-        // With several chains, the glance follows the first one.
-        const days = getChains()[0]?.days ?? [];
+        const chains = getChains();
+        chainLabel.textContent = chains.length > 1 ? 'Chains' : 'Chain';
+        if (chains.length > 1) {
+          const open = chains.filter((ch) => !chainStats(ch.days, now).doneToday).length;
+          chain.textContent = `${chains.length - open} of ${chains.length} today`;
+          dots.replaceChildren(chainRows(chains, now));
+          chainText.textContent = open ? `${open} still open today.` : 'All marked today.';
+          chainLink.textContent = open ? 'Mark them to keep the chains' : 'See the months';
+          return;
+        }
+        const days = chains[0]?.days ?? [];
         const s = chainStats(days, now);
         const set = new Set(days);
         const start = addDays(startOfDay(now), -13);
@@ -249,6 +304,64 @@ const progressUrl = url('/progress');
   .glance :global(.bar__day--today) {
     fill: var(--color-text);
     font-weight: 700;
+  }
+
+  .glance :global(.glance__chains) {
+    display: grid;
+    gap: var(--space-1);
+    list-style: none;
+    padding: 0;
+  }
+
+  .glance :global(.glance__chains li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    max-width: none;
+    font-size: var(--text-sm);
+  }
+
+  .glance :global(.glance__chain-name) {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .glance :global(.glance__chain-dots) {
+    display: flex;
+    flex-shrink: 0;
+    gap: 4px;
+  }
+
+  .glance :global(.glance__chain-dots span) {
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: 50%;
+  }
+
+  .glance :global(.glance__chain-dots .is-today) {
+    border: 2px solid var(--color-text);
+  }
+
+  .glance :global(.glance__chain-dots .is-on) {
+    border-color: var(--chain-color);
+    background: var(--chain-color);
+  }
+
+  .glance :global(.glance__chain-run) {
+    min-width: 3.5rem;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .glance :global(.glance__chain-more) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
   }
 
   .glance :global(.dots__line) {

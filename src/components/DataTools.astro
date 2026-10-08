@@ -71,6 +71,7 @@ import { url } from '../lib/paths';
     isPersistent,
     parseBackup,
     type BackupData,
+    chainsOf,
   } from '../lib/storage';
   import { applyAppearance, applyTheme } from '../lib/appearance';
   import { backupSummary, downloadBackup } from '../lib/export/backup';
@@ -120,10 +121,18 @@ import { url } from '../lib/paths';
         }
         pending = result.data;
         const d = result.data;
+        const chains = chainsOf(d.chain);
+        const chainDays = chains.reduce((n, c) => n + c.days.length, 0);
+        const chainText =
+          chains.length > 1
+            ? ` and ${chains.length} chains (${chainDays} days)`
+            : chains.length
+              ? ` and a chain for “${chains[0]!.habit}” (${chainDays} days)`
+              : '';
         summary.textContent =
           `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.filter((x) => x.deletedAt === undefined).length} done items, ` +
           `${d.tasks.items.filter((t) => t.deletedAt === undefined).length} tasks` +
-          `${d.chain.habit ? ` and a chain for “${d.chain.habit}” (${d.chain.days.length} days)` : ''}.` +
+          `${chainText}.` +
           `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
         panel.hidden = false;
         say('');
