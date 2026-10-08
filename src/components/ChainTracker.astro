@@ -91,6 +91,7 @@ const Heading = headingLevel;
 <script>
   import {
     addChain,
+    CHAIN_COLORS,
     deleteChain,
     getChains,
     MAX_CHAINS,
@@ -108,8 +109,6 @@ const Heading = headingLevel;
 
   /** Days you can still mark or unmark, counting today. Older days are read-only. */
   const EDIT_DAYS = 7;
-  /** Chain colours, by ChainEntry.color. The first chain keeps the accent green. */
-  const COLORS = ['var(--color-accent)', 'var(--cat-reward)', 'var(--cat-visual)', 'var(--cat-time)', 'var(--cat-rest)'];
   const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const shortMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
 
@@ -233,7 +232,7 @@ const Heading = headingLevel;
         const isOpen = ch.id === openId;
         const set = new Set(ch.days);
         const now = startOfDay(new Date());
-        r.el.style.setProperty('--chain-color', COLORS[ch.color % COLORS.length]!);
+        r.el.style.setProperty('--chain-color', CHAIN_COLORS[ch.color % CHAIN_COLORS.length]!);
         r.el.classList.toggle('is-open', isOpen);
         r.name.textContent = ch.habit;
         r.sub.textContent =

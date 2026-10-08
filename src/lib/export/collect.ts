@@ -3,7 +3,7 @@
  * chosen in the export dialog. Pure — the caller passes the stored data in.
  */
 import { addDays, dayKey, formatShort, startOfDay, startOfWeek, type DayKey } from '../dates';
-import type { Chain, DoneItem, FocusSession, Task } from '../storage';
+import { chainsOf, type Chain, type ChainEntry, type DoneItem, type FocusSession, type Task } from '../storage';
 
 export type ExportRange = 'week' | '30d' | 'all';
 
@@ -38,7 +38,10 @@ export interface ExportData {
   /** Sessions, done items and chain days inside the range, oldest first. Empty if not included. */
   sessions: FocusSession[];
   done: DoneItem[];
-  chainDays: DayKey[];
+  /** One entry per marked day of each chain. */
+  chainDays: { day: DayKey; habit: string }[];
+  /** Every chain, whatever the range. */
+  chains: ChainEntry[];
   chain: Chain;
 }
 
@@ -56,6 +59,7 @@ export function collect(source: ExportSource, options: ExportOptions, now = new 
   const from = rangeStart(options.range, now);
   const since = from?.getTime() ?? -Infinity;
   const fromKey = from ? dayKey(from) : '';
+  const chains = chainsOf(source.chain);
   const rangeLabel =
     options.range === 'week' ? `${formatShort(from!)} – ${yearFmt.format(addDays(from!, 6))}` : RANGE_LABELS[options.range];
   return {
@@ -67,7 +71,12 @@ export function collect(source: ExportSource, options: ExportOptions, now = new 
     allSessions: source.sessions,
     sessions: options.sessions ? source.sessions.filter((s) => s.start >= since).sort((a, b) => a.start - b.start) : [],
     done: options.done ? source.done.filter((d) => d.deletedAt === undefined && d.doneAt >= since).sort((a, b) => a.doneAt - b.doneAt) : [],
-    chainDays: options.chain ? source.chain.days.filter((k) => k >= fromKey).sort() : [],
+    chainDays: options.chain
+      ? chains
+          .flatMap((c) => c.days.filter((k) => k >= fromKey).map((day) => ({ day, habit: c.habit })))
+          .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0))
+      : [],
+    chains,
     chain: source.chain,
   };
 }

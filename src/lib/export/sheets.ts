@@ -168,7 +168,7 @@ export function buildSheet(data: ExportData, title: string): SheetBuild {
 
   if (options.chain) {
     const rows = [row(...['Day marked', 'Habit'].map(head))];
-    for (const key of data.chainDays) rows.push(row(day(fromDayKey(key)), str(data.chain.habit)));
+    for (const d of data.chainDays) rows.push(row(day(fromDayKey(d.day)), str(d.habit)));
     add('Chain', rows);
   }
 

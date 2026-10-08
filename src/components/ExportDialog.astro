@@ -85,7 +85,7 @@
 </dialog>
 
 <script>
-  import { getChain, getDoneStore, getSessions, getTasks } from '../lib/storage';
+  import { getChain, getChains, getDoneStore, getSessions, getTasks } from '../lib/storage';
   import { collect, RANGE_LABELS, type ExportData, type ExportOptions, type ExportRange } from '../lib/export/collect';
   import { buildSheet } from '../lib/export/sheets';
   import { buildDoc } from '../lib/export/docs';
@@ -189,7 +189,7 @@
                 ['Tasks', plural(getTasks().length, 'task')],
                 ['Focus sessions', plural(getSessions().length, 'session')],
                 ['Done list', plural(getDoneStore().filter((d) => d.deletedAt === undefined).length, 'item')],
-                ['Chain', plural(getChain().days.length, 'day')],
+                ['Chains', plural(getChains().reduce((n, c) => n + c.days.length, 0), 'day')],
                 ['Settings', 'theme, look, timer'],
               ];
       parts.replaceChildren(

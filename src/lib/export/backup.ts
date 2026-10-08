@@ -1,6 +1,6 @@
 /** The backup file: everything, as JSON that "Import from JSON" reads back. */
 import { dayKey } from '../dates';
-import { exportBackup, type Backup } from '../storage';
+import { chainsOf, exportBackup, type Backup } from '../storage';
 
 export const backupFileName = (now = new Date()) => `rewarding-work-${dayKey(now)}.json`;
 
@@ -22,5 +22,6 @@ export function backupSummary({ data: d }: Backup): string {
   const done = d.done.filter((x) => x.deletedAt === undefined).length;
   const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
   const exam = d.exam.exam ? ', your exam plan' : '';
-  return `${d.sessions.length} sessions, ${done} done items, ${tasks} tasks${exam} and ${d.chain.days.length} chain days`;
+  const chainDays = chainsOf(d.chain).reduce((n, c) => n + c.days.length, 0);
+  return `${d.sessions.length} sessions, ${done} done items, ${tasks} tasks${exam} and ${chainDays} chain days`;
 }

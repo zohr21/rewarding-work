@@ -541,8 +541,8 @@ export interface ChainEntry {
 
 export const MAIN_CHAIN = 'main';
 export const MAX_CHAINS = 8;
-/** How many chain colours there are to hand out. */
-export const CHAIN_COLORS = 5;
+/** Chain colours, by ChainEntry.color. The first chain keeps the accent green. */
+export const CHAIN_COLORS = ['var(--color-accent)', 'var(--cat-reward)', 'var(--cat-visual)', 'var(--cat-time)', 'var(--cat-rest)'];
 
 const isBestRecord = (v: unknown): v is [string, number] =>
   Array.isArray(v) && v.length === 2 && isDayKey(v[0]) && typeof v[1] === 'number';
@@ -603,13 +603,16 @@ export function setChain(chain: Chain): void {
   write('chain', cleanChain(chain));
 }
 
-/** Every chain that has a habit, the first chain first. */
-export function getChains(): ChainEntry[] {
-  const c = getChain();
+/** Every chain in a stored record that has a habit, the first chain first. */
+export function chainsOf(c: Chain): ChainEntry[] {
   return [
     ...(c.habit ? [{ id: MAIN_CHAIN, habit: c.habit, days: c.days, color: 0 }] : []),
     ...(c.more ?? []).filter((m) => !m.deletedAt).map((m) => ({ id: m.id, habit: m.habit, days: m.days, color: m.color ?? 1 })),
   ];
+}
+
+export function getChains(): ChainEntry[] {
+  return chainsOf(getChain());
 }
 
 /** Start a chain for a habit. Returns its id, or null when the name is empty or there are MAX_CHAINS already. */
@@ -623,9 +626,9 @@ export function addChain(habit: string): string | null {
     return MAIN_CHAIN;
   }
   const used = new Set(live.map((l) => l.color));
-  const color = Array.from({ length: CHAIN_COLORS }, (_, i) => i).find((i) => !used.has(i)) ?? live.length % CHAIN_COLORS;
+  const color = CHAIN_COLORS.findIndex((_, i) => !used.has(i));
   const id = newId('chain');
-  setChain({ ...c, more: [...(c.more ?? []), { id, habit: name, days: [], color }] });
+  setChain({ ...c, more: [...(c.more ?? []), { id, habit: name, days: [], color: color < 0 ? live.length % CHAIN_COLORS.length : color }] });
   return id;
 }
 
