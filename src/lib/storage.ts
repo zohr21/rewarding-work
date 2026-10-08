@@ -271,7 +271,7 @@ export function setTheme(choice: ThemeChoice): void {
 /** Soft CSS glows (cheap, always available). */
 export const GLOWS = ['sunrise', 'meadow', 'lavender'] as const;
 /** WebGL scenes (src/lib/scene). Fall back to the Sunrise glow where WebGL is unavailable. */
-export const SCENES = ['aurora', 'lights', 'water', 'hills'] as const;
+export const SCENES = ['lake', 'ripples', 'shallows', 'water', 'aurora', 'lights', 'hills'] as const;
 export const BACKDROPS = [...GLOWS, ...SCENES, 'plain'] as const;
 export type Backdrop = (typeof BACKDROPS)[number];
 export type SceneId = (typeof SCENES)[number];
