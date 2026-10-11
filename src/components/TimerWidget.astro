@@ -114,6 +114,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     <input type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
     <datalist data-task-options></datalist>
   </label>
+  {/* The Android app's web view doesn't open the suggestions above, so there your tasks are buttons (timer-ui.ts). */}
+  {NATIVE_APP && <div class="timer__picks" role="group" aria-label="Your tasks" data-task-picks hidden />}
   <p class="timer__task muted" data-task-link hidden></p>
 
   <div class="timer__jot">
@@ -748,6 +750,45 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   :global(html[data-app]) .timer__task {
     inline-size: 100%;
     padding-inline: var(--space-4);
+  }
+
+  /* Your tasks, one tap each: a row that scrolls sideways under the field. */
+  .timer__picks {
+    order: 6;
+    display: flex;
+    gap: var(--space-2);
+    inline-size: 100%;
+    margin-top: calc(-1 * var(--space-2));
+    padding-bottom: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .timer__picks[hidden] {
+    display: none;
+  }
+
+  .timer__picks :global(.timer__pick) {
+    flex: none;
+    max-inline-size: 15rem;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 12px;
+    background: none;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .timer__picks :global(.timer__pick[aria-pressed='true']) {
+    border-color: var(--accent-edge);
+    background: var(--color-accent-soft);
+    font-weight: 700;
   }
 
   /* The main button on its own row; the quieter ones share the row under it. */

@@ -12,7 +12,7 @@ import { el } from '../lib/dom';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
-import { jot, listOf, logSession, taskName, type SessionLog } from '../lib/tasks';
+import { jot, listOf, logSession, taskName, todayTasks, type SessionLog } from '../lib/tasks';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -121,6 +121,8 @@ function mountTimer(root: HTMLElement): () => void {
     live: q<HTMLElement>('[data-live]'),
     /** The app's full-screen "Session complete" (TimerWidget.astro); not there on the site. */
     done: root.querySelector<HTMLDialogElement>('[data-done]'),
+    /** The app's row of tasks to pick from, under "What are you working on?". */
+    picks: root.querySelector<HTMLElement>('[data-task-picks]'),
   };
   // In the app the note form is part of that screen.
   els.done?.querySelector('[data-done-slot]')?.append(els.log);
@@ -552,6 +554,23 @@ function mountTimer(root: HTMLElement): () => void {
         ...openChapters().map((ch) => ch.name),
       ].map((value) => Object.assign(document.createElement('option'), { value })),
     );
+    if (els.picks) {
+      // Today's tasks first, in their order; then the rest, and open exam chapters.
+      const open = getTasks().filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox');
+      const today = todayTasks(open);
+      const names = [...today, ...open.filter((t) => !today.includes(t))].map((t) => t.title).concat(openChapters().map((ch) => ch.name));
+      const chosen = els.label.value.trim().toLowerCase();
+      els.picks.hidden = names.length === 0;
+      els.picks.replaceChildren(
+        ...[...new Set(names)].slice(0, 12).map((name) => {
+          const b = el('button', 'timer__pick', name);
+          b.type = 'button';
+          b.dataset.pick = name;
+          b.setAttribute('aria-pressed', String(name.toLowerCase() === chosen));
+          return b;
+        }),
+      );
+    }
     const task = state.taskId ? getTask(state.taskId) : null;
     const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
     els.taskLink.hidden = !task && !chapter;
@@ -614,13 +633,25 @@ function mountTimer(root: HTMLElement): () => void {
     }
   });
 
-  els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
-  els.label.setAttribute('list', els.taskOptions.id);
+  // The suggestions come from a <datalist>. The Android app's web view doesn't open one,
+  // so there the same tasks are a row of buttons under the field (renderTasks).
+  if (!els.picks) {
+    els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
+    els.label.setAttribute('list', els.taskOptions.id);
+  }
 
-  els.label.addEventListener('input', () => {
+  const onLabel = () => {
     state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id ?? chapterForLabel(els.label.value)?.id);
     write('timer', state);
     renderTasks();
+  };
+  els.label.addEventListener('input', onLabel);
+  els.picks?.addEventListener('click', (e) => {
+    const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-pick]');
+    if (!pick) return;
+    els.label.value = pick.dataset.pick!;
+    onLabel();
+    announce(`Working on ${pick.dataset.pick}.`);
   });
 
   // Arriving from "Focus on this" on the tasks page: /timer?task=<id>
