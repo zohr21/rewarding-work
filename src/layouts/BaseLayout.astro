@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
+import AppNav from '../components/AppNav.astro';
 import Ambient from '../components/Ambient.astro';
 import RewardNotice from '../components/RewardNotice.astro';
 import UndoToast from '../components/UndoToast.astro';
@@ -25,7 +26,7 @@ const sceneIds = SCENES.join('|');
 ---
 
 <!doctype html>
-<html lang={SITE.lang} data-theme="dark" data-bg="sunrise" data-bg-kind="glow" data-motion="on">
+<html lang={SITE.lang} data-theme="dark" data-bg="sunrise" data-bg-kind="glow" data-motion="on" data-app={NATIVE_APP ? '' : undefined}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -78,7 +79,8 @@ const sceneIds = SCENES.join('|');
     <main id="main" tabindex="-1">
       <slot />
     </main>
-    <SiteFooter />
+    {/* The Android app has a bottom bar where the site has its footer. */}
+    {NATIVE_APP ? <AppNav /> : <SiteFooter />}
     <RewardNotice />
     <UndoToast />
 

@@ -5,13 +5,35 @@
  * Add, move, break down, start a focus session on, finish, reopen or delete tasks.
  * Focus time comes from timer sessions whose label matched the task.
  */
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
 const timerUrl = url('/timer');
+// The Android app shows one list at a time, picked from a row of tabs.
+const TABS = [
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'today', label: 'Today' },
+  { id: 'next', label: 'Next' },
+  { id: 'someday', label: 'Someday' },
+  { id: 'finished', label: 'Done' },
+];
 ---
 
 <section class="card tasks" data-task-list data-timer-url={timerUrl} aria-labelledby="tasks-heading">
   <h2 id="tasks-heading" class="panel-title">Your tasks</h2>
+
+  {
+    NATIVE_APP && (
+      <div class="tasks__tabs" role="group" aria-label="Lists" data-tl-tabs>
+        {TABS.map((tab) => (
+          <button type="button" data-tl-tab={tab.id} aria-pressed={tab.id === 'today' ? 'true' : 'false'}>
+            {tab.label}
+            <span class="tasks__tab-count" data-tl-tab-count />
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   <form class="tasks__form" data-tl-form>
     <label for="tl-new" class="visually-hidden">New task</label>
@@ -25,13 +47,13 @@ const timerUrl = url('/timer');
     <button type="submit" class="btn">Add</button>
   </form>
 
-  <section class="tasks__section tasks__inbox" data-tl-inbox-wrap hidden aria-labelledby="tl-inbox-head">
+  <section class="tasks__section tasks__inbox" data-list="inbox" data-tl-inbox-wrap hidden aria-labelledby="tl-inbox-head">
     <h3 class="tasks__heading tasks__heading--inbox" id="tl-inbox-head" data-tl-inbox-head>Inbox</h3>
     <p class="muted tasks__hint">Thoughts you jotted on the timer. Sort each one into a list, add it to a task's notes, or clear it.</p>
     <ul class="tasks__items" data-tl-inbox></ul>
   </section>
 
-  <section class="tasks__section" aria-labelledby="tl-today-head">
+  <section class="tasks__section" data-list="today" aria-labelledby="tl-today-head">
     <h3 class="tasks__heading tasks__heading--today" id="tl-today-head" data-tl-today-head>Today</h3>
     <div class="tasks__carry" data-tl-carry hidden>
       <p data-tl-carry-text></p>
@@ -44,21 +66,32 @@ const timerUrl = url('/timer');
     <p class="muted tasks__hint" data-tl-today-hint></p>
   </section>
 
-  <section class="tasks__section" aria-labelledby="tl-next-head">
+  <section class="tasks__section" data-list="next" aria-labelledby="tl-next-head">
     <h3 class="tasks__heading tasks__heading--next" id="tl-next-head" data-tl-next-head>Next</h3>
     <ul class="tasks__items" data-tl-next></ul>
     <p class="muted tasks__hint" data-tl-next-empty>Nothing here. Add a task above, or break one down below.</p>
   </section>
 
-  <details class="disclosure tasks__section tasks__someday" data-tl-someday-wrap hidden>
+  <details class="disclosure tasks__section tasks__someday" data-list="someday" data-tl-someday-wrap hidden>
     <summary class="tasks__heading tasks__heading--someday" data-tl-someday-head>Someday</summary>
     <ul class="tasks__items" data-tl-someday></ul>
   </details>
 
-  <details class="disclosure tasks__finished" data-tl-finished-wrap hidden>
+  <details class="disclosure tasks__finished" data-list="finished" data-tl-finished-wrap hidden>
     <summary data-tl-finished-summary>Finished</summary>
     <ul class="tasks__items" data-tl-finished></ul>
   </details>
+  <p class="muted tasks__hint" data-tl-view-empty hidden></p>
+  {
+    NATIVE_APP && (
+      <button type="button" class="btn tasks__fab" data-tl-fab>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+        </svg>
+        New task
+      </button>
+    )
+  }
   <p class="visually-hidden" aria-live="polite" data-tl-live></p>
 </section>
 
@@ -93,6 +126,13 @@ const timerUrl = url('/timer');
   const CLOCK_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l3 2M9 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  /** The list the app's tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
+  let appView = 'today';
+  const VIEW_EMPTY: Record<string, string> = {
+    inbox: 'Nothing to sort. Thoughts you jot on the timer land here.',
+    someday: 'Nothing parked for someday.',
+    finished: 'Nothing finished yet. It will show up here when it is.',
+  };
 
   onPage('task-list', () => {
     const c = cleanups();
@@ -120,6 +160,31 @@ const timerUrl = url('/timer');
       const finishedList = $<HTMLUListElement>('[data-tl-finished]');
       const live = $<HTMLElement>('[data-tl-live]');
       const timerUrl = root.dataset.timerUrl!;
+      // Only in the Android app: the list tabs, the New task button and the steps sheet (tasks.astro).
+      const tabs = root.querySelector<HTMLElement>('[data-tl-tabs]');
+      const viewEmpty = $<HTMLElement>('[data-tl-view-empty]');
+      const sheet = document.querySelector<HTMLDialogElement>('[data-task-sheet]');
+
+      function showView(view: string): void {
+        if (!tabs) return;
+        appView = view;
+        root.dataset.view = view;
+        tabs.querySelectorAll<HTMLElement>('[data-tl-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tlTab === view)));
+        // These two are folded away on the site; a tab shows its list outright.
+        if (view === 'someday') somedayWrap.open = true;
+        if (view === 'finished') finishedWrap.open = true;
+        if ((MOVABLE as string[]).includes(view)) newList.value = view;
+      }
+
+      /** Open the steps sheet on a task, with a way straight into a focus session. */
+      function openSheet(task: Task): void {
+        if (!sheet) return;
+        setCurrentTask(task.id);
+        const go = sheet.querySelector<HTMLAnchorElement>('[data-task-sheet-focus]');
+        if (go) go.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
+        sheet.showModal();
+      }
+
       /** Deleted tasks still offered for Undo (src/lib/undo.ts). */
       const removing = new Set<string>();
 
@@ -301,7 +366,11 @@ const timerUrl = url('/timer');
         const actions = document.createElement('div');
         actions.className = 'task__actions';
         if (active) {
-          if (task.id !== currentId) {
+          if (sheet) {
+            const steps = button('Steps', () => openSheet(task));
+            steps.setAttribute('aria-label', `Steps and notes for “${name}”`);
+            actions.append(steps);
+          } else if (task.id !== currentId) {
             actions.append(
               button('Break down', () => {
                 setCurrentTask(task.id);
@@ -319,7 +388,7 @@ const timerUrl = url('/timer');
             );
           }
           const focusLink = document.createElement('a');
-          focusLink.className = 'btn btn--ghost btn--small';
+          focusLink.className = 'btn btn--ghost btn--small task__go';
           focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
           focusLink.textContent = 'Focus';
           focusLink.setAttribute('aria-label', `Start a focus session on “${name}”`);
@@ -394,6 +463,21 @@ const timerUrl = url('/timer');
         const finishedFocus = finished.reduce((sum, t) => sum + (focus.get(t.id) ?? 0), 0);
         setHead(finishedSummary, 'Finished', plural(finished.length, 'task') + (finishedFocus >= 60 ? `, ${formatFocus(finishedFocus)} of focus` : ''));
         finishedList.replaceChildren(...finished.map((t) => renderTask(t, currentId, focus, maxFocus)));
+
+        if (tabs) {
+          const counts: Record<string, number> = { inbox: inbox.length, today: today.length, next: next.length, someday: someday.length, finished: finished.length };
+          tabs.querySelectorAll<HTMLElement>('[data-tl-tab]').forEach((b) => {
+            const id = b.dataset.tlTab!;
+            const n = counts[id] ?? 0;
+            // The Inbox tab is only there while there is something to sort.
+            if (id === 'inbox') b.hidden = n === 0;
+            b.querySelector('[data-tl-tab-count]')!.textContent = n && id !== 'finished' ? String(n) : '';
+          });
+          if (appView === 'inbox' && !inbox.length) showView('today');
+          const message = counts[appView] ? undefined : VIEW_EMPTY[appView];
+          viewEmpty.hidden = !message;
+          viewEmpty.textContent = message ?? '';
+        }
       }
 
       form.addEventListener('submit', (e) => {
@@ -419,6 +503,35 @@ const timerUrl = url('/timer');
         carried.forEach((t) => moveTask(t.id, 'next'));
         announce(`Moved ${carried.length} to Next.`);
       });
+
+      if (tabs) {
+        const onTab = (e: Event) => {
+          const tab = (e.target as HTMLElement).closest<HTMLElement>('[data-tl-tab]');
+          if (!tab) return;
+          showView(tab.dataset.tlTab!);
+          render();
+        };
+        tabs.addEventListener('click', onTab);
+        // New task: back to the form, on a list a task can be added to.
+        root.querySelector<HTMLElement>('[data-tl-fab]')?.addEventListener('click', () => {
+          if (!(MOVABLE as string[]).includes(appView)) {
+            showView('today');
+            render();
+          }
+          input.scrollIntoView({ block: 'center' });
+          input.focus();
+        });
+        showView(appView);
+      }
+      if (sheet) {
+        // Close from its button, or by tapping the dimmed page behind it.
+        const onSheetClick = (e: Event) => {
+          const el = e.target as HTMLElement;
+          if (el === sheet || el.closest('[data-task-sheet-close], [data-task-sheet-focus]')) sheet.close();
+        };
+        sheet.addEventListener('click', onSheetClick);
+        c.add(() => sheet.removeEventListener('click', onSheetClick));
+      }
 
       // Rings fill once on arrival (global.css); later re-renders show the new state at once.
       root.classList.add('is-entering');
@@ -674,5 +787,130 @@ const timerUrl = url('/timer');
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  /*
+    The Android app: one list at a time, chosen from a row of tabs. The tabs are only
+    in the app's markup, and the script sets data-view only when they are there.
+  */
+  .tasks[data-view] {
+    padding: 0 0 var(--space-5);
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .tasks[data-view] .panel-title {
+    display: none;
+  }
+
+  .tasks__tabs {
+    display: flex;
+    margin-bottom: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .tasks__tabs button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 48px;
+    padding: 0 var(--space-1);
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .tasks__tabs button[hidden] {
+    display: none;
+  }
+
+  .tasks__tabs button[aria-pressed='true'] {
+    border-bottom-color: var(--color-accent);
+    color: var(--color-text);
+    font-weight: 700;
+  }
+
+  .tasks__tab-count {
+    min-inline-size: 20px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .tasks__tab-count:empty {
+    display: none;
+  }
+
+  .tasks__tabs button[aria-pressed='true'] .tasks__tab-count {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  /* Only the chosen list shows; its name is already on the tab. */
+  .tasks[data-view] [data-list] {
+    display: none;
+  }
+
+  .tasks[data-view='inbox'] [data-list='inbox']:not([hidden]),
+  .tasks[data-view='today'] [data-list='today']:not([hidden]),
+  .tasks[data-view='next'] [data-list='next']:not([hidden]),
+  .tasks[data-view='someday'] [data-list='someday']:not([hidden]),
+  .tasks[data-view='finished'] [data-list='finished']:not([hidden]) {
+    display: block;
+  }
+
+  .tasks[data-view] .tasks__section,
+  .tasks[data-view] .tasks__finished {
+    margin-top: var(--space-4);
+  }
+
+  .tasks[data-view] .tasks__heading,
+  .tasks[data-view] .tasks__finished > summary {
+    display: none;
+  }
+
+  /* Bigger targets, and Focus as the one green action on a task. */
+  .tasks[data-view] :global(.task__actions .btn) {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+
+  .tasks[data-view] :global(.task__go) {
+    --btn-edge: var(--accent-edge);
+    background: var(--accent-grad);
+    border-color: transparent;
+    color: var(--color-on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 var(--btn-depth) 0 var(--btn-edge);
+  }
+
+  .tasks[data-view] :global(.tasks__list-select) {
+    min-height: 44px;
+  }
+
+  .tasks__fab {
+    position: fixed;
+    inset-inline-end: var(--space-4);
+    inset-block-end: calc(var(--app-nav-h, 0px) + var(--space-4));
+    z-index: 15;
+    min-height: 56px;
+    padding-inline: var(--space-4) var(--space-5);
+    border-radius: 18px;
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 var(--btn-depth) 0 var(--btn-edge),
+      0 18px 28px -10px rgb(0 0 0 / 0.8);
   }
 </style>

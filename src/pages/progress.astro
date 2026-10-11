@@ -9,6 +9,7 @@ import RewardTiers from '../components/RewardTiers.astro';
 import DoneList from '../components/DoneList.astro';
 import ChainTracker from '../components/ChainTracker.astro';
 import DataTools from '../components/DataTools.astro';
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 ---
 
@@ -23,6 +24,8 @@ import { url } from '../lib/paths';
     </header>
 
     <div class="progress">
+      {/* In the Android app the grove leads the page. */}
+      {NATIVE_APP && <RewardTiers />}
       <ProgressStats />
       <FocusTrend />
       <Heatmap />
@@ -30,7 +33,7 @@ import { url } from '../lib/paths';
         <TechniqueDonut />
         <DoneWeeks />
       </div>
-      <RewardTiers />
+      {!NATIVE_APP && <RewardTiers />}
       <div class="progress__pair">
         <DoneList />
         <ChainTracker />

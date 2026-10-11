@@ -2,6 +2,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProblemCards from '../components/ProblemCards.astro';
 import Quiz from '../components/Quiz.astro';
+import AppToday from '../components/AppToday.astro';
+import { NATIVE_APP } from '../config/app';
 import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 
@@ -12,7 +14,9 @@ const LEVELS = [0, 1, 0, 2, 1, 0, 1, 1, 2, 3, 1, 2, 2, 0, 0, 3, 4, 2, 3, 1, 2, 2
 
 <BaseLayout>
   <div class="container">
-    <header class="hero">
+    {/* The Android app opens on what to work on now; the site opens on what it is. */}
+    {NATIVE_APP && <AppToday />}
+    <header class="hero" hidden={NATIVE_APP}>
       <div class="hero__text">
         <p class="hero__eyebrow">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -45,7 +49,7 @@ const LEVELS = [0, 1, 0, 2, 1, 0, 1, 1, 2, 3, 1, 2, 2, 0, 0, 3, 4, 2, 3, 1, 2, 2
     </header>
 
     <section class="section" aria-labelledby="problems-heading">
-      <h2 id="problems-heading">What's your problem right now?</h2>
+      <h2 id="problems-heading">{NATIVE_APP ? "What's in the way?" : "What's your problem right now?"}</h2>
       <p class="muted section__intro">Pick the one that fits best. Each leads to techniques you can try in minutes.</p>
       <ProblemCards />
     </section>
@@ -58,7 +62,7 @@ const LEVELS = [0, 1, 0, 2, 1, 0, 1, 1, 2, 3, 1, 2, 2, 0, 0, 3, 4, 2, 3, 1, 2, 2
       <Quiz />
     </section>
 
-    <section class="section tools" aria-labelledby="tools-heading">
+    <section class="section tools" aria-labelledby="tools-heading" hidden={NATIVE_APP}>
       <h2 id="tools-heading" class="visually-hidden">Tools</h2>
       <a class="tool-link" href={url('/timer')}>
         <span class="tool-link__icon" aria-hidden="true">
@@ -86,6 +90,12 @@ const LEVELS = [0, 1, 0, 2, 1, 0, 1, 1, 2, 3, 1, 2, 2, 0, 0, 3, 4, 2, 3, 1, 2, 2
 </BaseLayout>
 
 <style>
+  /* Left out of the Android app, which opens on Today instead. */
+  .hero[hidden],
+  .tools[hidden] {
+    display: none;
+  }
+
   .hero {
     display: grid;
     gap: var(--space-6);

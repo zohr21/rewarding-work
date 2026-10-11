@@ -1,0 +1,385 @@
+---
+/**
+ * The Android app's home screen: what to work on now. The task that is first up on
+ * Today with one button to start focusing on it, today's focus, the chain, and the
+ * tier that is closest. Everything is read from stored data; nothing is kept here.
+ */
+import { url } from '../lib/paths';
+---
+
+<section
+  class="today"
+  data-app-today
+  data-timer-url={url('/timer')}
+  data-tasks-url={url('/tasks')}
+  aria-labelledby="today-heading">
+  <header class="today__head">
+    <h1 id="today-heading">Today</h1>
+    <p class="muted" data-td-date></p>
+  </header>
+
+  <div class="card today__first" data-td-first></div>
+
+  <div class="today__pair">
+    <a class="card today__stat" href={url('/progress')}>
+      <span class="today__label">Focus today</span>
+      <strong class="today__value" data-td-focus>0 min</strong>
+      <span class="today__chart" data-td-bars></span>
+    </a>
+    <a class="card today__stat" href={url('/progress')}>
+      <span class="today__label" data-td-chain-label>Chain</span>
+      <strong class="today__value" data-td-chain>None yet</strong>
+      <span class="today__dots" data-td-dots></span>
+    </a>
+  </div>
+
+  <a class="today__nudge" href={`${url('/progress')}#tiers`} data-td-nudge hidden>
+    <span class="tier-coin tier-coin--blank" data-td-nudge-coin></span>
+    <span class="today__nudge-text" data-td-nudge-text></span>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  </a>
+</section>
+
+<script>
+  import { getChain, getChains, getDone, getSessions, getTasks, subscribe } from '../lib/storage';
+  import { allProgress, chainInput, tierLabel } from '../lib/rewards';
+  import { chainStats, dailyMinutes, totals } from '../lib/stats';
+  import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
+  import { miniBars, ring } from '../lib/charts';
+  import { tierIcon } from '../lib/tier-icons';
+  import { addDays, dayKey, startOfWeek } from '../lib/dates';
+  import { cleanups, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const PLAY_SVG =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>';
+
+  onPage('app-today', () => {
+    const root = document.querySelector<HTMLElement>('[data-app-today]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const timerUrl = root.dataset.timerUrl!;
+    const tasksUrl = root.dataset.tasksUrl!;
+
+    function renderFirst(): void {
+      const box = $('[data-td-first]');
+      const today = todayTasks(getTasks());
+      const task = today[0];
+      if (!task) {
+        const title = el('h2', 'today__title', 'Nothing on Today yet');
+        const text = el('p', 'muted', 'Pick one thing that matters and put it first, or just start the timer.');
+        const actions = el('div', 'today__actions');
+        const add = el('a', 'btn', 'Choose a task');
+        add.href = tasksUrl;
+        const go = el('a', 'btn btn--ghost', 'Start a focus session');
+        go.href = timerUrl;
+        actions.append(add, go);
+        box.replaceChildren(title, text, actions);
+        return;
+      }
+
+      const top = el('div', 'today__top');
+      top.append(el('span', 'today__eyebrow', 'First up'));
+      if (today.length > 1) top.append(el('span', 'muted today__more', `${today.length - 1} more on Today`));
+
+      const done = task.steps.filter((s) => s.done).length;
+      const row = el('div', 'today__task');
+      row.append(ring(done, task.steps.length, 56, task.steps.length ? `${done} of ${task.steps.length} steps done` : 'No steps yet'));
+      const text = el('div', 'today__task-text');
+      text.append(el('h2', 'today__title', taskName(task)));
+      const seconds = focusByTask(getSessions()).get(task.id) ?? 0;
+      text.append(el('span', 'muted', seconds ? `${formatFocus(seconds)} focused so far` : 'Not started yet'));
+      row.append(text);
+
+      const parts: HTMLElement[] = [top, row];
+      const next = task.steps.find((s) => !s.done);
+      if (next) {
+        const step = el('p', 'today__step');
+        step.append(el('span', 'today__box'), `Next step: ${next.text}`);
+        parts.push(step);
+      }
+
+      const start = el('a', 'btn today__start');
+      start.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
+      start.innerHTML = PLAY_SVG;
+      start.append('Start focusing');
+      parts.push(start);
+      box.replaceChildren(...parts);
+    }
+
+    function renderFocus(): void {
+      const sessions = getSessions();
+      $('[data-td-focus]').textContent = formatFocus(totals(sessions).todayMin * 60);
+      const week = dailyMinutes(sessions, 7);
+      $('[data-td-bars]').innerHTML = miniBars(
+        week.map((d) => d.value),
+        6,
+        'Focus minutes for the last seven days, ending today',
+      );
+    }
+
+    function renderChain(): void {
+      const chain = getChains()[0];
+      const label = $('[data-td-chain-label]');
+      const value = $('[data-td-chain]');
+      const dots = $('[data-td-dots]');
+      if (!chain) {
+        label.textContent = 'Chain';
+        value.textContent = 'None yet';
+        dots.replaceChildren(el('span', 'muted today__hint', 'Pick a daily habit to mark'));
+        return;
+      }
+      const stats = chainStats(chain.days);
+      label.textContent = `Chain · ${chain.habit}`;
+      value.textContent = `${stats.current} ${stats.current === 1 ? 'day' : 'days'}`;
+      const marked = new Set(chain.days);
+      const monday = startOfWeek(new Date());
+      const todayKey = dayKey(new Date());
+      dots.replaceChildren(
+        ...Array.from({ length: 7 }, (_, i) => {
+          const key = dayKey(addDays(monday, i));
+          return el('span', `today__dot${marked.has(key) ? ' is-on' : key === todayKey ? ' is-today' : ''}`);
+        }),
+      );
+      dots.setAttribute('role', 'img');
+      dots.setAttribute('aria-label', `This week, ${stats.doneToday ? 'today is marked' : 'today is still open'}`);
+    }
+
+    /** The one tier that is closest, so the home screen points at a single next thing. */
+    function renderNudge(): void {
+      const nudge = $<HTMLAnchorElement>('[data-td-nudge]');
+      const closest = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) })
+        .flatMap((p) => {
+          const next = p.track.thresholds[p.level];
+          if (next === undefined) return [];
+          const prev = p.level ? p.track.thresholds[p.level - 1]! : 0;
+          return [{ p, next, share: (p.value - prev) / (next - prev) }];
+        })
+        .sort((a, b) => b.share - a.share)[0];
+      nudge.hidden = !closest;
+      if (!closest) return;
+      const { p, next, share } = closest;
+      const left = p.track.id === 'focus' ? Math.ceil((next - p.value) * 10) / 10 : Math.ceil(next - p.value);
+      const coin = $('[data-td-nudge-coin]');
+      coin.innerHTML = tierIcon(p.level, 22);
+      coin.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
+      coin.style.setProperty('--next', `var(--tier-${p.level})`);
+      const text = $('[data-td-nudge-text]');
+      text.replaceChildren(el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} · ${p.track.title}`);
+    }
+
+    const render = () => {
+      $('[data-td-date]').textContent = dateFmt.format(new Date());
+      renderFirst();
+      renderFocus();
+      renderChain();
+      renderNudge();
+    };
+    render();
+    (['tasks', 'sessions', 'chain', 'done'] as const).forEach((name) => c.add(subscribe(name, render)));
+    return c.run;
+  });
+</script>
+
+<style>
+  .today {
+    display: grid;
+    gap: var(--space-3);
+    padding-block: var(--space-4) var(--space-5);
+  }
+
+  .today__head h1 {
+    font-size: var(--text-xl);
+    letter-spacing: -0.01em;
+  }
+
+  .today__head p {
+    font-size: var(--text-sm);
+  }
+
+  .today__first {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .today__first :global(.today__top) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .today__first :global(.today__eyebrow) {
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .today__first :global(.today__more) {
+    font-size: var(--text-xs);
+  }
+
+  .today__first :global(.today__task) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .today__first :global(.today__task-text) {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .today__first :global(.today__title) {
+    font-size: var(--text-lg);
+    line-height: var(--leading-tight);
+    overflow-wrap: anywhere;
+  }
+
+  .today__first :global(.today__step) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .today__first :global(.today__box) {
+    flex: none;
+    inline-size: 20px;
+    block-size: 20px;
+    border: 2px solid var(--color-border-strong);
+    border-radius: 7px;
+  }
+
+  .today__first :global(.today__start) {
+    min-height: 56px;
+    margin-bottom: 4px;
+    border-radius: 16px;
+    font-size: var(--text-base);
+    font-weight: 700;
+  }
+
+  .today__first :global(.today__actions) {
+    display: grid;
+    gap: var(--space-3);
+    margin-bottom: 4px;
+  }
+
+  .today__first :global(.today__actions .btn) {
+    min-height: 52px;
+  }
+
+  .today__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .today__stat {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .today__label {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .today__value {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    line-height: 1;
+  }
+
+  .today__chart,
+  .today__dots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-block-size: 34px;
+  }
+
+  .today__dots :global(.today__dot) {
+    flex: 1;
+    aspect-ratio: 1;
+    max-inline-size: 22px;
+    border-radius: 6px;
+    background: var(--heat-0);
+  }
+
+  .today__dots :global(.today__dot.is-on) {
+    background: var(--heat-3);
+    box-shadow: 0 2px 0 var(--heat-edge-3);
+  }
+
+  .today__dots :global(.today__dot.is-today) {
+    background: transparent;
+    border: 2px dashed var(--color-accent);
+  }
+
+  .today__dots :global(.today__hint) {
+    font-size: var(--text-xs);
+  }
+
+  /* The closest tier: a blank coin with a ring that fills in the next material's colour. */
+  .today__nudge {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 18px;
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+
+  .today__nudge[hidden] {
+    display: none;
+  }
+
+  .today__nudge .tier-coin {
+    --coin-size: 38px;
+    margin: 0;
+    opacity: 1;
+    color: var(--next);
+    background:
+      radial-gradient(circle, var(--well-bg) 58%, transparent 60%),
+      conic-gradient(var(--next) var(--share), var(--color-border) 0);
+    box-shadow: none;
+  }
+
+  .today__nudge-text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .today__nudge > svg {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+</style>

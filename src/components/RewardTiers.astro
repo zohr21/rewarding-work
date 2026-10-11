@@ -1,22 +1,24 @@
 ---
 /**
- * Reward tiers on the progress page: one ladder of five tiers per track
- * (src/lib/rewards.ts), with how far it is to the next one.
+ * Reward tiers on the progress page: a grove with one plant per track, then one
+ * ladder of five tiers per track (src/lib/rewards.ts), with how far it is to the next one.
  */
 ---
 
-<section class="card tiers" data-reward-tiers aria-labelledby="tiers-heading">
-  <h2 id="tiers-heading" class="panel-title">Tiers</h2>
+<section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
+  <h2 id="tiers-heading" class="panel-title">Your grove</h2>
   <p class="muted tiers__intro">
-    Markers along the way — there to show how far you've come, not to keep score. The chain counts your best run, so a
-    missed day never takes a tier away.
+    Markers along the way — there to show how far you've come, not to keep score. Green to start, then bronze, silver
+    and gold, with diamond for the hardest runs. The chain counts your best run, so a missed day never takes a tier
+    away.
   </p>
+  <ul class="grove" data-tiers-grove aria-label="One plant per track"></ul>
   <ul class="tiers__grid" data-tiers-list></ul>
 </section>
 
 <script>
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
-  import { allProgress, chainInput, TIER_NAMES, type TrackProgress } from '../lib/rewards';
+  import { allProgress, chainInput, tierLabel, TIER_MATERIALS, TIER_NAMES, type TrackProgress } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
   import { cleanups, onPage } from '../lib/page';
 
@@ -45,14 +47,14 @@
     const current = document.createElement('p');
     current.className = `tier__current${level ? '' : ' muted'}`;
     current.innerHTML = level ? LEAF_SVG : '';
-    current.append(level ? TIER_NAMES[level - 1]! : 'No tier yet');
+    current.append(level ? tierLabel(level - 1) : 'No tier yet');
     const text = document.createElement('div');
     text.className = 'tier__text';
     text.append(title, current);
 
-    // A 3D coin: amber and lit once a tier is reached, a dark blank before that.
+    // A 3D coin in the tier's material, a dark blank before the first one.
     const coin = document.createElement('span');
-    coin.className = `tier__coin${level ? ' is-earned' : ''}`;
+    coin.className = `tier-coin ${level ? `tier-coin--t${level - 1}` : 'tier-coin--blank'}`;
     coin.innerHTML = tierIcon(Math.max(0, level - 1), 26);
     head.append(coin, text);
 
@@ -63,6 +65,8 @@
       const pip = document.createElement('li');
       const at = reachedAt[i];
       pip.className = `tier__pip${at !== null ? ' is-reached' : ''}`;
+      pip.style.setProperty('--pip', `var(--tier-${i})`);
+      pip.style.setProperty('--pip-edge', `var(--tier-${i}-edge)`);
       if (i === level) {
         const prev = level ? track.thresholds[level - 1]! : 0;
         const fill = document.createElement('span');
@@ -70,7 +74,7 @@
         fill.style.inlineSize = `${Math.min(100, Math.max(0, ((p.value - prev) / (n - prev)) * 100))}%`;
         pip.append(fill);
       }
-      const label = `${TIER_NAMES[i]}: ${track.describe(n)}`;
+      const label = `${tierLabel(i)}: ${track.describe(n)}`;
       pip.title = at !== null ? `${label} — reached ${dateFmt.format(at)}` : label;
       const name = document.createElement('span');
       name.className = 'visually-hidden';
@@ -87,9 +91,39 @@
     if (next === undefined) {
       foot.textContent = `All five tiers reached — ${track.describe(track.thresholds.at(-1)!)}.`;
     } else {
-      foot.textContent = `${amount(p)} of ${next} ${track.unit(next)} to ${TIER_NAMES[level]}`;
+      foot.textContent = `${amount(p)} of ${next} ${track.unit(next)} to ${tierLabel(level)}`;
     }
     li.append(foot);
+    return li;
+  }
+
+  /** The track's plant, as tall as its tier, standing on the grove's ground line. */
+  function renderPlant(p: TrackProgress): HTMLLIElement {
+    const { track, level } = p;
+    const li = document.createElement('li');
+    li.className = 'grove__plant';
+    const plant = document.createElement('span');
+    plant.className = `grove__glyph${level ? '' : ' is-bare'}`;
+    plant.innerHTML = tierIcon(Math.max(0, level - 1), 36 + level * 10);
+    const name = document.createElement('span');
+    name.className = 'grove__tier';
+    if (level) {
+      const dot = document.createElement('span');
+      dot.className = 'grove__dot';
+      dot.style.setProperty('--pip', `var(--tier-${level - 1})`);
+      dot.style.setProperty('--pip-edge', `var(--tier-${level - 1}-edge)`);
+      name.append(dot, TIER_MATERIALS[level - 1]!);
+    } else {
+      name.textContent = 'Not yet';
+    }
+    const title = document.createElement('span');
+    title.className = 'grove__track';
+    title.textContent = track.title;
+    const say = document.createElement('span');
+    say.className = 'visually-hidden';
+    say.textContent = level ? `: ${TIER_NAMES[level - 1]}.` : ': no tier yet.';
+    title.append(say);
+    li.append(plant, name, title);
     return li;
   }
 
@@ -97,8 +131,10 @@
     const c = cleanups();
     document.querySelectorAll<HTMLElement>('[data-reward-tiers]').forEach((root) => {
       const list = root.querySelector<HTMLElement>('[data-tiers-list]')!;
+      const grove = root.querySelector<HTMLElement>('[data-tiers-grove]')!;
       const render = () => {
         const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
+        grove.replaceChildren(...progress.map(renderPlant));
         list.replaceChildren(...progress.map(renderTrack));
       };
       render();
@@ -153,32 +189,64 @@
     min-width: 0;
   }
 
-  .tiers__grid :global(.tier__coin) {
+  /* The grove: four plants on one ground line, each as tall as its tier. */
+  .grove {
     display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 56px;
-    height: 56px;
-    margin-bottom: 5px;
-    border-radius: 50%;
-    background: var(--raised-grad);
-    color: var(--color-text-muted);
-    box-shadow:
-      inset 0 2px 0 var(--raised-hl),
-      0 5px 0 var(--edge),
-      0 12px 18px -8px rgb(0 0 0 / 0.5);
-    opacity: 0.8;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-1);
+    margin-top: var(--space-4);
+    padding: var(--space-4) var(--space-2) var(--space-3);
+    list-style: none;
+    background: var(--well-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--well-shadow);
   }
 
-  .tiers__grid :global(.tier__coin.is-earned) {
-    background: radial-gradient(circle at 35% 28%, #ffe9c7, #f2b877 50%, #c9832f);
-    color: #4a2804;
-    opacity: 1;
-    box-shadow:
-      inset 0 2px 0 rgb(255 255 255 / 0.55),
-      inset 0 -6px 10px rgb(0 0 0 / 0.18),
-      0 5px 0 #8a4b08,
-      0 14px 22px -8px rgb(242 184 119 / 0.5);
+  .grove :global(.grove__plant) {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: 2px;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .grove :global(.grove__glyph) {
+    display: grid;
+    align-items: end;
+    justify-items: center;
+    block-size: 84px;
+    inline-size: 100%;
+    margin-bottom: var(--space-2);
+    color: var(--color-accent);
+    border-bottom: 6px solid var(--heat-edge-2);
+    border-radius: 0 0 3px 3px;
+  }
+
+  .grove :global(.grove__glyph.is-bare) {
+    color: var(--color-border-strong);
+  }
+
+  .grove :global(.grove__tier) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .grove :global(.grove__dot) {
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 50%;
+    background: var(--pip);
+    box-shadow: 0 1.5px 0 var(--pip-edge);
+  }
+
+  .grove :global(.grove__track) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
   }
 
   .tiers__grid :global(.tier__title) {
@@ -218,15 +286,16 @@
     overflow: hidden;
   }
 
+  /* Each segment is the colour of its tier's coin. */
   .tiers__grid :global(.tier__pip.is-reached) {
-    background: var(--accent-grad);
-    box-shadow: 0 0 10px -2px var(--accent-glow);
+    background: var(--pip);
+    box-shadow: 0 2px 0 var(--pip-edge);
   }
 
   .tiers__grid :global(.tier__fill) {
     display: block;
     block-size: 100%;
-    background: var(--heat-2);
+    background: var(--pip);
     border-radius: inherit;
   }
 

@@ -11,6 +11,11 @@ import { addDays, dayKey, fromDayKey, type DayKey } from './dates';
 import type { Chain, DoneItem, FocusSession } from './storage';
 
 export const TIER_NAMES = ['Seedling', 'Sprout', 'Sapling', 'Tree', 'Grove'] as const;
+/** What each tier's coin is made of: gold is the best regular tier, diamond is for the hardest thresholds. */
+export const TIER_MATERIALS = ['Green', 'Bronze', 'Silver', 'Gold', 'Diamond'] as const;
+
+/** "Silver Sapling" — the tier at `index` with its material. */
+export const tierLabel = (index: number) => `${TIER_MATERIALS[index]} ${TIER_NAMES[index]}`;
 
 export type TrackId = 'focus' | 'sessions' | 'streak' | 'done';
 

@@ -1,0 +1,48 @@
+---
+/**
+ * The two halves of Learn in the Android app, where Exam prep has no place of its
+ * own in the bottom bar (AppNav.astro): Techniques and Exam prep, as tabs.
+ */
+import { isActive, url } from '../lib/paths';
+
+const current = Astro.url.pathname;
+const TABS = [
+  { label: 'Techniques', href: '/techniques' },
+  { label: 'Exam prep', href: '/exam' },
+];
+---
+
+<nav class="learn-tabs" aria-label="Learn">
+  {
+    TABS.map((tab) => (
+      <a href={url(tab.href)} aria-current={isActive(current, tab.href) ? 'page' : undefined}>
+        {tab.label}
+      </a>
+    ))
+  }
+</nav>
+
+<style>
+  .learn-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-top: var(--space-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .learn-tabs a {
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    border-bottom: 3px solid transparent;
+    color: var(--color-text-muted);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .learn-tabs a[aria-current='page'] {
+    border-bottom-color: var(--color-accent);
+    color: var(--color-text);
+    font-weight: 700;
+  }
+</style>
