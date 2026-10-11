@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import TimerWidget from '../components/TimerWidget.astro';
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 ---
 
@@ -8,7 +9,8 @@ import { url } from '../lib/paths';
   <div class="container timer-page">
     <header class="page-header">
       <h1>Focus timer</h1>
-      <p>Pick a rhythm, name your task if you like, and start.</p>
+      {/* The Android app keeps the top of the screen for the timer itself. */}
+      {!NATIVE_APP && <p>Pick a rhythm, name your task if you like, and start.</p>}
     </header>
 
     <TimerWidget standalone />

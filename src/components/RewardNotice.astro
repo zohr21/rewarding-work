@@ -14,11 +14,27 @@ import { url } from '../lib/paths';
 <div class="achievements" data-reward-notice data-progress-url={url('/progress')} transition:persist="reward-notice">
   <ol class="achievements__stack" data-rn-stack></ol>
   <p class="visually-hidden" role="status" data-rn-live></p>
+
+  <!-- Silver and above get the whole screen for a moment; the first two tiers stay a toast. -->
+  <dialog class="tier-up" data-rn-dialog aria-labelledby="tier-up-name">
+    <button type="button" class="tier-up__close" data-rn-close aria-label="Close">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg>
+    </button>
+    <span class="tier-up__coin" data-rn-coin></span>
+    <p class="tier-up__eyebrow" data-rn-eyebrow></p>
+    <h2 id="tier-up-name" class="tier-up__name" data-rn-name></h2>
+    <p class="tier-up__text" data-rn-text></p>
+    <ol class="tier-up__ladder" data-rn-ladder></ol>
+    <div class="tier-up__actions">
+      <a class="btn" href={`${url('/progress')}#tiers`} data-rn-grove>See your grove</a>
+      <button type="button" class="btn btn--ghost" data-rn-close>Keep going</button>
+    </div>
+  </dialog>
 </div>
 
 <script>
   import { getChain, getDone, getSessions, onWrite, subscribe, type StoreName } from '../lib/storage';
-  import { chainInput, earnedTierIds, tierInfo, TIER_NAMES, type TierInfo } from '../lib/rewards';
+  import { chainInput, earnedTierIds, tierInfo, tierLabel, TIER_MATERIALS, TIER_NAMES, type TierInfo } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
   import { armAudioUnlock, cueVolume, playAchievement } from '../lib/timer/cues';
   import { celebrate } from '../lib/appearance';
@@ -29,6 +45,8 @@ import { url } from '../lib/paths';
   /** Toasts after the first wait a moment each, so a burst reads as a sequence. */
   const STAGGER_MS = 700;
   const MAX_VISIBLE = 3;
+  /** Tiers from this index up (Silver) are celebrated full-screen instead of with a toast. */
+  const BIG_FROM = 2;
 
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -92,7 +110,7 @@ import { url } from '../lib/paths';
       li.className = `achievement achievement--t${tier.index}`;
 
       const badge = document.createElement('span');
-      badge.className = 'achievement__badge';
+      badge.className = `tier-coin tier-coin--t${tier.index} achievement__badge`;
       badge.innerHTML = tierIcon(tier.index, 30);
 
       const body = document.createElement('a');
@@ -103,7 +121,7 @@ import { url } from '../lib/paths';
       eyebrow.textContent = 'Achievement unlocked';
       const name = document.createElement('span');
       name.className = 'achievement__name';
-      name.textContent = `${tier.name} · ${tier.track.title}`;
+      name.textContent = `${tierLabel(tier.index)} · ${tier.track.title}`;
       const text = document.createElement('span');
       text.className = 'achievement__text';
       text.textContent = `${capitalise(tier.track.describe(tier.threshold))}.`;
@@ -147,10 +165,61 @@ import { url } from '../lib/paths';
       });
     }
 
+    const dialog = root.querySelector<HTMLDialogElement>('[data-rn-dialog]')!;
+    const big: TierInfo[] = [];
+
+    /** Fill the full-screen moment for one tier and open it; the next one waits for it to close. */
+    function openBig(): void {
+      const tier = big.shift();
+      if (!tier || dialog.open) return;
+      dialog.className = `tier-up tier-up--t${tier.index}`;
+      const coin = dialog.querySelector<HTMLElement>('[data-rn-coin]')!;
+      coin.className = `tier-coin tier-coin--t${tier.index} tier-up__coin`;
+      coin.innerHTML = tierIcon(tier.index, 92);
+      dialog.querySelector('[data-rn-eyebrow]')!.textContent =
+        `${tier.index === TIER_NAMES.length - 1 ? 'Hardest tier' : 'New tier'} · ${tier.track.title}`;
+      dialog.querySelector('[data-rn-name]')!.textContent = tierLabel(tier.index);
+      dialog.querySelector('[data-rn-text]')!.textContent =
+        `${capitalise(tier.track.describe(tier.threshold))}. This one stays yours, whatever tomorrow brings.`;
+      const ladder = dialog.querySelector<HTMLElement>('[data-rn-ladder]')!;
+      ladder.replaceChildren(
+        ...TIER_NAMES.map((_, i) => {
+          const li = document.createElement('li');
+          if (i === tier.index) li.className = 'is-new';
+          const c = document.createElement('span');
+          c.className = `tier-coin ${i <= tier.index ? `tier-coin--t${i}` : 'tier-coin--blank'}`;
+          c.innerHTML = tierIcon(i, 20);
+          const label = document.createElement('span');
+          label.textContent = TIER_MATERIALS[i]!;
+          const say = document.createElement('span');
+          say.className = 'visually-hidden';
+          say.textContent = i <= tier.index ? ', reached.' : ', not reached yet.';
+          label.append(say);
+          li.append(c, label);
+          return li;
+        }),
+      );
+      dialog.showModal();
+      playAchievement(tier.index, cueVolume());
+    }
+
+    const onDialogClick = (e: Event) => {
+      // Buttons close it; so does the link, which then goes on to the grove.
+      if ((e.target as HTMLElement).closest('[data-rn-close], [data-rn-grove]')) dialog.close();
+    };
+    dialog.addEventListener('click', onDialogClick);
+    dialog.addEventListener('close', openBig);
+    c.add(() => {
+      dialog.removeEventListener('click', onDialogClick);
+      dialog.removeEventListener('close', openBig);
+    });
+
     function show(tiers: TierInfo[]): void {
       // Lowest first, so a burst builds up to the biggest one.
       const sorted = [...tiers].sort((a, b) => a.index - b.index);
-      waiting.push(...sorted);
+      waiting.push(...sorted.filter((t) => t.index < BIG_FROM));
+      big.push(...sorted.filter((t) => t.index >= BIG_FROM));
+      openBig();
       const summary = sorted.map((t) => `${t.name}, ${t.track.describe(t.threshold)}`).join('. ');
       live.textContent = '';
       window.setTimeout(() => (live.textContent = `Achievement unlocked: ${summary}.`), 50);
@@ -225,7 +294,8 @@ import { url } from '../lib/paths';
     --ach-accent: #7ec8ff;
     position: fixed;
     inset-inline: var(--gutter) var(--gutter);
-    inset-block-end: var(--space-4);
+    /* Above the app's bottom bar (AppNav.astro), where there is one. */
+    inset-block-end: calc(var(--space-4) + var(--app-nav-h, 0px));
     z-index: 50;
     pointer-events: none;
   }
@@ -275,27 +345,153 @@ import { url } from '../lib/paths';
     animation: ach-out 320ms ease-in both;
   }
 
-  .achievements :global(.achievement--t1) { --tier: #a6d86b; }
-  .achievements :global(.achievement--t2) { --tier: #6cc6c9; }
-  .achievements :global(.achievement--t3) { --tier: #b89cff; }
-  .achievements :global(.achievement--t4) { --tier: #ffc857; }
+  /* The tier's material (tokens.css). */
+  .achievements :global(.achievement--t0) { --tier: var(--tier-0); }
+  .achievements :global(.achievement--t1) { --tier: var(--tier-1); }
+  .achievements :global(.achievement--t2) { --tier: var(--tier-2); }
+  .achievements :global(.achievement--t3) { --tier: var(--tier-3); }
+  .achievements :global(.achievement--t4) { --tier: var(--tier-4); }
 
+  /* A coin (.tier-coin in global.css), like the brand mark and the tiers on the Progress page. */
   .achievements :global(.achievement__badge) {
+    --coin-size: 3.5rem;
+    animation: ach-pop 600ms 180ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  /* ---------- Full-screen tier moment ---------- */
+  .tier-up {
+    --tier: var(--tier-2);
+    pointer-events: auto;
+    position: fixed;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    max-inline-size: none;
+    max-block-size: none;
+    margin: 0;
+    padding: calc(var(--space-7) + env(safe-area-inset-top, 0px)) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: #0e1512;
+    color: #eef1ec;
+    text-align: center;
+    overflow-y: auto;
+  }
+
+  .tier-up[open] {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: var(--space-3);
+  }
+
+  .tier-up::backdrop {
+    background: #0e1512;
+  }
+
+  .tier-up--t3 {
+    --tier: var(--tier-3);
+  }
+
+  /* Diamond gets its own night-blue ground. */
+  .tier-up--t4 {
+    --tier: #a9e4fb;
+    background: #0a1016;
+  }
+
+  .tier-up__close {
+    position: absolute;
+    inset-block-start: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    inset-inline-end: var(--space-3);
     display: grid;
     place-items: center;
-    flex: none;
-    inline-size: 3.5rem;
-    block-size: 3.5rem;
-    margin-bottom: 5px;
-    /* A coin, like the brand mark and the tiers on the Progress page. */
-    border-radius: 50%;
-    color: #10161c;
-    background: radial-gradient(circle at 35% 30%, rgb(255 255 255 / 0.55), transparent 60%), var(--tier);
+    inline-size: 48px;
+    block-size: 48px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .tier-up :global(.tier-up__coin) {
+    --coin-size: min(11rem, 46vw);
+    margin-bottom: var(--space-5);
     box-shadow:
-      inset 0 2px 0 rgb(255 255 255 / 0.45),
-      0 5px 0 color-mix(in srgb, var(--tier) 50%, #000),
-      0 0 18px color-mix(in srgb, var(--tier) 55%, transparent);
-    animation: ach-pop 600ms 180ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+      inset 0 3px 0 rgb(255 255 255 / 0.55),
+      inset 0 -12px 20px rgb(0 0 0 / 0.16),
+      0 14px 0 var(--coin-edge),
+      0 0 60px -6px color-mix(in srgb, var(--coin) 70%, transparent);
+    animation: ach-pop 700ms 120ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  .tier-up__eyebrow {
+    color: var(--tier);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .tier-up__name {
+    font-size: clamp(2.2rem, 1.4rem + 4vw, 3.2rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+
+  .tier-up__text {
+    max-inline-size: 22rem;
+    color: #a7b3ab;
+  }
+
+  .tier-up__ladder {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-1);
+    inline-size: min(100%, 22rem);
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-2);
+    list-style: none;
+    border-radius: var(--radius-lg);
+    background: rgb(0 0 0 / 0.35);
+    box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.6);
+  }
+
+  .tier-up__ladder :global(li) {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    color: #a7b3ab;
+    font-size: 0.75rem;
+  }
+
+  .tier-up__ladder :global(li.is-new) {
+    color: #eef1ec;
+    font-weight: 700;
+  }
+
+  .tier-up__ladder :global(.tier-coin) {
+    --coin-size: 2.25rem;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 3px 0 var(--coin-edge);
+  }
+
+  .tier-up__ladder :global(.tier-coin--blank) {
+    background: #22302a;
+    color: #6f8177;
+    box-shadow: 0 3px 0 #050806;
+    opacity: 1;
+  }
+
+  .tier-up__actions {
+    display: grid;
+    gap: var(--space-3);
+    inline-size: min(100%, 22rem);
+    margin-top: var(--space-5);
+  }
+
+  .tier-up__actions .btn {
+    min-height: 52px;
   }
 
   .achievements :global(.achievement__body) {

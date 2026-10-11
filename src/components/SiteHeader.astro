@@ -4,31 +4,35 @@ import SoundMenu from './SoundMenu.astro';
 import AccountButton from './AccountButton.astro';
 import CoinMark from './CoinMark.astro';
 import { NAV, SITE } from '../config/site';
+import { NATIVE_APP } from '../config/app';
 import { url, isActive } from '../lib/paths';
 
 const current = Astro.url.pathname;
 ---
 
-<header class="site-header">
+<header class:list={['site-header', { 'site-header--app': NATIVE_APP }]}>
   <div class="container site-header__inner">
     <a class="brand" href={url('/')} aria-current={isActive(current, '/') ? 'page' : undefined}>
       <CoinMark size={36} />
       <span class="brand__name">{SITE.name}</span>
     </a>
 
-    <nav class="site-nav" aria-label="Main">
-      <ul>
-        {
-          NAV.map((item) => (
-            <li>
-              <a href={url(item.href)} aria-current={isActive(current, item.href) ? 'page' : undefined}>
-                {item.label}
-              </a>
-            </li>
-          ))
-        }
-      </ul>
-    </nav>
+    {
+      /* The Android app navigates from its bottom bar (AppNav.astro) instead. */
+      !NATIVE_APP && (
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            {NAV.map((item) => (
+              <li>
+                <a href={url(item.href)} aria-current={isActive(current, item.href) ? 'page' : undefined}>
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )
+    }
 
     <div class="site-header__tools">
       <SoundMenu />
@@ -47,7 +51,8 @@ const current = Astro.url.pathname;
 
   onPage('site-header', () => {
     const header = document.querySelector<HTMLElement>('.site-header');
-    if (!header) return;
+    // Nothing to fold in the app: its header has no nav, and scrolls away with the page.
+    if (!header || header.classList.contains('site-header--app')) return;
     const update = () => {
       // An open menu lives in the tools, which folding hides.
       if (header.querySelector('details[open]')) return;
@@ -156,6 +161,16 @@ const current = Astro.url.pathname;
     .site-header.is-scrolled .site-nav li:first-child a {
       margin-left: 0;
     }
+  }
+
+  /* The app: one row under the status bar, and it scrolls away with the page. */
+  .site-header.site-header--app {
+    position: relative;
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .site-header--app .site-header__inner {
+    grid-template-areas: 'brand toggle';
   }
 
   .site-nav {

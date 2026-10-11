@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import TechniqueCard from '../../components/TechniqueCard.astro';
+import LearnTabs from '../../components/LearnTabs.astro';
+import { NATIVE_APP } from '../../config/app';
 import { getTechniques } from '../../lib/techniques';
 import { CATEGORIES, CATEGORY_SLUGS, PROBLEMS, PROBLEM_SLUGS } from '../../data/taxonomy';
 
@@ -9,6 +11,7 @@ const techniques = await getTechniques();
 
 <BaseLayout title="Techniques" description="Browse techniques for making work feel rewarding, filtered by category or problem.">
   <div class="container">
+    {NATIVE_APP && <LearnTabs />}
     <header class="page-header">
       <h1>Technique library</h1>
       <p>Every technique explains the idea and lets you try it on the spot.</p>

@@ -7,6 +7,8 @@
  * page keeps running on /timer, after a reload, or in another tab.
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
+import CoinMark from './CoinMark.astro';
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES, TONE_LABELS } from '../lib/timer/cues';
 
@@ -148,6 +150,27 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
       <p class="timer__keys muted">
         Keyboard: <kbd>Space</kbd> start / pause · <kbd>R</kbd> reset · <kbd>J</kbd> jot a thought
       </p>
+    )
+  }
+
+  {
+    /*
+      The Android app gives the end of a focus session the whole screen: what you did,
+      how far it moved your focus tier, and the note form above (timer-ui.ts moves it in).
+    */
+    NATIVE_APP && (
+      <dialog class="done" data-done aria-labelledby="done-title">
+        <button type="button" class="done__close" data-done-close aria-label="Close">
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <CoinMark size={120} class="done__coin" />
+        <h2 id="done-title" class="done__title">Session complete</h2>
+        <p class="done__text" data-done-text />
+        <div class="done__tier" data-done-tier />
+        <div class="done__form" data-done-slot />
+      </dialog>
     )
   }
 
@@ -599,6 +622,358 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   .timer__keys {
     font-size: var(--text-xs);
+  }
+
+  /*
+    The Android app: the timer is the screen, not a card on it. The dial leads, what
+    you're working on sits right under it, and the main button spans the screen where
+    a thumb reaches. Only the look and the order change; the markup and script don't.
+  */
+  :global(html[data-app]) .timer {
+    gap: var(--space-4);
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  :global(html[data-app]) .timer__head {
+    order: 1;
+  }
+
+  :global(html[data-app]) .timer__custom {
+    order: 2;
+  }
+
+  /* Small enough that the main button is on screen without scrolling. */
+  :global(html[data-app]) .timer .timer__dial {
+    order: 3;
+    width: min(100%, 256px);
+  }
+
+  :global(html[data-app]) .timer .timer__time {
+    font-size: 3.25rem;
+  }
+
+  :global(html[data-app]) .timer__message {
+    order: 4;
+  }
+
+  :global(html[data-app]) .timer__message:empty {
+    display: none;
+  }
+
+  :global(html[data-app]) .timer__log {
+    order: 5;
+    inline-size: 100%;
+  }
+
+  :global(html[data-app]) .timer__label {
+    order: 6;
+  }
+
+  :global(html[data-app]) .timer__task {
+    order: 7;
+  }
+
+  :global(html[data-app]) .timer__controls {
+    order: 8;
+  }
+
+  :global(html[data-app]) .timer__jot {
+    order: 9;
+  }
+
+  :global(html[data-app]) .timer__footer {
+    order: 10;
+  }
+
+  /* Four equal segments; the chosen one is raised, so green stays the colour of the main button. */
+  :global(html[data-app]) .timer__modes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    inline-size: 100%;
+  }
+
+  :global(html[data-app]) .seg span {
+    justify-content: center;
+    inline-size: 100%;
+    min-height: 44px;
+    padding: 0;
+    font-size: var(--text-xs);
+  }
+
+  :global(html[data-app]) .seg input:checked + span {
+    background: var(--raised-grad);
+    color: var(--color-text);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+  }
+
+  /* "What are you working on?" as one raised row. */
+  :global(html[data-app]) .timer__label {
+    inline-size: 100%;
+    padding: var(--space-2) var(--space-4) var(--space-1);
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 500;
+  }
+
+  :global(html[data-app]) .timer__label input {
+    padding-inline: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--color-text);
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+
+  :global(html[data-app]) .timer__label input:focus-visible {
+    outline: none;
+  }
+
+  :global(html[data-app]) .timer__label:focus-within {
+    border-color: var(--color-accent);
+  }
+
+  :global(html[data-app]) .timer__task {
+    inline-size: 100%;
+    padding-inline: var(--space-4);
+  }
+
+  /* The main button on its own row; the quieter ones share the row under it. */
+  :global(html[data-app]) .timer__controls {
+    inline-size: 100%;
+    gap: var(--space-3);
+  }
+
+  :global(html[data-app]) .timer__main {
+    flex: 1 0 100%;
+    min-height: 60px;
+    border-radius: 18px;
+    font-size: var(--text-lg);
+    font-weight: 700;
+  }
+
+  :global(html[data-app]) .timer__controls .btn--ghost {
+    flex: 1 1 0;
+    min-height: 52px;
+    padding-inline: var(--space-3);
+    border-radius: 16px;
+  }
+
+  :global(html[data-app]) .timer__jot,
+  :global(html[data-app]) .timer__jot-form {
+    inline-size: 100%;
+  }
+
+  :global(html[data-app]) .timer__jot [data-jot-open] {
+    --btn-depth: 0px;
+    inline-size: 100%;
+    min-height: 48px;
+    border: 1px dashed var(--color-border-strong);
+    background: none;
+    box-shadow: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 500;
+  }
+
+  :global(html[data-app]) .timer__footer {
+    inline-size: 100%;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  /* ---------- The app's full-screen "Session complete" ---------- */
+  .done {
+    position: fixed;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    max-inline-size: none;
+    max-block-size: none;
+    margin: 0;
+    padding: calc(var(--space-7) + env(safe-area-inset-top, 0px)) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    text-align: center;
+    overflow-y: auto;
+  }
+
+  .done[open] {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: var(--space-3);
+  }
+
+  .done::backdrop {
+    background: var(--color-bg);
+  }
+
+  .done__close {
+    position: absolute;
+    inset-block-start: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    inset-inline-end: var(--space-3);
+    display: grid;
+    place-items: center;
+    inline-size: 48px;
+    block-size: 48px;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .done :global(.done__coin) {
+    margin-bottom: var(--space-2);
+    filter: drop-shadow(0 14px 18px var(--accent-glow));
+  }
+
+  .done[open] :global(.done__coin) {
+    animation: done-pop 600ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  .done__title {
+    font-size: var(--text-2xl);
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
+
+  .done__text {
+    max-inline-size: 22rem;
+    color: var(--color-text-muted);
+  }
+
+  /* How far this session moved the focus tier: its coin, the ladder, what is left. */
+  .done__tier {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: min(100%, 26rem);
+    margin-top: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+    text-align: start;
+  }
+
+  .done__tier:empty {
+    display: none;
+  }
+
+  .done__tier :global(.tier-coin) {
+    --coin-size: 44px;
+    margin: 0;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.5),
+      0 3px 0 var(--coin-edge);
+  }
+
+  .done__tier :global(.done__tier-body) {
+    display: grid;
+    flex: 1;
+    gap: 6px;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .done__tier :global(.done__tier-head) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-weight: 600;
+  }
+
+  .done__tier :global(.done__tier-gain) {
+    color: var(--tier-3);
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .done__tier :global(.done__pips) {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .done__tier :global(.done__pips > span) {
+    block-size: 9px;
+    border-radius: 5px;
+    background: var(--well-bg);
+    overflow: hidden;
+  }
+
+  .done__tier :global(.done__pips > .is-on) {
+    background: var(--pip);
+    box-shadow: 0 2px 0 var(--pip-edge);
+  }
+
+  .done__tier :global(.done__pips > span > span) {
+    display: block;
+    block-size: 100%;
+    background: var(--pip);
+  }
+
+  .done__tier :global(.done__tier-foot) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .done__form {
+    inline-size: min(100%, 26rem);
+    margin-top: var(--space-2);
+  }
+
+  .done__form .timer__log {
+    padding: 0;
+    border: 0;
+    background: none;
+    animation: none;
+  }
+
+  .done__form .timer__log-actions {
+    margin-top: var(--space-2);
+  }
+
+  .done__form .timer__log-actions .btn {
+    flex: 1;
+    min-height: 52px;
+    border-radius: 16px;
+    font-size: var(--text-base);
+  }
+
+  @keyframes done-pop {
+    from {
+      transform: scale(0.6);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .done[open] :global(.done__coin) {
+      animation: none;
+    }
+  }
+
+  /* No keyboard on a phone. */
+  :global(html[data-app]) .timer__keys {
+    display: none;
   }
 
   kbd {

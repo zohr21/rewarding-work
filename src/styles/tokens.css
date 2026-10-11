@@ -43,6 +43,23 @@
 :root {
   color-scheme: light;
 
+  /* Tier coins, Seedling to Grove: green to start, then bronze, silver, gold and diamond. Same in both themes. */
+  --tier-0: #5db582;
+  --tier-0-edge: #336a4a;
+  --tier-0-ink: #07170f;
+  --tier-1: #cd8b55;
+  --tier-1-edge: #7d4a22;
+  --tier-1-ink: #3a1f0a;
+  --tier-2: #cfd8dc;
+  --tier-2-edge: #7c8a91;
+  --tier-2-ink: #26323a;
+  --tier-3: #f2c14e;
+  --tier-3-edge: #a67c12;
+  --tier-3-ink: #3d2c00;
+  --tier-4: #8fdcf7;
+  --tier-4-edge: #3f6fa8;
+  --tier-4-ink: #0e2a44;
+
   /* Surfaces */
   --color-bg: #fbf8f3;
   /* Slightly see-through so the ambient background glows through cards. */

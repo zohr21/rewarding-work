@@ -3,24 +3,53 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import TaskGlance from '../components/TaskGlance.astro';
 import TaskList from '../components/TaskList.astro';
 import BreakdownTool from '../components/BreakdownTool.astro';
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
+
+const breakdown = { heading: 'Break it down', linkToTasks: false, intro: 'Steps for your current task. Make each one small enough to start in two minutes.' };
 ---
 
 <BaseLayout title="Tasks" description="Your tasks, broken into small steps, with the focus time you've spent on each.">
   <div class="container">
     <header class="page-header">
       <h1>Tasks</h1>
-      <p>
-        Keep what you're working on in one place. Break a task into small steps, then press Focus to start
-        a <a href={url('/timer')}>timer</a> session on it — the time shows up here.
-      </p>
+      {
+        /* The Android app goes straight to the lists. */
+        !NATIVE_APP && (
+          <p>
+            Keep what you're working on in one place. Break a task into small steps, then press Focus to start
+            a <a href={url('/timer')}>timer</a> session on it — the time shows up here.
+          </p>
+        )
+      }
     </header>
 
-    <TaskGlance />
+    {!NATIVE_APP && <TaskGlance />}
     <div class="tasks-page">
       <TaskList />
-      <BreakdownTool heading="Break it down" linkToTasks={false} intro="Steps for your current task. Make each one small enough to start in two minutes." />
+      {
+        NATIVE_APP ? (
+          /* In the app the breakdown is a sheet over the list, opened from a task's Steps button (TaskList.astro). */
+          <dialog class="task-sheet" data-task-sheet aria-labelledby="bd-heading">
+            <div class="task-sheet__bar">
+              <span class="task-sheet__handle" aria-hidden="true" />
+              <button type="button" class="task-sheet__close" data-task-sheet-close aria-label="Close">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+                </svg>
+              </button>
+            </div>
+            <BreakdownTool {...breakdown} />
+            <div class="task-sheet__foot">
+              <a class="btn" href={url('/timer')} data-task-sheet-focus>Start focusing</a>
+            </div>
+          </dialog>
+        ) : (
+          <BreakdownTool {...breakdown} />
+        )
+      }
     </div>
+    {NATIVE_APP && <TaskGlance />}
   </div>
 </BaseLayout>
 
@@ -34,6 +63,97 @@ import { url } from '../lib/paths';
   @media (min-width: 52rem) {
     .tasks-page {
       grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* The app's steps sheet: slides up from the bottom, over a dimmed list. */
+  .task-sheet {
+    position: fixed;
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: 88dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-top: 1px solid var(--color-border-strong);
+    border-radius: 28px 28px 0 0;
+    background: var(--popover-bg);
+    color: var(--color-text);
+    box-shadow: var(--popover-shadow);
+    overflow-y: auto;
+  }
+
+  .task-sheet[open] {
+    animation: sheet-in 260ms var(--ease-out);
+  }
+
+  .task-sheet::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .task-sheet__bar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    min-height: 48px;
+    background: var(--popover-bg);
+  }
+
+  .task-sheet__handle {
+    inline-size: 36px;
+    block-size: 4px;
+    border-radius: 2px;
+    background: var(--color-border-strong);
+  }
+
+  .task-sheet__close {
+    position: absolute;
+    inset-inline-end: var(--space-2);
+    display: grid;
+    place-items: center;
+    inline-size: 48px;
+    block-size: 48px;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .task-sheet :global(.breakdown) {
+    padding-top: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .task-sheet__foot {
+    position: sticky;
+    bottom: 0;
+    padding: var(--space-3) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+    background: var(--popover-bg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .task-sheet__foot .btn {
+    inline-size: 100%;
+    min-height: 56px;
+    border-radius: 16px;
+    font-weight: 700;
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateY(40%);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .task-sheet[open] {
+      animation: none;
     }
   }
 </style>

@@ -5,7 +5,10 @@
 import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type Task } from '../lib/storage';
+import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
+import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
+import { tierIcon } from '../lib/tier-icons';
+import { el } from '../lib/dom';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
@@ -116,7 +119,11 @@ function mountTimer(root: HTMLElement): () => void {
     jotStatus: q<HTMLElement>('[data-jot-status]'),
     today: q<HTMLAnchorElement>('[data-today]'),
     live: q<HTMLElement>('[data-live]'),
+    /** The app's full-screen "Session complete" (TimerWidget.astro); not there on the site. */
+    done: root.querySelector<HTMLDialogElement>('[data-done]'),
   };
+  // In the app the note form is part of that screen.
+  els.done?.querySelector('[data-done-slot]')?.append(els.log);
   const circumference = Number(els.ring.dataset.circumference);
   const baseTitle = document.title;
   const icon = root.dataset.icon;
@@ -211,7 +218,10 @@ function mountTimer(root: HTMLElement): () => void {
       text = 'Break over. Start the next focus session when you are ready.';
     }
 
-    if (e.from === 'work' && e.session) offerLog(e.session.taskId, e.session.focusSeconds);
+    if (e.from === 'work' && e.session) {
+      offerLog(e.session.taskId, e.session.focusSeconds);
+      showDone(e.session, text);
+    }
 
     setMessage(text);
     announce(pendingLog ? `${text} You can note what you did and what's next below.` : text);
@@ -362,6 +372,63 @@ function mountTimer(root: HTMLElement): () => void {
   function closeLog(): void {
     pendingLog = null;
     els.log.hidden = true;
+    if (els.done?.open) els.done.close();
+  }
+
+  /** The app's "Session complete" screen: what the session was, and where it leaves the focus tier. */
+  function showDone(session: FocusSession, next: string): void {
+    const done = els.done;
+    if (!done) return;
+    const what = session.label ? ` on “${session.label}”` : '';
+    done.querySelector('[data-done-text]')!.textContent = `${minutesText(session.focusSeconds * 1000)} of focus${what}. ${next}`;
+
+    const p = trackProgress({ sessions: getSessions(), done: [], chainDays: [] }, TRACKS[0]!);
+    const { track, level } = p;
+    const coin = el('span', `tier-coin ${level ? `tier-coin--t${level - 1}` : 'tier-coin--blank'}`);
+    coin.innerHTML = tierIcon(Math.max(0, level - 1), 22);
+    const head = el('div', 'done__tier-head');
+    head.append(el('span', '', level ? `${track.title} · ${tierLabel(level - 1)}` : track.title), el('span', 'done__tier-gain', `+${minutesText(session.focusSeconds * 1000)}`));
+    const pips = el('div', 'done__pips');
+    pips.setAttribute('aria-hidden', 'true');
+    track.thresholds.forEach((n, i) => {
+      const pip = el('span', i < level ? 'is-on' : '');
+      pip.style.setProperty('--pip', `var(--tier-${i})`);
+      pip.style.setProperty('--pip-edge', `var(--tier-${i}-edge)`);
+      if (i === level) {
+        const prev = level ? track.thresholds[level - 1]! : 0;
+        const fill = el('span');
+        fill.style.inlineSize = `${Math.min(100, Math.max(0, ((p.value - prev) / (n - prev)) * 100))}%`;
+        pip.append(fill);
+      }
+      pips.append(pip);
+    });
+    const goal = track.thresholds[level];
+    const left = goal === undefined ? 0 : Math.ceil((goal - p.value) * 10) / 10;
+    const foot = el('span', 'done__tier-foot', goal === undefined ? 'All five tiers reached.' : `${left.toLocaleString()} more ${track.unit(left)} to a ${tierLabel(level)}`);
+    const body = el('div', 'done__tier-body');
+    body.append(head, pips, foot);
+    done.querySelector('[data-done-tier]')!.replaceChildren(coin, body);
+
+    if (!done.open) done.showModal();
+  }
+
+  if (els.done) {
+    const done = els.done;
+    // Its own close button; the form's Save and Skip close it through closeLog().
+    const onDoneClick = (e: Event) => {
+      if ((e.target as HTMLElement).closest('[data-done-close]')) done.close();
+    };
+    // Closed any other way (Escape, the back gesture): the note goes with it.
+    const onDoneClose = () => {
+      pendingLog = null;
+      els.log.hidden = true;
+    };
+    done.addEventListener('click', onDoneClick);
+    done.addEventListener('close', onDoneClose);
+    c.add(() => {
+      done.removeEventListener('click', onDoneClick);
+      done.removeEventListener('close', onDoneClose);
+    });
   }
 
   els.log.addEventListener('submit', (e) => {
