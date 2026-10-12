@@ -10,10 +10,10 @@ import { cleanups, onPage } from '../lib/page';
 type Runtime = Awaited<ReturnType<typeof loadAccount>>;
 
 const SYNC_TEXT: Record<AccountState['sync'], string> = {
-  idle: 'Connecting to your account…',
-  saving: 'Saving changes to your account…',
-  synced: 'All changes are saved to your account.',
-  offline: "You're offline. Changes are kept here and sent when you're back online.",
+  idle: 'Connecting…',
+  saving: 'Saving…',
+  synced: 'Synced',
+  offline: 'Offline · changes kept here',
   error: '',
 };
 
@@ -199,6 +199,27 @@ onPage('account-page', () => {
     }),
   );
 
+  // Edit the name shown on the profile.
+  const nameForm = $<HTMLFormElement>('[data-form="name"]');
+  const nameInput = $<HTMLInputElement>('input[name="name"]', nameForm);
+  $('[data-edit-open]').addEventListener('click', () => {
+    nameForm.hidden = !nameForm.hidden;
+    if (nameForm.hidden) return;
+    nameInput.value = getAccount().user?.name ?? '';
+    nameInput.focus();
+  });
+  $('[data-edit-cancel]').addEventListener('click', () => (nameForm.hidden = true));
+  nameForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    void act(nameForm, profileMsg, async (m) => {
+      const name = nameInput.value.trim();
+      if (!name) throw invalid('Enter a name.', nameInput);
+      await m.updateName(name);
+      nameForm.hidden = true;
+      return 'Name saved.';
+    });
+  });
+
   const securityMsg = $('[data-security-msg]');
   const changeForm = $<HTMLFormElement>('[data-form="change-password"]');
   changeForm.addEventListener('submit', (e) => {
@@ -215,7 +236,7 @@ onPage('account-page', () => {
   });
   const linkGoogle = $<HTMLButtonElement>('[data-link-google]');
   linkGoogle.addEventListener('click', () =>
-    act(linkGoogle, securityMsg, async (m) => {
+    act(linkGoogle, $('[data-connect-msg]'), async (m) => {
       await m.linkGoogle();
       return 'Google connected.';
     }),
@@ -291,11 +312,15 @@ onPage('account-page', () => {
 
       $('[data-avatar]').textContent = guest ? '?' : (u.name ?? u.email ?? '?').trim().charAt(0).toUpperCase();
       $('[data-name]').textContent = guest ? 'Guest account' : (u.name ?? u.email ?? 'Your account');
-      const badges = guest ? ['Guest · this browser only'] : [...(hasPassword ? ['Email and password'] : []), ...(hasGoogle ? ['Google'] : [])];
-      if (!guest && u.name && u.email) badges.unshift(u.email);
+      $('[data-email]').textContent = guest ? 'Saved in this browser only' : u.name && u.email ? u.email : '';
+      const badges = guest
+        ? ['Guest']
+        : [...(hasPassword ? ['Email and password'] : []), ...(hasGoogle ? ['Google'] : []), ...(u.emailVerified ? ['Email confirmed'] : [])];
       $('[data-badges]').replaceChildren(
-        ...badges.map((b) => Object.assign(document.createElement('span'), { className: 'badge', textContent: b })),
+        ...badges.map((b) => Object.assign(document.createElement('span'), { className: 'badge badge--plain', textContent: b })),
       );
+      $('[data-email-sub]').textContent = u.email ? `${u.email} · ${u.emailVerified ? 'confirmed' : 'not confirmed yet'}` : '';
+      if (guest) nameForm.hidden = true;
 
       $('[data-verify]').hidden = guest || !hasPassword || u.emailVerified;
       $('[data-verify-email]').textContent = u.email ?? '';
@@ -306,14 +331,14 @@ onPage('account-page', () => {
       $('[data-google-linked]').hidden = !hasGoogle;
       $('[data-google-unlinked]').hidden = hasGoogle;
       $('[data-delete-password]').hidden = !hasPassword;
-      $('[data-delete-title]').textContent = guest ? 'Delete guest account' : 'Delete account';
+      $('[data-delete-title]').textContent = guest ? 'Delete guest account…' : 'Delete account…';
       if (!armed) deleteBtn.textContent = guest ? 'Delete guest account' : 'Delete account';
 
       const sync = $('.sync');
       sync.dataset.sync = s.sync;
       let text = s.sync === 'error' ? `Sync problem: ${s.syncError ?? 'unknown error'}` : SYNC_TEXT[s.sync];
       if (s.sync === 'synced' && s.lastSynced) {
-        text += ` Last checked ${new Date(s.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`;
+        text += ` · ${new Date(s.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       }
       $('[data-sync-text]').textContent = text;
     }),
