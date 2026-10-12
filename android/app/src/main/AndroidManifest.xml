@@ -24,6 +24,23 @@
 
         </activity>
 
+        <!-- A timer phase ended while the app was in the background (TimerNotices.java). -->
+        <receiver android:name=".TimerAlarmReceiver" android:exported="false" />
+
+        <!-- Home-screen widgets (Widgets.java). -->
+        <receiver android:name=".FirstUpWidget" android:label="@string/widget_first_up_name" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_first_up_info" />
+        </receiver>
+        <receiver android:name=".ChainWidget" android:label="@string/widget_chain_name" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_chain_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -38,4 +55,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The timer's notifications, and telling you on time that a session ended. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
 </manifest>

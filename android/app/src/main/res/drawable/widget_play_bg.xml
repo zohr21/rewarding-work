@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The green button on its darker edge. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FF2E7A50" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item android:bottom="4dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#FF9BE8B9" android:endColor="#FF6FCB94" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+</layer-list>

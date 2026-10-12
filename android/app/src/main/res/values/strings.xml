@@ -4,4 +4,29 @@
     <string name="title_activity_main">Rewarding Work</string>
     <string name="package_name">app.rewardingwork</string>
     <string name="custom_url_scheme">app.rewardingwork</string>
+
+    <!-- Notification channels, as they appear in the phone's settings. -->
+    <string name="channel_timer">Running timer</string>
+    <string name="channel_timer_about">The time left in your focus session or break, while it runs.</string>
+    <string name="channel_alerts">Session ended</string>
+    <string name="channel_alerts_about">Tells you when a focus session or break is over.</string>
+
+    <!-- Home-screen widgets. -->
+    <string name="widget_first_up_name">First up</string>
+    <string name="widget_first_up_about">Your first task for today, with a button to start focusing on it.</string>
+    <string name="widget_first_up_label">First up</string>
+    <string name="widget_first_up_empty">Nothing on Today yet</string>
+    <string name="widget_first_up_empty_hint">Tap to pick a task</string>
+    <string name="widget_next_step">Next: %1$s</string>
+    <string name="widget_steps">%1$d of %2$d steps</string>
+    <string name="widget_no_steps">No steps yet</string>
+    <string name="widget_start">Start focusing</string>
+    <string name="widget_chain_name">Chain</string>
+    <string name="widget_chain_about">Your chain\'s current run and this week\'s days.</string>
+    <string name="widget_chain_label">Chain</string>
+    <string name="widget_chain_empty">None yet</string>
+    <plurals name="widget_days">
+        <item quantity="one">%d day</item>
+        <item quantity="other">%d days</item>
+    </plurals>
 </resources>

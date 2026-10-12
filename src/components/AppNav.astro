@@ -36,6 +36,12 @@ const ITEMS = [
   </ul>
 </nav>
 
+<script>
+  import { mountDeviceSync } from '../scripts/device-sync';
+  import { onPage } from '../lib/page';
+  onPage('device-sync', mountDeviceSync);
+</script>
+
 <style is:global>
   /* Room for the bar under the page, and for toasts above it (RewardNotice, UndoToast). */
   html[data-app] {

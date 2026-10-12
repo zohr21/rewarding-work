@@ -9,6 +9,7 @@ import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, w
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { el } from '../lib/dom';
+import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
@@ -178,6 +179,7 @@ function mountTimer(root: HTMLElement): () => void {
     write('timer', state);
     schedule();
     render();
+    syncNotice();
   }
 
   function savePrefs(patch: Partial<TimerPrefs>): void {
@@ -334,7 +336,52 @@ function mountTimer(root: HTMLElement): () => void {
     renderTime();
   }
 
+  // ---- The Android app's notifications (src/lib/device.ts; none of this does anything on the site) ----
+
+  /** The notification for a state: counting down, counting up (Flowtime), or standing still while paused. */
+  function ongoingFor(s: TimerState, now: number): TimerOngoing | null {
+    if (s.status === 'idle') return null;
+    const title = PHASE_LABEL[s.phase];
+    const text = s.label || 'Rewarding Work';
+    if (s.status === 'paused') {
+      const rem = T.remaining(s, now);
+      return { title: `${title} paused`, text: rem === null ? text : `${formatClock(rem, true)} left · ${text}` };
+    }
+    const end = T.endsAt(s);
+    return end === null ? { title, text, since: now - T.elapsed(s, now) } : { title, text, endAt: end };
+  }
+
+  /**
+   * A page can't run in the background, so the phone is told now what is coming: the
+   * engine is run ahead to each phase end, for what to say then and what to show after.
+   */
+  function syncNotice(): void {
+    const ongoing = ongoingFor(state, Date.now());
+    if (!ongoing) return clearTimerNotice();
+    const alerts: TimerAlert[] = [];
+    let s = state;
+    while (alerts.length < 4 && s.status === 'running') {
+      const end = T.endsAt(s);
+      if (end === null) break;
+      const r = T.tick(s, end);
+      const e = r.events.find((ev) => ev.type === 'phase-complete');
+      if (e?.type !== 'phase-complete') break;
+      const text =
+        e.from !== 'work'
+          ? 'Start the next focus session when you are ready.'
+          : e.to === 'work'
+            ? `${minutesText(e.focusMs)} of focus. Ready for the next one.`
+            : `${minutesText(e.focusMs)} of focus. ${e.to === 'long-break' ? 'Long break' : 'Break'}: ${minutesText(e.breakMs)}.`;
+      alerts.push({ at: end, title: e.from === 'work' ? 'Focus session done' : 'Break over', text, then: ongoingFor(r.state, end) });
+      s = r.state;
+    }
+    showTimerNotice(ongoing, alerts);
+  }
+
   function renderNotifyStatus(): void {
+    void notificationsGranted().then((granted) => {
+      if (granted !== null) els.notifyStatus.textContent = granted ? 'Notifications on' : 'Notifications are off for this app';
+    });
     const p = notificationPermission();
     els.notifyStatus.textContent =
       p === 'granted'
@@ -487,6 +534,11 @@ function mountTimer(root: HTMLElement): () => void {
       if (notificationPermission() === 'default') {
         await requestNotificationPermission();
         renderNotifyStatus();
+      }
+      // The app asks the phone instead; once allowed, the running timer's notification can go up.
+      if ((await requestNotifications()) !== null) {
+        renderNotifyStatus();
+        syncNotice();
       }
     }
   }
@@ -644,6 +696,7 @@ function mountTimer(root: HTMLElement): () => void {
     state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id ?? chapterForLabel(els.label.value)?.id);
     write('timer', state);
     renderTasks();
+    syncNotice();
   };
   els.label.addEventListener('input', onLabel);
   els.picks?.addEventListener('click', (e) => {
@@ -750,5 +803,6 @@ function mountTimer(root: HTMLElement): () => void {
   render();
   renderTasks();
   schedule();
+  syncNotice();
   return c.run;
 }
