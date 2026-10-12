@@ -18,6 +18,8 @@ const MESSAGES: Record<string, string> = {
   'auth/popup-blocked': 'The sign-in window was blocked. Allow pop-ups for this site and try again.',
   'auth/popup-closed-by-user': 'The sign-in window was closed before finishing.',
   'auth/cancelled-popup-request': 'The sign-in window was closed before finishing.',
+  'google/cancelled': 'Google sign-in was closed before finishing.',
+  'google/unavailable': "Google sign-in couldn't start on this phone. Use your email and password, or try again later.",
   'auth/requires-recent-login': 'For your security, confirm your identity again first.',
   'auth/provider-already-linked': 'Google is already connected to this account.',
   'auth/operation-not-allowed': "This sign-in method isn't turned on for this site yet.",

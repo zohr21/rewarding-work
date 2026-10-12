@@ -41,7 +41,8 @@ import {
 } from 'firebase/auth';
 import { collection, connectFirestoreEmulator, deleteDoc, doc, getDocs, getFirestore, onSnapshot, setDoc, type Firestore } from 'firebase/firestore';
 import { NATIVE_APP } from '../../config/app';
-import { FIREBASE_CONFIG, USE_EMULATOR } from '../../config/firebase';
+import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
+import { googleIdToken } from '../device';
 import {
   SYNCED_STORES,
   getSyncMeta,
@@ -277,10 +278,20 @@ function clearLocal(): void {
 
 // ---------- Actions (used by the account page) ----------
 
-const google = () => {
-  // Google's sign-in window can't open inside the Android app.
-  if (NATIVE_APP) throw new Error("Google sign-in isn't available in the app yet. Use your email and password.");
-  return new GoogleAuthProvider();
+/**
+ * Google's sign-in window can't open inside the Android app, so there the phone's own
+ * account picker is asked for the credential instead (src/lib/device.ts).
+ */
+async function appGoogleCredential(): Promise<AuthCredential> {
+  if (!GOOGLE_SIGNIN_CLIENT_ID) throw new Error("Google sign-in isn't available in the app yet. Use your email and password.");
+  return GoogleAuthProvider.credential(await googleIdToken(GOOGLE_SIGNIN_CLIENT_ID));
+}
+
+const google = {
+  signIn: async () => (NATIVE_APP ? signInWithCredential(auth, await appGoogleCredential()) : signInWithPopup(auth, new GoogleAuthProvider())),
+  link: async (user: User) => (NATIVE_APP ? linkWithCredential(user, await appGoogleCredential()) : linkWithPopup(user, new GoogleAuthProvider())),
+  reauthenticate: async (user: User) =>
+    NATIVE_APP ? reauthenticateWithCredential(user, await appGoogleCredential()) : reauthenticateWithPopup(user, new GoogleAuthProvider()),
 };
 
 /**
@@ -323,18 +334,20 @@ export async function createWithEmail(email: string, password: string): Promise<
 export async function continueWithGoogle(): Promise<void> {
   const user = auth.currentUser;
   if (!user?.isAnonymous) {
-    await signInWithPopup(auth, google());
+    await google.signIn();
     return;
   }
   // Guest: keep the same account and just attach Google to it…
+  // In the app the credential is in hand before linking, and is still good if linking is refused.
+  const picked = NATIVE_APP ? await appGoogleCredential() : null;
   try {
-    await linkWithPopup(user, google());
+    await (picked ? linkWithCredential(user, picked) : google.link(user));
     await user.reload();
     publishUser();
   } catch (err) {
     // …unless that Google account already has an account here: switch to it and bring the data along.
     if (errorCode(err) !== 'auth/credential-already-in-use') throw err;
-    const credential: AuthCredential | null = GoogleAuthProvider.credentialFromError(err as never);
+    const credential: AuthCredential | null = GoogleAuthProvider.credentialFromError(err as never) ?? picked;
     if (!credential) throw err;
     await leaveGuest(() => signInWithCredential(auth, credential));
   }
@@ -344,7 +357,7 @@ export async function continueWithGoogle(): Promise<void> {
 export async function linkGoogle(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in.');
-  await linkWithPopup(user, google());
+  await google.link(user);
   await user.reload();
   publishUser();
 }
@@ -375,7 +388,7 @@ async function reauthenticate(user: User, password?: string): Promise<void> {
   if (password && user.email && providers.includes('password')) {
     await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
   } else if (providers.includes('google.com')) {
-    await reauthenticateWithPopup(user, google());
+    await google.reauthenticate(user);
   } else if (providers.includes('password')) {
     throw Object.assign(new Error('Enter your current password.'), { code: 'auth/missing-password' });
   }

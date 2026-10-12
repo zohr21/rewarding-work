@@ -9,10 +9,11 @@ import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, w
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { el } from '../lib/dom';
+import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
-import { jot, listOf, logSession, taskName, type SessionLog } from '../lib/tasks';
+import { jot, listOf, logSession, taskName, todayTasks, type SessionLog } from '../lib/tasks';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -121,6 +122,8 @@ function mountTimer(root: HTMLElement): () => void {
     live: q<HTMLElement>('[data-live]'),
     /** The app's full-screen "Session complete" (TimerWidget.astro); not there on the site. */
     done: root.querySelector<HTMLDialogElement>('[data-done]'),
+    /** The app's row of tasks to pick from, under "What are you working on?". */
+    picks: root.querySelector<HTMLElement>('[data-task-picks]'),
   };
   // In the app the note form is part of that screen.
   els.done?.querySelector('[data-done-slot]')?.append(els.log);
@@ -176,6 +179,7 @@ function mountTimer(root: HTMLElement): () => void {
     write('timer', state);
     schedule();
     render();
+    syncNotice();
   }
 
   function savePrefs(patch: Partial<TimerPrefs>): void {
@@ -332,7 +336,52 @@ function mountTimer(root: HTMLElement): () => void {
     renderTime();
   }
 
+  // ---- The Android app's notifications (src/lib/device.ts; none of this does anything on the site) ----
+
+  /** The notification for a state: counting down, counting up (Flowtime), or standing still while paused. */
+  function ongoingFor(s: TimerState, now: number): TimerOngoing | null {
+    if (s.status === 'idle') return null;
+    const title = PHASE_LABEL[s.phase];
+    const text = s.label || 'Rewarding Work';
+    if (s.status === 'paused') {
+      const rem = T.remaining(s, now);
+      return { title: `${title} paused`, text: rem === null ? text : `${formatClock(rem, true)} left · ${text}` };
+    }
+    const end = T.endsAt(s);
+    return end === null ? { title, text, since: now - T.elapsed(s, now) } : { title, text, endAt: end };
+  }
+
+  /**
+   * A page can't run in the background, so the phone is told now what is coming: the
+   * engine is run ahead to each phase end, for what to say then and what to show after.
+   */
+  function syncNotice(): void {
+    const ongoing = ongoingFor(state, Date.now());
+    if (!ongoing) return clearTimerNotice();
+    const alerts: TimerAlert[] = [];
+    let s = state;
+    while (alerts.length < 4 && s.status === 'running') {
+      const end = T.endsAt(s);
+      if (end === null) break;
+      const r = T.tick(s, end);
+      const e = r.events.find((ev) => ev.type === 'phase-complete');
+      if (e?.type !== 'phase-complete') break;
+      const text =
+        e.from !== 'work'
+          ? 'Start the next focus session when you are ready.'
+          : e.to === 'work'
+            ? `${minutesText(e.focusMs)} of focus. Ready for the next one.`
+            : `${minutesText(e.focusMs)} of focus. ${e.to === 'long-break' ? 'Long break' : 'Break'}: ${minutesText(e.breakMs)}.`;
+      alerts.push({ at: end, title: e.from === 'work' ? 'Focus session done' : 'Break over', text, then: ongoingFor(r.state, end) });
+      s = r.state;
+    }
+    showTimerNotice(ongoing, alerts);
+  }
+
   function renderNotifyStatus(): void {
+    void notificationsGranted().then((granted) => {
+      if (granted !== null) els.notifyStatus.textContent = granted ? 'Notifications on' : 'Notifications are off for this app';
+    });
     const p = notificationPermission();
     els.notifyStatus.textContent =
       p === 'granted'
@@ -486,6 +535,11 @@ function mountTimer(root: HTMLElement): () => void {
         await requestNotificationPermission();
         renderNotifyStatus();
       }
+      // The app asks the phone instead; once allowed, the running timer's notification can go up.
+      if ((await requestNotifications()) !== null) {
+        renderNotifyStatus();
+        syncNotice();
+      }
     }
   }
 
@@ -552,6 +606,23 @@ function mountTimer(root: HTMLElement): () => void {
         ...openChapters().map((ch) => ch.name),
       ].map((value) => Object.assign(document.createElement('option'), { value })),
     );
+    if (els.picks) {
+      // Today's tasks first, in their order; then the rest, and open exam chapters.
+      const open = getTasks().filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox');
+      const today = todayTasks(open);
+      const names = [...today, ...open.filter((t) => !today.includes(t))].map((t) => t.title).concat(openChapters().map((ch) => ch.name));
+      const chosen = els.label.value.trim().toLowerCase();
+      els.picks.hidden = names.length === 0;
+      els.picks.replaceChildren(
+        ...[...new Set(names)].slice(0, 12).map((name) => {
+          const b = el('button', 'timer__pick', name);
+          b.type = 'button';
+          b.dataset.pick = name;
+          b.setAttribute('aria-pressed', String(name.toLowerCase() === chosen));
+          return b;
+        }),
+      );
+    }
     const task = state.taskId ? getTask(state.taskId) : null;
     const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
     els.taskLink.hidden = !task && !chapter;
@@ -614,13 +685,26 @@ function mountTimer(root: HTMLElement): () => void {
     }
   });
 
-  els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
-  els.label.setAttribute('list', els.taskOptions.id);
+  // The suggestions come from a <datalist>. The Android app's web view doesn't open one,
+  // so there the same tasks are a row of buttons under the field (renderTasks).
+  if (!els.picks) {
+    els.taskOptions.id = `timer-tasks-${Math.random().toString(36).slice(2, 8)}`;
+    els.label.setAttribute('list', els.taskOptions.id);
+  }
 
-  els.label.addEventListener('input', () => {
+  const onLabel = () => {
     state = T.setLabel(state, els.label.value, taskForLabel(els.label.value)?.id ?? chapterForLabel(els.label.value)?.id);
     write('timer', state);
     renderTasks();
+    syncNotice();
+  };
+  els.label.addEventListener('input', onLabel);
+  els.picks?.addEventListener('click', (e) => {
+    const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-pick]');
+    if (!pick) return;
+    els.label.value = pick.dataset.pick!;
+    onLabel();
+    announce(`Working on ${pick.dataset.pick}.`);
   });
 
   // Arriving from "Focus on this" on the tasks page: /timer?task=<id>
@@ -719,5 +803,6 @@ function mountTimer(root: HTMLElement): () => void {
   render();
   renderTasks();
   schedule();
+  syncNotice();
   return c.run;
 }
