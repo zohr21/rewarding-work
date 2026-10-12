@@ -4,6 +4,18 @@ import android.Manifest;
 import android.os.Build;
 
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
+import androidx.credentials.Credential;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.exceptions.GetCredentialCancellationException;
+import androidx.credentials.exceptions.GetCredentialException;
+
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -17,7 +29,8 @@ import com.getcapacitor.annotation.PermissionCallback;
 
 /**
  * What the pages ask of the phone (src/lib/device.ts): the timer's notifications,
- * the home-screen widgets' data, and where a notification or widget wanted to go.
+ * the home-screen widgets' data, where a notification or widget wanted to go, and
+ * Google's account picker for signing in.
  * The pages own all the data; nothing here changes it.
  */
 @CapacitorPlugin(
@@ -89,6 +102,48 @@ public class DevicePlugin extends Plugin {
     public void setWidgets(PluginCall call) {
         Widgets.save(getContext(), call.getData().toString());
         call.resolve();
+    }
+
+    /**
+     * Google's account picker. Gives back an ID token for the page to sign in to Firebase with;
+     * `clientId` is the Firebase project's web client, which the token is made out to.
+     */
+    @PluginMethod
+    public void googleSignIn(PluginCall call) {
+        String clientId = call.getString("clientId");
+        if (clientId == null || clientId.isEmpty() || getActivity() == null) {
+            call.reject("Google sign-in isn't set up.", "google/unavailable");
+            return;
+        }
+        GetCredentialRequest request = new GetCredentialRequest.Builder()
+            .addCredentialOption(new GetSignInWithGoogleOption.Builder(clientId).build())
+            .build();
+        CredentialManager.create(getContext()).getCredentialAsync(
+            getActivity(),
+            request,
+            null,
+            ContextCompat.getMainExecutor(getContext()),
+            new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                @Override
+                public void onResult(GetCredentialResponse response) {
+                    Credential credential = response.getCredential();
+                    if (!(credential instanceof CustomCredential)
+                        || !GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(credential.getType())) {
+                        call.reject("Google didn't answer with a sign-in.", "google/unavailable");
+                        return;
+                    }
+                    JSObject result = new JSObject();
+                    result.put("idToken", GoogleIdTokenCredential.createFrom(credential.getData()).getIdToken());
+                    call.resolve(result);
+                }
+
+                @Override
+                public void onError(GetCredentialException e) {
+                    boolean cancelled = e instanceof GetCredentialCancellationException;
+                    call.reject(e.getMessage(), cancelled ? "google/cancelled" : "google/unavailable", e);
+                }
+            }
+        );
     }
 
     @PluginMethod

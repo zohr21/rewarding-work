@@ -33,6 +33,7 @@ interface DevicePlugin {
   requestNotifications(): Promise<{ granted: boolean }>;
   setWidgets(data: WidgetData): Promise<void>;
   takeRoute(): Promise<{ route: string | null }>;
+  googleSignIn(options: { clientId: string }): Promise<{ idToken: string }>;
 }
 
 // Wrapped in an object: Capacitor's plugin is a proxy that answers to any name, `then` included,
@@ -58,3 +59,12 @@ export const notificationsGranted = () => call<boolean | null>(async (p) => (awa
 export const requestNotifications = () => call<boolean | null>(async (p) => (await p.requestNotifications()).granted, null);
 export const setWidgets = (data: WidgetData) => void call((p) => p.setWidgets(data), undefined);
 export const takeRoute = () => call<string | null>(async (p) => (await p.takeRoute()).route, null);
+
+/**
+ * Opens Google's account picker and gives back the ID token to sign in to Firebase with.
+ * Unlike the calls above it throws (code `google/cancelled` or `google/unavailable`), so the page can say why.
+ */
+export async function googleIdToken(clientId: string): Promise<string> {
+  if (!plugin) throw Object.assign(new Error('No native side.'), { code: 'google/unavailable' });
+  return (await (await plugin).device.googleSignIn({ clientId })).idToken;
+}
