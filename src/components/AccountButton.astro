@@ -2,7 +2,8 @@
 /**
  * Header link to /account: "Sign in", or your initial with a small sync dot.
  * Also starts the account code on every page (it only downloads Firebase when
- * someone is signed in on this device). Not rendered when accounts aren't configured.
+ * someone is signed in on this device). When accounts aren't configured it still
+ * leads to the page, for its data tools and preferences.
  */
 import { ACCOUNTS_ENABLED } from '../config/firebase';
 import { url, isActive } from '../lib/paths';
@@ -10,28 +11,25 @@ import { url, isActive } from '../lib/paths';
 const current = Astro.url.pathname;
 ---
 
-{
-  ACCOUNTS_ENABLED && (
-    <a
-      class="account-btn tool-btn"
-      href={url('/account')}
-      data-account-btn
-      data-state="signed-out"
-      aria-current={isActive(current, '/account') ? 'page' : undefined}
-    >
-      <span class="account-btn__avatar" aria-hidden="true" data-account-avatar>
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8" />
-          <path d="M4.5 20a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-      </span>
-      <span class="account-btn__text" data-account-label>
-        Sign in
-      </span>
-      <span class="account-btn__dot" aria-hidden="true" />
-    </a>
-  )
-}
+<a
+  class="account-btn tool-btn"
+  href={url('/account')}
+  data-account-btn={ACCOUNTS_ENABLED ? '' : undefined}
+  data-state="signed-out"
+  aria-label={ACCOUNTS_ENABLED ? undefined : 'Settings and your data'}
+  aria-current={isActive(current, '/account') ? 'page' : undefined}
+>
+  <span class="account-btn__avatar" aria-hidden="true" data-account-avatar>
+    <svg viewBox="0 0 24 24" width="20" height="20">
+      <circle cx="12" cy="8.5" r="3.8" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+    </svg>
+  </span>
+  <span class="account-btn__text" data-account-label>
+    {ACCOUNTS_ENABLED ? 'Sign in' : 'Settings'}
+  </span>
+  <span class="account-btn__dot" aria-hidden="true"></span>
+</a>
 
 <script>
   import { onAccountChange, startAccount, type AccountState } from '../lib/account/state';

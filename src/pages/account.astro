@@ -3,184 +3,229 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthPanel from '../components/AuthPanel.astro';
 import PasswordField from '../components/PasswordField.astro';
 import CoinMark from '../components/CoinMark.astro';
+import DataTools from '../components/DataTools.astro';
+import AppearanceMenu from '../components/AppearanceMenu.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { NATIVE_APP } from '../config/app';
 import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 ---
 
-<BaseLayout title="Account" description="Optional account: keep your progress safe and in sync across your devices.">
+<BaseLayout title="Account" description="Your account, your data and how the site looks. Signing in is optional.">
   <div class="container account" data-account-page>
     <header class="page-header">
-      <h1>Account</h1>
-      <p>Optional. Sign in to keep your progress safe and in sync across your devices.</p>
+      <h1>{NATIVE_APP ? 'You' : 'Account'}</h1>
+      <p>Your sign-in, your data and how things look. Signing in is optional.</p>
     </header>
 
     <p class="account__page-msg" role="status" data-page-msg></p>
 
-    {
-      !ACCOUNTS_ENABLED && (
-        <section class="card">
-          <h2 class="panel-title">Accounts aren't set up on this copy of the site</h2>
-          <p class="muted">
-            Everything still works and is saved in this browser. To turn on accounts, connect a Firebase project — see
-            “Accounts” in the README.
-          </p>
-        </section>
-      )
-    }
+    <div class="you">
+      {/* Wide screens only: the sections are one short scroll on a phone. */}
+      <nav class="you__nav" aria-label="On this page">
+        <ul>
+          <li data-view="signed-out" hidden><a href="#acc-signin">Sign in</a></li>
+          <li data-view="signed-in" hidden><a href="#acc-profile">Profile</a></li>
+          <li data-view="signed-in" data-member-only hidden><a href="#acc-security">Sign-in and security</a></li>
+          <li><a href="#acc-data">Your data</a></li>
+          <li><a href="#acc-prefs">Preferences</a></li>
+          <li data-view="signed-in" hidden><a href="#acc-device">This device</a></li>
+        </ul>
+      </nav>
 
-    <div class="account__loading" data-view="loading" hidden={!ACCOUNTS_ENABLED}>
-      <span class="coin-loader" aria-hidden="true">
-        <svg class="coin-loader__ring" viewBox="0 0 120 120" width="96" height="96">
-          <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
-          <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
-        </svg>
-        <CoinMark size={54} />
-      </span>
-      <p class="muted">Loading your account…</p>
-    </div>
+      <div class="you__body">
+        {
+          !ACCOUNTS_ENABLED && (
+            <section class="card">
+              <h2 class="panel-title">Accounts aren't set up on this copy of the site</h2>
+              <p class="muted">
+                Everything still works and is saved in this browser. To turn on accounts, connect a Firebase project — see
+                “Accounts” in the README.
+              </p>
+            </section>
+          )
+        }
 
-    <!-- Signed out -->
-    <div class="account__grid" data-view="signed-out" hidden>
-      <section class="card" aria-labelledby="acc-signin-h">
-        <p class="account__brand">
-          <CoinMark size={64} />
-          <span>{SITE.name}</span>
-        </p>
-        <h2 id="acc-signin-h" class="panel-title">Sign in or create an account</h2>
-        <AuthPanel id="acc" />
-      </section>
+        <div class="account__loading" data-view="loading" hidden={!ACCOUNTS_ENABLED}>
+          <span class="coin-loader" aria-hidden="true">
+            <svg class="coin-loader__ring" viewBox="0 0 120 120" width="96" height="96">
+              <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
+              <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
+            </svg>
+            <CoinMark size={54} />
+          </span>
+          <p class="muted">Loading your account…</p>
+        </div>
 
-      <div class="account__side">
-        <section class="card" aria-labelledby="acc-guest-h">
-          <h2 id="acc-guest-h" class="panel-title">No email? Continue as a guest</h2>
-          <p class="muted">
-            Start straight away — no email, no password. Your progress is backed up to a guest account tied to this
-            browser. Save it with an email or Google whenever you like to keep it for good and use it on other devices.
-          </p>
-          <div class="account__actions">
-            <button type="button" class="btn btn--ghost" data-guest>Continue as guest</button>
-          </div>
-          <p class="account__msg" role="status" data-guest-msg></p>
-        </section>
-
-        <section class="card account__info" aria-labelledby="acc-what-h">
-          <h2 id="acc-what-h" class="panel-title">What your account keeps</h2>
-          <ul>
-            <li>Focus sessions, done list, habit chain and your tasks.</li>
-            <li>Timer settings, theme and background.</li>
-            <li>The running timer and sound settings stay on each device.</li>
-            <li>Anything already in this browser is added to your account when you sign in — nothing is overwritten.</li>
-          </ul>
-        </section>
-      </div>
-    </div>
-
-    <!-- Signed in -->
-    <div class="account__grid" data-view="signed-in" hidden>
-      <div class="account__main">
-        <section class="card profile" aria-labelledby="acc-profile-h">
-          <div class="profile__head">
-            <span class="profile__avatar" aria-hidden="true" data-avatar></span>
-            <div>
-              <h2 id="acc-profile-h" class="profile__name" data-name></h2>
-              <p class="profile__badges" data-badges></p>
-            </div>
-          </div>
-
-          <div class="profile__verify" data-verify hidden>
-            <p>
-              Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
+        <!-- Signed out -->
+        <div class="account__grid" id="acc-signin" data-view="signed-out" hidden>
+          <section class="card" aria-labelledby="acc-signin-h">
+            <p class="account__brand">
+              <CoinMark size={64} />
+              <span>{SITE.name}</span>
             </p>
+            <h2 id="acc-signin-h" class="panel-title">Sign in or create an account</h2>
+            <AuthPanel id="acc" />
+          </section>
+
+          <div class="account__side">
+            <section class="card" aria-labelledby="acc-guest-h">
+              <h2 id="acc-guest-h" class="panel-title">No email? Continue as a guest</h2>
+              <p class="muted">
+                Start straight away — no email, no password. Your progress is backed up to a guest account tied to this
+                browser. Save it with an email or Google whenever you like to keep it for good and use it on other devices.
+              </p>
+              <div class="account__actions">
+                <button type="button" class="btn btn--ghost" data-guest>Continue as guest</button>
+              </div>
+              <p class="account__msg" role="status" data-guest-msg></p>
+            </section>
+
+            <section class="card account__info" aria-labelledby="acc-what-h">
+              <h2 id="acc-what-h" class="panel-title">What your account keeps</h2>
+              <ul>
+                <li>Focus sessions, done list, habit chain and your tasks.</li>
+                <li>Timer settings, theme and background.</li>
+                <li>The running timer and sound settings stay on each device.</li>
+                <li>Anything already in this browser is added to your account when you sign in — nothing is overwritten.</li>
+              </ul>
+            </section>
+          </div>
+        </div>
+
+        <!-- Signed in -->
+        <div class="account__stack" data-view="signed-in" hidden>
+          <section class="card profile" id="acc-profile" aria-labelledby="acc-profile-h">
+            <div class="profile__head">
+              <span class="profile__avatar" aria-hidden="true" data-avatar></span>
+              <div>
+                <h2 id="acc-profile-h" class="profile__name" data-name></h2>
+                <p class="profile__badges" data-badges></p>
+              </div>
+            </div>
+
+            <div class="profile__verify" data-verify hidden>
+              <p>
+                Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
+              </p>
+              <div class="account__actions">
+                <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
+                <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
+              </div>
+            </div>
+
+            <p class="sync" data-sync="idle">
+              <span class="sync__dot" aria-hidden="true"></span>
+              <span data-sync-text>Connecting…</span>
+            </p>
+
+            <a class="profile__tier" href={`${url('/progress')}#tiers`} data-tier-row>
+              <span class="tier-coin tier-coin--blank" data-tier-coin aria-hidden="true"></span>
+              <span class="profile__tier-text">
+                <strong data-tier-name>No tier yet</strong>
+                <span class="muted">Your grove and reward tiers</span>
+              </span>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </a>
+            <p class="account__msg" role="status" data-profile-msg></p>
+          </section>
+
+          <section class="card" aria-labelledby="acc-save-h" data-guest-only hidden>
+            <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
+            <p class="muted account__lead">
+              Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
+              it safe and to sign in on your other devices.
+            </p>
+            <AuthPanel id="guest" guest />
+          </section>
+
+          <section class="card" id="acc-security" aria-labelledby="acc-security-h" data-member-only hidden>
+            <h2 id="acc-security-h" class="panel-title">Sign-in and security</h2>
+
+            <div class="security__row" data-has-password hidden>
+              <h3>Change password</h3>
+              <form class="auth__form" data-form="change-password" novalidate>
+                <PasswordField id="acc-cur-pw" label="Current password" name="current" />
+                <PasswordField id="acc-new-pw" label="New password" isNew />
+                <div class="account__actions">
+                  <button type="submit" class="btn btn--small">Change password</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="security__row">
+              <h3>Google</h3>
+              <p class="muted" data-google-linked hidden>Connected — you can sign in with Google.</p>
+              <div data-google-unlinked hidden>
+                <p class="muted">Connect Google to sign in with one click, alongside your password.</p>
+                <div class="account__actions">
+                  <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect Google</button>
+                </div>
+              </div>
+            </div>
+            <p class="account__msg" role="status" data-security-msg></p>
+          </section>
+        </div>
+
+        {/* For everyone, signed in or not: the data is in this browser either way. */}
+        <div id="acc-data">
+          <DataTools />
+        </div>
+
+        <section class="card" id="acc-prefs" aria-labelledby="acc-prefs-h">
+          <h2 id="acc-prefs-h" class="panel-title">Preferences</h2>
+          <AppearanceMenu inline />
+          <div class="security__row">
+            <h3>Timer</h3>
+            <p class="muted">Session lengths and the end-of-session sound are set on the timer itself.</p>
             <div class="account__actions">
-              <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
-              <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
+              <a class="btn btn--ghost btn--small" href={url('/timer')}>Open the timer</a>
             </div>
           </div>
-
-          <p class="sync" data-sync="idle">
-            <span class="sync__dot" aria-hidden="true"></span>
-            <span data-sync-text>Connecting…</span>
-          </p>
-          <p class="account__msg" role="status" data-profile-msg></p>
         </section>
 
-        <section class="card" aria-labelledby="acc-save-h" data-guest-only hidden>
-          <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
-          <p class="muted account__lead">
-            Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
-            it safe and to sign in on your other devices.
-          </p>
-          <AuthPanel id="guest" guest />
-        </section>
-
-        <section class="card" aria-labelledby="acc-security-h" data-member-only hidden>
-          <h2 id="acc-security-h" class="panel-title">Sign-in and security</h2>
-
-          <div class="security__row" data-has-password hidden>
-            <h3>Change password</h3>
-            <form class="auth__form" data-form="change-password" novalidate>
-              <PasswordField id="acc-cur-pw" label="Current password" name="current" />
-              <PasswordField id="acc-new-pw" label="New password" isNew />
+        <div class="account__pair" data-view="signed-in" hidden>
+          <section class="card" id="acc-device" aria-labelledby="acc-device-h">
+            <h2 id="acc-device-h" class="panel-title">This device</h2>
+            <div data-member-only hidden>
+              <p class="muted">Signing out removes your data from this browser. It stays in your account.</p>
               <div class="account__actions">
-                <button type="submit" class="btn btn--small">Change password</button>
+                <button type="button" class="btn btn--ghost" data-sign-out>Sign out</button>
+              </div>
+              <div class="account__warn" data-sign-out-warn hidden>
+                <p>Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
+                <div class="account__actions">
+                  <button type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
+                  <button type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
+                </div>
+              </div>
+            </div>
+            <p class="muted" data-guest-only hidden>
+              You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
+              Google first if you want to use it elsewhere.
+            </p>
+            <p class="account__msg" role="status" data-device-msg></p>
+          </section>
+
+          <section class="card danger" aria-labelledby="acc-delete-h">
+            <h2 id="acc-delete-h" class="panel-title" data-delete-title>Delete account</h2>
+            <p class="muted">
+              Permanently deletes your account, everything stored in it, and this browser's copy. This can't be undone —{' '}
+              <a href="#acc-data">export a backup</a> first if you might want your data.
+            </p>
+            <form class="auth__form" data-form="delete" novalidate>
+              <div data-delete-password hidden>
+                <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
+              </div>
+              <div class="account__actions">
+                <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
               </div>
             </form>
-          </div>
-
-          <div class="security__row">
-            <h3>Google</h3>
-            <p class="muted" data-google-linked hidden>Connected — you can sign in with Google.</p>
-            <div data-google-unlinked hidden>
-              <p class="muted">Connect Google to sign in with one click, alongside your password.</p>
-              <div class="account__actions">
-                <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect Google</button>
-              </div>
-            </div>
-          </div>
-          <p class="account__msg" role="status" data-security-msg></p>
-        </section>
-      </div>
-
-      <div class="account__side">
-        <section class="card" aria-labelledby="acc-device-h">
-          <h2 id="acc-device-h" class="panel-title">This device</h2>
-          <div data-member-only hidden>
-            <p class="muted">Signing out removes your data from this browser. It stays in your account.</p>
-            <div class="account__actions">
-              <button type="button" class="btn btn--ghost" data-sign-out>Sign out</button>
-            </div>
-            <div class="account__warn" data-sign-out-warn hidden>
-              <p>Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
-              <div class="account__actions">
-                <button type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
-                <button type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
-              </div>
-            </div>
-          </div>
-          <p class="muted" data-guest-only hidden>
-            You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
-            Google first if you want to use it elsewhere.
-          </p>
-          <p class="account__msg" role="status" data-device-msg></p>
-        </section>
-
-        <section class="card danger" aria-labelledby="acc-delete-h">
-          <h2 id="acc-delete-h" class="panel-title" data-delete-title>Delete account</h2>
-          <p class="muted">
-            Permanently deletes your account, everything stored in it, and this browser's copy. This can't be undone —{' '}
-            <a href={url('/progress')}>export a backup</a> first if you might want your data.
-          </p>
-          <form class="auth__form" data-form="delete" novalidate>
-            <div data-delete-password hidden>
-              <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
-            </div>
-            <div class="account__actions">
-              <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
-            </div>
-          </form>
-          <p class="account__msg" role="status" data-delete-msg></p>
-        </section>
+            <p class="account__msg" role="status" data-delete-msg></p>
+          </section>
+        </div>
       </div>
     </div>
   </div>
@@ -188,6 +233,34 @@ import { url } from '../lib/paths';
 
 <script>
   import '../scripts/account-ui';
+</script>
+
+<script>
+  import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
+  import { allProgress, chainInput, tierLabel } from '../lib/rewards';
+  import { tierIcon } from '../lib/tier-icons';
+  import { cleanups, onPage } from '../lib/page';
+
+  // The profile's tier row: the highest tier reached on any track.
+  onPage('account-tier', () => {
+    const row = document.querySelector<HTMLElement>('[data-tier-row]');
+    if (!row) return;
+    const coin = row.querySelector<HTMLElement>('[data-tier-coin]')!;
+    const name = row.querySelector<HTMLElement>('[data-tier-name]')!;
+    const c = cleanups();
+    const render = () => {
+      const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
+      const level = Math.max(0, ...progress.map((p) => p.level));
+      coin.className = `tier-coin ${level ? `tier-coin--t${level - 1}` : 'tier-coin--blank'}`;
+      coin.innerHTML = tierIcon(Math.max(0, level - 1), 20);
+      name.textContent = level ? tierLabel(level - 1) : 'No tier yet';
+    };
+    render();
+    c.add(subscribe('sessions', render));
+    c.add(subscribe('done', render));
+    c.add(subscribe('chain', render));
+    return c.run;
+  });
 </script>
 
 <style>
@@ -262,21 +335,85 @@ import { url } from '../lib/paths';
     line-height: 1;
   }
 
-  .account__grid {
+  /* Section links beside the page on wide screens; the sections themselves in one column. */
+  .you {
     display: grid;
     gap: var(--space-5);
     align-items: start;
   }
 
-  .account__main,
+  .you__nav {
+    display: none;
+  }
+
+  .you__nav ul {
+    display: grid;
+    gap: var(--space-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .you__nav a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border-radius: var(--radius-md);
+    color: var(--color-text-muted);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .you__nav a:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .you__body [id] {
+    scroll-margin-top: var(--space-5);
+  }
+
+  /* Small screens: clear the header that follows you down the page. */
+  @media (max-width: 51.99rem) {
+    .you__body [id] {
+      scroll-margin-top: 7rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    .you {
+      grid-template-columns: 13rem minmax(0, 1fr);
+    }
+
+    .you__nav {
+      display: block;
+      position: sticky;
+      top: var(--space-5);
+    }
+  }
+
+  .you__body,
+  .account__stack,
+  .account__grid,
+  .account__pair,
   .account__side {
     display: grid;
     gap: var(--space-5);
+    min-width: 0;
+  }
+
+  .account__grid,
+  .account__pair {
+    align-items: start;
   }
 
   @media (min-width: 52rem) {
     .account__grid {
       grid-template-columns: 3fr 2fr;
+    }
+
+    .account__pair {
+      grid-template-columns: 1fr 1fr;
     }
   }
 
@@ -356,6 +493,37 @@ import { url } from '../lib/paths';
     color: var(--color-text-muted);
   }
 
+  /* The highest tier reached, leading to the grove on the progress page. */
+  .profile__tier {
+    --coin-size: 40px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 64px;
+    margin-top: var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .profile__tier > svg {
+    flex: none;
+    color: var(--color-border-strong);
+  }
+
+  .profile__tier-text {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+  }
+
+  .profile__tier-text .muted {
+    font-size: var(--text-sm);
+  }
+
   .sync {
     display: flex;
     align-items: center;
@@ -386,7 +554,8 @@ import { url } from '../lib/paths';
     background: #b3261e;
   }
 
-  .security__row + .security__row {
+  .security__row + .security__row,
+  .account :global(.appearance) + .security__row {
     margin-top: var(--space-5);
     padding-top: var(--space-5);
     border-top: 1px solid var(--color-border);
