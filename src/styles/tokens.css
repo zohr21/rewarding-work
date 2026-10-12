@@ -80,6 +80,7 @@
   --color-accent-soft: #e1eee6;
   --color-on-accent: #ffffff;
   --color-focus: #1d5fd0;
+  --color-danger: #b3261e;
 
   /* Categories (text on their soft background meets AA) */
   --cat-reward: #8a4b08;
@@ -193,6 +194,7 @@
     --color-accent-soft: #1f3a2b;
     --color-on-accent: #07170f;
     --color-focus: #8cc3ea;
+    --color-danger: #ff8a80;
     --cat-reward: #f2b877;
     --cat-reward-bg: #3a2a17;
     --cat-visual: #8cc3ea;
@@ -255,6 +257,7 @@
   --color-accent-soft: #1f3a2b;
   --color-on-accent: #07170f;
   --color-focus: #8cc3ea;
+  --color-danger: #ff8a80;
   --cat-reward: #f2b877;
   --cat-reward-bg: #3a2a17;
   --cat-visual: #8cc3ea;

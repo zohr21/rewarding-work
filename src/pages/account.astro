@@ -5,29 +5,105 @@ import PasswordField from '../components/PasswordField.astro';
 import CoinMark from '../components/CoinMark.astro';
 import DataTools from '../components/DataTools.astro';
 import AppearanceMenu from '../components/AppearanceMenu.astro';
-import { ACCOUNTS_ENABLED } from '../config/firebase';
+import RowIcon from '../components/RowIcon.astro';
+import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
-import { SITE } from '../config/site';
 import { url } from '../lib/paths';
+import pkg from '../../package.json';
 ---
 
 <BaseLayout title="Account" description="Your account, your data and how the site looks. Signing in is optional.">
   <div class="container account" data-account-page>
-    <header class="page-header">
-      <h1>{NATIVE_APP ? 'You' : 'Account'}</h1>
-      <p>Your sign-in, your data and how things look. Signing in is optional.</p>
+    <header class="page-header account__head">
+      {
+        NATIVE_APP && (
+          <a class="tool-btn account__back" href={url('/')} aria-label="Back to Today">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </a>
+        )
+      }
+      <div>
+        <h1>{NATIVE_APP ? 'You' : 'Account'}</h1>
+        {!NATIVE_APP && <p>Your sign-in, your data and how things look. Signing in is optional.</p>}
+      </div>
     </header>
 
     <p class="account__page-msg" role="status" data-page-msg></p>
 
+    <div class="account__loading" data-view="loading" hidden={!ACCOUNTS_ENABLED}>
+      <span class="coin-loader" aria-hidden="true">
+        <svg class="coin-loader__ring" viewBox="0 0 120 120" width="96" height="96">
+          <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
+          <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
+        </svg>
+        <CoinMark size={54} />
+      </span>
+      <p class="muted">Loading your account…</p>
+    </div>
+
+    <!-- Signed in: a card on a phone, the page's heading on wide screens -->
+    <section class="profile" id="acc-profile" aria-labelledby="acc-profile-h" data-view="signed-in" hidden>
+      <div class="profile__head">
+        <span class="profile__avatar" aria-hidden="true" data-avatar></span>
+        <div class="profile__who">
+          <h2 id="acc-profile-h" class="profile__name" data-name></h2>
+          <p class="profile__email muted" data-email></p>
+        </div>
+        <button type="button" class="btn btn--ghost btn--small" data-edit-open data-member-only hidden>
+          <span>Edit<span class="profile__edit-more"> profile</span></span>
+        </button>
+      </div>
+
+      <form class="profile__edit" data-form="name" novalidate hidden>
+        <div class="field">
+          <label for="acc-name">Your name</label>
+          <input id="acc-name" class="input" type="text" name="name" autocomplete="name" maxlength="80" />
+        </div>
+        <div class="account__actions">
+          <button type="submit" class="btn btn--small">Save</button>
+          <button type="button" class="btn btn--ghost btn--small" data-edit-cancel>Cancel</button>
+        </div>
+      </form>
+
+      <p class="profile__chips">
+        <span class="sync badge" data-sync="idle">
+          <span class="sync__dot" aria-hidden="true"></span>
+          <span data-sync-text>Connecting…</span>
+        </span>
+        <span class="profile__badges" data-badges></span>
+      </p>
+
+      <div class="profile__verify" data-verify hidden>
+        <p>
+          Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
+        </p>
+        <div class="account__actions">
+          <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
+          <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
+        </div>
+      </div>
+
+      <a class="profile__tier" href={`${url('/progress')}#tiers`} data-tier-row>
+        <span class="tier-coin tier-coin--blank" data-tier-coin aria-hidden="true"></span>
+        <span class="profile__tier-text">
+          <strong data-tier-name>No tier yet</strong>
+          <span class="muted">Your grove and reward tiers</span>
+        </span>
+        <RowIcon chevron />
+      </a>
+      <p class="account__msg" role="status" data-profile-msg></p>
+    </section>
+
     <div class="you">
       {/* Wide screens only: the sections are one short scroll on a phone. */}
-      <nav class="you__nav" aria-label="On this page">
+      <nav class="you__nav" aria-label="On this page" data-you-nav>
         <ul>
           <li data-view="signed-out" hidden><a href="#acc-signin">Sign in</a></li>
-          <li data-view="signed-in" hidden><a href="#acc-profile">Profile</a></li>
           <li data-view="signed-in" data-member-only hidden><a href="#acc-security">Sign-in and security</a></li>
-          <li><a href="#acc-data">Your data</a></li>
+          <li><a href="#acc-data">Data and sync</a></li>
+          <li><a href="#acc-connections">Connections</a></li>
           <li><a href="#acc-prefs">Preferences</a></li>
           <li data-view="signed-in" hidden><a href="#acc-device">This device</a></li>
         </ul>
@@ -46,155 +122,150 @@ import { url } from '../lib/paths';
           )
         }
 
-        <div class="account__loading" data-view="loading" hidden={!ACCOUNTS_ENABLED}>
-          <span class="coin-loader" aria-hidden="true">
-            <svg class="coin-loader__ring" viewBox="0 0 120 120" width="96" height="96">
-              <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
-              <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
-            </svg>
-            <CoinMark size={54} />
-          </span>
-          <p class="muted">Loading your account…</p>
-        </div>
-
         <!-- Signed out -->
-        <div class="account__grid" id="acc-signin" data-view="signed-out" hidden>
-          <section class="card" aria-labelledby="acc-signin-h">
-            <p class="account__brand">
-              <CoinMark size={64} />
-              <span>{SITE.name}</span>
-            </p>
-            <h2 id="acc-signin-h" class="panel-title">Sign in or create an account</h2>
-            <AuthPanel id="acc" />
-          </section>
-
-          <div class="account__side">
-            <section class="card" aria-labelledby="acc-guest-h">
-              <h2 id="acc-guest-h" class="panel-title">No email? Continue as a guest</h2>
-              <p class="muted">
-                Start straight away — no email, no password. Your progress is backed up to a guest account tied to this
-                browser. Save it with an email or Google whenever you like to keep it for good and use it on other devices.
-              </p>
-              <div class="account__actions">
-                <button type="button" class="btn btn--ghost" data-guest>Continue as guest</button>
-              </div>
-              <p class="account__msg" role="status" data-guest-msg></p>
-            </section>
-
-            <section class="card account__info" aria-labelledby="acc-what-h">
-              <h2 id="acc-what-h" class="panel-title">What your account keeps</h2>
-              <ul>
-                <li>Focus sessions, done list, habit chain and your tasks.</li>
-                <li>Timer settings, theme and background.</li>
-                <li>The running timer and sound settings stay on each device.</li>
-                <li>Anything already in this browser is added to your account when you sign in — nothing is overwritten.</li>
-              </ul>
-            </section>
-          </div>
-        </div>
-
-        <!-- Signed in -->
-        <div class="account__stack" data-view="signed-in" hidden>
-          <section class="card profile" id="acc-profile" aria-labelledby="acc-profile-h">
-            <div class="profile__head">
-              <span class="profile__avatar" aria-hidden="true" data-avatar></span>
-              <div>
-                <h2 id="acc-profile-h" class="profile__name" data-name></h2>
-                <p class="profile__badges" data-badges></p>
-              </div>
-            </div>
-
-            <div class="profile__verify" data-verify hidden>
-              <p>
-                Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
-              </p>
-              <div class="account__actions">
-                <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
-                <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
-              </div>
-            </div>
-
-            <p class="sync" data-sync="idle">
-              <span class="sync__dot" aria-hidden="true"></span>
-              <span data-sync-text>Connecting…</span>
-            </p>
-
-            <a class="profile__tier" href={`${url('/progress')}#tiers`} data-tier-row>
-              <span class="tier-coin tier-coin--blank" data-tier-coin aria-hidden="true"></span>
-              <span class="profile__tier-text">
-                <strong data-tier-name>No tier yet</strong>
-                <span class="muted">Your grove and reward tiers</span>
-              </span>
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        <section class="card signin" id="acc-signin" aria-labelledby="acc-signin-h" data-view="signed-out" hidden>
+          <div class="profile__head">
+            <span class="profile__avatar profile__avatar--none" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="28" height="28">
+                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-            </a>
-            <p class="account__msg" role="status" data-profile-msg></p>
-          </section>
-
-          <section class="card" aria-labelledby="acc-save-h" data-guest-only hidden>
-            <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
-            <p class="muted account__lead">
-              Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
-              it safe and to sign in on your other devices.
-            </p>
-            <AuthPanel id="guest" guest />
-          </section>
-
-          <section class="card" id="acc-security" aria-labelledby="acc-security-h" data-member-only hidden>
-            <h2 id="acc-security-h" class="panel-title">Sign-in and security</h2>
-
-            <div class="security__row" data-has-password hidden>
-              <h3>Change password</h3>
-              <form class="auth__form" data-form="change-password" novalidate>
-                <PasswordField id="acc-cur-pw" label="Current password" name="current" />
-                <PasswordField id="acc-new-pw" label="New password" isNew />
-                <div class="account__actions">
-                  <button type="submit" class="btn btn--small">Change password</button>
-                </div>
-              </form>
+            </span>
+            <div class="profile__who">
+              <h2 id="acc-signin-h" class="profile__name">Not signed in</h2>
+              <p class="profile__email muted">Saved {NATIVE_APP ? 'on this phone' : 'in this browser'} only</p>
             </div>
+          </div>
+          <p class="signin__lead">
+            Clearing {NATIVE_APP ? "the app's" : "this browser's"} data would lose your progress. Add Google or an email to keep it for good and
+            use it on your other devices.
+          </p>
+          {/* Google first; the email forms open on request. Without a Google client they are simply shown. */}
+          <div class="signin__auth" data-collapsed={GOOGLE_SIGNIN_ENABLED ? '' : undefined}>
+            <AuthPanel id="acc" />
+            <button type="button" class="btn btn--ghost signin__email" data-use-email>Use an email instead</button>
+          </div>
+          <p class="signin__fine muted">Everything already here is added to your account. Nothing is overwritten.</p>
+          <div class="signin__guest">
+            <button type="button" class="btn btn--ghost btn--small" data-guest>Continue as guest</button>
+            <p class="muted">No email or password: a backup tied to this {NATIVE_APP ? 'phone' : 'browser'}, which you can save properly later.</p>
+          </div>
+          <p class="account__msg" role="status" data-guest-msg></p>
+        </section>
 
-            <div class="security__row">
-              <h3>Google</h3>
-              <p class="muted" data-google-linked hidden>Connected — you can sign in with Google.</p>
-              <div data-google-unlinked hidden>
-                <p class="muted">Connect Google to sign in with one click, alongside your password.</p>
-                <div class="account__actions">
-                  <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect Google</button>
-                </div>
+        <section class="card" aria-labelledby="acc-save-h" data-view="signed-in" data-guest-only hidden>
+          <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
+          <p class="muted account__lead">
+            Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
+            it safe and to sign in on your other devices.
+          </p>
+          <AuthPanel id="guest" guest />
+        </section>
+
+        <section class="group o-sec" id="acc-security" aria-labelledby="acc-security-h" data-view="signed-in" data-member-only hidden>
+          <h2 id="acc-security-h" class="group__title">Sign-in and security</h2>
+          <div class="rows">
+            <div class="row">
+              <RowIcon name="mail" />
+              <span class="row__main">Email<small data-email-sub></small></span>
+            </div>
+            <details class="row-more" data-has-password hidden>
+              <summary class="row">
+                <RowIcon name="lock" />
+                <span class="row__main">Password<small>Change your password</small></span>
+                <RowIcon chevron />
+              </summary>
+              <div class="row-more__body">
+                <form class="auth__form" data-form="change-password" novalidate>
+                  <PasswordField id="acc-cur-pw" label="Current password" name="current" />
+                  <PasswordField id="acc-new-pw" label="New password" isNew />
+                  <div class="account__actions">
+                    <button type="submit" class="btn btn--small">Change password</button>
+                  </div>
+                </form>
               </div>
-            </div>
-            <p class="account__msg" role="status" data-security-msg></p>
-          </section>
-        </div>
-
-        {/* For everyone, signed in or not: the data is in this browser either way. */}
-        <div id="acc-data">
-          <DataTools />
-        </div>
-
-        <section class="card" id="acc-prefs" aria-labelledby="acc-prefs-h">
-          <h2 id="acc-prefs-h" class="panel-title">Preferences</h2>
-          <AppearanceMenu inline />
-          <div class="security__row">
-            <h3>Timer</h3>
-            <p class="muted">Session lengths and the end-of-session sound are set on the timer itself.</p>
-            <div class="account__actions">
-              <a class="btn btn--ghost btn--small" href={url('/timer')}>Open the timer</a>
-            </div>
+            </details>
+            <p class="account__msg row-note" role="status" data-security-msg></p>
           </div>
         </section>
 
-        <div class="account__pair" data-view="signed-in" hidden>
-          <section class="card" id="acc-device" aria-labelledby="acc-device-h">
-            <h2 id="acc-device-h" class="panel-title">This device</h2>
-            <div data-member-only hidden>
-              <p class="muted">Signing out removes your data from this browser. It stays in your account.</p>
-              <div class="account__actions">
-                <button type="button" class="btn btn--ghost" data-sign-out>Sign out</button>
+        {/* For everyone, signed in or not: the data is in this browser either way. */}
+        <div class="o-data" id="acc-data">
+          <DataTools />
+        </div>
+
+        <section class="group o-conn" id="acc-connections" aria-labelledby="acc-connections-h">
+          <h2 id="acc-connections-h" class="group__title">Connections</h2>
+          <div class="rows">
+            <div class="row" data-view="signed-in" data-member-only hidden>
+              <RowIcon name="link" />
+              <span class="row__main">Google<small>Sign in with one tap</small></span>
+              <span class="badge badge--ok" data-google-linked hidden>Connected</span>
+              <span data-google-unlinked hidden>
+                <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect</button>
+              </span>
+            </div>
+            <div class="row">
+              <RowIcon name="heart" />
+              <span class="row__main">{NATIVE_APP ? 'Health Connect' : 'Health data'}<small>Sleep, steps and activity</small></span>
+              <span class="badge badge--plain">Coming soon</span>
+            </div>
+            <p class="account__msg row-note" role="status" data-connect-msg></p>
+          </div>
+        </section>
+
+        <section class="group o-prefs" id="acc-prefs" aria-labelledby="acc-prefs-h">
+          <h2 id="acc-prefs-h" class="group__title">Preferences</h2>
+          <div class="rows">
+            <details class="row-more">
+              <summary class="row">
+                <RowIcon name="sun" />
+                <span class="row__main">Appearance</span>
+                <span class="row__value" data-pref-look></span>
+                <RowIcon chevron />
+              </summary>
+              <div class="row-more__body">
+                <AppearanceMenu inline />
               </div>
-              <div class="account__warn" data-sign-out-warn hidden>
+            </details>
+            <button type="button" class="row" data-open-sound>
+              <RowIcon name="sound" />
+              <span class="row__main">Sounds</span>
+              <span class="row__value" data-pref-sound></span>
+              <RowIcon chevron />
+            </button>
+            <a class="row" href={url('/timer')}>
+              <RowIcon name="timer" />
+              <span class="row__main">Timer defaults</span>
+              <span class="row__value" data-pref-timer></span>
+              <RowIcon chevron />
+            </a>
+            {
+              NATIVE_APP && (
+                <button type="button" class="row" data-notify>
+                  <RowIcon name="bell" />
+                  <span class="row__main">
+                    Notifications and widgets<small>Timer alerts. Widgets are added from your home screen.</small>
+                  </span>
+                  <span class="row__value" data-pref-notify />
+                </button>
+              )
+            }
+          </div>
+        </section>
+
+        <section class="group device o-device" id="acc-device" aria-labelledby="acc-device-h" data-view="signed-in" hidden>
+          <h2 id="acc-device-h" class="group__title">This device</h2>
+          <div class="rows">
+            <div data-member-only hidden>
+              <div class="row row--signout">
+                <RowIcon name="signout" />
+                <span class="row__main">
+                  <span class="row__label">Sign out</span>
+                  <small>Removes your data from this {NATIVE_APP ? 'phone' : 'browser'}. It stays in your account.</small>
+                </span>
+                <button type="button" class="btn btn--ghost btn--small" data-sign-out>Sign out</button>
+              </div>
+              <div class="account__warn row-note" data-sign-out-warn hidden>
                 <p>Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
                 <div class="account__actions">
                   <button type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
@@ -202,30 +273,41 @@ import { url } from '../lib/paths';
                 </div>
               </div>
             </div>
-            <p class="muted" data-guest-only hidden>
+            <p class="muted row-note" data-guest-only hidden>
               You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
               Google first if you want to use it elsewhere.
             </p>
-            <p class="account__msg" role="status" data-device-msg></p>
-          </section>
+            <p class="account__msg row-note" role="status" data-device-msg></p>
 
-          <section class="card danger" aria-labelledby="acc-delete-h">
-            <h2 id="acc-delete-h" class="panel-title" data-delete-title>Delete account</h2>
-            <p class="muted">
-              Permanently deletes your account, everything stored in it, and this browser's copy. This can't be undone —{' '}
-              <a href="#acc-data">export a backup</a> first if you might want your data.
-            </p>
-            <form class="auth__form" data-form="delete" novalidate>
-              <div data-delete-password hidden>
-                <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
+            <details class="row-more row-more--danger">
+              <summary class="row">
+                <RowIcon name="trash" />
+                <span class="row__main">
+                  <span class="row__label" data-delete-title>Delete account…</span>
+                  <small>Permanently deletes your account and everything in it. Export a backup first.</small>
+                </span>
+                <RowIcon chevron />
+              </summary>
+              <div class="row-more__body">
+                <p class="muted">
+                  This removes your account, everything stored in it, and this {NATIVE_APP ? "phone's" : "browser's"} copy. It can't be undone —{' '}
+                  <a href="#acc-data">export a backup</a> first if you might want your data.
+                </p>
+                <form class="auth__form" data-form="delete" novalidate>
+                  <div data-delete-password hidden>
+                    <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
+                  </div>
+                  <div class="account__actions">
+                    <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
+                  </div>
+                </form>
+                <p class="account__msg" role="status" data-delete-msg></p>
               </div>
-              <div class="account__actions">
-                <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
-              </div>
-            </form>
-            <p class="account__msg" role="status" data-delete-msg></p>
-          </section>
-        </div>
+            </details>
+          </div>
+        </section>
+
+        {NATIVE_APP && <p class="account__version muted o-ver">Version {pkg.version}</p>}
       </div>
     </div>
   </div>
@@ -236,9 +318,12 @@ import { url } from '../lib/paths';
 </script>
 
 <script>
-  import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
+  import { getAppearance, getChain, getDone, getSessions, getSoundPrefs, getTheme, read, subscribe } from '../lib/storage';
   import { allProgress, chainInput, tierLabel } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
+  import { FIFTY_TWO, POMODORO } from '../lib/timer/engine';
+  import { onPlayerChange } from '../lib/sound/player';
+  import { notificationsGranted, requestNotifications } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
 
   // The profile's tier row: the highest tier reached on any track.
@@ -261,6 +346,97 @@ import { url } from '../lib/paths';
     c.add(subscribe('chain', render));
     return c.run;
   });
+
+  // Preferences: what each row is set to, and the rows that open something elsewhere.
+  onPage('account-prefs', () => {
+    const page = document.querySelector<HTMLElement>('[data-account-page]');
+    if (!page) return;
+    const c = cleanups();
+    const q = <E extends HTMLElement = HTMLElement>(s: string) => page.querySelector<E>(s);
+
+    const look = q('[data-pref-look]')!;
+    const renderLook = () => {
+      const theme = getTheme();
+      const bg = page.querySelector<HTMLInputElement>(`input[data-pref="bg"][value="${getAppearance().bg}"]`);
+      const bgName = bg?.closest('label')?.textContent?.trim();
+      look.textContent = [theme.charAt(0).toUpperCase() + theme.slice(1), bgName].filter(Boolean).join(' · ');
+    };
+    renderLook();
+    c.add(subscribe('theme', renderLook));
+    c.add(subscribe('appearance', renderLook));
+
+    const timer = q('[data-pref-timer]')!;
+    const renderTimer = () => {
+      const p = read<{ mode?: string; custom?: { workMin?: number; breakMin?: number } } | null>('timer-prefs', null);
+      const mode = p?.mode ?? 'pomodoro';
+      timer.textContent =
+        mode === 'flowtime'
+          ? 'Flowtime'
+          : mode === '52-17'
+            ? `${FIFTY_TWO.workMin} / ${FIFTY_TWO.breakMin} min`
+            : mode === 'custom' && p?.custom?.workMin
+              ? `${p.custom.workMin} / ${p.custom.breakMin ?? 0} min`
+              : `${POMODORO.workMin} / ${POMODORO.shortMin} min`;
+    };
+    renderTimer();
+    c.add(subscribe('timer-prefs', renderTimer));
+
+    // Sounds live in the header's menu, which also holds the player.
+    const soundMenu = document.querySelector<HTMLDetailsElement>('[data-sound-menu]');
+    const sound = q('[data-pref-sound]')!;
+    const names: Record<string, string> = JSON.parse(soundMenu?.dataset.names ?? '{}');
+    let playing = false;
+    const renderSound = () => (sound.textContent = playing ? (names[getSoundPrefs().source] ?? 'On') : 'Off');
+    c.add(
+      onPlayerChange((s) => {
+        playing = s.playing;
+        renderSound();
+      }),
+    );
+    c.add(subscribe('sound', renderSound));
+    q('[data-open-sound]')!.addEventListener('click', () => {
+      if (!soundMenu) return;
+      window.scrollTo({ top: 0 });
+      // After this click has finished, or the menu's own outside-click handler closes it again.
+      window.setTimeout(() => {
+        soundMenu.open = true;
+        soundMenu.querySelector<HTMLElement>('summary')?.focus();
+      });
+    });
+
+    const notify = q<HTMLButtonElement>('[data-notify]');
+    if (notify) {
+      const value = q('[data-pref-notify]')!;
+      const show = (granted: boolean | null) => (value.textContent = granted === null ? '' : granted ? 'On' : 'Off');
+      void notificationsGranted().then(show);
+      notify.addEventListener('click', () => void requestNotifications().then(show));
+    }
+
+    const useEmail = q<HTMLButtonElement>('[data-use-email]')!;
+    useEmail.addEventListener('click', () => {
+      const auth = useEmail.parentElement!;
+      auth.removeAttribute('data-collapsed');
+      auth.querySelector<HTMLInputElement>('form:not([hidden]) input')?.focus();
+    });
+
+    // Mark the section in view in the side links.
+    const links = [...page.querySelectorAll<HTMLAnchorElement>('[data-you-nav] a')];
+    const mark = (id: string) => links.forEach((l) => (l.hash === `#${id}` ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')));
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries.find((e) => e.isIntersecting);
+        if (hit) mark(hit.target.id);
+      },
+      { rootMargin: '-15% 0px -70% 0px' },
+    );
+    links.forEach((l) => {
+      const target = document.getElementById(l.hash.slice(1));
+      if (target) io.observe(target);
+    });
+    c.add(() => io.disconnect());
+
+    return c.run;
+  });
 </script>
 
 <style>
@@ -278,6 +454,17 @@ import { url } from '../lib/paths';
 
   .account :global([hidden]) {
     display: none !important;
+  }
+
+  .account__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .account__back {
+    flex: none;
+    text-decoration: none;
   }
 
   /* The coin inside a turning ring. */
@@ -322,19 +509,204 @@ import { url } from '../lib/paths';
     }
   }
 
-  /* The stacked lockup above the sign-in form. */
-  .account__brand {
-    display: grid;
-    justify-items: center;
-    gap: var(--space-2);
+  /* ---------- Profile ---------- */
+  /* A card on a phone. */
+  .profile {
     margin-bottom: var(--space-5);
-    font-family: var(--font-display);
-    font-weight: 700;
-    font-size: var(--text-xl);
-    letter-spacing: -0.035em;
-    line-height: 1;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-grad);
+    box-shadow: var(--shadow-card);
   }
 
+  .profile__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .profile__avatar {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+  }
+
+  .profile__avatar--none {
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+  }
+
+  .profile__who {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .profile__name {
+    font-size: var(--text-lg);
+    overflow-wrap: anywhere;
+  }
+
+  .profile__email {
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .profile__email:empty {
+    display: none;
+  }
+
+  .profile__edit-more {
+    display: none;
+  }
+
+  .profile__edit {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+    max-width: 26rem;
+  }
+
+  .profile__chips,
+  .profile__badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .profile__chips {
+    margin-top: var(--space-4);
+  }
+
+  .sync {
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+  }
+
+  .sync[data-sync='synced'] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .sync__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-border-strong);
+  }
+
+  .sync[data-sync='synced'] .sync__dot {
+    background: var(--color-accent);
+  }
+
+  .sync[data-sync='saving'] .sync__dot,
+  .sync[data-sync='offline'] .sync__dot {
+    background: #c28a00;
+  }
+
+  .sync[data-sync='error'] .sync__dot {
+    background: var(--color-danger);
+  }
+
+  /* The highest tier reached, leading to the grove on the progress page. */
+  .profile__tier {
+    --coin-size: 40px;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 64px;
+    margin-top: var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .profile__tier-text {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+  }
+
+  .profile__tier-text .muted {
+    font-size: var(--text-sm);
+  }
+
+  .account__warn,
+  .profile__verify {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--ev-some-bg);
+    color: var(--ev-some);
+    font-size: var(--text-sm);
+  }
+
+  .profile__verify {
+    margin-top: var(--space-4);
+  }
+
+  .account__warn {
+    margin: 0 var(--space-4) var(--space-4);
+  }
+
+  /* Wide screens: the profile is the page's heading, in place of "Account". */
+  @media (min-width: 52rem) {
+    .profile {
+      margin-bottom: var(--space-6);
+      padding: var(--space-6) 0 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .profile__avatar:not(.profile__avatar--none) {
+      width: 72px;
+      height: 72px;
+      font-size: 2rem;
+    }
+
+    .profile .profile__name {
+      font-size: var(--text-2xl);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .profile .profile__email {
+      font-size: var(--text-base);
+    }
+
+    .profile__edit-more {
+      display: inline;
+    }
+
+    .profile__chips {
+      margin-top: var(--space-3);
+      padding-left: calc(72px + var(--space-4));
+    }
+
+    .profile__tier {
+      display: none;
+    }
+
+    :global(html:not([data-app])) .account:has(> .profile:not([hidden])) .page-header {
+      display: none;
+    }
+  }
+
+  /* ---------- Sections ---------- */
   /* Section links beside the page on wide screens; the sections themselves in one column. */
   .you {
     display: grid;
@@ -359,30 +731,35 @@ import { url } from '../lib/paths';
     min-height: 44px;
     padding-inline: var(--space-3);
     border-radius: var(--radius-md);
-    color: var(--color-text-muted);
+    color: var(--color-text);
     font-weight: 500;
     text-decoration: none;
   }
 
   .you__nav a:hover {
     background: var(--color-surface-2);
-    color: var(--color-text);
+  }
+
+  .you__nav a[aria-current] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .you__body {
+    display: grid;
+    gap: var(--space-5);
+    min-width: 0;
   }
 
   .you__body [id] {
     scroll-margin-top: var(--space-5);
   }
 
-  /* Small screens: clear the header that follows you down the page. */
-  @media (max-width: 51.99rem) {
-    .you__body [id] {
-      scroll-margin-top: 7rem;
-    }
-  }
-
   @media (min-width: 64rem) {
     .you {
       grid-template-columns: 13rem minmax(0, 1fr);
+      gap: var(--space-6);
     }
 
     .you__nav {
@@ -392,29 +769,146 @@ import { url } from '../lib/paths';
     }
   }
 
-  .you__body,
-  .account__stack,
-  .account__grid,
-  .account__pair,
-  .account__side {
+  /* Phones: preferences first, the account's own settings after, as in the app's design. */
+  @media (max-width: 51.99rem) {
+    /* Clear the header that follows you down the page. */
+    .you__body [id] {
+      scroll-margin-top: 7rem;
+    }
+
+    .o-prefs {
+      order: 1;
+    }
+
+    .o-conn {
+      order: 2;
+    }
+
+    .o-data {
+      order: 3;
+    }
+
+    .o-sec {
+      order: 4;
+    }
+
+    .o-device {
+      order: 5;
+    }
+
+    .o-ver {
+      order: 6;
+    }
+
+    /* Signing out is a plain button under the lists, deleting a quiet link under that. */
+    .device .group__title {
+      display: none;
+    }
+
+    .device .rows {
+      overflow: visible;
+      border: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .device .rows > *,
+    .device .rows > * > * {
+      box-shadow: none;
+    }
+
+    .row--signout {
+      flex-direction: column-reverse;
+      gap: var(--space-2);
+      padding: 0;
+      text-align: center;
+    }
+
+    .row--signout :global(.row__icon),
+    .row--signout .row__label {
+      display: none;
+    }
+
+    .row--signout .btn {
+      width: 100%;
+      min-height: 48px;
+    }
+
+    .row-more--danger > summary {
+      justify-content: center;
+      min-height: 48px;
+    }
+
+    .row-more--danger > summary .row__main {
+      flex: none;
+    }
+
+    .row-more--danger > summary :global(.row__icon),
+    .row-more--danger > summary :global(.row__chev),
+    .row-more--danger > summary small {
+      display: none;
+    }
+  }
+
+  .row-more--danger .row__label {
+    color: var(--color-danger);
+  }
+
+  .row-more--danger :global(.row__icon) {
+    color: var(--color-danger);
+  }
+
+  .account__version {
+    text-align: center;
+    font-size: var(--text-xs);
+  }
+
+  /* ---------- Signed out ---------- */
+  .signin {
     display: grid;
-    gap: var(--space-5);
-    min-width: 0;
+    gap: var(--space-4);
   }
 
-  .account__grid,
-  .account__pair {
-    align-items: start;
+  .signin__auth {
+    display: grid;
+    gap: var(--space-3);
   }
 
-  @media (min-width: 52rem) {
-    .account__grid {
-      grid-template-columns: 3fr 2fr;
-    }
+  .signin__auth[data-collapsed] :global(.auth__tabs),
+  .signin__auth[data-collapsed] :global(.auth__or),
+  .signin__auth[data-collapsed] :global(.auth__form) {
+    display: none;
+  }
 
-    .account__pair {
-      grid-template-columns: 1fr 1fr;
-    }
+  .signin__auth[data-collapsed] :global(.auth__google) {
+    --btn-edge: var(--accent-edge);
+    margin-top: 0;
+    border-color: transparent;
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+  }
+
+  .signin__auth:not([data-collapsed]) .signin__email {
+    display: none;
+  }
+
+  .signin__fine {
+    font-size: var(--text-xs);
+    text-align: center;
+  }
+
+  .signin__guest {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .signin__guest p {
+    flex: 1 1 14rem;
+    font-size: var(--text-xs);
   }
 
   .account__actions {
@@ -435,139 +929,6 @@ import { url } from '../lib/paths';
 
   .account__msg:empty {
     display: none;
-  }
-
-  .account__info ul {
-    padding-left: var(--space-5);
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-  }
-
-  .account__info li + li {
-    margin-top: var(--space-2);
-  }
-
-  .account__warn,
-  .profile__verify {
-    margin-top: var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-sm);
-    background: var(--ev-some-bg);
-    color: var(--ev-some);
-    font-size: var(--text-sm);
-  }
-
-  .profile__head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .profile__avatar {
-    display: grid;
-    place-items: center;
-    width: 56px;
-    height: 56px;
-    flex-shrink: 0;
-    border-radius: 50%;
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
-    font-size: var(--text-xl);
-    font-weight: 700;
-  }
-
-  .profile__name {
-    font-size: var(--text-lg);
-    overflow-wrap: anywhere;
-  }
-
-  .profile__badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    margin-top: var(--space-1);
-  }
-
-  .profile__badges .badge {
-    background: var(--color-surface-2);
-    color: var(--color-text-muted);
-  }
-
-  /* The highest tier reached, leading to the grove on the progress page. */
-  .profile__tier {
-    --coin-size: 40px;
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 64px;
-    margin-top: var(--space-4);
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--well-bg);
-    box-shadow: var(--well-shadow);
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .profile__tier > svg {
-    flex: none;
-    color: var(--color-border-strong);
-  }
-
-  .profile__tier-text {
-    flex: 1;
-    display: grid;
-    min-width: 0;
-  }
-
-  .profile__tier-text .muted {
-    font-size: var(--text-sm);
-  }
-
-  .sync {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-4);
-    font-size: var(--text-sm);
-    color: var(--color-text-muted);
-  }
-
-  .sync__dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: var(--color-border-strong);
-  }
-
-  .sync[data-sync='synced'] .sync__dot {
-    background: var(--color-accent);
-  }
-
-  .sync[data-sync='saving'] .sync__dot,
-  .sync[data-sync='offline'] .sync__dot {
-    background: #c28a00;
-  }
-
-  .sync[data-sync='error'] .sync__dot {
-    background: #b3261e;
-  }
-
-  .security__row + .security__row,
-  .account :global(.appearance) + .security__row {
-    margin-top: var(--space-5);
-    padding-top: var(--space-5);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .security__row h3 {
-    font-size: var(--text-base);
-    margin-bottom: var(--space-2);
-  }
-
-  .danger {
-    border-color: color-mix(in srgb, #b3261e 35%, var(--color-border));
   }
 
   /* ---------- Shared by AuthPanel / PasswordField (rendered inside this page) ---------- */
@@ -642,7 +1003,7 @@ import { url } from '../lib/paths';
   }
 
   .account :global(.field .input[aria-invalid='true']) {
-    border-color: #b3261e;
+    border-color: var(--color-danger);
   }
 
   .account :global(.pw) {

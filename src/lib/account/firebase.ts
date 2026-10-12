@@ -35,6 +35,7 @@ import {
   signInWithPopup,
   signOut as fbSignOut,
   updatePassword,
+  updateProfile,
   type Auth,
   type AuthCredential,
   type User,
@@ -380,6 +381,14 @@ export async function resendVerification(): Promise<void> {
 /** Re-read the account (e.g. after clicking the verification link in another tab). */
 export async function refreshUser(): Promise<void> {
   await auth.currentUser?.reload();
+  publishUser();
+}
+
+/** Change the name shown on the account page. */
+export async function updateName(name: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error('Not signed in.');
+  await updateProfile(user, { displayName: name.slice(0, 80) });
   publishUser();
 }
 

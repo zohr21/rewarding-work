@@ -1,63 +1,102 @@
 ---
 /**
- * Export / import all data as JSON, send a readable copy to Google (when a Google client
- * is configured), and delete everything. Confirmations are inline.
+ * The account page's "Data and sync" rows: export / import all data as JSON, send a
+ * readable copy to Google (when a Google client is configured), and delete everything.
+ * Confirmations are inline.
  */
 import ExportDialog from './ExportDialog.astro';
+import RowIcon from './RowIcon.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
 import { GOOGLE_EXPORT_ENABLED } from '../config/google';
 import { url } from '../lib/paths';
 ---
 
-<section class="card data" data-data-tools aria-labelledby="data-heading">
-  <h2 id="data-heading" class="panel-title">Your data</h2>
-  <p class="muted data__intro">
-    Everything is stored in this browser. Export a backup to move it to another device or keep it safe.
-    {ACCOUNTS_ENABLED && <>{' '}Or <a href={url('/account')}>sign in</a> to keep it in sync across your devices.</>}
-  </p>
-  <p class="data__warn" data-data-warn hidden>
-    This browser isn't saving data (private browsing or blocked storage?). It will be lost when you close the tab —
-    export it if you want to keep it.
-  </p>
-
-  <div class="data__actions">
-    <button type="button" class="btn" data-export>Export as JSON</button>
-    <label class="btn btn--ghost data__import">
-      Import from JSON
+<section class="group data" data-data-tools aria-labelledby="data-heading">
+  <h2 id="data-heading" class="group__title">Data and sync</h2>
+  <div class="rows">
+    {
+      ACCOUNTS_ENABLED && (
+        <details class="row-more">
+          <summary class="row">
+            <RowIcon name="cloud" />
+            <span class="row__main">
+              What's kept in your account<small>Sessions, tasks, chain, settings</small>
+            </span>
+            <RowIcon chevron />
+          </summary>
+          <div class="row-more__body data__kept">
+            <ul>
+              <li>Kept in your account: focus sessions, done list, habit chain, tasks, timer settings, theme and background.</li>
+              <li>Stays on each device: the running timer and sound settings.</li>
+              <li>Without an account everything is stored in this browser only.</li>
+              <li>Anything already here is added to your account when you sign in — nothing is overwritten.</li>
+            </ul>
+          </div>
+        </details>
+      )
+    }
+    <p class="data__warn row-note" data-data-warn hidden>
+      This browser isn't saving data (private browsing or blocked storage?). It will be lost when you close the tab —
+      export it if you want to keep it.
+    </p>
+    <button type="button" class="row" data-export>
+      <RowIcon name="download" />
+      <span class="row__main">Export a backup<small>A file with everything, to keep or move</small></span>
+      <RowIcon chevron />
+    </button>
+    <label class="row data__import">
+      <RowIcon name="upload" />
+      <span class="row__main">Import a backup<small>Merge a file with your data, or replace it</small></span>
+      <RowIcon chevron />
       <input type="file" accept="application/json,.json" class="visually-hidden" data-import />
     </label>
     {
       GOOGLE_EXPORT_ENABLED && (
-        <button type="button" class="btn btn--ghost" data-export-open>
-          Send to Google…
+        <button type="button" class="row" data-export-open>
+          <RowIcon name="sheet" />
+          <span class="row__main">
+            Send to Google…<small>A Sheet with charts, or a Doc report, in your own Drive</small>
+          </span>
+          <RowIcon chevron />
         </button>
       )
     }
-  </div>
-  {GOOGLE_EXPORT_ENABLED && <p class="muted data__hint">Send to Google makes a Sheet with charts, or a Doc report, in your own Drive.</p>}
 
-  <div class="data__confirm" data-import-panel hidden>
-    <p data-import-summary></p>
-    <div class="data__actions">
-      <button type="button" class="btn btn--small" data-import-merge>Merge with my data</button>
-      <button type="button" class="btn btn--ghost btn--small" data-import-replace>Replace my data</button>
-      <button type="button" class="btn btn--ghost btn--small" data-import-cancel>Cancel</button>
+    <div class="data__confirm row-note" data-import-panel hidden>
+      <p data-import-summary></p>
+      <div class="data__actions">
+        <button type="button" class="btn btn--small" data-import-merge>Merge with my data</button>
+        <button type="button" class="btn btn--ghost btn--small" data-import-replace>Replace my data</button>
+        <button type="button" class="btn btn--ghost btn--small" data-import-cancel>Cancel</button>
+      </div>
+      <p class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
     </div>
-    <p class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
+
+    <a class="row" href={url('/privacy')}>
+      <RowIcon name="shield" />
+      <span class="row__main">Privacy</span>
+      <RowIcon chevron />
+    </a>
+
+    <details class="row-more">
+      <summary class="row">
+        <RowIcon name="trash" />
+        <span class="row__main">Delete all data</span>
+        <RowIcon chevron />
+      </summary>
+      <div class="row-more__body">
+        <p class="muted">
+          Removes your sessions, done list, tasks, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
+          Export first if you might want them back.
+        </p>
+        <div class="data__actions">
+          <button type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
+        </div>
+      </div>
+    </details>
+
+    <p class="data__status row-note" role="status" data-data-status></p>
   </div>
-
-  <details class="data__danger disclosure">
-    <summary>Delete all data</summary>
-    <p class="muted">
-      Removes your sessions, done list, tasks, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
-      Export first if you might want them back.
-    </p>
-    <div class="data__actions">
-      <button type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
-    </div>
-  </details>
-
-  <p class="data__status" role="status" data-data-status></p>
 </section>
 
 {GOOGLE_EXPORT_ENABLED && <ExportDialog />}
@@ -179,20 +218,23 @@ import { url } from '../lib/paths';
 </script>
 
 <style>
-  .data__intro {
+  .data__kept ul {
+    padding-left: var(--space-5);
+    color: var(--color-text-muted);
     font-size: var(--text-sm);
+  }
+
+  .data__kept li + li {
+    margin-top: var(--space-2);
   }
 
   .data__warn {
-    margin-top: var(--space-3);
-    padding: var(--space-3);
-    border-radius: var(--radius-sm);
     background: var(--ev-some-bg);
     color: var(--ev-some);
-    font-size: var(--text-sm);
   }
 
-  .data__warn[hidden] {
+  .data__warn[hidden],
+  .data__confirm[hidden] {
     display: none;
   }
 
@@ -200,7 +242,7 @@ import { url } from '../lib/paths';
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-top: var(--space-4);
+    margin-top: var(--space-3);
   }
 
   .data__import {
@@ -209,23 +251,11 @@ import { url } from '../lib/paths';
 
   .data__import:focus-within {
     outline: 3px solid var(--color-focus);
-    outline-offset: 2px;
+    outline-offset: -3px;
   }
 
   .data__confirm {
-    margin-top: var(--space-4);
-    padding: var(--space-4);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-md);
     background: var(--color-surface-2);
-  }
-
-  .data__confirm[hidden] {
-    display: none;
-  }
-
-  .data__confirm .data__actions {
-    margin-top: var(--space-3);
   }
 
   .data__hint {
@@ -233,22 +263,7 @@ import { url } from '../lib/paths';
     font-size: var(--text-xs);
   }
 
-  .data__danger {
-    margin-top: var(--space-5);
-    font-size: var(--text-sm);
-  }
-
-  .data__danger summary {
-    color: var(--color-text-muted);
-  }
-
-  .data__danger p {
-    margin-top: var(--space-1);
-  }
-
-  .data__status {
-    margin-top: var(--space-3);
-    font-size: var(--text-sm);
-    min-height: 1.6em;
+  .data__status:empty {
+    display: none;
   }
 </style>

@@ -1,0 +1,44 @@
+---
+/**
+ * The icon at the start of a settings row (.row in global.css), or with `chevron`
+ * the arrow at its end.
+ */
+const ICONS = {
+  mail: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  lock: 'M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z',
+  shield: 'M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.500-7-9V6z',
+  cloud: 'M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.5 1.5A3.5 3.5 0 0 1 17.5 18z',
+  download: 'M12 4v11M7 11l5 5 5-5M5 20h14',
+  upload: 'M12 16V5M7 9l5-5 5 5M5 20h14',
+  sheet: 'M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7',
+  trash: 'M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  heart: 'M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.500-7 10-7 10z',
+  sun: 'M12 4v2M12 18v2M4 12h2M18 12h2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z',
+  sound: 'M4 10v4h3l5 4V6L7 10zM16 9a4 4 0 0 1 0 6',
+  timer: 'M12 5a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 9v4l2.5 2M9 2h6',
+  bell: 'M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
+  signout: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h9',
+} as const;
+
+interface Props {
+  name?: keyof typeof ICONS;
+  chevron?: boolean;
+}
+
+const { name, chevron = false } = Astro.props;
+---
+
+{
+  chevron ? (
+    <svg class="row__chev" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  ) : (
+    <span class="row__icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20">
+        <path d={ICONS[name!]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </span>
+  )
+}
