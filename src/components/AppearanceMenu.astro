@@ -2,6 +2,7 @@
 /**
  * Appearance menu: theme, ambient background (soft glows or live scenes), motion.
  * A <details> disclosure — no modal, closes on Escape / outside click.
+ * With `inline` the same controls sit open in the page (the account page's Preferences).
  */
 import { SCENES } from '../lib/storage';
 import { SCENE_INFO } from '../lib/scene';
@@ -17,24 +18,38 @@ const BACKGROUNDS = [
   { value: 'lavender', label: 'Lavender', swatch: 'linear-gradient(135deg, #dccfff, #c4dcff 45%, #ffd3ea)' },
   { value: 'plain', label: 'Plain', swatch: 'var(--color-bg)' },
 ];
+interface Props {
+  inline?: boolean;
+}
+
+const { inline = false } = Astro.props;
+const Tag = inline ? 'div' : 'details';
+/** Radio groups are per document, so the two copies on the account page need their own names. */
+const group = inline ? 'page' : 'menu';
+
 const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].label, preview: SCENE_INFO[id].preview }));
 ---
 
-<details class="appearance" data-appearance>
-  <summary class="appearance__button tool-btn" aria-label="Appearance: theme and background">
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-      <path
-        d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.5-4-8.2-9-8.2z"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.8"
-        stroke-linejoin="round"></path>
-      <circle cx="7.5" cy="11" r="1.3" fill="currentColor"></circle>
-      <circle cx="10" cy="7.3" r="1.3" fill="currentColor"></circle>
-      <circle cx="14.5" cy="7.3" r="1.3" fill="currentColor"></circle>
-    </svg>
-    <span class="appearance__text">Look</span>
-  </summary>
+<Tag class:list={['appearance', { 'appearance--inline': inline }]} data-appearance>
+  {
+    !inline && (
+      <summary class="appearance__button tool-btn" aria-label="Appearance: theme and background">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path
+            d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.5-4-8.2-9-8.2z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linejoin="round"
+          />
+          <circle cx="7.5" cy="11" r="1.3" fill="currentColor" />
+          <circle cx="10" cy="7.3" r="1.3" fill="currentColor" />
+          <circle cx="14.5" cy="7.3" r="1.3" fill="currentColor" />
+        </svg>
+        <span class="appearance__text">Look</span>
+      </summary>
+    )
+  }
 
   <div class="appearance__panel">
     <fieldset>
@@ -43,7 +58,7 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
         {
           THEMES.map((t) => (
             <label>
-              <input type="radio" name="rw-theme" value={t.value} />
+              <input type="radio" name={`rw-theme-${group}`} data-pref="theme" value={t.value} />
               <span>{t.label}</span>
             </label>
           ))
@@ -57,7 +72,7 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
         {
           BACKGROUNDS.map((b) => (
             <label class="swatch">
-              <input type="radio" name="rw-bg" value={b.value} />
+              <input type="radio" name={`rw-bg-${group}`} data-pref="bg" value={b.value} />
               <span class="swatch__chip" style={`background:${b.swatch}`} />
               <span class="swatch__label">{b.label}</span>
             </label>
@@ -72,7 +87,7 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
         {
           SCENE_OPTIONS.map((sc) => (
             <label class="scene">
-              <input type="radio" name="rw-bg" value={sc.value} />
+              <input type="radio" name={`rw-bg-${group}`} data-pref="bg" value={sc.value} />
               <span class="scene__preview" style={`background:${sc.preview}`} />
               <span class="scene__label">{sc.label}</span>
             </label>
@@ -84,12 +99,12 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
     </fieldset>
 
     <label class="appearance__switch">
-      <input type="checkbox" name="rw-motion" role="switch" />
+      <input type="checkbox" data-pref="motion" role="switch" />
       <span>Gentle background motion</span>
     </label>
     <p class="appearance__note" data-reduced-note hidden>Your system asks for reduced motion, so the background stays still.</p>
   </div>
-</details>
+</Tag>
 
 <script>
   import { getAppearance, getTheme, setAppearance, setTheme, subscribe, type Backdrop, type ThemeChoice } from '../lib/storage';
@@ -101,7 +116,7 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
 
   onPage('appearance', () => {
     const c = cleanups();
-    document.querySelectorAll<HTMLDetailsElement>('[data-appearance]').forEach((menu) => {
+    document.querySelectorAll<HTMLElement>('[data-appearance]').forEach((menu) => {
       const q = <E extends Element>(s: string) => menu.querySelector<E>(s)!;
 
       function sync(): void {
@@ -109,42 +124,49 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
         const a = getAppearance();
         applyTheme(theme);
         applyAppearance(a);
-        menu.querySelectorAll<HTMLInputElement>('input[name="rw-theme"]').forEach((i) => (i.checked = i.value === theme));
-        menu.querySelectorAll<HTMLInputElement>('input[name="rw-bg"]').forEach((i) => (i.checked = i.value === a.bg));
-        const motion = q<HTMLInputElement>('input[name="rw-motion"]');
+        menu.querySelectorAll<HTMLInputElement>('input[data-pref="theme"]').forEach((i) => (i.checked = i.value === theme));
+        menu.querySelectorAll<HTMLInputElement>('input[data-pref="bg"]').forEach((i) => (i.checked = i.value === a.bg));
+        const motion = q<HTMLInputElement>('input[data-pref="motion"]');
         motion.checked = a.motion;
         motion.disabled = a.bg === 'plain';
         q<HTMLElement>('[data-reduced-note]').hidden = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       }
 
-      // Checking for WebGL creates a throwaway context, so only do it once the menu is opened.
-      menu.addEventListener('toggle', () => {
-        if (!menu.open) return;
+      const checkWebGL = () => {
         canWebGL ??= webglAvailable();
         q<HTMLElement>('[data-no-webgl]').hidden = canWebGL;
         q<HTMLElement>('[data-scene-note]').hidden = !canWebGL;
-      });
+      };
 
       menu.addEventListener('change', (e) => {
         const input = e.target as HTMLInputElement;
-        if (input.name === 'rw-theme') setTheme(input.value as ThemeChoice);
-        if (input.name === 'rw-bg') setAppearance({ ...getAppearance(), bg: input.value as Backdrop });
-        if (input.name === 'rw-motion') setAppearance({ ...getAppearance(), motion: input.checked });
+        if (input.dataset.pref === 'theme') setTheme(input.value as ThemeChoice);
+        if (input.dataset.pref === 'bg') setAppearance({ ...getAppearance(), bg: input.value as Backdrop });
+        if (input.dataset.pref === 'motion') setAppearance({ ...getAppearance(), motion: input.checked });
         sync();
       });
 
-      // Close on Escape (return focus to the button) and on outside click.
-      menu.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && menu.open) {
-          menu.open = false;
-          q<HTMLElement>('summary').focus();
-        }
-      });
-      c.add(
-        listen(document, 'click', (e) => {
-          if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
-        }),
-      );
+      if (menu instanceof HTMLDetailsElement) {
+        // Checking for WebGL creates a throwaway context, so only do it once the menu is opened.
+        menu.addEventListener('toggle', () => {
+          if (menu.open) checkWebGL();
+        });
+
+        // Close on Escape (return focus to the button) and on outside click.
+        menu.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && menu.open) {
+            menu.open = false;
+            q<HTMLElement>('summary').focus();
+          }
+        });
+        c.add(
+          listen(document, 'click', (e) => {
+            if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
+          }),
+        );
+      } else {
+        checkWebGL();
+      }
 
       c.add(subscribe('theme', sync)); // also changes arriving from your account
       c.add(subscribe('appearance', sync));
@@ -177,6 +199,24 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
     border-radius: var(--radius-lg);
     box-shadow: var(--popover-shadow);
     animation: panel-in var(--duration-base) var(--ease-out);
+  }
+
+  /* In the page: the same controls without the popover around them. */
+  .appearance--inline .appearance__panel {
+    position: static;
+    width: auto;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    animation: none;
+  }
+
+  .appearance--inline .appearance__swatches,
+  .appearance--inline .appearance__scenes {
+    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
   }
 
   @keyframes panel-in {
