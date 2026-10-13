@@ -1,19 +1,18 @@
 ---
 /**
- * The Android app's bottom bar (BaseLayout shows it only in the app build): five
- * destinations, the current one marked with a pill behind its icon. Exam prep and
- * the problem pages live under Learn, next to the techniques.
+ * The Android app's bottom bar (BaseLayout shows it only in the app build): three
+ * destinations, the current one marked with a pill behind its icon. The timer, tasks,
+ * exam prep and the techniques all live under Focus, as its tabs (FocusTabs.astro).
  */
-import { isActive, url } from '../lib/paths';
+import { FOCUS } from '../config/site';
+import { isCurrent, url } from '../lib/paths';
 
 const current = Astro.url.pathname;
 
 const ITEMS = [
-  { label: 'Today', href: '/', under: ['/'], icon: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z' },
-  { label: 'Timer', href: '/timer', under: ['/timer'], icon: 'M12 5a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 9v4l2.5 2M9 2h6' },
-  { label: 'Tasks', href: '/tasks', under: ['/tasks'], icon: 'M10 6h10M10 12h10M10 18h10M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2' },
-  { label: 'Progress', href: '/progress', under: ['/progress'], icon: 'M5 20V11M12 20V5M19 20v-6' },
-  { label: 'Learn', href: '/techniques', under: ['/techniques', '/exam', '/problems'], icon: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11' },
+  { label: 'Today', href: '/', icon: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z' },
+  { ...FOCUS, icon: 'M12 5a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 9v4l2.5 2M9 2h6' },
+  { label: 'Progress', href: '/progress', icon: 'M5 20V11M12 20V5M19 20v-6' },
 ];
 ---
 
@@ -22,7 +21,7 @@ const ITEMS = [
     {
       ITEMS.map((item) => (
         <li>
-          <a href={url(item.href)} aria-current={item.under.some((p) => isActive(current, p)) ? 'page' : undefined}>
+          <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined}>
             <span class="app-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="22" height="22">
                 <path d={item.icon} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -81,7 +80,7 @@ const ITEMS = [
 
   .app-nav ul {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     max-width: 34rem;
     margin-inline: auto;
     padding: 0 var(--space-1);

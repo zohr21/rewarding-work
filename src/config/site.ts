@@ -10,12 +10,22 @@ export const SITE = {
 export interface NavItem {
   label: string;
   href: string;
+  /** Every path that belongs to this item, when that is more than `href` and its children. */
+  under?: string[];
 }
 
-export const NAV: NavItem[] = [
-  { label: 'Techniques', href: '/techniques' },
+/** The pages inside Focus, in the order of its tabs (FocusTabs.astro). Focus opens on the first. */
+export const FOCUS_TABS: NavItem[] = [
   { label: 'Timer', href: '/timer' },
   { label: 'Tasks', href: '/tasks' },
   { label: 'Exam prep', href: '/exam' },
-  { label: 'Progress', href: '/progress' },
+  { label: 'Techniques', href: '/techniques', under: ['/techniques', '/problems'] },
 ];
+
+export const FOCUS: NavItem = {
+  label: 'Focus',
+  href: FOCUS_TABS[0]!.href,
+  under: FOCUS_TABS.flatMap((tab) => tab.under ?? [tab.href]),
+};
+
+export const NAV: NavItem[] = [{ label: 'Home', href: '/' }, FOCUS, { label: 'Progress', href: '/progress' }];

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import FocusTabs from '../../components/FocusTabs.astro';
 import TechniqueCard from '../../components/TechniqueCard.astro';
 import { getTechniquesForProblem } from '../../lib/techniques';
 import { PROBLEMS, PROBLEM_SLUGS, type ProblemSlug } from '../../data/taxonomy';
@@ -17,6 +18,7 @@ const others = PROBLEM_SLUGS.filter((p) => p !== slug);
 
 <BaseLayout title={problem.title} description={problem.explanation}>
   <div class="container">
+    <FocusTabs />
     <header class="page-header">
       <p class="eyebrow">Problem</p>
       <h1>“{problem.title}”</h1>

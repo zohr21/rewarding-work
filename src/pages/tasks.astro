@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FocusTabs from '../components/FocusTabs.astro';
 import TaskGlance from '../components/TaskGlance.astro';
 import TaskList from '../components/TaskList.astro';
 import BreakdownTool from '../components/BreakdownTool.astro';
@@ -11,6 +12,7 @@ const breakdown = { heading: 'Break it down', linkToTasks: false, intro: 'Steps 
 
 <BaseLayout title="Tasks" description="Your tasks, broken into small steps, with the focus time you've spent on each.">
   <div class="container">
+    <FocusTabs />
     <header class="page-header">
       <h1>Tasks</h1>
       {
