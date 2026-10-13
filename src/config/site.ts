@@ -28,4 +28,9 @@ export const FOCUS: NavItem = {
   under: FOCUS_TABS.flatMap((tab) => tab.under ?? [tab.href]),
 };
 
-export const NAV: NavItem[] = [{ label: 'Home', href: '/' }, FOCUS, { label: 'Progress', href: '/progress' }];
+export const NAV: NavItem[] = [
+  { label: 'Home', href: '/' },
+  FOCUS,
+  { label: 'Health', href: '/health' },
+  { label: 'Progress', href: '/progress' },
+];

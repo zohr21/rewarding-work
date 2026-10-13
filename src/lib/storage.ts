@@ -27,10 +27,12 @@ export type StoreName =
   | 'exam'
   | 'breakdown' // legacy: moved into `tasks` on first load (see migrateBreakdown)
   | 'sound'
+  | 'health' // wellbeing spend (src/lib/health.ts)
+  | 'body' // the last read from Health Connect, in the Android app (HealthBody.astro)
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).

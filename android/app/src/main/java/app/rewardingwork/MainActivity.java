@@ -22,7 +22,14 @@ public class MainActivity extends BridgeActivity {
         keepRoute(intent);
     }
 
+    /** Android's link to why the app wants health data, which must lead to the privacy page. */
+    private static final String HEALTH_RATIONALE = "android.intent.action.VIEW_PERMISSION_USAGE";
+
     private static void keepRoute(Intent intent) {
+        if (intent != null && HEALTH_RATIONALE.equals(intent.getAction())) {
+            pendingRoute = "privacy";
+            return;
+        }
         String route = intent == null ? null : intent.getStringExtra(Routes.EXTRA);
         if (route == null) return;
         pendingRoute = route;

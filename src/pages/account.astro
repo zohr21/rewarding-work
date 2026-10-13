@@ -206,8 +206,8 @@ import pkg from '../../package.json';
             </div>
             <div class="row">
               <RowIcon name="heart" />
-              <span class="row__main">{NATIVE_APP ? 'Health Connect' : 'Health data'}<small>Sleep, steps and activity</small></span>
-              <span class="badge badge--plain">Coming soon</span>
+              <span class="row__main">{NATIVE_APP ? 'Health Connect' : 'Health data'}<small>{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small></span>
+              <a class="btn btn--ghost btn--small" href={url('/health')}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
             </div>
             <p class="account__msg row-note" role="status" data-connect-msg></p>
           </div>

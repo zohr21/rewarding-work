@@ -1,6 +1,8 @@
 package app.rewardingwork;
 
 import android.Manifest;
+import android.content.Intent;
+import android.health.connect.HealthConnectManager;
 import android.os.Build;
 
 import androidx.core.app.NotificationManagerCompat;
@@ -27,15 +29,25 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * What the pages ask of the phone (src/lib/device.ts): the timer's notifications,
- * the home-screen widgets' data, where a notification or widget wanted to go, and
- * Google's account picker for signing in.
+ * the home-screen widgets' data, where a notification or widget wanted to go,
+ * Google's account picker for signing in, and reading from Health Connect.
  * The pages own all the data; nothing here changes it.
  */
 @CapacitorPlugin(
     name = "RewardDevice",
-    permissions = { @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications") }
+    permissions = {
+        @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications"),
+        // Health Connect, one per kind of data so each can be allowed on its own (HealthData.java).
+        @Permission(strings = { "android.permission.health.READ_SLEEP" }, alias = HealthData.SLEEP),
+        @Permission(strings = { "android.permission.health.READ_STEPS" }, alias = HealthData.STEPS),
+        @Permission(strings = { "android.permission.health.READ_EXERCISE" }, alias = HealthData.EXERCISE),
+        @Permission(strings = { "android.permission.health.READ_RESTING_HEART_RATE" }, alias = HealthData.HEART)
+    }
 )
 public class DevicePlugin extends Plugin {
     /** True while the app is on screen: the page then announces a finished session itself. */
@@ -144,6 +156,83 @@ public class DevicePlugin extends Plugin {
                 }
             }
         );
+    }
+
+    /** Health Connect is part of Android from version 14; older phones are told it isn't there. */
+    private static final boolean HEALTH = Build.VERSION.SDK_INT >= 34;
+    private static final String[] HEALTH_KINDS = { HealthData.SLEEP, HealthData.STEPS, HealthData.EXERCISE, HealthData.HEART };
+    private static final int HEALTH_DAYS_MAX = 60;
+
+    @PluginMethod
+    public void healthState(PluginCall call) {
+        call.resolve(healthState());
+    }
+
+    /** Asks for the `kinds` not yet allowed. Android stops showing the question after two refusals. */
+    @PluginMethod
+    public void healthConnect(PluginCall call) {
+        List<String> wanted = new ArrayList<>();
+        try {
+            wanted = call.getArray("kinds", new JSArray()).toList();
+        } catch (org.json.JSONException e) {
+            /* Nothing asked for. */
+        }
+        List<String> ask = new ArrayList<>();
+        for (String kind : HEALTH_KINDS) {
+            if (HEALTH && wanted.contains(kind) && getPermissionState(kind) != PermissionState.GRANTED) ask.add(kind);
+        }
+        if (ask.isEmpty()) {
+            call.resolve(healthState());
+        } else {
+            requestPermissionForAliases(ask.toArray(new String[0]), call, "healthResult");
+        }
+    }
+
+    @PermissionCallback
+    private void healthResult(PluginCall call) {
+        call.resolve(healthState());
+    }
+
+    /** Daily totals for the last `days` days, for the kinds that are allowed. */
+    @PluginMethod
+    public void healthRead(PluginCall call) {
+        JSObject result = new JSObject();
+        if (!HEALTH) {
+            result.put("days", new JSArray());
+            call.resolve(result);
+            return;
+        }
+        List<String> allowed = new ArrayList<>();
+        for (String kind : HEALTH_KINDS) {
+            if (getPermissionState(kind) == PermissionState.GRANTED) allowed.add(kind);
+        }
+        int days = Math.max(1, Math.min(HEALTH_DAYS_MAX, call.getInt("days", 30)));
+        HealthData.read(getContext(), days, allowed, list -> {
+            result.put("days", list);
+            call.resolve(result);
+        });
+    }
+
+    /** Health Connect's own screen for what this app may read. */
+    @PluginMethod
+    public void healthSettings(PluginCall call) {
+        if (HEALTH && getActivity() != null) {
+            try {
+                getActivity().startActivity(
+                    new Intent(HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS).putExtra(Intent.EXTRA_PACKAGE_NAME, getContext().getPackageName())
+                );
+            } catch (RuntimeException e) {
+                /* No such screen on this phone: nothing to open. */
+            }
+        }
+        call.resolve();
+    }
+
+    private JSObject healthState() {
+        JSObject result = new JSObject();
+        result.put("available", HEALTH);
+        for (String kind : HEALTH_KINDS) result.put(kind, HEALTH && getPermissionState(kind) == PermissionState.GRANTED);
+        return result;
     }
 
     @PluginMethod
