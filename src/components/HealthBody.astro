@@ -73,6 +73,12 @@ const CHECK = 'M5 12l5 5 9-10';
           ))}
         </section>
 
+        <p class="body__hint" data-hb-hint hidden>
+          <span data-hb-hint-text />{' '}
+          Health Connect only has what other apps put into it. In the app for your watch or band (Samsung Health, Mi Fitness and
+          the like), turn on sharing with Health Connect, then come back here.
+        </p>
+
         <section class="card body__chart" data-hb-chart hidden aria-labelledby="hb-chart-heading">
           <div>
             <h2 id="hb-chart-heading" class="panel-title">Sleep and focus</h2>
@@ -103,7 +109,7 @@ const CHECK = 'M5 12l5 5 9-10';
 
 <script>
   import { getSessions, read, subscribe, write } from '../lib/storage';
-  import { HEALTH_KINDS, healthConnect, healthRead, healthState, openHealthSettings, type BodyDay, type HealthKind, type HealthState } from '../lib/device';
+  import { HEALTH_KINDS, healthConnect, healthRead, healthState, openHealthSettings, type BodyDay, type BodyField, type HealthKind, type HealthState } from '../lib/device';
   import { minutesByDay } from '../lib/stats';
   import { formatFocus } from '../lib/tasks';
   import { dayKey, fromDayKey } from '../lib/dates';
@@ -116,10 +122,11 @@ const CHECK = 'M5 12l5 5 9-10';
   /** What a full bar means on Today. */
   const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30 };
   const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
+  const dayNameFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
 
   const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-  const numbers = (days: BodyDay[], key: keyof Omit<BodyDay, 'day'>) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
+  const numbers = (days: BodyDay[], key: BodyField) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
 
   onPage('health-body', () => {
     const root = document.querySelector<HTMLElement>('[data-body]');
@@ -153,16 +160,21 @@ const CHECK = 'M5 12l5 5 9-10';
       const off = (kind: HealthKind) => tile(kind, 'Off', 'Not allowed in Health Connect');
 
       const sleep = numbers(shown, 'sleepMin');
+      const before = days[days.length - 2];
       if (!allowed('sleep')) off('sleep');
-      else if (!sleep.length) tile('sleep', 'No data', today ? 'Nothing recorded for last night' : `Nothing recorded ${span}`);
+      else if (!sleep.length && today && before?.sleepMin) {
+        // Not slept yet since the evening: the night before is the latest there is.
+        tile('sleep', hm(before.sleepMin), `Night to ${dayNameFmt.format(fromDayKey(before.day))} · goal 8h`, before.sleepMin / GOALS.sleepMin);
+      } else if (!sleep.length) tile('sleep', 'No data', today ? 'Nothing recorded for last night' : `Nothing recorded ${span}`);
       else if (today) tile('sleep', hm(sleep[0]!), 'Last night · goal 8h', sleep[0]! / GOALS.sleepMin);
       else tile('sleep', hm(avg(sleep)), `Nightly average · ${sleep.length} nights`);
 
       const steps = numbers(shown, 'steps');
       if (!allowed('steps')) off('steps');
-      else if (!steps.length) tile('steps', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
+      else if (!steps.length && today) tile('steps', '0', `Goal ${GOALS.steps.toLocaleString()}`, 0);
+      else if (!steps.length) tile('steps', 'No data', `Nothing recorded ${span}`);
       else if (today) tile('steps', steps[0]!.toLocaleString(), `Goal ${GOALS.steps.toLocaleString()}`, steps[0]! / GOALS.steps);
-      else tile('steps', Math.round(avg(steps)).toLocaleString(), 'Daily average');
+      else tile('steps', Math.round(avg(steps)).toLocaleString(), `Daily average · ${steps.reduce((a, b) => a + b, 0).toLocaleString()} in all`);
 
       const active = numbers(shown, 'activeMin');
       const total = active.reduce((a, b) => a + b, 0);
@@ -176,6 +188,19 @@ const CHECK = 'M5 12l5 5 9-10';
       if (!allowed('heart')) off('heart');
       else if (!heart.length) tile('heart', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
       else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
+    }
+
+    /** Allowed, yet nothing in a month: no app on the phone is handing that kind to Health Connect. */
+    function renderHint(): void {
+      const kinds: [HealthKind, BodyField, string][] = [
+        ['sleep', 'sleepMin', 'sleep'],
+        ['exercise', 'activeMin', 'exercise'],
+        ['heart', 'restingHr', 'resting heart rate'],
+      ];
+      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(days, field).length).map(([, , name]) => name);
+      const hint = $<HTMLElement>('[data-hb-hint]');
+      hint.hidden = !missing.length || !days.length;
+      $('[data-hb-hint-text]').textContent = `No ${missing.join(' or ')} in the last ${days.length} days.`;
     }
 
     function renderChart(): void {
@@ -217,6 +242,7 @@ const CHECK = 'M5 12l5 5 9-10';
       if (!any) return;
       data.querySelectorAll<HTMLElement>('[data-hb-range]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.hbRange === range)));
       renderTiles();
+      renderHint();
       renderChart();
     }
 
@@ -226,8 +252,16 @@ const CHECK = 'M5 12l5 5 9-10';
       render();
       if (!state || !HEALTH_KINDS.some((k) => state![k])) return;
       const fresh = await healthRead(READ_DAYS);
-      if (!fresh.length) return;
-      days = fresh;
+      if (!fresh?.days.length) return;
+      // A field Health Connect would not answer for this time keeps the numbers from the last read.
+      const lost = Object.keys(fresh.failed) as BodyField[];
+      const kept = new Map(days.map((d) => [d.day, d]));
+      days = fresh.days.map((d) => {
+        const old = kept.get(d.day);
+        const merged = { ...d };
+        for (const field of lost) if (old?.[field] !== undefined) merged[field] = old[field];
+        return merged;
+      });
       write('body', days);
       render();
     }
@@ -268,6 +302,7 @@ const CHECK = 'M5 12l5 5 9-10';
   .body__data[hidden],
   .body__connect[hidden],
   .body__chart[hidden],
+  .body__hint[hidden],
   .body__refused[hidden],
   .body__bar[hidden] {
     display: none;
@@ -334,6 +369,13 @@ const CHECK = 'M5 12l5 5 9-10';
   .body__promises svg {
     flex: none;
     color: var(--color-accent);
+  }
+
+  .body__hint {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-accent-soft);
+    font-size: var(--text-sm);
   }
 
   .body__link {

@@ -41,10 +41,12 @@ export interface BodyDay {
   restingHr?: number;
 }
 
+export type BodyField = keyof Omit<BodyDay, 'day'>;
+
 interface DevicePlugin {
   healthState(): Promise<HealthState>;
   healthConnect(options: { kinds: HealthKind[] }): Promise<HealthState>;
-  healthRead(options: { days: number }): Promise<{ days: BodyDay[] }>;
+  healthRead(options: { days: number }): Promise<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> }>;
   healthSettings(): Promise<void>;
   showTimer(options: { ongoing: TimerOngoing | null; alerts: TimerAlert[] }): Promise<void>;
   clearTimer(): Promise<void>;
@@ -80,7 +82,11 @@ export const setWidgets = (data: WidgetData) => void call((p) => p.setWidgets(da
 /** null where there is no native side to ask. */
 export const healthState = () => call<HealthState | null>((p) => p.healthState(), null);
 export const healthConnect = (kinds: HealthKind[]) => call<HealthState | null>((p) => p.healthConnect({ kinds }), null);
-export const healthRead = (days: number) => call<BodyDay[]>(async (p) => (await p.healthRead({ days })).days, []);
+/**
+ * The last `days` days, and the fields Health Connect would not answer for this time (it only
+ * answers while the app is on screen). null where there is no native side, or the call failed.
+ */
+export const healthRead = (days: number) => call<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> } | null>((p) => p.healthRead({ days }), null);
 export const openHealthSettings = () => void call((p) => p.healthSettings(), undefined);
 export const takeRoute = () => call<string | null>(async (p) => (await p.takeRoute()).route, null);
 

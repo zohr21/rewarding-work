@@ -49,9 +49,10 @@ final class HealthData {
     /**
      * One object per day for the last `days` days, oldest first: `day` ("2026-10-13") and,
      * where Health Connect has something, `sleepMin`, `steps`, `activeMin`, `restingHr`.
-     * Only the `kinds` the user allowed are asked for.
+     * Only the `kinds` the user allowed are asked for. Beside `days` comes `failed`: the fields
+     * Health Connect would not answer for (it only answers while the app is on screen), each with why.
      */
-    static void read(Context context, int days, List<String> kinds, Consumer<JSArray> done) {
+    static void read(Context context, int days, List<String> kinds, Consumer<JSObject> done) {
         HealthConnectManager manager = context.getSystemService(HealthConnectManager.class);
         LocalDate today = LocalDate.now();
         LocalDate first = today.minusDays(days - 1);
@@ -66,11 +67,15 @@ final class HealthData {
         }
 
         // Answers come back on the main thread, one per kind; the last one hands over the days.
+        JSObject failed = new JSObject();
         int[] waiting = { kinds.size() };
         Runnable finished = () -> {
             if (--waiting[0] > 0) return;
-            JSArray result = new JSArray();
-            for (JSObject entry : byDay.values()) result.put(entry);
+            JSArray list = new JSArray();
+            for (JSObject entry : byDay.values()) list.put(entry);
+            JSObject result = new JSObject();
+            result.put("days", list);
+            result.put("failed", failed);
             done.accept(result);
         };
         if (manager == null || kinds.isEmpty()) {
@@ -85,17 +90,17 @@ final class HealthData {
             switch (kind) {
                 case SLEEP: {
                     LocalDateTime end = today.atTime(NIGHT_STARTS, 0);
-                    totals(manager, main, SleepSessionRecord.SLEEP_DURATION_TOTAL, first.minusDays(1).atTime(NIGHT_STARTS, 0), end.isBefore(now) ? end : now, 1, "sleepMin", MINUTE, byDay, finished);
+                    totals(manager, main, SleepSessionRecord.SLEEP_DURATION_TOTAL, first.minusDays(1).atTime(NIGHT_STARTS, 0), end.isBefore(now) ? end : now, 1, "sleepMin", MINUTE, byDay, failed, finished);
                     break;
                 }
                 case STEPS:
-                    totals(manager, main, StepsRecord.STEPS_COUNT_TOTAL, midnight, now, 0, "steps", 1, byDay, finished);
+                    totals(manager, main, StepsRecord.STEPS_COUNT_TOTAL, midnight, now, 0, "steps", 1, byDay, failed, finished);
                     break;
                 case EXERCISE:
-                    totals(manager, main, ExerciseSessionRecord.EXERCISE_DURATION_TOTAL, midnight, now, 0, "activeMin", MINUTE, byDay, finished);
+                    totals(manager, main, ExerciseSessionRecord.EXERCISE_DURATION_TOTAL, midnight, now, 0, "activeMin", MINUTE, byDay, failed, finished);
                     break;
                 case HEART:
-                    totals(manager, main, RestingHeartRateRecord.BPM_AVG, midnight, now, 0, "restingHr", 1, byDay, finished);
+                    totals(manager, main, RestingHeartRateRecord.BPM_AVG, midnight, now, 0, "restingHr", 1, byDay, failed, finished);
                     break;
                 default:
                     finished.run();
@@ -114,6 +119,7 @@ final class HealthData {
         String field,
         long unit,
         Map<String, JSObject> byDay,
+        JSObject failed,
         Runnable finished
     ) {
         AggregateRecordsRequest<Long> request = new AggregateRecordsRequest.Builder<Long>(
@@ -140,12 +146,14 @@ final class HealthData {
 
                     @Override
                     public void onError(@NonNull HealthConnectException e) {
+                        failed.put(field, e.getErrorCode() + ": " + e.getMessage());
                         finished.run();
                     }
                 }
             );
         } catch (RuntimeException e) {
             // Permission taken away between the check and the read: that kind is left out.
+            failed.put(field, String.valueOf(e.getMessage()));
             finished.run();
         }
     }

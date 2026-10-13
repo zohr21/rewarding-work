@@ -196,9 +196,10 @@ public class DevicePlugin extends Plugin {
     /** Daily totals for the last `days` days, for the kinds that are allowed. */
     @PluginMethod
     public void healthRead(PluginCall call) {
-        JSObject result = new JSObject();
         if (!HEALTH) {
+            JSObject result = new JSObject();
             result.put("days", new JSArray());
+            result.put("failed", new JSObject());
             call.resolve(result);
             return;
         }
@@ -207,10 +208,7 @@ public class DevicePlugin extends Plugin {
             if (getPermissionState(kind) == PermissionState.GRANTED) allowed.add(kind);
         }
         int days = Math.max(1, Math.min(HEALTH_DAYS_MAX, call.getInt("days", 30)));
-        HealthData.read(getContext(), days, allowed, list -> {
-            result.put("days", list);
-            call.resolve(result);
-        });
+        HealthData.read(getContext(), days, allowed, call::resolve);
     }
 
     /** Health Connect's own screen for what this app may read. */
