@@ -1,0 +1,38 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import HealthBody from '../components/HealthBody.astro';
+import HealthSpend from '../components/HealthSpend.astro';
+import { NATIVE_APP } from '../config/app';
+---
+
+<BaseLayout title="Health" description="Rest, movement and what you put into feeling well, next to your focus.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Health</h1>
+      <p>Rest, movement and what you put into feeling well, next to your focus.</p>
+    </header>
+
+    <div class="health">
+      {/* The Android app has body data to lead with; the site only has a line about it, which goes last. */}
+      {NATIVE_APP && <HealthBody />}
+      <HealthSpend />
+      <p class="muted health__note">Your entries and budget are kept on this device. They are not part of account sync or backups yet.</p>
+      {!NATIVE_APP && <HealthBody />}
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .health {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .health__note {
+    font-size: var(--text-sm);
+  }
+
+  .health :global(.body__note) {
+    font-size: var(--text-sm);
+  }
+</style>

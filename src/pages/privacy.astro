@@ -8,7 +8,7 @@ import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 
 const CONTACT = 'babazadezohr@gmail.com';
-const UPDATED = '3 October 2026';
+const UPDATED = '13 October 2026';
 ---
 
 <BaseLayout title="Privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
@@ -67,6 +67,18 @@ const UPDATED = '3 October 2026';
         <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>,
         including the Limited Use requirements.
       </p>
+
+      <h2>Health data in the Android app</h2>
+      <p>
+        The Health page of the Android app can read sleep, steps, exercise and resting heart rate from Health Connect, and only
+        the kinds you allow. It reads daily totals to show them next to your focus time. It never writes to Health Connect.
+      </p>
+      <ul>
+        <li>the numbers stay on your phone. They are not sent to us, not copied to your account, and not part of backups;</li>
+        <li>they are not used for ads and are not shared with anyone;</li>
+        <li>you can take the permission back at any time in Health Connect, under App permissions. Deleting all data in the app also clears the last numbers it read.</li>
+      </ul>
+      <p>What you type in under Wellbeing spend is kept on the device you typed it on.</p>
 
       <h2>Other services the site talks to</h2>
       <ul>

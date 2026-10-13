@@ -1,0 +1,501 @@
+---
+/**
+ * Wellbeing spend on /health: the month's total against the budget, split by category,
+ * and the month's entries. Entries and the budget are typed in by hand (src/lib/health.ts).
+ */
+import { AMOUNT_MAX, CURRENCY_MAX, SPEND_CATEGORIES, SPEND_LABELS, WHAT_MAX } from '../lib/health';
+
+const PLUS = 'M12 5v14M5 12h14';
+---
+
+<div class="spend" data-spend>
+  <section class="card spend__summary" aria-labelledby="spend-heading">
+    <div class="spend__head">
+      <div>
+        <h2 id="spend-heading" class="panel-title">Wellbeing spend</h2>
+        <div class="spend__month">
+          <button type="button" class="spend__step" data-sp-prev aria-label="Previous month">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+          <span data-sp-month aria-live="polite"></span>
+          <button type="button" class="spend__step" data-sp-next aria-label="Next month">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </button>
+        </div>
+      </div>
+      <button type="button" class="btn btn--small" data-sp-add>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d={PLUS} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
+        Add
+      </button>
+    </div>
+
+    <p class="spend__total">
+      <strong data-sp-total></strong>
+      <span class="muted" data-sp-of></span>
+    </p>
+    <div class="spend__bar well" data-sp-bar role="img"></div>
+    <ul class="spend__cats" role="list" data-sp-cats></ul>
+    <p class="muted spend__empty" data-sp-empty hidden>
+      Nothing logged this month. Gym, therapy, nutrition, medical: add what you spend on feeling well.
+    </p>
+    <button type="button" class="btn btn--ghost btn--small spend__budget" data-sp-budget></button>
+  </section>
+
+  <section class="card spend__entries" aria-labelledby="spend-entries-heading">
+    <h2 id="spend-entries-heading" class="panel-title">Entries</h2>
+    <ul class="spend__list" role="list" data-sp-list></ul>
+    <p class="muted spend__none" data-sp-none>No entries this month.</p>
+  </section>
+
+  <dialog class="spend-dialog" data-sp-add-dialog aria-labelledby="sp-add-title">
+    <form method="dialog" data-sp-add-form>
+      <h2 id="sp-add-title">Add an expense</h2>
+      <label class="spend-dialog__field">
+        <span>What</span>
+        <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. Yoga class" data-sp-what />
+      </label>
+      <div class="spend-dialog__pair">
+        <label class="spend-dialog__field">
+          <span>Amount</span>
+          <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-sp-amount />
+        </label>
+        <label class="spend-dialog__field">
+          <span>Date</span>
+          <input class="input" type="date" required data-sp-day />
+        </label>
+      </div>
+      <label class="spend-dialog__field">
+        <span>Category</span>
+        <select class="input" data-sp-category>
+          {SPEND_CATEGORIES.map((c) => <option value={c}>{SPEND_LABELS[c]}</option>)}
+        </select>
+      </label>
+      <div class="spend-dialog__actions">
+        <button type="button" class="btn btn--ghost" data-sp-cancel>Cancel</button>
+        <button type="submit" class="btn">Add expense</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="spend-dialog" data-sp-budget-dialog aria-labelledby="sp-budget-title">
+    <form method="dialog" data-sp-budget-form>
+      <h2 id="sp-budget-title">Monthly budget</h2>
+      <p class="muted">What you are happy to spend on wellbeing in a month. Leave the amount empty for no budget.</p>
+      <div class="spend-dialog__pair">
+        <label class="spend-dialog__field">
+          <span>Amount</span>
+          <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-sp-budget-amount />
+        </label>
+        <label class="spend-dialog__field">
+          <span>Currency sign</span>
+          <input class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" data-sp-currency />
+        </label>
+      </div>
+      <div class="spend-dialog__actions">
+        <button type="button" class="btn btn--ghost" data-sp-cancel>Cancel</button>
+        <button type="submit" class="btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <p class="visually-hidden" aria-live="polite" data-sp-live></p>
+</div>
+
+<script>
+  import { subscribe } from '../lib/storage';
+  import {
+    addSpend,
+    formatMoney,
+    getHealth,
+    monthOf,
+    monthSpend,
+    removeSpend,
+    setBudget,
+    shiftMonth,
+    SPEND_COLORS,
+    SPEND_LABELS,
+    type SpendCategory,
+    type SpendEntry,
+  } from '../lib/health';
+  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { offerUndo } from '../lib/undo';
+  import { cleanups, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const X_SVG =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  onPage('health-spend', () => {
+    const root = document.querySelector<HTMLElement>('[data-spend]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const addDialog = $<HTMLDialogElement>('[data-sp-add-dialog]');
+    const budgetDialog = $<HTMLDialogElement>('[data-sp-budget-dialog]');
+    const what = $<HTMLInputElement>('[data-sp-what]');
+    const amount = $<HTMLInputElement>('[data-sp-amount]');
+    const day = $<HTMLInputElement>('[data-sp-day]');
+    const category = $<HTMLSelectElement>('[data-sp-category]');
+    const budgetAmount = $<HTMLInputElement>('[data-sp-budget-amount]');
+    const currency = $<HTMLInputElement>('[data-sp-currency]');
+    const next = $<HTMLButtonElement>('[data-sp-next]');
+    const live = $<HTMLElement>('[data-sp-live]');
+
+    const thisMonth = () => monthOf(dayKey(new Date()));
+    let month = thisMonth();
+    /** Removed entries still offered for Undo (src/lib/undo.ts). */
+    const removing = new Set<string>();
+
+    const announce = (text: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    };
+
+    function entryRow(entry: SpendEntry, sign: string): HTMLLIElement {
+      const item = el('li', 'spend__entry');
+      const main = el('span', 'spend__entry-main');
+      main.append(el('strong', '', entry.what), el('span', 'muted', `${SPEND_LABELS[entry.category]} · ${formatDay(fromDayKey(entry.day))}`));
+      const remove = el('button', 'spend__remove');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove ${entry.what}`);
+      remove.innerHTML = X_SVG;
+      remove.addEventListener('click', () => {
+        removing.add(entry.id);
+        render();
+        offerUndo({
+          message: `Removed “${entry.what}”`,
+          commit: () => {
+            removing.delete(entry.id);
+            removeSpend(entry.id);
+          },
+          undo: () => {
+            removing.delete(entry.id);
+            render();
+          },
+        });
+      });
+      item.append(main, el('span', 'spend__amount', formatMoney(entry.amount, sign)), remove);
+      return item;
+    }
+
+    function render(): void {
+      const store = getHealth();
+      const sign = store.currency;
+      const spent = monthSpend(
+        store.entries.filter((e) => !removing.has(e.id)),
+        month,
+      );
+      const { budget } = store;
+
+      $('[data-sp-month]').textContent = monthFmt.format(fromDayKey(`${month}-01`));
+      next.disabled = month >= thisMonth();
+      $('[data-sp-total]').textContent = formatMoney(spent.total, sign);
+      $('[data-sp-of]').textContent = budget ? `of ${formatMoney(budget, sign)} budget` : 'this month';
+      $('[data-sp-budget]').textContent = budget ? 'Change budget' : 'Set a monthly budget';
+
+      // The bar is the budget when there is one, so the empty part is what is left; otherwise the month's total.
+      const whole = Math.max(budget ?? 0, spent.total);
+      const bar = $<HTMLElement>('[data-sp-bar]');
+      bar.replaceChildren(
+        ...spent.byCategory.map(({ category: cat, amount: sum }) => {
+          const part = el('i');
+          part.style.width = `${(sum / whole) * 100}%`;
+          part.style.background = SPEND_COLORS[cat];
+          return part;
+        }),
+      );
+      bar.setAttribute(
+        'aria-label',
+        budget
+          ? spent.total > budget
+            ? `${formatMoney(spent.total - budget, sign)} over the budget`
+            : `${formatMoney(budget - spent.total, sign)} of the budget left`
+          : 'Spend by category',
+      );
+      bar.classList.toggle('is-over', !!budget && spent.total > budget);
+
+      $('[data-sp-cats]').replaceChildren(
+        ...spent.byCategory.map(({ category: cat, amount: sum }) => {
+          const row = el('li');
+          const dot = el('i');
+          dot.style.background = SPEND_COLORS[cat];
+          row.append(dot, el('span', '', SPEND_LABELS[cat]), el('strong', '', formatMoney(sum, sign)));
+          return row;
+        }),
+      );
+      $<HTMLElement>('[data-sp-empty]').hidden = spent.entries.length > 0;
+      $('[data-sp-list]').replaceChildren(...spent.entries.map((e) => entryRow(e, sign)));
+      $<HTMLElement>('[data-sp-none]').hidden = spent.entries.length > 0;
+    }
+
+    $('[data-sp-prev]').addEventListener('click', () => {
+      month = shiftMonth(month, -1);
+      render();
+    });
+    next.addEventListener('click', () => {
+      month = shiftMonth(month, 1);
+      render();
+    });
+
+    $('[data-sp-add]').addEventListener('click', () => {
+      what.value = '';
+      amount.value = '';
+      // A past month being looked at gets its entries dated in that month.
+      day.value = month === thisMonth() ? dayKey(new Date()) : `${month}-01`;
+      day.max = dayKey(new Date());
+      addDialog.showModal();
+      what.focus();
+    });
+    $<HTMLFormElement>('[data-sp-add-form]').addEventListener('submit', () => {
+      const entry = addSpend({ what: what.value, category: category.value as SpendCategory, amount: Number(amount.value), day: day.value });
+      if (!entry) return;
+      month = monthOf(entry.day);
+      announce(`Added ${entry.what}, ${formatMoney(entry.amount, getHealth().currency)}`);
+    });
+
+    $('[data-sp-budget]').addEventListener('click', () => {
+      const store = getHealth();
+      budgetAmount.value = store.budget ? String(store.budget) : '';
+      currency.value = store.currency;
+      budgetDialog.showModal();
+      budgetAmount.focus();
+    });
+    $<HTMLFormElement>('[data-sp-budget-form]').addEventListener('submit', () => {
+      setBudget(Number(budgetAmount.value), currency.value);
+      announce('Budget saved.');
+    });
+
+    for (const dialog of [addDialog, budgetDialog]) {
+      dialog.addEventListener('click', (e) => {
+        // A click on the dimmed page behind lands on the dialog itself.
+        if (e.target === dialog || (e.target as HTMLElement).closest('[data-sp-cancel]')) dialog.close();
+      });
+    }
+
+    render();
+    c.add(subscribe('health', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .spend {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  @media (min-width: 56rem) {
+    .spend {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    }
+  }
+
+  .spend__summary {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .spend__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .spend__head .panel-title {
+    margin-bottom: 0;
+  }
+
+  .spend__month {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-inline-start: -10px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .spend__step,
+  .spend :global(.spend__remove) {
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .spend__step:hover:not(:disabled),
+  .spend :global(.spend__remove:hover) {
+    color: var(--color-text);
+    background: var(--color-surface-2);
+  }
+
+  .spend__step:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .spend__total {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .spend__total strong {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    line-height: 1;
+  }
+
+  .spend__bar {
+    display: flex;
+    gap: 2px;
+    block-size: 14px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .spend__bar.is-over {
+    outline: 2px solid var(--color-danger);
+    outline-offset: 2px;
+  }
+
+  .spend__cats,
+  .spend__list {
+    padding: 0;
+    list-style: none;
+  }
+
+  .spend__cats :global(li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: none;
+    min-height: 44px;
+  }
+
+  .spend__cats :global(li + li),
+  .spend__list :global(li + li) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .spend__cats :global(i) {
+    flex: none;
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 4px;
+  }
+
+  .spend__cats :global(span) {
+    flex: 1;
+  }
+
+  .spend__empty,
+  .spend__none {
+    font-size: var(--text-sm);
+  }
+
+  .spend__empty[hidden],
+  .spend__none[hidden] {
+    display: none;
+  }
+
+  .spend__budget {
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  .spend__list :global(.spend__entry) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: none;
+    min-height: 60px;
+  }
+
+  .spend__list :global(.spend__entry-main) {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .spend__list :global(.spend__entry-main .muted) {
+    font-size: var(--text-sm);
+  }
+
+  .spend__list :global(.spend__amount) {
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .spend-dialog {
+    inline-size: min(100% - 2 * var(--space-4), 26rem);
+    margin: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--popover-bg);
+    color: var(--color-text);
+    box-shadow: var(--popover-shadow);
+  }
+
+  .spend-dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .spend-dialog form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .spend-dialog h2 {
+    font-size: var(--text-lg);
+  }
+
+  .spend-dialog p {
+    font-size: var(--text-sm);
+  }
+
+  .spend-dialog__field {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .spend-dialog__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .spend-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  /* The Android app: the dialogs come up from the bottom, like its other sheets. */
+  :global(html[data-app]) .spend-dialog {
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    margin: 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border-width: 1px 0 0;
+    border-radius: 28px 28px 0 0;
+  }
+
+  :global(html[data-app]) .spend-dialog__actions .btn {
+    flex: 1;
+    min-height: 52px;
+  }
+</style>

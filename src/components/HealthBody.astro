@@ -1,0 +1,543 @@
+---
+/**
+ * Body data on /health: sleep, steps, exercise and resting heart rate, read from Health
+ * Connect by the Android app (src/lib/device.ts) and set next to focus time. The site
+ * has nothing to read from, so it says where the numbers come from instead.
+ */
+import { NATIVE_APP } from '../config/app';
+import { HEALTH_KINDS } from '../lib/device';
+import { url } from '../lib/paths';
+
+const ASK = { sleep: 'Sleep', steps: 'Steps', exercise: 'Exercise', heart: 'Resting heart rate' };
+const TILES = [
+  { kind: 'sleep', label: 'Sleep', icon: 'M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10z' },
+  { kind: 'steps', label: 'Steps', icon: 'M3 12h4l3-7 4 14 3-7h4' },
+  { kind: 'exercise', label: 'Active', icon: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10' },
+  { kind: 'heart', label: 'Resting heart', icon: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z' },
+];
+const RANGES = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+];
+const CHECK = 'M5 12l5 5 9-10';
+---
+
+{
+  NATIVE_APP ? (
+    <div class="body" data-body>
+      <section class="card body__connect" data-hb-connect hidden aria-labelledby="hb-connect-heading">
+        <h2 id="hb-connect-heading">See how rest and movement shape your focus</h2>
+        <p class="muted">Choose what to read from Health Connect. You can change this at any time.</p>
+        <div class="body__asks well">
+          {HEALTH_KINDS.map((kind) => (
+            <label>
+              <span>{ASK[kind]}</span>
+              <input type="checkbox" value={kind} checked={kind !== 'heart'} data-hb-ask />
+            </label>
+          ))}
+        </div>
+        <button type="button" class="btn body__go" data-hb-go>Connect Health Connect</button>
+        <p class="body__refused" data-hb-refused hidden>
+          Nothing was allowed. If Android no longer asks, allow it in Health Connect:
+          <button type="button" class="body__link" data-hb-manage>open its settings</button>.
+        </p>
+        <ul class="body__promises muted" role="list">
+          {['Read only. The app never writes to your health record.', 'Stays on this phone. It is not part of account sync.', 'Never used for ads or shared with anyone.'].map((text) => (
+            <li>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d={CHECK} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              {text}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div class="body__data" data-hb-data hidden>
+        <div class="body__ranges well" role="group" aria-label="Range" data-hb-ranges>
+          {RANGES.map((r) => (
+            <button type="button" data-hb-range={r.id} aria-pressed={r.id === 'today' ? 'true' : 'false'}>{r.label}</button>
+          ))}
+        </div>
+
+        <section class="body__tiles" aria-label="Body data">
+          {TILES.map((t) => (
+            <div class={`card body__tile body__tile--${t.kind}`} data-hb-tile={t.kind}>
+              <span class="body__kind">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d={t.icon} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                {t.label}
+              </span>
+              <strong class="body__value" data-hb-value />
+              <div class="body__bar well" data-hb-bar hidden><i /></div>
+              <span class="muted body__sub" data-hb-sub />
+            </div>
+          ))}
+        </section>
+
+        <p class="body__hint" data-hb-hint hidden>
+          <span data-hb-hint-text />{' '}
+          Health Connect only has what other apps put into it. In the app for your watch or band (Samsung Health, Mi Fitness and
+          the like), turn on sharing with Health Connect, then come back here.
+        </p>
+
+        <section class="card body__chart" data-hb-chart hidden aria-labelledby="hb-chart-heading">
+          <div>
+            <h2 id="hb-chart-heading" class="panel-title">Sleep and focus</h2>
+            <p class="muted body__sub">Last 7 days</p>
+          </div>
+          <div class="body__bars well" role="img" data-hb-bars />
+          <p class="body__legend">
+            <span><i class="body__dot body__dot--sleep" />Hours slept</span>
+            <span><i class="body__dot body__dot--focus" />Focus time</span>
+          </p>
+        </section>
+
+        <p class="muted body__note">
+          Body data comes from Health Connect and stays on this phone.
+          <button type="button" class="body__link" data-hb-manage>Manage</button>
+        </p>
+      </div>
+
+      <p class="muted body__note" data-hb-none hidden>Sleep, steps and activity need Health Connect, which is part of Android 14 and later.</p>
+    </div>
+  ) : (
+    <p class="muted body__note">
+      Sleep, steps, exercise and resting heart rate are read from Health Connect by the Android app, and stay on the phone. See the
+      <a href={url('/privacy')}>privacy page</a>.
+    </p>
+  )
+}
+
+<script>
+  import { getSessions, read, subscribe, write } from '../lib/storage';
+  import { HEALTH_KINDS, healthConnect, healthRead, healthState, openHealthSettings, type BodyDay, type BodyField, type HealthKind, type HealthState } from '../lib/device';
+  import { minutesByDay } from '../lib/stats';
+  import { formatFocus } from '../lib/tasks';
+  import { dayKey, fromDayKey } from '../lib/dates';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  type Range = 'today' | 'week' | 'month';
+  const SPAN: Record<Range, number> = { today: 1, week: 7, month: 30 };
+  const READ_DAYS = 30;
+  /** What a full bar means on Today. */
+  const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30 };
+  const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
+  const dayNameFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
+
+  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
+  const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const numbers = (days: BodyDay[], key: BodyField) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
+
+  onPage('health-body', () => {
+    const root = document.querySelector<HTMLElement>('[data-body]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const connect = $<HTMLElement>('[data-hb-connect]');
+    const data = $<HTMLElement>('[data-hb-data]');
+    const none = $<HTMLElement>('[data-hb-none]');
+    const refused = $<HTMLElement>('[data-hb-refused]');
+
+    let state: HealthState | null = null;
+    let range: Range = 'today';
+    // The last read is kept so the page has numbers before Health Connect answers.
+    let days = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+
+    function tile(kind: HealthKind, value: string, sub: string, share?: number): void {
+      const box = $<HTMLElement>(`[data-hb-tile="${kind}"]`);
+      box.querySelector('[data-hb-value]')!.textContent = value;
+      box.querySelector('[data-hb-sub]')!.textContent = sub;
+      const bar = box.querySelector<HTMLElement>('[data-hb-bar]')!;
+      bar.hidden = share === undefined;
+      bar.querySelector('i')!.style.width = `${Math.round(Math.min(1, share ?? 0) * 100)}%`;
+    }
+
+    function renderTiles(): void {
+      const today = range === 'today';
+      const shown = days.slice(-SPAN[range]);
+      const span = range === 'week' ? 'this week' : 'this month';
+      const allowed = (kind: HealthKind) => !!state?.[kind];
+      const off = (kind: HealthKind) => tile(kind, 'Off', 'Not allowed in Health Connect');
+
+      const sleep = numbers(shown, 'sleepMin');
+      const before = days[days.length - 2];
+      if (!allowed('sleep')) off('sleep');
+      else if (!sleep.length && today && before?.sleepMin) {
+        // Not slept yet since the evening: the night before is the latest there is.
+        tile('sleep', hm(before.sleepMin), `Night to ${dayNameFmt.format(fromDayKey(before.day))} · goal 8h`, before.sleepMin / GOALS.sleepMin);
+      } else if (!sleep.length) tile('sleep', 'No data', today ? 'Nothing recorded for last night' : `Nothing recorded ${span}`);
+      else if (today) tile('sleep', hm(sleep[0]!), 'Last night · goal 8h', sleep[0]! / GOALS.sleepMin);
+      else tile('sleep', hm(avg(sleep)), `Nightly average · ${sleep.length} nights`);
+
+      const steps = numbers(shown, 'steps');
+      if (!allowed('steps')) off('steps');
+      else if (!steps.length && today) tile('steps', '0', `Goal ${GOALS.steps.toLocaleString()}`, 0);
+      else if (!steps.length) tile('steps', 'No data', `Nothing recorded ${span}`);
+      else if (today) tile('steps', steps[0]!.toLocaleString(), `Goal ${GOALS.steps.toLocaleString()}`, steps[0]! / GOALS.steps);
+      else tile('steps', Math.round(avg(steps)).toLocaleString(), `Daily average · ${steps.reduce((a, b) => a + b, 0).toLocaleString()} in all`);
+
+      const active = numbers(shown, 'activeMin');
+      const total = active.reduce((a, b) => a + b, 0);
+      if (!allowed('exercise')) off('exercise');
+      else if (!active.length) tile('exercise', today ? '0 min' : 'No data', today ? `Goal ${GOALS.activeMin} min` : `Nothing recorded ${span}`, today ? 0 : undefined);
+      else if (today) tile('exercise', `${total} min`, `Goal ${GOALS.activeMin} min${total >= GOALS.activeMin ? ' · reached' : ''}`, total / GOALS.activeMin);
+      else tile('exercise', formatFocus(total * 60), `${span[0]!.toUpperCase()}${span.slice(1)} · ${active.length} of ${shown.length} days`);
+
+      const heart = numbers(shown, 'restingHr');
+      const month = numbers(days, 'restingHr');
+      if (!allowed('heart')) off('heart');
+      else if (!heart.length) tile('heart', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
+      else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
+    }
+
+    /** Allowed, yet nothing in a month: no app on the phone is handing that kind to Health Connect. */
+    function renderHint(): void {
+      const kinds: [HealthKind, BodyField, string][] = [
+        ['sleep', 'sleepMin', 'sleep'],
+        ['exercise', 'activeMin', 'exercise'],
+        ['heart', 'restingHr', 'resting heart rate'],
+      ];
+      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(days, field).length).map(([, , name]) => name);
+      const hint = $<HTMLElement>('[data-hb-hint]');
+      hint.hidden = !missing.length || !days.length;
+      $('[data-hb-hint-text]').textContent = `No ${missing.join(' or ')} in the last ${days.length} days.`;
+    }
+
+    function renderChart(): void {
+      const chart = $<HTMLElement>('[data-hb-chart]');
+      const week = days.slice(-7);
+      const sleep = week.map((d) => d.sleepMin ?? 0);
+      chart.hidden = !state?.sleep || !sleep.some(Boolean);
+      if (chart.hidden) return;
+      const focusByDay = minutesByDay(getSessions());
+      const focus = week.map((d) => Math.round(focusByDay.get(d.day) ?? 0));
+      const maxSleep = Math.max(GOALS.sleepMin, ...sleep);
+      const maxFocus = Math.max(60, ...focus);
+      const todayKey = dayKey(new Date());
+      const bars = $<HTMLElement>('[data-hb-bars]');
+      bars.replaceChildren(
+        ...week.map((d, i) => {
+          const col = el('div', 'body__col');
+          const pair = el('div', 'body__pair');
+          const a = el('i', 'body__dot--sleep');
+          a.style.height = `${(sleep[i]! / maxSleep) * 100}%`;
+          const b = el('i', 'body__dot--focus');
+          b.style.height = `${(focus[i]! / maxFocus) * 100}%`;
+          pair.append(a, b);
+          col.append(pair, el('span', d.day === todayKey ? 'body__day is-today' : 'body__day muted', weekdayFmt.format(fromDayKey(d.day))));
+          return col;
+        }),
+      );
+      bars.setAttribute(
+        'aria-label',
+        week.map((d, i) => `${weekdayFmt.format(fromDayKey(d.day))}: ${sleep[i] ? hm(sleep[i]!) : 'no'} sleep, ${focus[i]} minutes of focus`).join('; '),
+      );
+    }
+
+    function render(): void {
+      const any = !!state && HEALTH_KINDS.some((k) => state![k]);
+      none.hidden = !!state?.available;
+      connect.hidden = !state?.available || any;
+      data.hidden = !any;
+      if (!any) return;
+      data.querySelectorAll<HTMLElement>('[data-hb-range]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.hbRange === range)));
+      renderTiles();
+      renderHint();
+      renderChart();
+    }
+
+    /** Ask what is allowed now and read it again: permissions change outside the app, in Health Connect. */
+    async function refresh(): Promise<void> {
+      state = await healthState();
+      render();
+      if (!state || !HEALTH_KINDS.some((k) => state![k])) return;
+      const fresh = await healthRead(READ_DAYS);
+      if (!fresh?.days.length) return;
+      // A field Health Connect would not answer for this time keeps the numbers from the last read.
+      const lost = Object.keys(fresh.failed) as BodyField[];
+      const kept = new Map(days.map((d) => [d.day, d]));
+      days = fresh.days.map((d) => {
+        const old = kept.get(d.day);
+        const merged = { ...d };
+        for (const field of lost) if (old?.[field] !== undefined) merged[field] = old[field];
+        return merged;
+      });
+      write('body', days);
+      render();
+    }
+
+    $('[data-hb-go]').addEventListener('click', async () => {
+      const kinds = Array.from(root.querySelectorAll<HTMLInputElement>('[data-hb-ask]:checked'), (i) => i.value as HealthKind);
+      if (!kinds.length) return;
+      const after = await healthConnect(kinds);
+      refused.hidden = !after || HEALTH_KINDS.some((k) => after[k]);
+      await refresh();
+    });
+    root.querySelectorAll('[data-hb-manage]').forEach((b) => b.addEventListener('click', openHealthSettings));
+    $('[data-hb-ranges]').addEventListener('click', (e) => {
+      const button = (e.target as HTMLElement).closest<HTMLElement>('[data-hb-range]');
+      if (!button) return;
+      range = button.dataset.hbRange as Range;
+      render();
+    });
+
+    void refresh();
+    c.add(subscribe('sessions', render));
+    c.add(
+      listen(document, 'visibilitychange', () => {
+        if (!document.hidden) void refresh();
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .body,
+  .body__data {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .body__data[hidden],
+  .body__connect[hidden],
+  .body__chart[hidden],
+  .body__hint[hidden],
+  .body__refused[hidden],
+  .body__bar[hidden] {
+    display: none;
+  }
+
+  .body__connect {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .body__connect h2 {
+    font-size: var(--text-xl);
+  }
+
+  .body__asks {
+    padding: 2px var(--space-4);
+    border-radius: var(--radius-md);
+  }
+
+  .body__asks label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 52px;
+    font-weight: 600;
+  }
+
+  .body__asks label + label {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .body__asks input {
+    inline-size: 22px;
+    block-size: 22px;
+    accent-color: var(--color-accent);
+  }
+
+  .body__go {
+    min-height: 52px;
+  }
+
+  .body__refused,
+  .body__promises,
+  .body__note,
+  .body__sub,
+  .body__legend {
+    font-size: var(--text-sm);
+  }
+
+  .body__promises {
+    display: grid;
+    gap: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .body__promises li {
+    display: flex;
+    gap: var(--space-3);
+    max-width: none;
+  }
+
+  .body__promises svg {
+    flex: none;
+    color: var(--color-accent);
+  }
+
+  .body__hint {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-accent-soft);
+    font-size: var(--text-sm);
+  }
+
+  .body__link {
+    min-height: 24px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .body__ranges {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-1);
+    padding: 5px;
+    border-radius: 17px;
+  }
+
+  .body__ranges button {
+    min-height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .body__ranges button[aria-pressed='true'] {
+    background: var(--raised-grad);
+    color: var(--color-text);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+  }
+
+  .body__tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .body__tile {
+    --tint: var(--color-accent);
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-4);
+  }
+
+  .body__tile--sleep {
+    --tint: var(--cat-visual);
+  }
+
+  .body__tile--exercise {
+    --tint: var(--cat-reward);
+  }
+
+  .body__tile--heart {
+    --tint: var(--cat-time);
+  }
+
+  .body__kind {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--tint);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .body__value {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    line-height: 1.1;
+  }
+
+  .body__bar {
+    block-size: 8px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .body__bar i {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--tint);
+  }
+
+  .body__chart {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .body__chart .panel-title {
+    margin-bottom: 0;
+  }
+
+  .body__bars {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-3) var(--space-2);
+    border-radius: var(--radius-md);
+  }
+
+  .body__bars :global(.body__col) {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+  }
+
+  .body__bars :global(.body__pair) {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    block-size: 100px;
+  }
+
+  .body__bars :global(.body__pair i) {
+    inline-size: 12px;
+    min-block-size: 2px;
+    border-radius: 4px;
+  }
+
+  .body__bars :global(.body__day) {
+    font-size: var(--text-xs);
+  }
+
+  .body__bars :global(.body__day.is-today) {
+    font-weight: 700;
+  }
+
+  .body__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .body__legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .body__dot {
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 3px;
+  }
+
+  .body :global(.body__dot--sleep) {
+    background: var(--cat-visual);
+  }
+
+  .body :global(.body__dot--focus) {
+    background: var(--heat-2);
+  }
+</style>

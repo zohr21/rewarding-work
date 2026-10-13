@@ -1,6 +1,6 @@
 /**
  * The Android app's native side (android/…/DevicePlugin.java): the timer's notifications,
- * the home-screen widgets and where a notification or widget asked to go. On the site
+ * the home-screen widgets, where a notification or widget asked to go, and Health Connect. On the site
  * every call here does nothing, and Capacitor isn't even loaded.
  */
 import { NATIVE_APP } from '../config/app';
@@ -26,7 +26,28 @@ export interface WidgetData {
   chain: { habit: string; days: string[] } | null;
 }
 
+export const HEALTH_KINDS = ['sleep', 'steps', 'exercise', 'heart'] as const;
+export type HealthKind = (typeof HEALTH_KINDS)[number];
+
+/** `available` is false before Android 14, which has no Health Connect of its own; each kind is true once allowed. */
+export type HealthState = { available: boolean } & Record<HealthKind, boolean>;
+
+/** One day from Health Connect. A field is missing when nothing was recorded or that kind isn't allowed. */
+export interface BodyDay {
+  day: string;
+  sleepMin?: number;
+  steps?: number;
+  activeMin?: number;
+  restingHr?: number;
+}
+
+export type BodyField = keyof Omit<BodyDay, 'day'>;
+
 interface DevicePlugin {
+  healthState(): Promise<HealthState>;
+  healthConnect(options: { kinds: HealthKind[] }): Promise<HealthState>;
+  healthRead(options: { days: number }): Promise<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> }>;
+  healthSettings(): Promise<void>;
   showTimer(options: { ongoing: TimerOngoing | null; alerts: TimerAlert[] }): Promise<void>;
   clearTimer(): Promise<void>;
   notificationState(): Promise<{ granted: boolean }>;
@@ -58,6 +79,15 @@ export const clearTimerNotice = () => void call((p) => p.clearTimer(), undefined
 export const notificationsGranted = () => call<boolean | null>(async (p) => (await p.notificationState()).granted, null);
 export const requestNotifications = () => call<boolean | null>(async (p) => (await p.requestNotifications()).granted, null);
 export const setWidgets = (data: WidgetData) => void call((p) => p.setWidgets(data), undefined);
+/** null where there is no native side to ask. */
+export const healthState = () => call<HealthState | null>((p) => p.healthState(), null);
+export const healthConnect = (kinds: HealthKind[]) => call<HealthState | null>((p) => p.healthConnect({ kinds }), null);
+/**
+ * The last `days` days, and the fields Health Connect would not answer for this time (it only
+ * answers while the app is on screen). null where there is no native side, or the call failed.
+ */
+export const healthRead = (days: number) => call<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> } | null>((p) => p.healthRead({ days }), null);
+export const openHealthSettings = () => void call((p) => p.healthSettings(), undefined);
 export const takeRoute = () => call<string | null>(async (p) => (await p.takeRoute()).route, null);
 
 /**
