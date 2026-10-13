@@ -31,3 +31,8 @@ export function isActive(current: string, path: string): boolean {
   if (path === '/') return here === target || here === '';
   return here === target || here.startsWith(`${target}/`);
 }
+
+/** True when `current` is one of a nav item's pages: any path in `under`, or `href` when there is none. */
+export function isCurrent(current: string, item: { href: string; under?: string[] }): boolean {
+  return (item.under ?? [item.href]).some((path) => isActive(current, path));
+}

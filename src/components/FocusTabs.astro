@@ -1,0 +1,120 @@
+---
+/**
+ * The top of every page inside Focus: its name and the tabs between its pages
+ * (FOCUS_TABS in src/config/site.ts). The Android app shows the tabs alone, since
+ * its bottom bar already says Focus.
+ */
+import { FOCUS, FOCUS_TABS } from '../config/site';
+import { isCurrent, url } from '../lib/paths';
+
+const current = Astro.url.pathname;
+---
+
+<div class="focus-bar">
+  <p class="focus-bar__title">{FOCUS.label}</p>
+  <nav class="focus-tabs" aria-label={FOCUS.label}>
+    {
+      FOCUS_TABS.map((tab) => (
+        <a href={url(tab.href)} aria-current={isCurrent(current, tab) ? 'page' : undefined}>
+          {tab.label}
+        </a>
+      ))
+    }
+  </nav>
+</div>
+
+<style is:global>
+  /* Under the bar a page's own heading is a level down from "Focus". */
+  .focus-bar + .page-header {
+    padding-block: var(--space-5) var(--space-4);
+  }
+
+  html:not([data-app]) .focus-bar + .page-header h1 {
+    font-size: var(--text-xl);
+  }
+
+  html:not([data-app]) .focus-bar + .page-header p {
+    font-size: var(--text-base);
+  }
+</style>
+
+<style>
+  .focus-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-5);
+    padding-top: var(--space-5);
+  }
+
+  .focus-bar__title {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    line-height: var(--leading-tight);
+    letter-spacing: -0.02em;
+  }
+
+  .focus-tabs {
+    display: flex;
+    gap: var(--space-1);
+    max-width: 100%;
+    padding: 5px;
+    border-radius: 17px;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .focus-tabs a {
+    flex: 1 0 auto;
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-4);
+    border-radius: 12px;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+
+  .focus-tabs a:hover {
+    color: var(--color-text);
+  }
+
+  .focus-tabs a[aria-current='page'] {
+    background: var(--raised-grad);
+    color: var(--color-text);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+  }
+
+  :global(html[data-app]) .focus-bar {
+    padding-top: var(--space-3);
+  }
+
+  :global(html[data-app]) .focus-bar__title {
+    display: none;
+  }
+
+  :global(html[data-app]) .focus-tabs {
+    flex: 1;
+  }
+
+  /* Four tabs across a phone: tighter, so the last one is not cut off. */
+  @media (max-width: 30rem) {
+    .focus-tabs {
+      flex: 1 1 100%;
+    }
+
+    .focus-tabs a {
+      padding-inline: var(--space-2);
+    }
+  }
+</style>

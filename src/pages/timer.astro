@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import FocusTabs from '../components/FocusTabs.astro';
 import TimerWidget from '../components/TimerWidget.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
@@ -7,6 +8,7 @@ import { url } from '../lib/paths';
 
 <BaseLayout title="Focus timer" description="A calm focus timer with Pomodoro, 52/17, Flowtime and custom modes.">
   <div class="container timer-page">
+    <FocusTabs />
     <header class="page-header">
       <h1>Focus timer</h1>
       {/* The Android app keeps the top of the screen for the timer itself. */}

@@ -5,7 +5,7 @@ import AccountButton from './AccountButton.astro';
 import CoinMark from './CoinMark.astro';
 import { NAV, SITE } from '../config/site';
 import { NATIVE_APP } from '../config/app';
-import { url, isActive } from '../lib/paths';
+import { url, isActive, isCurrent } from '../lib/paths';
 
 const current = Astro.url.pathname;
 ---
@@ -24,7 +24,7 @@ const current = Astro.url.pathname;
           <ul>
             {NAV.map((item) => (
               <li>
-                <a href={url(item.href)} aria-current={isActive(current, item.href) ? 'page' : undefined}>
+                <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined}>
                   {item.label}
                 </a>
               </li>

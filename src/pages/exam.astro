@@ -4,14 +4,13 @@ import ExamGoal from '../components/ExamGoal.astro';
 import ExamChapters from '../components/ExamChapters.astro';
 import ExamBank from '../components/ExamBank.astro';
 import ExamPast from '../components/ExamPast.astro';
-import LearnTabs from '../components/LearnTabs.astro';
-import { NATIVE_APP } from '../config/app';
+import FocusTabs from '../components/FocusTabs.astro';
 import { url } from '../lib/paths';
 ---
 
 <BaseLayout title="Exam prep" description="Prepare for an exam or certification: set the goal, list the chapters, focus on one at a time and practise test questions.">
   <div class="container">
-    {NATIVE_APP && <LearnTabs />}
+    <FocusTabs />
     <header class="page-header">
       <h1>Exam prep</h1>
       <p>

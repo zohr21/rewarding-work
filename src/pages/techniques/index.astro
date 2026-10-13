@@ -1,8 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import TechniqueCard from '../../components/TechniqueCard.astro';
-import LearnTabs from '../../components/LearnTabs.astro';
-import { NATIVE_APP } from '../../config/app';
+import FocusTabs from '../../components/FocusTabs.astro';
+import Quiz from '../../components/Quiz.astro';
 import { getTechniques } from '../../lib/techniques';
 import { CATEGORIES, CATEGORY_SLUGS, PROBLEMS, PROBLEM_SLUGS } from '../../data/taxonomy';
 
@@ -11,7 +11,7 @@ const techniques = await getTechniques();
 
 <BaseLayout title="Techniques" description="Browse techniques for making work feel rewarding, filtered by category or problem.">
   <div class="container">
-    {NATIVE_APP && <LearnTabs />}
+    <FocusTabs />
     <header class="page-header">
       <h1>Technique library</h1>
       <p>Every technique explains the idea and lets you try it on the spot.</p>
@@ -61,6 +61,14 @@ const techniques = await getTechniques();
       <p>No techniques match these filters.</p>
       <button type="button" class="btn btn--ghost" data-reset>Clear filters</button>
     </div>
+
+    <section class="quiz-section" id="quiz" aria-labelledby="quiz-heading">
+      <div>
+        <h2 id="quiz-heading">Not sure? Four quick questions.</h2>
+        <p class="muted quiz-section__intro">Answer honestly and get 2–3 techniques to try first. Nothing is saved or sent anywhere.</p>
+      </div>
+      <Quiz />
+    </section>
   </div>
 </BaseLayout>
 
@@ -178,5 +186,23 @@ const techniques = await getTechniques();
 
   .empty[hidden] {
     display: none;
+  }
+
+  .quiz-section {
+    display: grid;
+    gap: var(--space-4) var(--space-6);
+    margin-top: var(--space-7);
+    scroll-margin-top: var(--space-5);
+  }
+
+  .quiz-section__intro {
+    margin-top: var(--space-1);
+  }
+
+  @media (min-width: 56rem) {
+    .quiz-section {
+      grid-template-columns: 1fr 1.6fr;
+      align-items: start;
+    }
   }
 </style>
