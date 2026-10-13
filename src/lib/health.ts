@@ -1,6 +1,7 @@
 /**
  * Wellbeing spend: what you put into feeling well (gym, therapy, nutrition, medical),
- * entered by hand, against an optional monthly budget. Kept on this device.
+ * entered by hand, against an optional monthly budget. Copied to your account when
+ * you are signed in, like tasks and sessions.
  */
 import { newId, read, write } from './storage';
 import { dayKey, isDayKey, type DayKey } from './dates';
@@ -38,6 +39,11 @@ export interface SpendEntry {
   amount: number;
   /** Epoch ms. */
   createdAt: number;
+  /**
+   * Set when the entry was removed: a marker (what and amount stripped) that stays in
+   * the store so the removal reaches other devices instead of the entry coming back.
+   */
+  deletedAt?: number;
 }
 
 export interface HealthStore {
@@ -45,10 +51,16 @@ export interface HealthStore {
   budget: number | null;
   /** Shown in front of every amount, e.g. "$" or "€". */
   currency: string;
+  /** When the budget and currency were last set (epoch ms), so the newer pair wins between devices. */
+  budgetAt: number;
+  /** Removal markers included; `getHealth` leaves them out. */
   entries: SpendEntry[];
 }
 
-export const EMPTY_HEALTH: HealthStore = { budget: null, currency: '$', entries: [] };
+export const EMPTY_HEALTH: HealthStore = { budget: null, currency: '$', budgetAt: 0, entries: [] };
+
+/** Removal markers older than this are dropped; by then every device has long since synced. */
+const MARKER_MS = 180 * 86_400_000;
 
 const isCategory = (v: unknown): v is SpendCategory => (SPEND_CATEGORIES as readonly unknown[]).includes(v);
 const isAmount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= AMOUNT_MAX;
@@ -56,21 +68,47 @@ const isAmount = (v: unknown): v is number => typeof v === 'number' && Number.is
 function isSpendEntry(v: unknown): v is SpendEntry {
   if (typeof v !== 'object' || v === null) return false;
   const e = v as Record<string, unknown>;
-  return typeof e.id === 'string' && isDayKey(e.day) && typeof e.what === 'string' && isCategory(e.category) && isAmount(e.amount) && typeof e.createdAt === 'number';
+  const removed = typeof e.deletedAt === 'number';
+  return (
+    typeof e.id === 'string' &&
+    isDayKey(e.day) &&
+    typeof e.what === 'string' &&
+    isCategory(e.category) &&
+    (isAmount(e.amount) || (removed && e.amount === 0)) &&
+    typeof e.createdAt === 'number' &&
+    (removed || e.deletedAt === undefined)
+  );
 }
 
 /** Newest day first, and within a day the one added last. */
 const byDay = (a: SpendEntry, b: SpendEntry) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt;
 
-export function getHealth(): HealthStore {
-  const raw = read<unknown>('health', null);
+/** Anything stored or synced, made into a store: bad entries dropped, missing parts filled in. */
+export function normaliseHealth(raw: unknown): HealthStore {
   if (typeof raw !== 'object' || raw === null) return EMPTY_HEALTH;
   const s = raw as Record<string, unknown>;
   return {
     budget: isAmount(s.budget) ? s.budget : null,
     currency: typeof s.currency === 'string' ? s.currency.slice(0, CURRENCY_MAX) : EMPTY_HEALTH.currency,
+    budgetAt: typeof s.budgetAt === 'number' ? s.budgetAt : 0,
     entries: Array.isArray(s.entries) ? s.entries.filter(isSpendEntry).sort(byDay) : [],
   };
+}
+
+/** Everything stored, removal markers included (for sync). */
+function getHealthStore(): HealthStore {
+  return normaliseHealth(read<unknown>('health', null));
+}
+
+/** The budget and the live (not removed) entries. */
+export function getHealth(): HealthStore {
+  const store = getHealthStore();
+  return { ...store, entries: store.entries.filter((e) => e.deletedAt === undefined) };
+}
+
+function writeHealth(store: HealthStore): void {
+  const cutoff = Date.now() - MARKER_MS;
+  write('health', { ...store, entries: store.entries.filter((e) => e.deletedAt === undefined || e.deletedAt > cutoff).sort(byDay) });
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -86,20 +124,40 @@ export function addSpend(input: { what: string; category: SpendCategory; amount:
     amount,
     createdAt: Date.now(),
   };
-  const store = getHealth();
-  write('health', { ...store, entries: [entry, ...store.entries].sort(byDay) });
+  const store = getHealthStore();
+  writeHealth({ ...store, entries: [entry, ...store.entries] });
   return entry;
 }
 
 export function removeSpend(id: string): void {
-  const store = getHealth();
-  write('health', { ...store, entries: store.entries.filter((e) => e.id !== id) });
+  const store = getHealthStore();
+  if (!store.entries.some((e) => e.id === id && e.deletedAt === undefined)) return;
+  const now = Date.now();
+  writeHealth({
+    ...store,
+    entries: store.entries.map((e) => (e.id === id ? { id, day: e.day, what: '', category: e.category, amount: 0, createdAt: e.createdAt, deletedAt: now } : e)),
+  });
 }
 
 /** `budget` of 0 (or anything that is not an amount) clears it. */
 export function setBudget(budget: number, currency: string): void {
   const rounded = round(budget);
-  write('health', { ...getHealth(), budget: isAmount(rounded) ? rounded : null, currency: currency.trim().slice(0, CURRENCY_MAX) });
+  writeHealth({ ...getHealthStore(), budget: isAmount(rounded) ? rounded : null, currency: currency.trim().slice(0, CURRENCY_MAX), budgetAt: Date.now() });
+}
+
+/**
+ * Combine two copies of the store (account sync). Entries are never edited, only added
+ * or removed, so per id a removal marker beats the live copy. The budget and currency
+ * come from whichever copy set them last.
+ */
+export function mergeHealthStores(a: HealthStore, b: HealthStore): HealthStore {
+  const byId = new Map(a.entries.map((e) => [e.id, e]));
+  for (const e of b.entries) {
+    const mine = byId.get(e.id);
+    if (!mine || (e.deletedAt !== undefined && (mine.deletedAt === undefined || e.deletedAt < mine.deletedAt))) byId.set(e.id, e);
+  }
+  const newer = b.budgetAt > a.budgetAt ? b : a;
+  return { budget: newer.budget, currency: newer.currency, budgetAt: newer.budgetAt, entries: [...byId.values()].sort(byDay) };
 }
 
 /** "2026-10" for a day in October 2026. */

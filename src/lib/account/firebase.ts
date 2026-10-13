@@ -45,6 +45,7 @@ import { NATIVE_APP } from '../../config/app';
 import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
 import { googleIdToken } from '../device';
 import {
+  SYNCED_AT_FIRST,
   SYNCED_STORES,
   getSyncMeta,
   isSyncedStore,
@@ -207,6 +208,12 @@ function startSync(uid: string): void {
       setSyncMeta({ uid, active: true, dirty: localStores() });
     }
   }
+
+  // A store that joined the sync since this device last compared notes: send what is here.
+  const linked = getSyncMeta();
+  const known = linked.known ?? SYNCED_AT_FIRST;
+  const joined = SYNCED_STORES.filter((name) => !known.includes(name) && readJson(name) !== null);
+  setSyncMeta({ ...linked, dirty: [...linked.dirty, ...joined], known: [...SYNCED_STORES] });
 
   stopFns.push(
     onWrite((name) => {
