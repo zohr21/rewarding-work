@@ -17,6 +17,7 @@ import {
   type FocusSession,
   type SyncedStore,
 } from '../storage';
+import { mergeHealthStores, normaliseHealth } from '../health';
 
 function parse(json: string | null): unknown {
   if (json === null) return undefined;
@@ -61,6 +62,8 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
       return JSON.stringify(mergeTaskStores(normaliseTasks(local), normaliseTasks(remote)));
     case 'exam':
       return JSON.stringify(mergeExamStores(normaliseExam(local), normaliseExam(remote)));
+    case 'health':
+      return JSON.stringify(mergeHealthStores(normaliseHealth(local), normaliseHealth(remote)));
     default:
       return localJson;
   }

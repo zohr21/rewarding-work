@@ -36,10 +36,11 @@ const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'ti
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
- * The live timer and sound settings stay per device. `breakdown` stays listed only so
+ * The live timer and sound settings stay per device, and so does what the Android app
+ * reads from Health Connect (`body`). Each name must also be allowed in firestore.rules. `breakdown` stays listed only so
  * its removal (after moving into `tasks`) reaches the account too.
  */
-export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
 export type SyncedStore = (typeof SYNCED_STORES)[number];
 
 export function isSyncedStore(name: string): name is SyncedStore {
@@ -1299,7 +1300,16 @@ export interface SyncMeta {
   active: boolean;
   /** Stores changed here that haven't reached the account yet. */
   dirty: SyncedStore[];
+  /**
+   * Stores this device has compared with the account at least once. One that joins the
+   * sync later (as `health` did) is not in it, so what the device already holds is sent
+   * instead of being mistaken for something removed elsewhere.
+   */
+  known?: SyncedStore[];
 }
+
+/** What `known` stands for on a device that signed in before it was recorded. */
+export const SYNCED_AT_FIRST: readonly SyncedStore[] = SYNCED_STORES.filter((name) => name !== 'health');
 
 const EMPTY_SYNC: SyncMeta = { uid: null, active: false, dirty: [] };
 
@@ -1309,7 +1319,8 @@ function isSyncMeta(v: unknown): v is SyncMeta {
     (v.uid === null || typeof v.uid === 'string') &&
     typeof v.active === 'boolean' &&
     Array.isArray(v.dirty) &&
-    v.dirty.every((d) => typeof d === 'string' && isSyncedStore(d))
+    v.dirty.every((d) => typeof d === 'string' && isSyncedStore(d)) &&
+    (v.known === undefined || (Array.isArray(v.known) && v.known.every((d) => typeof d === 'string' && isSyncedStore(d))))
   );
 }
 
