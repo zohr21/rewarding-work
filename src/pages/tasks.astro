@@ -26,7 +26,6 @@ const breakdown = { heading: 'Break it down', linkToTasks: false, intro: 'Steps 
       }
     </header>
 
-    {!NATIVE_APP && <TaskGlance />}
     <div class="tasks-page">
       <TaskList />
       {
@@ -51,7 +50,7 @@ const breakdown = { heading: 'Break it down', linkToTasks: false, intro: 'Steps 
         )
       }
     </div>
-    {NATIVE_APP && <TaskGlance />}
+    <TaskGlance />
   </div>
 </BaseLayout>
 

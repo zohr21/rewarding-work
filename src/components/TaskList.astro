@@ -2,6 +2,7 @@
 /**
  * All your tasks, in lists: Today (a short plan for the day, first up first), Next,
  * and Someday, plus an Inbox of thoughts jotted on the timer's scratchpad to sort.
+ * One list shows at a time, picked from a row of tabs.
  * Add, move, break down, start a focus session on, finish, reopen or delete tasks.
  * Focus time comes from timer sessions whose label matched the task.
  */
@@ -9,7 +10,6 @@ import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
 const timerUrl = url('/timer');
-// The Android app shows one list at a time, picked from a row of tabs.
 const TABS = [
   { id: 'inbox', label: 'Inbox' },
   { id: 'today', label: 'Today' },
@@ -22,18 +22,16 @@ const TABS = [
 <section class="card tasks" data-task-list data-timer-url={timerUrl} aria-labelledby="tasks-heading">
   <h2 id="tasks-heading" class="panel-title">Your tasks</h2>
 
-  {
-    NATIVE_APP && (
-      <div class="tasks__tabs" role="group" aria-label="Lists" data-tl-tabs>
-        {TABS.map((tab) => (
-          <button type="button" data-tl-tab={tab.id} aria-pressed={tab.id === 'today' ? 'true' : 'false'}>
-            {tab.label}
-            <span class="tasks__tab-count" data-tl-tab-count />
-          </button>
-        ))}
-      </div>
-    )
-  }
+  <div class="tasks__tabs" role="group" aria-label="Lists" data-tl-tabs>
+    {
+      TABS.map((tab) => (
+        <button type="button" data-tl-tab={tab.id} aria-pressed={tab.id === 'today' ? 'true' : 'false'}>
+          {tab.label}
+          <span class="tasks__tab-count" data-tl-tab-count />
+        </button>
+      ))
+    }
+  </div>
 
   <form class="tasks__form" data-tl-form>
     <label for="tl-new" class="visually-hidden">New task</label>
@@ -126,7 +124,7 @@ const TABS = [
   const CLOCK_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l3 2M9 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-  /** The list the app's tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
+  /** The list the tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
   let appView = 'today';
   const VIEW_EMPTY: Record<string, string> = {
     inbox: 'Nothing to sort. Thoughts you jot on the timer land here.',
@@ -160,9 +158,9 @@ const TABS = [
       const finishedList = $<HTMLUListElement>('[data-tl-finished]');
       const live = $<HTMLElement>('[data-tl-live]');
       const timerUrl = root.dataset.timerUrl!;
-      // Only in the Android app: the list tabs, the New task button and the steps sheet (tasks.astro).
       const tabs = root.querySelector<HTMLElement>('[data-tl-tabs]');
       const viewEmpty = $<HTMLElement>('[data-tl-view-empty]');
+      // Only in the Android app: the steps sheet (tasks.astro).
       const sheet = document.querySelector<HTMLDialogElement>('[data-task-sheet]');
 
       function showView(view: string): void {
@@ -170,7 +168,7 @@ const TABS = [
         appView = view;
         root.dataset.view = view;
         tabs.querySelectorAll<HTMLElement>('[data-tl-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tlTab === view)));
-        // These two are folded away on the site; a tab shows its list outright.
+        // These two fold away without the tabs; a tab shows its list outright.
         if (view === 'someday') somedayWrap.open = true;
         if (view === 'finished') finishedWrap.open = true;
         if ((MOVABLE as string[]).includes(view)) newList.value = view;
@@ -789,41 +787,40 @@ const TABS = [
     gap: var(--space-2);
   }
 
-  /*
-    The Android app: one list at a time, chosen from a row of tabs. The tabs are only
-    in the app's markup, and the script sets data-view only when they are there.
-  */
-  .tasks[data-view] {
+  /* One list at a time, chosen from a row of tabs. The script sets data-view. */
+  .tasks[data-view] .panel-title {
+    display: none;
+  }
+
+  /* The Android app: the lists sit on the page itself, with no card around them. */
+  :global(html[data-app]) .tasks[data-view] {
     padding: 0 0 var(--space-5);
     background: none;
     border: 0;
     box-shadow: none;
   }
 
-  .tasks[data-view] .panel-title {
-    display: none;
-  }
-
   .tasks__tabs {
     display: flex;
+    gap: var(--space-2);
     margin-bottom: var(--space-4);
-    border-bottom: 1px solid var(--color-border);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
   .tasks__tabs button {
-    flex: 1;
+    flex: none;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    min-height: 48px;
-    padding: 0 var(--space-1);
-    border: 0;
-    border-bottom: 3px solid transparent;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
     background: none;
     color: var(--color-text-muted);
     font-size: var(--text-sm);
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
   }
 
@@ -831,10 +828,14 @@ const TABS = [
     display: none;
   }
 
-  .tasks__tabs button[aria-pressed='true'] {
-    border-bottom-color: var(--color-accent);
+  .tasks__tabs button:hover {
     color: var(--color-text);
-    font-weight: 700;
+  }
+
+  .tasks__tabs button[aria-pressed='true'] {
+    background: var(--color-accent-soft);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+    color: var(--color-accent);
   }
 
   .tasks__tab-count {
@@ -852,7 +853,7 @@ const TABS = [
   }
 
   .tasks__tabs button[aria-pressed='true'] .tasks__tab-count {
-    background: var(--color-accent-soft);
+    background: color-mix(in srgb, var(--color-accent) 22%, transparent);
     color: var(--color-accent);
   }
 

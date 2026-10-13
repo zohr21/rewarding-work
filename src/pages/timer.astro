@@ -1,13 +1,31 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import CategoryBadge from '../components/CategoryBadge.astro';
+import EvidenceBadge from '../components/EvidenceBadge.astro';
 import FocusTabs from '../components/FocusTabs.astro';
 import TimerWidget from '../components/TimerWidget.astro';
 import { NATIVE_APP } from '../config/app';
+import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
+import { getTechniques } from '../lib/techniques';
 import { url } from '../lib/paths';
+
+/** How the timer runs each mode, under the technique it comes from. */
+const RUNS: Record<TimerMode, string> = {
+  pomodoro: '25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.',
+  '52-17': 'Longer focus blocks with a proper break. Suits work that takes a while to get into.',
+  flowtime: 'Counts up. Press “Stop & take a break” when your focus fades; the break is a fifth of your focus time.',
+  custom: 'Your own lengths, handy for timeboxing a task. Set the break to 0 for no break.',
+};
+
+const techniques = await getTechniques();
+const rhythms = TIMER_MODES.flatMap((mode) => {
+  const technique = techniques.find((t) => t.data.timer_mode === mode);
+  return technique ? [{ mode, technique }] : [];
+});
 ---
 
 <BaseLayout title="Focus timer" description="A calm focus timer with Pomodoro, 52/17, Flowtime and custom modes.">
-  <div class="container timer-page">
+  <div class="container">
     <FocusTabs />
     <header class="page-header">
       <h1>Focus timer</h1>
@@ -15,62 +33,184 @@ import { url } from '../lib/paths';
       {!NATIVE_APP && <p>Pick a rhythm, name your task if you like, and start.</p>}
     </header>
 
-    <TimerWidget standalone />
+    <div class="timer-page">
+      <TimerWidget standalone />
 
-    <section class="modes" aria-labelledby="modes-heading">
-      <h2 id="modes-heading">Which mode?</h2>
-      <dl>
-        <div>
-          <dt><a href={url('/techniques/pomodoro')}>Pomodoro</a></dt>
-          <dd>25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.</dd>
-        </div>
-        <div>
-          <dt><a href={url('/techniques/fifty-two-seventeen')}>52/17</a></dt>
-          <dd>Longer focus blocks with a proper break. Suits work that takes a while to get into.</dd>
-        </div>
-        <div>
-          <dt><a href={url('/techniques/flowtime')}>Flowtime</a></dt>
-          <dd>Counts up. Press “Stop &amp; take a break” when your focus fades; the break is a fifth of your focus time.</dd>
-        </div>
-        <div>
-          <dt><a href={url('/techniques/timeboxing')}>Custom</a></dt>
-          <dd>Your own lengths — handy for timeboxing a task. Set the break to 0 for no break.</dd>
-        </div>
-      </dl>
-      <p class="muted note">
-        Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
-        minute or more are saved in this browser and shown on your <a href={url('/progress')}>progress page</a>.
-      </p>
-    </section>
+      <aside class="timer-side" aria-label="Alongside the timer">
+        <section class="card side-card" aria-labelledby="side-today-heading" data-side-today data-timer-url={url('/timer')}>
+          <div class="side-card__head">
+            <h2 id="side-today-heading">On Today</h2>
+            <a href={url('/tasks')}>All tasks</a>
+          </div>
+          <ul class="side-tasks" role="list" data-side-tasks></ul>
+          <p class="muted side-card__empty" data-side-empty hidden>
+            Nothing on Today yet. Pick what matters on <a href={url('/tasks')}>Tasks</a>, or just start the timer.
+          </p>
+        </section>
+
+        <section class="card side-card" aria-label="The rhythm you picked">
+          {
+            rhythms.map(({ mode, technique }) => (
+              <div class="rhythm" data-rhythm={mode} hidden={mode !== 'pomodoro'}>
+                <div class="rhythm__badges">
+                  <CategoryBadge category={technique.data.category} />
+                  <EvidenceBadge level={technique.data.evidence} />
+                </div>
+                <h2>{technique.data.title}</h2>
+                <p class="muted">{RUNS[mode]}</p>
+                <a href={url(`/techniques/${technique.id}`)}>Why it works, and when it does not</a>
+              </div>
+            ))
+          }
+        </section>
+
+        <p class="muted note">
+          Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
+          minute or more are saved in this browser and shown on your <a href={url('/progress')}>progress page</a>.
+        </p>
+      </aside>
+    </div>
   </div>
 </BaseLayout>
 
+<script>
+  import { getSessions, getTasks, subscribe } from '../lib/storage';
+  import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  onPage('timer-side', () => {
+    const today = document.querySelector<HTMLElement>('[data-side-today]');
+    if (!today) return;
+    const c = cleanups();
+    const list = today.querySelector<HTMLElement>('[data-side-tasks]')!;
+    const empty = today.querySelector<HTMLElement>('[data-side-empty]')!;
+    const timerUrl = today.dataset.timerUrl!;
+
+    const renderTasks = () => {
+      const tasks = todayTasks(getTasks());
+      const focus = focusByTask(getSessions());
+      list.replaceChildren(
+        ...tasks.map((task) => {
+          const item = el('li');
+          const link = el('a', 'side-task');
+          link.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
+          const seconds = focus.get(task.id) ?? 0;
+          link.append(el('span', 'side-task__name', taskName(task)), el('span', 'muted side-task__time', seconds ? formatFocus(seconds) : 'Not started'));
+          item.append(link);
+          return item;
+        }),
+      );
+      empty.hidden = tasks.length > 0;
+    };
+
+    /** The card under the list follows the mode picked in the timer. */
+    const showRhythm = () => {
+      const mode = document.querySelector<HTMLInputElement>('input[name="timer-mode"]:checked')?.value;
+      document.querySelectorAll<HTMLElement>('[data-rhythm]').forEach((card) => (card.hidden = card.dataset.rhythm !== mode));
+    };
+
+    renderTasks();
+    // After the timer's own script has set the mode it remembers.
+    requestAnimationFrame(showRhythm);
+    (['tasks', 'sessions'] as const).forEach((name) => c.add(subscribe(name, renderTasks)));
+    c.add(listen(document, 'change', showRhythm));
+    return c.run;
+  });
+</script>
+
 <style>
   .timer-page {
-    max-width: 44rem;
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
   }
 
-  .modes {
-    margin-top: var(--space-7);
+  @media (min-width: 62rem) {
+    .timer-page {
+      grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
+    }
   }
 
-  .modes dl {
+  .timer-side {
     display: grid;
     gap: var(--space-4);
-    margin-top: var(--space-4);
   }
 
-  .modes dt {
+  .side-card h2 {
+    font-size: var(--text-lg);
+  }
+
+  .side-card__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .side-card__head a,
+  .side-card__empty,
+  .rhythm p,
+  .rhythm a {
+    font-size: var(--text-sm);
+  }
+
+  .side-card__head a,
+  .rhythm a {
     font-weight: 600;
   }
 
-  .modes dd {
-    margin: var(--space-1) 0 0;
-    color: var(--color-text-muted);
+  .side-tasks {
+    padding: 0;
+    list-style: none;
+  }
+
+  .side-tasks :global(li) {
+    max-width: none;
+  }
+
+  .side-tasks :global(.side-task) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 48px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .side-tasks :global(.side-task:hover .side-task__name) {
+    color: var(--color-accent);
+  }
+
+  .side-tasks :global(.side-task__name) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .side-tasks :global(.side-task__time) {
+    flex: none;
+    font-size: var(--text-sm);
+  }
+
+  .rhythm {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .rhythm[hidden] {
+    display: none;
+  }
+
+  .rhythm__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .note {
-    margin-top: var(--space-5);
     font-size: var(--text-sm);
   }
 </style>
