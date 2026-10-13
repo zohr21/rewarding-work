@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import TechniqueCard from '../../components/TechniqueCard.astro';
+import TechniqueRow from '../../components/TechniqueRow.astro';
 import FocusTabs from '../../components/FocusTabs.astro';
 import Quiz from '../../components/Quiz.astro';
 import { getTechniques } from '../../lib/techniques';
@@ -17,45 +17,49 @@ const techniques = await getTechniques();
       <p>Every technique explains the idea and lets you try it on the spot.</p>
     </header>
 
-    <!-- Works without JS (all cards shown); the script below adds filtering. -->
+    <!-- Works without JS (all rows shown); the script below adds filtering. -->
     <form class="filters" role="search" aria-label="Filter techniques" data-filters>
-      <div class="filters__search">
-        <label for="q">Search by title</label>
-        <input id="q" name="q" type="search" autocomplete="off" placeholder="e.g. Pomodoro" />
-      </div>
-
-      <fieldset class="chips">
-        <legend>Category</legend>
-        <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
-        {
-          CATEGORY_SLUGS.map((c) => (
-            <label class="chip">
-              <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
-            </label>
-          ))
-        }
-      </fieldset>
-
-      <fieldset class="chips">
-        <legend>Problem</legend>
+      <fieldset class="chips chips--lead">
+        <legend>What's in the way?</legend>
         <label class="chip"><input type="radio" name="problem" value="" checked /> <span>All</span></label>
         {
           PROBLEM_SLUGS.map((p) => (
             <label class="chip">
-              <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].short}</span>
+              <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].title}</span>
             </label>
           ))
         }
       </fieldset>
+
+      <div class="filters__more">
+        <fieldset class="chips">
+          <legend>Type</legend>
+          <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
+          {
+            CATEGORY_SLUGS.map((c) => (
+              <label class="chip">
+                <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
+              </label>
+            ))
+          }
+        </fieldset>
+
+        <div class="filters__search">
+          <label for="q">Search by title</label>
+          <input id="q" name="q" type="search" autocomplete="off" placeholder="e.g. Pomodoro" />
+        </div>
+      </div>
     </form>
 
-    <p class="results-count muted" aria-live="polite" data-count>
-      Showing all {techniques.length} techniques
-    </p>
-
-    <div class="grid" data-grid>
-      {techniques.map((t) => <TechniqueCard technique={t} />)}
-    </div>
+    <section class="card library" aria-label="Techniques">
+      <div class="library__head">
+        <p class="muted" aria-live="polite" data-count>Showing all {techniques.length} techniques</p>
+        <a href="#quiz">Not sure? Four quick questions</a>
+      </div>
+      <ul class="library__list" role="list" data-grid>
+        {techniques.map((t) => <TechniqueRow technique={t} />)}
+      </ul>
+    </section>
 
     <div class="empty card" data-empty hidden>
       <p>No techniques match these filters.</p>
@@ -82,27 +86,44 @@ const techniques = await getTechniques();
   .filters {
     display: grid;
     gap: var(--space-4);
-    padding: var(--space-4);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+  }
+
+  .filters__more {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--space-4) var(--space-6);
+  }
+
+  .filters__search {
+    flex: 0 1 18rem;
   }
 
   .filters__search label,
   .chips legend {
     display: block;
     margin-bottom: var(--space-2);
+    color: var(--color-text-muted);
     font-size: var(--text-sm);
     font-weight: 600;
+  }
+
+  .chips--lead legend {
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 700;
   }
 
   .filters__search input {
     width: 100%;
     min-height: 44px;
     padding: var(--space-2) var(--space-3);
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
   }
 
   .chips {
@@ -134,11 +155,13 @@ const techniques = await getTechniques();
   .chip span {
     display: inline-flex;
     align-items: center;
-    min-height: 36px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--color-border-strong);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-pill);
+    color: var(--color-text-muted);
     font-size: var(--text-sm);
+    font-weight: 600;
     cursor: pointer;
     transition:
       background-color var(--duration-fast) var(--ease-out),
@@ -146,14 +169,13 @@ const techniques = await getTechniques();
   }
 
   .chip:hover span {
-    background: var(--color-surface-2);
+    color: var(--color-text);
   }
 
   .chip input:checked + span {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-    color: var(--color-on-accent);
-    font-weight: 600;
+    background: var(--color-accent-soft);
+    border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+    color: var(--color-accent);
   }
 
   .chip input:focus-visible + span {
@@ -161,22 +183,36 @@ const techniques = await getTechniques();
     outline-offset: 2px;
   }
 
-  .results-count {
-    margin-block: var(--space-5) var(--space-3);
+  .library {
+    margin-top: var(--space-5);
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .library__head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-5);
+    padding: var(--space-4) var(--space-5);
     font-size: var(--text-sm);
   }
 
-  .grid {
-    display: grid;
-    gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  .library__head a {
+    font-weight: 600;
   }
 
-  .grid :global([data-technique][hidden]) {
+  .library__list {
+    padding: 0;
+    list-style: none;
+  }
+
+  .library__list :global([data-technique][hidden]) {
     display: none;
   }
 
   .empty {
+    margin-top: var(--space-4);
     display: flex;
     flex-wrap: wrap;
     align-items: center;

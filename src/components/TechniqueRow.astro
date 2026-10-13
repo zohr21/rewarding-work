@@ -1,0 +1,110 @@
+---
+/**
+ * One technique as a row of the library list (/techniques): what it is on the left,
+ * its badges and how long a try takes on the right. Carries the same data attributes
+ * as TechniqueCard, which the library filters read.
+ */
+import CategoryBadge from './CategoryBadge.astro';
+import EvidenceBadge from './EvidenceBadge.astro';
+import { url } from '../lib/paths';
+import type { Technique } from '../lib/techniques';
+
+interface Props {
+  technique: Technique;
+}
+const { technique } = Astro.props;
+const { title, summary, category, evidence, time_to_try, problems } = technique.data;
+---
+
+<li class="trow" data-technique data-title={title.toLowerCase()} data-category={category} data-problems={problems.join(' ')}>
+  <div class="trow__text">
+    <h2 class="trow__title">
+      {/* The whole row is clickable via the stretched link. */}
+      <a href={url(`/techniques/${technique.id}`)}>{title}</a>
+    </h2>
+    <p class="trow__summary">{summary}</p>
+  </div>
+  <div class="trow__badges">
+    <CategoryBadge category={category} />
+    <EvidenceBadge level={evidence} />
+  </div>
+  <span class="trow__try">
+    Try it in {time_to_try} min
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+      <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </span>
+</li>
+
+<style>
+  .trow {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-5);
+    max-width: none;
+    padding: var(--space-4) var(--space-5);
+    border-top: 1px solid var(--color-border);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .trow:hover {
+    background: color-mix(in srgb, var(--color-surface-2) 55%, transparent);
+  }
+
+  .trow:focus-within {
+    outline: 3px solid var(--color-focus);
+    outline-offset: -3px;
+  }
+
+  .trow__text {
+    flex: 1 1 22rem;
+    min-width: 0;
+  }
+
+  .trow__title {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .trow__title a {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .trow__title a:focus-visible {
+    outline: none; /* the row shows the focus ring */
+  }
+
+  .trow__title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .trow__summary {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .trow__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    flex: 0 1 17rem;
+  }
+
+  .trow__try {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-inline-start: auto;
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+</style>
