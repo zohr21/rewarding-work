@@ -4,7 +4,7 @@
  * the month so far, budgets per category, the last six months, the month's expenses and
  * the bills that repeat. Everything is typed in by hand (src/lib/budget.ts).
  */
-import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_SHORT, CURRENCY_MAX, KIND_LABELS, WELLBEING_KINDS, WHAT_MAX } from '../lib/budget';
+import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_SHORT, CURRENCIES, CURRENCY_MAX, KIND_LABELS, WELLBEING_KINDS, WHAT_MAX } from '../lib/budget';
 import { NATIVE_APP } from '../config/app';
 
 const PLUS = 'M12 5v14M5 12h14';
@@ -191,10 +191,18 @@ const icon = (d: string, w = 2) =>
           <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bv-b-total />
         </label>
         <label class="bv-dialog__field">
-          <span>Currency sign</span>
-          <input class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" data-bv-b-currency />
+          <span>Currency</span>
+          <select class="input" data-bv-b-currency>
+            {CURRENCIES.map((c) => <option value={c.code}>{c.code} {c.sign} · {c.name}</option>)}
+            <option value="">Other…</option>
+          </select>
         </label>
       </div>
+      <label class="bv-dialog__field" data-bv-b-sign-field hidden>
+        <span>Sign to show</span>
+        <input class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" placeholder="e.g. ₴ or CHF" data-bv-b-sign />
+      </label>
+      <p class="muted">Changing the currency does not convert amounts you already entered.</p>
       <div class="bv-budgets">
         {
           CATEGORIES.map((c) => (
@@ -230,6 +238,8 @@ const icon = (d: string, w = 2) =>
     CATEGORY_LABELS,
     CATEGORY_SHORT,
     changeSpend,
+    currencyCode,
+    currencySign,
     daysInMonth,
     dueSoon,
     formatMoney,
@@ -265,7 +275,6 @@ const icon = (d: string, w = 2) =>
   const OK = svgIcon('M5 12l5 5 9-10');
   const WARN = svgIcon('M12 8v5M12 17h.01M10.3 4l-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z');
 
-  const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
   const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -287,7 +296,7 @@ const icon = (d: string, w = 2) =>
     const grid = [0, 0.5, 1]
       .map((f) => {
         const v = top * f;
-        return `<line class="pc__grid" x1="${L}" y1="${y(v)}" x2="${W}" y2="${y(v)}"/><text class="pc__axis" x="0" y="${y(v) + 4}">${esc(sign + compact.format(v))}</text>`;
+        return `<line class="pc__grid" x1="${L}" y1="${y(v)}" x2="${W}" y2="${y(v)}"/><text class="pc__axis" x="0" y="${y(v) + 4}">${esc(formatMoney(v, sign, 0, true))}</text>`;
       })
       .join('');
     const pace = paced ? `<polyline class="pc__pace" points="${[`${x(0)},${y(0)}`, ...paced.map((v, i) => `${x(i + 1)},${y(v)}`)].join(' ')}"/>` : '';
@@ -663,7 +672,7 @@ const icon = (d: string, w = 2) =>
       editing = entry;
       const store = getBudget();
       setText('[data-bv-x-title]', entry ? 'Change expense' : repeat ? 'New repeating bill' : 'New expense');
-      setText('[data-bv-x-sign]', store.currency);
+      setText('[data-bv-x-sign]', currencySign(store.currency));
       xAmount.value = entry ? String(entry.amount) : '';
       xWhat.value = entry ? entry.what : '';
       xDay.value = entry ? entry.day : month === thisMonth() ? today() : `${month}-01`;
@@ -731,7 +740,10 @@ const icon = (d: string, w = 2) =>
     const openBudgets = () => {
       const store = getBudget();
       $<HTMLInputElement>('[data-bv-b-total]').value = store.budget ? String(store.budget) : '';
-      $<HTMLInputElement>('[data-bv-b-currency]').value = store.currency;
+      const code = currencyCode(store.currency);
+      $<HTMLSelectElement>('[data-bv-b-currency]').value = code ?? '';
+      $<HTMLInputElement>('[data-bv-b-sign]').value = code ? '' : store.currency;
+      $('[data-bv-b-sign-field]').hidden = !!code;
       for (const input of $$<HTMLInputElement>('[data-bv-b-cat]')) {
         const v = store.budgets[input.dataset.bvBCat as Category];
         input.value = v ? String(v) : '';
@@ -740,6 +752,11 @@ const icon = (d: string, w = 2) =>
       $<HTMLInputElement>('[data-bv-b-total]').focus();
     };
     $('[data-bv-edit-budgets]').addEventListener('click', openBudgets);
+    $<HTMLSelectElement>('[data-bv-b-currency]').addEventListener('change', (e) => {
+      const other = !(e.target as HTMLSelectElement).value;
+      $('[data-bv-b-sign-field]').hidden = !other;
+      if (other) $<HTMLInputElement>('[data-bv-b-sign]').focus();
+    });
     $('[data-bv-set]').addEventListener('click', openBudgets);
     $<HTMLFormElement>('[data-bv-b-form]').addEventListener('submit', () => {
       const total = Number($<HTMLInputElement>('[data-bv-b-total]').value);
@@ -748,7 +765,8 @@ const icon = (d: string, w = 2) =>
         const v = Number(input.value);
         if (input.value && v > 0) budgets[input.dataset.bvBCat as Category] = v;
       }
-      setBudgets(total > 0 ? total : null, budgets, $<HTMLInputElement>('[data-bv-b-currency]').value);
+      const picked = $<HTMLSelectElement>('[data-bv-b-currency]').value;
+      setBudgets(total > 0 ? total : null, budgets, picked || $<HTMLInputElement>('[data-bv-b-sign]').value.trim() || '$');
       announce('Budgets saved.');
     });
 

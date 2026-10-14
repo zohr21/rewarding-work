@@ -482,9 +482,56 @@ export function monthTotals(entries: SpendEntry[], last: MonthKey, count: number
   return out;
 }
 
-export function formatMoney(amount: number, currency: string, decimals: 'auto' | 0 = 'auto'): string {
-  const text = amount.toLocaleString(undefined, decimals === 0 ? { maximumFractionDigits: 0 } : { minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 });
-  return `${currency}${text}`;
+/**
+ * Currencies you can pick by name. The store keeps the code ("AZN"); anything else in it
+ * is a sign you typed yourself, shown in front of the amount.
+ */
+export const CURRENCIES = [
+  { code: 'USD', name: 'US dollar', sign: '$' },
+  { code: 'EUR', name: 'Euro', sign: '€' },
+  { code: 'GBP', name: 'British pound', sign: '£' },
+  { code: 'RUB', name: 'Russian ruble', sign: '₽' },
+  { code: 'AZN', name: 'Azerbaijani manat', sign: '₼' },
+  { code: 'TRY', name: 'Turkish lira', sign: '₺' },
+] as const;
+export type CurrencyCode = (typeof CURRENCIES)[number]['code'];
+
+/** The listed currency `currency` stands for: its code, or its sign (stores from before the list say "$"). */
+export function currencyCode(currency: string): CurrencyCode | null {
+  return CURRENCIES.find((c) => c.code === currency || c.sign === currency)?.code ?? null;
+}
+
+/** The short sign to show next to an amount being typed. */
+export function currencySign(currency: string): string {
+  const code = currencyCode(currency);
+  return code ? CURRENCIES.find((c) => c.code === code)!.sign : currency;
+}
+
+const moneyFormats = new Map<string, Intl.NumberFormat>();
+
+/**
+ * A listed currency is written the way your language writes it ("$652", "652 ₽", "652,40 €");
+ * a typed sign goes in front. `compact` shortens big numbers for chart axes ("₼1.2K").
+ */
+export function formatMoney(amount: number, currency: string, decimals: 'auto' | 0 = 'auto', compact = false): string {
+  const fraction = compact
+    ? { maximumFractionDigits: 1 }
+    : decimals === 0
+      ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+      : { minimumFractionDigits: Number.isInteger(amount) ? 0 : 2, maximumFractionDigits: 2 };
+  const code = currencyCode(currency);
+  const key = `${code ?? ''}|${JSON.stringify(fraction)}|${compact}`;
+  let fmt = moneyFormats.get(key);
+  if (!fmt) {
+    fmt = new Intl.NumberFormat(undefined, {
+      ...(code ? { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' } : {}),
+      ...(compact ? { notation: 'compact' } : {}),
+      ...fraction,
+    });
+    moneyFormats.set(key, fmt);
+  }
+  // A sign made of letters ("CHF") gets a space before the number; "$" does not.
+  return code ? fmt.format(amount) : `${currency}${/\p{L}$/u.test(currency) ? ' ' : ''}${fmt.format(amount)}`;
 }
 
 /** The month's entries as CSV, for a spreadsheet. */
@@ -494,7 +541,7 @@ export function toCsv(entries: SpendEntry[], currency: string): string {
     const s = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const rows = [['Date', 'What', 'Category', 'Kind', `Amount (${currency})`].join(',')];
+  const rows = [['Date', 'What', 'Category', 'Kind', `Amount (${currencyCode(currency) ?? currency})`].join(',')];
   for (const e of [...entries].sort((a, b) => a.day.localeCompare(b.day))) {
     rows.push([e.day, cell(e.what), CATEGORY_LABELS[e.category], e.kind ? KIND_LABELS[e.kind] : '', String(e.amount)].join(','));
   }
