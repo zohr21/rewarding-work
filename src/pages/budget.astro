@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BudgetView from '../components/BudgetView.astro';
+---
+
+<BaseLayout title="Budget" description="What you spend, against a monthly budget: what is left, your pace, and where it goes.">
+  <div class="container">
+    <header class="page-header">
+      <h1>Budget</h1>
+      <p>What is left this month, whether you are on pace, and where it goes.</p>
+    </header>
+
+    <BudgetView />
+    <p class="muted budget__note">
+      Your expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
+      backup file yet.
+    </p>
+  </div>
+</BaseLayout>
+
+<style>
+  .budget__note {
+    margin-top: var(--space-5);
+    font-size: var(--text-sm);
+  }
+</style>

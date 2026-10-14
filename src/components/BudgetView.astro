@@ -1,0 +1,1586 @@
+---
+/**
+ * The Budget page: what is left this month and whether spending is on pace, a chart of
+ * the month so far, budgets per category, the last six months, the month's expenses and
+ * the bills that repeat. Everything is typed in by hand (src/lib/budget.ts).
+ */
+import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_SHORT, CURRENCY_MAX, KIND_LABELS, WELLBEING_KINDS, WHAT_MAX } from '../lib/budget';
+import { NATIVE_APP } from '../config/app';
+
+const PLUS = 'M12 5v14M5 12h14';
+const icon = (d: string, w = 2) =>
+  `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+---
+
+<div class="bv" data-budget>
+  <div class="bv__bar">
+    <div class="bv__month">
+      <button type="button" class="icon-btn" data-bv-prev aria-label="Previous month" set:html={icon('M15 6l-6 6 6 6')} />
+      <span data-bv-month aria-live="polite"></span>
+      <button type="button" class="icon-btn" data-bv-next aria-label="Next month" set:html={icon('M9 6l6 6-6 6')} />
+    </div>
+    <div class="bv__actions">
+      {
+        !NATIVE_APP && (
+          <button type="button" class="btn btn--ghost btn--small" data-bv-csv>
+            <Fragment set:html={icon('M12 4v11M7 10l5 5 5-5M5 20h14')} />
+            Export CSV
+          </button>
+        )
+      }
+      {
+        !NATIVE_APP && (
+          <button type="button" class="btn btn--small" data-bv-add aria-keyshortcuts="N">
+            <Fragment set:html={icon(PLUS, 2.4)} />
+            Add expense
+            <kbd class="bv__kbd" aria-hidden="true">N</kbd>
+          </button>
+        )
+      }
+    </div>
+  </div>
+
+  <div class="bv__top">
+    <section class="card bv__hero" aria-labelledby="bv-left-label">
+      <p class="bv__label" id="bv-left-label" data-bv-left-label></p>
+      <p class="bv__big"><strong data-bv-big></strong> <span class="muted" data-bv-of></span></p>
+      <div class="bv__meter" data-bv-meter>
+        <div class="bv__track well"><i data-bv-fill></i></div>
+        <span class="bv__tick" data-bv-tick aria-hidden="true"></span>
+        <p class="bv__meter-foot muted"><span data-bv-spent></span><span data-bv-pace></span></p>
+      </div>
+      <p class="bv__status" data-bv-status></p>
+      <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
+    </section>
+
+    <section class="card bv__chart-card" aria-labelledby="bv-pace-title">
+      <div class="bv__card-head">
+        <h2 class="bv__label" id="bv-pace-title">Spending vs. pace</h2>
+        <p class="bv__legend muted">
+          <span><i class="bv__key bv__key--line"></i>Spent so far</span>
+          <span data-bv-pace-key><i class="bv__key bv__key--dash"></i><span data-bv-pace-key-text></span></span>
+        </p>
+      </div>
+      <div data-bv-pace-chart></div>
+    </section>
+  </div>
+
+  <div class="bv__tiles">
+    <div class="card bv__tile"><p class="bv__label">vs. last month</p><strong data-bv-t1></strong><span class="muted" data-bv-t1s></span></div>
+    <div class="card bv__tile"><p class="bv__label">Biggest category</p><strong data-bv-t2></strong><span class="muted" data-bv-t2s></span></div>
+    <div class="card bv__tile"><p class="bv__label">Due in 7 days</p><strong data-bv-t3></strong><span class="muted" data-bv-t3s></span></div>
+    <div class="card bv__tile"><p class="bv__label">Days with an entry</p><strong data-bv-t4></strong><span class="muted" data-bv-t4s></span></div>
+  </div>
+
+  <div class="bv__pair">
+    <section class="card bv__cats" aria-labelledby="bv-cats-title">
+      <div class="bv__card-head">
+        <h2 class="panel-title" id="bv-cats-title">Categories</h2>
+        <button type="button" class="btn btn--ghost btn--small" data-bv-edit-budgets>Edit budgets</button>
+      </div>
+      <ul class="bv__cat-list" role="list" data-bv-cats></ul>
+      <p class="muted bv__note" data-bv-cats-note></p>
+    </section>
+
+    <section class="card bv__months" aria-labelledby="bv-months-title">
+      <div class="bv__card-head">
+        <h2 class="panel-title" id="bv-months-title" data-bv-months-title>Last 6 months</h2>
+        <p class="bv__legend muted" data-bv-months-key><span><i class="bv__key bv__key--dash"></i><span data-bv-months-key-text></span></span></p>
+      </div>
+      <div data-bv-months-chart></div>
+      <p class="bv__finding" data-bv-finding></p>
+    </section>
+  </div>
+
+  <div class="bv__pair bv__pair--list">
+    <section class="card bv__entries" aria-labelledby="bv-entries-title">
+      <div class="bv__card-head">
+        <h2 class="panel-title" id="bv-entries-title">Expenses</h2>
+        <label class="bv__search">
+          <span class="visually-hidden">Search expenses</span>
+          <Fragment set:html={icon('M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4')} />
+          <input class="input" type="search" placeholder="Search" autocomplete="off" data-bv-query />
+        </label>
+      </div>
+      <div class="bv__chips" role="group" aria-label="Show category" data-bv-chips>
+        <button type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
+        {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false">{CATEGORY_SHORT[c]}</button>)}
+      </div>
+      <div data-bv-list></div>
+      <p class="muted bv__note" data-bv-none hidden></p>
+      <button type="button" class="btn btn--ghost btn--small bv__more" data-bv-more hidden></button>
+    </section>
+
+    <section class="card bv__repeats" aria-labelledby="bv-repeats-title">
+      <h2 class="panel-title" id="bv-repeats-title">Repeating bills</h2>
+      <p class="muted bv__note">Added for you on their day each month.</p>
+      <ul class="bv__repeat-list" role="list" data-bv-repeats></ul>
+      <button type="button" class="btn btn--ghost btn--small" data-bv-add-repeat>
+        <Fragment set:html={icon(PLUS, 2.4)} />
+        Add a repeating bill
+      </button>
+    </section>
+  </div>
+
+  {
+    NATIVE_APP && (
+      <button type="button" class="btn bv__fab" data-bv-add>
+        <Fragment set:html={icon(PLUS, 2.6)} />
+        Expense
+      </button>
+    )
+  }
+
+  <dialog class="bv-dialog" data-bv-x-dialog aria-labelledby="bv-x-title">
+    <form method="dialog" data-bv-x-form>
+      <h2 id="bv-x-title" data-bv-x-title>New expense</h2>
+      <label class="bv-amount">
+        <span class="visually-hidden">Amount</span>
+        <span class="bv-amount__sign" data-bv-x-sign aria-hidden="true"></span>
+        <input type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bv-x-amount />
+      </label>
+      <p class="muted bv-dialog__hint" data-bv-x-hint aria-live="polite"></p>
+      <fieldset class="bv-cats">
+        <legend class="visually-hidden">Category</legend>
+        {
+          CATEGORIES.map((c, i) => (
+            <label class="bv-cat" style={`--c: ${CATEGORY_COLORS[c]}`}>
+              <input type="radio" name="bv-x-cat" value={c} class="visually-hidden" checked={i === 0} />
+              <i aria-hidden="true" />
+              {CATEGORY_SHORT[c]}
+            </label>
+          ))
+        }
+      </fieldset>
+      <label class="bv-dialog__field" data-bv-x-kind-field hidden>
+        <span>Kind</span>
+        <select class="input" data-bv-x-kind>
+          <option value="">Not set</option>
+          {WELLBEING_KINDS.map((k) => <option value={k}>{KIND_LABELS[k]}</option>)}
+        </select>
+      </label>
+      <div class="bv-dialog__pair">
+        <label class="bv-dialog__field">
+          <span>What <span class="muted">(optional)</span></span>
+          <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. Groceries" data-bv-x-what />
+        </label>
+        <label class="bv-dialog__field">
+          <span>Date</span>
+          <input class="input" type="date" required data-bv-x-day />
+        </label>
+      </div>
+      <label class="bv-check" data-bv-x-repeat-field>
+        <input type="checkbox" data-bv-x-repeat />
+        <span>Repeat every month on this day</span>
+      </label>
+      <div class="bv-dialog__actions">
+        <button type="button" class="btn btn--ghost bv-dialog__delete" data-bv-x-delete hidden>Delete</button>
+        <button type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
+        <button type="submit" class="btn" data-bv-x-save>Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="bv-dialog" data-bv-b-dialog aria-labelledby="bv-b-title">
+    <form method="dialog" data-bv-b-form>
+      <h2 id="bv-b-title">Budgets</h2>
+      <p class="muted">Leave a box empty for no budget. Without a monthly total, the category budgets are added up.</p>
+      <div class="bv-dialog__pair">
+        <label class="bv-dialog__field">
+          <span>Monthly total</span>
+          <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bv-b-total />
+        </label>
+        <label class="bv-dialog__field">
+          <span>Currency sign</span>
+          <input class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" data-bv-b-currency />
+        </label>
+      </div>
+      <div class="bv-budgets">
+        {
+          CATEGORIES.map((c) => (
+            <label class="bv-dialog__field bv-budgets__row">
+              <span>
+                <i style={`background: ${CATEGORY_COLORS[c]}`} aria-hidden="true" />
+                {CATEGORY_LABELS[c]}
+              </span>
+              <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bv-b-cat={c} />
+            </label>
+          ))
+        }
+      </div>
+      <div class="bv-dialog__actions">
+        <button type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
+        <button type="submit" class="btn">Save</button>
+      </div>
+    </form>
+  </dialog>
+  <p class="visually-hidden" aria-live="polite" data-bv-live></p>
+</div>
+
+<script>
+  import { listen, cleanups, onPage } from '../lib/page';
+  import { subscribe } from '../lib/storage';
+  import {
+    addRepeat,
+    addSpend,
+    billsAfter,
+    catchUpRepeats,
+    CATEGORIES,
+    CATEGORY_COLORS,
+    CATEGORY_LABELS,
+    CATEGORY_SHORT,
+    changeSpend,
+    daysInMonth,
+    dueSoon,
+    formatMoney,
+    getBudget,
+    KIND_LABELS,
+    monthBudget,
+    monthOf,
+    monthSpend,
+    monthTotals,
+    paceLine,
+    removeRepeat,
+    removeSpend,
+    runningTotals,
+    setBudgets,
+    shiftMonth,
+    toCsv,
+    type Category,
+    type SpendEntry,
+    type WellbeingKind,
+  } from '../lib/budget';
+  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { offerUndo } from '../lib/undo';
+  import { el } from '../lib/dom';
+
+  const monthLong = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
+  const monthShort = new Intl.DateTimeFormat(undefined, { month: 'short' });
+  const PAGE = 25;
+  const svgIcon = (d: string) =>
+    `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const EDIT = svgIcon('M4 20h4L19 9l-4-4L4 16z');
+  const CROSS = svgIcon('M6 6l12 12M18 6L6 18');
+  const OK = svgIcon('M5 12l5 5 9-10');
+  const WARN = svgIcon('M12 8v5M12 17h.01M10.3 4l-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z');
+
+  const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+
+  /** Money spent through the month against the budget's pace (budget.ts, paceLine). */
+  function paceChart(run: number[], upto: number, paced: number[] | null, sign: string, label: string): string {
+    const budget = paced ? (paced.at(-1) ?? 0) : null;
+    const W = 640;
+    const H = 230;
+    const L = 48;
+    const T = 12;
+    const B = 206;
+    const days = run.length;
+    // Two round steps up the side: 0, step, 2 × step.
+    const raw = (Math.max(budget ?? 0, run[upto - 1] ?? 0, 1) * 1.06) / 2;
+    const mag = 10 ** Math.floor(Math.log10(raw));
+    const top = 2 * mag * ([1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((f) => f * mag >= raw) ?? 10);
+    const x = (d: number) => r1(L + (d / days) * (W - L));
+    const y = (v: number) => r1(B - (v / top) * (B - T));
+    const grid = [0, 0.5, 1]
+      .map((f) => {
+        const v = top * f;
+        return `<line class="pc__grid" x1="${L}" y1="${y(v)}" x2="${W}" y2="${y(v)}"/><text class="pc__axis" x="0" y="${y(v) + 4}">${esc(sign + compact.format(v))}</text>`;
+      })
+      .join('');
+    const pace = paced ? `<polyline class="pc__pace" points="${[`${x(0)},${y(0)}`, ...paced.map((v, i) => `${x(i + 1)},${y(v)}`)].join(' ')}"/>` : '';
+    const pts = [`${x(0)},${y(0)}`, ...run.slice(0, upto).map((v, i) => `${x(i + 1)},${y(v)}`)].join(' ');
+    const ex = x(upto);
+    const ey = y(run[upto - 1] ?? 0);
+    const days1 = `<text class="pc__axis" x="${L}" y="${H - 2}">1</text><text class="pc__axis" x="${W}" y="${H - 2}" text-anchor="end">${days}</text>`;
+    return `<svg class="pc" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${grid}${pace}<polyline class="pc__line" points="${pts}"/><circle class="pc__dot" cx="${ex}" cy="${ey}" r="6"/>${days1}</svg>`;
+  }
+
+  /** One bar per month; the last is the month shown. Bars over the budget are marked. */
+  function monthBars(months: { month: string; total: number }[], budget: number | null, current: boolean, sign: string, label: string): string {
+    const W = 520;
+    const H = 260;
+    const B = 210;
+    const T = 30;
+    const n = months.length;
+    const slot = W / n;
+    const bw = Math.min(56, slot * 0.66);
+    const top = Math.max(budget ?? 0, ...months.map((m) => m.total), 1) * 1.04;
+    const y = (v: number) => r1(B - (v / top) * (B - T));
+    const bars = months
+      .map((m, i) => {
+        const cx = r1(slot * i + slot / 2);
+        const last = i === n - 1;
+        const over = !!budget && m.total > budget;
+        const h = Math.max(m.total > 0 ? 4 : 2, B - y(m.total));
+        const cls = `mb__bar${last ? ' mb__bar--now' : ''}${over ? ' mb__bar--over' : ''}`;
+        const rest = last && current && budget && m.total < budget ? `<rect class="mb__rest" x="${r1(cx - bw / 2)}" y="${y(budget)}" width="${r1(bw)}" height="${r1(Math.max(0, B - h - y(budget) - 2))}" rx="8"/>` : '';
+        const name = monthShort.format(fromDayKey(`${m.month}-01`));
+        const note = over ? 'over' : last && current ? 'so far' : '';
+        return (
+          `${rest}<rect class="${cls}" x="${r1(cx - bw / 2)}" y="${r1(B - h)}" width="${r1(bw)}" height="${r1(h)}" rx="8"/>` +
+          `<text class="mb__value${over ? ' mb__value--over' : ''}" x="${cx}" y="${r1(B - h - 8)}">${esc(m.total ? formatMoney(Math.round(m.total), sign, 0) : '')}</text>` +
+          `<text class="mb__month${last ? ' mb__month--now' : ''}" x="${cx}" y="${B + 20}">${esc(name)}</text>` +
+          (note ? `<text class="mb__note${over ? ' mb__value--over' : ''}" x="${cx}" y="${B + 38}">${note}</text>` : '')
+        );
+      })
+      .join('');
+    const line = budget ? `<line class="mb__budget" x1="0" y1="${y(budget)}" x2="${W}" y2="${y(budget)}"/>` : '';
+    return `<svg class="mb" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${bars}${line}<line class="mb__base" x1="0" y1="${B}" x2="${W}" y2="${B}"/></svg>`;
+  }
+
+  onPage('budget', () => {
+    const root = document.querySelector<HTMLElement>('[data-budget]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element = HTMLElement>(s: string) => root.querySelector<E>(s)!;
+    const $$ = <E extends Element = HTMLElement>(s: string) => [...root.querySelectorAll<E>(s)];
+    const xDialog = $<HTMLDialogElement>('[data-bv-x-dialog]');
+    const bDialog = $<HTMLDialogElement>('[data-bv-b-dialog]');
+    const xAmount = $<HTMLInputElement>('[data-bv-x-amount]');
+    const xWhat = $<HTMLInputElement>('[data-bv-x-what]');
+    const xDay = $<HTMLInputElement>('[data-bv-x-day]');
+    const xKind = $<HTMLSelectElement>('[data-bv-x-kind]');
+    const xRepeat = $<HTMLInputElement>('[data-bv-x-repeat]');
+    const live = $('[data-bv-live]');
+
+    const today = () => dayKey(new Date());
+    const thisMonth = () => monthOf(today());
+    let month = thisMonth();
+    let filter: Category | null = null;
+    let query = '';
+    let showAll = false;
+    /** The entry being changed in the dialog, or null for a new one. */
+    let editing: SpendEntry | null = null;
+    /** Removed entries and repeats still offered for Undo (src/lib/undo.ts). */
+    const removing = new Set<string>();
+
+    const announce = (text: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    };
+    const setText = (sel: string, text: string) => ($(sel).textContent = text);
+
+    function status(kind: 'ok' | 'warn', html: string): void {
+      const p = $('[data-bv-status]');
+      p.className = `bv__status bv__status--${kind}`;
+      p.innerHTML = (kind === 'ok' ? OK : WARN) + `<span>${html}</span>`;
+    }
+
+    function entryRow(entry: SpendEntry, sign: string): HTMLLIElement {
+      const item = el('li', 'bv__entry');
+      const dot = el('i', 'bv__dot');
+      dot.style.background = CATEGORY_COLORS[entry.category];
+      const main = el('span', 'bv__entry-main');
+      const sub = [CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : ''].filter(Boolean).join(' · ');
+      main.append(el('strong', '', entry.what), el('span', 'muted', sub));
+      const edit = el('button', 'icon-btn');
+      edit.type = 'button';
+      edit.setAttribute('aria-label', `Change ${entry.what}`);
+      edit.innerHTML = EDIT;
+      edit.addEventListener('click', () => openExpense(entry));
+      item.append(dot, main, el('span', 'bv__amount', formatMoney(entry.amount, sign)), edit);
+      return item;
+    }
+
+    function render(): void {
+      const store = getBudget();
+      const sign = store.currency;
+      const entries = store.entries.filter((e) => !removing.has(e.id));
+      const current = month === thisMonth();
+      const days = daysInMonth(month);
+      const dom = current ? fromDayKey(today()).getDate() : days;
+      const spent = monthSpend(entries, month);
+      const budget = monthBudget(store);
+      const fmt = (n: number) => formatMoney(n, sign);
+      const whole = (n: number) => formatMoney(Math.round(n), sign, 0);
+      const name = monthName.format(fromDayKey(`${month}-01`));
+
+      setText('[data-bv-month]', monthLong.format(fromDayKey(`${month}-01`)));
+      $<HTMLButtonElement>('[data-bv-next]').disabled = current;
+
+      // ---- What is left, and the pace ----
+      const meter = $('[data-bv-meter]');
+      const repeats = store.repeats.filter((r) => !removing.has(r.id));
+      const plan = budget ? paceLine(repeats, month, budget) : null;
+      const pace = plan ? plan.line[dom - 1]! : 0;
+      // Bills still to come this month are set aside before "a day".
+      const billsLater = plan && current ? billsAfter(plan.billsByDay, dom) : 0;
+      $('[data-bv-set]').hidden = !!budget;
+      meter.hidden = !budget;
+      if (budget) {
+        const left = budget - spent.total;
+        setText('[data-bv-left-label]', left >= 0 ? (current ? 'Left this month' : `Left in ${name}`) : 'Over budget');
+        setText('[data-bv-big]', fmt(Math.abs(Math.round(left * 100) / 100)));
+        setText('[data-bv-of]', `of ${fmt(budget)}`);
+        $('[data-bv-fill]').style.width = `${Math.min(100, (spent.total / budget) * 100)}%`;
+        $('[data-bv-fill]').classList.toggle('is-over', left < 0);
+        const tick = $('[data-bv-tick]');
+        tick.hidden = !current;
+        tick.style.left = `${Math.min(100, (pace / budget) * 100)}%`;
+        setText('[data-bv-spent]', `${fmt(spent.total)} spent`);
+        setText('[data-bv-pace]', current ? `Pace today: ${whole(pace)}` : '');
+        const daysLeft = days - dom + 1;
+        const free = left - billsLater;
+        const days_ = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`;
+        const bills = billsLater ? `, after ${esc(whole(billsLater))} of bills still to come` : '';
+        const perDay =
+          free > 0
+            ? `about <strong>${esc(whole(Math.floor(free / daysLeft)))} a day</strong> for the ${days_} left${bills}`
+            : `nothing more beyond the ${esc(whole(billsLater))} of bills still to come`;
+        if (!current) {
+          if (left >= 0) status('ok', `<strong>Finished ${esc(whole(left))} under budget.</strong>`);
+          else status('warn', `<strong>Ended ${esc(whole(-left))} over budget.</strong>`);
+        } else if (left < 0) {
+          status('warn', `<strong>Over budget</strong> by ${esc(whole(-left))}, with ${days_} to go.`);
+        } else if (spent.total > pace) {
+          status('warn', `<strong>Ahead of pace</strong> by ${esc(whole(spent.total - pace))}. To stay in budget: ${perDay}.`);
+        } else {
+          status('ok', `<strong>On track</strong>, ${esc(whole(pace - spent.total))} under pace. You can spend ${perDay}.`);
+        }
+      } else {
+        setText('[data-bv-left-label]', current ? 'Spent this month' : `Spent in ${name}`);
+        setText('[data-bv-big]', fmt(spent.total));
+        setText('[data-bv-of]', '');
+        $('[data-bv-status]').className = 'bv__status';
+        $('[data-bv-status]').innerHTML = '<span>Set a monthly budget to see what is left and whether you are on pace.</span>';
+      }
+
+      const run = runningTotals(entries, month);
+      $('[data-bv-pace-key]').hidden = !budget;
+      setText('[data-bv-pace-key-text]', budget ? `Pace to ${whole(budget)}` : '');
+      $('[data-bv-pace-chart]').innerHTML = paceChart(
+        run,
+        dom,
+        plan?.line ?? null,
+        sign,
+        `Spent through ${name}: ${fmt(run[dom - 1] ?? 0)} by day ${dom}${budget ? `, against a pace of ${whole(pace)}` : ''}.`,
+      );
+
+      // ---- Tiles ----
+      const prevMonth = shiftMonth(month, -1);
+      const prev = monthSpend(entries, prevMonth, dom).total;
+      const prevName = monthName.format(fromDayKey(`${prevMonth}-01`));
+      if (prev > 0) {
+        const pct = Math.round(((spent.total - prev) / prev) * 100);
+        setText('[data-bv-t1]', `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`);
+        setText('[data-bv-t1s]', current ? `${whole(prev)} by the same day in ${prevName}` : `${whole(prev)} in ${prevName}`);
+      } else {
+        setText('[data-bv-t1]', '—');
+        setText('[data-bv-t1s]', `Nothing logged in ${prevName}`);
+      }
+      const biggest = [...spent.byCategory].sort((a, b) => b[1] - a[1])[0];
+      setText('[data-bv-t2]', biggest ? CATEGORY_SHORT[biggest[0]] : '—');
+      setText('[data-bv-t2s]', biggest ? `${whole(biggest[1])} · ${Math.round((biggest[1] / spent.total) * 100)}% of spending` : 'Nothing spent yet');
+      const due = dueSoon(store.repeats.filter((r) => !removing.has(r.id)));
+      setText('[data-bv-t3]', whole(due.reduce((sum, d) => sum + d.repeat.amount, 0)));
+      setText('[data-bv-t3s]', due.length ? due.map((d) => d.repeat.what).join(', ') : 'No repeating bills due');
+      const logged = new Set(spent.entries.map((e) => e.day)).size;
+      setText('[data-bv-t4]', `${logged} of ${dom}`);
+      setText('[data-bv-t4s]', current ? 'days so far this month' : `days in ${name}`);
+
+      // ---- Categories ----
+      const shown = CATEGORIES.filter((cat) => store.budgets[cat] || spent.byCategory.has(cat));
+      $('[data-bv-cats]').replaceChildren(
+        ...shown.map((cat) => {
+          const sum = spent.byCategory.get(cat) ?? 0;
+          const own = store.budgets[cat];
+          const li = el('li');
+          const btn = el('button', 'bv__cat');
+          btn.type = 'button';
+          btn.setAttribute('aria-pressed', String(filter === cat));
+          btn.style.setProperty('--c', CATEGORY_COLORS[cat]);
+          const head = el('span', 'bv__cat-head');
+          const nameEl = el('span', 'bv__cat-name');
+          nameEl.append(el('i', 'bv__dot'), CATEGORY_LABELS[cat]);
+          const nums = el('span', 'bv__cat-nums', whole(sum));
+          if (own) nums.append(el('span', 'muted', ` / ${whole(own)}`));
+          head.append(nameEl, nums);
+          const meterEl = el('span', 'bv__cat-meter');
+          const track = el('span', 'bv__track bv__track--thin well');
+          const fill = el('i');
+          fill.style.width = `${Math.min(100, (sum / (own ?? Math.max(spent.total, 1))) * 100)}%`;
+          track.append(fill);
+          meterEl.append(track);
+          const catPlan = own ? paceLine(repeats, month, own, cat) : null;
+          const catPace = catPlan ? catPlan.line[dom - 1]! : 0;
+          if (own && current) {
+            const tick = el('span', 'bv__tick bv__tick--thin');
+            tick.style.left = `${Math.min(100, (catPace / own) * 100)}%`;
+            tick.setAttribute('aria-hidden', 'true');
+            meterEl.append(tick);
+          }
+          btn.append(head, meterEl);
+          if (own) {
+            const leftCat = own - sum;
+            const freeCat = leftCat - (current && catPlan ? billsAfter(catPlan.billsByDay, dom) : 0);
+            let note = '';
+            if (leftCat < 0) note = `Over by ${whole(-leftCat)}`;
+            else if (current && sum > catPace + 0.005)
+              note = freeCat > 0 ? `Ahead of pace, about ${whole(Math.floor(freeCat / (days - dom + 1)))} a day left` : 'Ahead of pace, nothing left after bills';
+            if (note) {
+              const n = el('span', 'bv__cat-warn');
+              n.innerHTML = WARN + `<span>${esc(note)}</span>`;
+              btn.append(n);
+            }
+          } else {
+            btn.append(el('span', 'bv__cat-sub muted', 'No budget'));
+          }
+          btn.addEventListener('click', () => setFilter(filter === cat ? null : cat));
+          li.append(btn);
+          return li;
+        }),
+      );
+      const notes: string[] = [];
+      if (!shown.length) notes.push(`Nothing spent in ${name} yet.`);
+      else notes.push('Choose a category to see only its expenses and months.');
+      if (current && shown.some((cat) => store.budgets[cat])) notes.push('The white tick is where your pace would be today: repeating bills count on their day, the rest is spread evenly.');
+      const assigned = Object.values(store.budgets).reduce((a, b) => a + (b ?? 0), 0);
+      if (store.budget && assigned > 0 && assigned < store.budget) notes.push(`${whole(store.budget - assigned)} of your budget is not given to a category.`);
+      setText('[data-bv-cats-note]', notes.join(' '));
+
+      // ---- Months ----
+      const months = monthTotals(entries, month, 6, filter ?? undefined);
+      const line = filter ? (store.budgets[filter] ?? null) : budget;
+      setText('[data-bv-months-title]', filter ? `Last 6 months · ${CATEGORY_SHORT[filter]}` : 'Last 6 months');
+      $('[data-bv-months-key]').hidden = !line;
+      setText('[data-bv-months-key-text]', line ? `Budget ${whole(line)}` : '');
+      $('[data-bv-months-chart]').innerHTML = monthBars(
+        months,
+        line,
+        current,
+        sign,
+        `${filter ? CATEGORY_SHORT[filter] + ' spending' : 'Spending'} by month: ${months.map((m) => `${monthShort.format(fromDayKey(`${m.month}-01`))} ${whole(m.total)}`).join(', ')}${current ? ' so far' : ''}.`,
+      );
+      const done = (current ? months.slice(0, -1) : months).filter((m) => m.total > 0);
+      const finding = $('[data-bv-finding]');
+      finding.hidden = done.length < 2;
+      if (done.length >= 2) {
+        const avg = done.reduce((sum, m) => sum + m.total, 0) / done.length;
+        const overs = line ? done.filter((m) => m.total > line) : [];
+        const overText = !line
+          ? ''
+          : overs.length === 0
+            ? ' You stayed in budget every month.'
+            : overs.length === 1
+              ? ` You went over once, in ${monthName.format(fromDayKey(`${overs[0]!.month}-01`))}.`
+              : ` You went over ${overs.length} times.`;
+        finding.innerHTML = `Average month: <strong>${esc(whole(avg))}</strong>.${esc(overText)}`;
+      }
+
+      // ---- Expenses ----
+      for (const chip of $$<HTMLButtonElement>('[data-bv-chip]')) chip.setAttribute('aria-pressed', String((chip.dataset.bvChip || null) === filter));
+      const q = query.trim().toLowerCase();
+      const list = spent.entries.filter((e) => (!filter || e.category === filter) && (!q || e.what.toLowerCase().includes(q)));
+      const visible = showAll ? list : list.slice(0, PAGE);
+      const groups: HTMLElement[] = [];
+      let lastDay = '';
+      let ul: HTMLUListElement | null = null;
+      for (const e of visible) {
+        if (e.day !== lastDay) {
+          lastDay = e.day;
+          const h = el('h3', 'bv__day', e.day === today() ? 'Today' : formatDay(fromDayKey(e.day)));
+          ul = el('ul', 'bv__list');
+          ul.setAttribute('role', 'list');
+          groups.push(h, ul);
+        }
+        ul!.append(entryRow(e, sign));
+      }
+      $('[data-bv-list]').replaceChildren(...groups);
+      const none = $('[data-bv-none]');
+      none.hidden = list.length > 0;
+      none.textContent = q || filter ? 'Nothing matches.' : `No expenses in ${name}.`;
+      const more = $<HTMLButtonElement>('[data-bv-more]');
+      more.hidden = showAll || list.length <= PAGE;
+      more.textContent = `Show all ${list.length} expenses`;
+
+      // ---- Repeats ----
+      $('[data-bv-repeats]').replaceChildren(
+        ...repeats.map((r) => {
+          const li = el('li', 'bv__repeat');
+          const main = el('span', 'bv__entry-main');
+          main.append(el('strong', '', r.what), el('span', 'muted', `Day ${r.dayOfMonth} each month · ${CATEGORY_SHORT[r.category]}`));
+          const stop = el('button', 'icon-btn');
+          stop.type = 'button';
+          stop.setAttribute('aria-label', `Stop repeating ${r.what}`);
+          stop.innerHTML = CROSS;
+          stop.addEventListener('click', () => {
+            removing.add(r.id);
+            render();
+            offerUndo({
+              message: `Stopped “${r.what}”`,
+              commit: () => {
+                removing.delete(r.id);
+                removeRepeat(r.id);
+              },
+              undo: () => {
+                removing.delete(r.id);
+                render();
+              },
+            });
+          });
+          li.append(main, el('span', 'bv__amount', fmt(r.amount)), stop);
+          return li;
+        }),
+      );
+      if (!repeats.length) $('[data-bv-repeats]').append(el('li', 'muted bv__note', 'Rent, phone, memberships: add them once.'));
+    }
+
+    function setFilter(next: Category | null): void {
+      filter = next;
+      showAll = false;
+      render();
+    }
+
+    // ---- The expense dialog ----
+    const chosenCategory = () => ($<HTMLInputElement>('input[name="bv-x-cat"]:checked')?.value ?? 'food') as Category;
+
+    function updateDialog(): void {
+      const cat = chosenCategory();
+      $('[data-bv-x-kind-field]').hidden = cat !== 'wellbeing';
+      const store = getBudget();
+      const own = store.budgets[cat];
+      const hint = $('[data-bv-x-hint]');
+      const day = xDay.value || today();
+      if (!own) {
+        hint.textContent = '';
+        return;
+      }
+      const amount = Number(xAmount.value) || 0;
+      const entries = store.entries.filter((e) => e.id !== editing?.id);
+      const sum = monthSpend(entries, monthOf(day)).byCategory.get(cat) ?? 0;
+      const left = own - sum - amount;
+      const mName = monthName.format(fromDayKey(day));
+      hint.textContent =
+        left >= 0
+          ? `${CATEGORY_SHORT[cat]}: ${formatMoney(Math.round(left), store.currency, 0)} left in ${mName}${amount ? ' after this' : ''}`
+          : `${CATEGORY_SHORT[cat]}: ${formatMoney(Math.round(-left), store.currency, 0)} over in ${mName}${amount ? ' with this' : ''}`;
+    }
+
+    function openExpense(entry: SpendEntry | null, repeat = false): void {
+      editing = entry;
+      const store = getBudget();
+      setText('[data-bv-x-title]', entry ? 'Change expense' : repeat ? 'New repeating bill' : 'New expense');
+      setText('[data-bv-x-sign]', store.currency);
+      xAmount.value = entry ? String(entry.amount) : '';
+      xWhat.value = entry ? entry.what : '';
+      xDay.value = entry ? entry.day : month === thisMonth() ? today() : `${month}-01`;
+      xDay.max = repeat ? '' : today();
+      xKind.value = entry?.kind ?? '';
+      const cat = entry?.category ?? filter ?? 'food';
+      for (const r of $$<HTMLInputElement>('input[name="bv-x-cat"]')) r.checked = r.value === cat;
+      xRepeat.checked = repeat;
+      $('[data-bv-x-repeat-field]').hidden = !!entry;
+      $('[data-bv-x-delete]').hidden = !entry;
+      updateDialog();
+      xDialog.showModal();
+      xAmount.focus();
+    }
+
+    xDialog.addEventListener('change', updateDialog);
+    xAmount.addEventListener('input', updateDialog);
+
+    $<HTMLFormElement>('[data-bv-x-form]').addEventListener('submit', () => {
+      const input = {
+        what: xWhat.value,
+        category: chosenCategory(),
+        kind: (xKind.value || null) as WellbeingKind | null,
+        amount: Number(xAmount.value),
+        day: xDay.value,
+      };
+      const sign = getBudget().currency;
+      if (editing) {
+        const entry = changeSpend(editing.id, input);
+        if (entry) announce(`Changed ${entry.what}, ${formatMoney(entry.amount, sign)}`);
+      } else if (xRepeat.checked) {
+        const r = addRepeat(input);
+        if (r) announce(`${r.what} repeats every month on day ${r.dayOfMonth}`);
+      } else {
+        const entry = addSpend(input);
+        if (!entry) return;
+        month = monthOf(entry.day);
+        announce(`Added ${entry.what}, ${formatMoney(entry.amount, sign)}`);
+      }
+      editing = null;
+      render();
+    });
+
+    $('[data-bv-x-delete]').addEventListener('click', () => {
+      const entry = editing;
+      xDialog.close();
+      editing = null;
+      if (!entry) return;
+      removing.add(entry.id);
+      render();
+      offerUndo({
+        message: `Deleted “${entry.what}”`,
+        commit: () => {
+          removing.delete(entry.id);
+          removeSpend(entry.id);
+        },
+        undo: () => {
+          removing.delete(entry.id);
+          render();
+        },
+      });
+    });
+
+    // ---- The budgets dialog ----
+    const openBudgets = () => {
+      const store = getBudget();
+      $<HTMLInputElement>('[data-bv-b-total]').value = store.budget ? String(store.budget) : '';
+      $<HTMLInputElement>('[data-bv-b-currency]').value = store.currency;
+      for (const input of $$<HTMLInputElement>('[data-bv-b-cat]')) {
+        const v = store.budgets[input.dataset.bvBCat as Category];
+        input.value = v ? String(v) : '';
+      }
+      bDialog.showModal();
+      $<HTMLInputElement>('[data-bv-b-total]').focus();
+    };
+    $('[data-bv-edit-budgets]').addEventListener('click', openBudgets);
+    $('[data-bv-set]').addEventListener('click', openBudgets);
+    $<HTMLFormElement>('[data-bv-b-form]').addEventListener('submit', () => {
+      const total = Number($<HTMLInputElement>('[data-bv-b-total]').value);
+      const budgets: Partial<Record<Category, number>> = {};
+      for (const input of $$<HTMLInputElement>('[data-bv-b-cat]')) {
+        const v = Number(input.value);
+        if (input.value && v > 0) budgets[input.dataset.bvBCat as Category] = v;
+      }
+      setBudgets(total > 0 ? total : null, budgets, $<HTMLInputElement>('[data-bv-b-currency]').value);
+      announce('Budgets saved.');
+    });
+
+    for (const dialog of [xDialog, bDialog]) {
+      dialog.addEventListener('click', (e) => {
+        // A click on the dimmed page behind lands on the dialog itself.
+        if (e.target === dialog || (e.target as HTMLElement).closest('[data-bv-cancel]')) dialog.close();
+      });
+    }
+
+    // ---- The rest of the controls ----
+    $('[data-bv-prev]').addEventListener('click', () => {
+      month = shiftMonth(month, -1);
+      showAll = false;
+      render();
+    });
+    $('[data-bv-next]').addEventListener('click', () => {
+      month = shiftMonth(month, 1);
+      showAll = false;
+      render();
+    });
+    for (const add of $$('[data-bv-add]')) add.addEventListener('click', () => openExpense(null));
+    $('[data-bv-add-repeat]').addEventListener('click', () => openExpense(null, true));
+    for (const chip of $$<HTMLButtonElement>('[data-bv-chip]')) chip.addEventListener('click', () => setFilter((chip.dataset.bvChip || null) as Category | null));
+    $<HTMLInputElement>('[data-bv-query]').addEventListener('input', (e) => {
+      query = (e.target as HTMLInputElement).value;
+      render();
+    });
+    $('[data-bv-more]').addEventListener('click', () => {
+      showAll = true;
+      render();
+    });
+
+    root.querySelector('[data-bv-csv]')?.addEventListener('click', () => {
+      const store = getBudget();
+      const blob = new Blob([toCsv(monthSpend(store.entries, month).entries, store.currency)], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `budget-${month}.csv`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    // N adds an expense, unless you are typing or a dialog is open.
+    c.add(
+      listen(document, 'keydown', (e: KeyboardEvent) => {
+        if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+        const t = e.target as HTMLElement;
+        if (t.closest('input, textarea, select, [contenteditable="true"]') || document.querySelector('dialog[open]')) return;
+        e.preventDefault();
+        openExpense(null);
+      }),
+    );
+
+    catchUpRepeats();
+    // Links from elsewhere (the Health page) open a category, or the Add sheet on one.
+    const params = new URLSearchParams(location.search);
+    const asked = params.get('category') ?? params.get('add');
+    if (asked && (CATEGORIES as readonly string[]).includes(asked)) filter = asked as Category;
+    render();
+    if (params.has('add')) openExpense(null);
+    if (params.has('category') || params.has('add')) history.replaceState(history.state, '', location.pathname);
+    c.add(subscribe('health', render));
+    // A page left open past midnight moves on to the new day (and month).
+    let shownDay = today();
+    const tick = window.setInterval(() => {
+      if (today() === shownDay) return;
+      if (month === monthOf(shownDay)) month = thisMonth();
+      shownDay = today();
+      catchUpRepeats();
+      render();
+    }, 60_000);
+    c.add(() => window.clearInterval(tick));
+    return c.run;
+  });
+</script>
+
+<style>
+  .bv {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .bv [hidden] {
+    display: none !important;
+  }
+
+  .bv__bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .bv__month {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-weight: 600;
+  }
+
+  .bv__month span {
+    min-inline-size: 9.5rem;
+    text-align: center;
+  }
+
+  .bv__month .icon-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+    background: none;
+  }
+
+  .bv__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .bv__kbd {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 0.12);
+    font: 600 0.6875rem/1.2 var(--font-sans);
+  }
+
+  .bv__label {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .bv__top {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  @media (min-width: 60rem) {
+    .bv__top {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr);
+    }
+  }
+
+  .bv__hero {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: var(--space-4);
+  }
+
+  .bv__big {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .bv__big strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 2rem + 3vw, 4rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .bv__meter,
+  .bv :global(.bv__cat-meter) {
+    position: relative;
+    display: block;
+  }
+
+  .bv__track,
+  .bv :global(.bv__track) {
+    display: block;
+    block-size: 16px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .bv :global(.bv__track--thin) {
+    block-size: 10px;
+  }
+
+  .bv__track i,
+  .bv :global(.bv__track i) {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--c, var(--accent-grad));
+  }
+
+  .bv__track i.is-over {
+    background: var(--color-danger);
+  }
+
+  .bv__tick,
+  .bv :global(.bv__tick) {
+    position: absolute;
+    top: -6px;
+    inline-size: 2px;
+    block-size: 28px;
+    margin-inline-start: -1px;
+    border-radius: 2px;
+    background: var(--color-text);
+  }
+
+  .bv :global(.bv__tick--thin) {
+    top: -4px;
+    block-size: 18px;
+  }
+
+  .bv__meter-foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .bv__status {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+  }
+
+  .bv__status :global(svg) {
+    flex: none;
+    margin-top: 2px;
+  }
+
+  .bv__status--ok {
+    background: var(--color-accent-soft);
+  }
+
+  .bv__status--ok :global(svg),
+  .bv__status--ok :global(strong:first-child) {
+    color: var(--color-accent);
+  }
+
+  .bv__status--warn {
+    background: var(--cat-reward-bg);
+  }
+
+  .bv__status--warn :global(svg),
+  .bv__status--warn :global(strong:first-child) {
+    color: var(--cat-reward);
+  }
+
+  .bv__set {
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  .bv__chart-card,
+  .bv__months {
+    display: grid;
+    align-content: start;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+
+  .bv__card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .bv__card-head .panel-title {
+    margin: 0;
+  }
+
+  .bv__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    font-size: var(--text-xs);
+  }
+
+  .bv__legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bv__key {
+    display: inline-block;
+    inline-size: 16px;
+  }
+
+  .bv__key--line {
+    block-size: 3px;
+    border-radius: 2px;
+    background: var(--color-accent);
+  }
+
+  .bv__key--dash {
+    border-top: 2px dashed var(--color-border-strong);
+  }
+
+  .bv :global(.pc),
+  .bv :global(.mb) {
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    overflow: visible;
+  }
+
+  .bv :global(.pc__grid) {
+    stroke: var(--color-border);
+  }
+
+  .bv :global(.pc__axis),
+  .bv :global(.mb__month),
+  .bv :global(.mb__note) {
+    fill: var(--color-text-muted);
+    font: 11px var(--font-sans);
+  }
+
+  .bv :global(.pc__pace),
+  .bv :global(.mb__budget) {
+    fill: none;
+    stroke: var(--color-border-strong);
+    stroke-width: 2;
+    stroke-dasharray: 6 6;
+  }
+
+  .bv :global(.pc__line) {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 3;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+
+  .bv :global(.pc__dot) {
+    fill: var(--color-accent);
+    stroke: var(--color-bg);
+    stroke-width: 3;
+  }
+
+  .bv :global(.mb text) {
+    text-anchor: middle;
+  }
+
+  .bv :global(.mb__bar) {
+    fill: var(--heat-2);
+  }
+
+  .bv :global(.mb__bar--now) {
+    fill: var(--color-accent);
+  }
+
+  .bv :global(.mb__bar--over) {
+    fill: var(--cat-reward);
+  }
+
+  .bv :global(.mb__rest) {
+    fill: none;
+    stroke: var(--color-border-strong);
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+  }
+
+  .bv :global(.mb__base) {
+    stroke: var(--color-border);
+  }
+
+  .bv :global(.mb__value) {
+    fill: var(--color-text);
+    font: 12px var(--font-sans);
+  }
+
+  .bv :global(.mb__value--over) {
+    fill: var(--cat-reward);
+    font-weight: 700;
+  }
+
+  .bv :global(.mb__month--now) {
+    fill: var(--color-text);
+    font-weight: 700;
+  }
+
+  .bv__finding {
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+  }
+
+  .bv__tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: var(--space-4);
+  }
+
+  .bv__tile {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .bv__tile strong {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bv__tile .muted {
+    font-size: var(--text-xs);
+  }
+
+  .bv__pair {
+    display: grid;
+    gap: var(--space-5);
+    align-items: start;
+  }
+
+  @media (min-width: 56rem) {
+    .bv__pair {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .bv__pair--list {
+      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    }
+  }
+
+  .bv__cats,
+  .bv__entries,
+  .bv__repeats {
+    display: grid;
+    align-content: start;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .bv__cat-list,
+  .bv__repeat-list,
+  .bv :global(.bv__list) {
+    display: grid;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bv__cat-list {
+    gap: var(--space-2);
+  }
+
+  .bv :global(.bv__cat) {
+    display: grid;
+    gap: var(--space-2);
+    inline-size: 100%;
+    padding: var(--space-3);
+    margin-inline: calc(-1 * var(--space-3));
+    box-sizing: content-box;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .bv :global(.bv__cat:hover) {
+    background: var(--color-surface-2);
+  }
+
+  .bv :global(.bv__cat[aria-pressed='true']) {
+    background: var(--color-surface-2);
+    box-shadow: inset 0 0 0 2px var(--c);
+  }
+
+  .bv :global(.bv__cat-head) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .bv :global(.bv__cat-name) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 600;
+  }
+
+  .bv :global(.bv__cat-nums) {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .bv :global(.bv__dot) {
+    flex: none;
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 3px;
+    background: var(--c);
+  }
+
+  .bv :global(.bv__cat-warn) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--cat-reward);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  .bv :global(.bv__cat-warn svg) {
+    inline-size: 14px;
+    block-size: 14px;
+  }
+
+  .bv :global(.bv__cat-sub) {
+    font-size: var(--text-xs);
+  }
+
+  .bv__note,
+  .bv :global(.bv__note) {
+    font-size: var(--text-sm);
+  }
+
+  .bv__search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 0 1 16rem;
+  }
+
+  .bv__search :global(svg) {
+    position: absolute;
+    inset-inline-start: 12px;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  .bv__search .input {
+    padding-inline-start: 38px;
+  }
+
+  .bv__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .bv__chip {
+    min-height: 36px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: var(--color-text-muted);
+    font: 600 var(--text-xs) var(--font-sans);
+    cursor: pointer;
+  }
+
+  .bv__chip[aria-pressed='true'] {
+    background: var(--color-accent);
+    box-shadow: none;
+    color: var(--color-on-accent);
+  }
+
+  .bv :global(.bv__day) {
+    margin: var(--space-3) 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .bv :global(.bv__entry),
+  .bv :global(.bv__repeat) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    max-width: none;
+    min-height: 56px;
+  }
+
+  .bv :global(.bv__list li + li),
+  .bv :global(.bv__repeat + .bv__repeat) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bv :global(.bv__entry-main) {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .bv :global(.bv__entry-main .muted) {
+    font-size: var(--text-xs);
+  }
+
+  .bv :global(.bv__amount) {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .bv__more,
+  .bv__repeats .btn {
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  /* The app: a floating Add button above the bottom bar. */
+  .bv__fab {
+    position: fixed;
+    inset-inline-end: var(--space-4);
+    inset-block-end: calc(var(--app-nav-h, 0px) + var(--space-4));
+    z-index: 15;
+    min-height: 56px;
+    padding-inline: var(--space-5);
+    border-radius: 18px;
+  }
+
+  :global(html[data-app]) .bv {
+    padding-bottom: 5rem;
+  }
+
+  /* ---- Dialogs ---- */
+  .bv-dialog {
+    inline-size: min(100% - 2 * var(--space-4), 30rem);
+    max-block-size: calc(100dvh - 2 * var(--space-4));
+    margin: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--popover-bg);
+    color: var(--color-text);
+    box-shadow: var(--popover-shadow);
+  }
+
+  .bv-dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .bv-dialog form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bv-dialog h2 {
+    font-size: var(--text-lg);
+  }
+
+  .bv-dialog p {
+    font-size: var(--text-sm);
+  }
+
+  .bv-dialog [hidden] {
+    display: none !important;
+  }
+
+  .bv-amount {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 4px;
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 800;
+  }
+
+  .bv-amount input {
+    inline-size: 6.5ch;
+    padding: 0;
+    border: 0;
+    border-bottom: 2px solid var(--color-border-strong);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    -moz-appearance: textfield;
+  }
+
+  .bv-amount input:focus {
+    outline: none;
+    border-bottom-color: var(--color-accent);
+  }
+
+  .bv-amount input::-webkit-inner-spin-button,
+  .bv-amount input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .bv-dialog__hint {
+    min-height: 1.4em;
+    margin-top: calc(-1 * var(--space-3));
+    text-align: center;
+  }
+
+  .bv-cats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bv-cat {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 6px;
+    min-height: 60px;
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .bv-cat i {
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 4px;
+    background: var(--c);
+  }
+
+  .bv-cat:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--c);
+    color: var(--color-text);
+    background: var(--color-surface-2);
+  }
+
+  .bv-cat:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .bv-dialog__field {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bv-dialog__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .bv-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    font-size: var(--text-sm);
+  }
+
+  .bv-check input {
+    inline-size: 20px;
+    block-size: 20px;
+    accent-color: var(--color-accent);
+  }
+
+  .bv-budgets {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bv-budgets__row {
+    grid-template-columns: minmax(0, 1fr) 8rem;
+    align-items: center;
+  }
+
+  .bv-budgets__row span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .bv-budgets__row i {
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 3px;
+  }
+
+  .bv-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .bv-dialog__delete {
+    margin-inline-end: auto;
+    color: var(--color-danger);
+  }
+
+  /* The Android app: dialogs come up from the bottom, like its other sheets. */
+  :global(html[data-app]) .bv-dialog {
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    margin: 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border-width: 1px 0 0;
+    border-radius: 28px 28px 0 0;
+  }
+
+  :global(html[data-app]) .bv-dialog__actions .btn {
+    flex: 1;
+    min-height: 52px;
+  }
+</style>

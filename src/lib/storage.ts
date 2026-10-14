@@ -27,7 +27,7 @@ export type StoreName =
   | 'exam'
   | 'breakdown' // legacy: moved into `tasks` on first load (see migrateBreakdown)
   | 'sound'
-  | 'health' // wellbeing spend (src/lib/health.ts)
+  | 'health' // Budget: spend, budgets and repeats (src/lib/budget.ts); named for where it began
   | 'body' // the last read from Health Connect, in the Android app (HealthBody.astro)
   | 'sync';
 

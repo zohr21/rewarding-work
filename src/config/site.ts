@@ -32,5 +32,6 @@ export const NAV: NavItem[] = [
   { label: 'Home', href: '/' },
   FOCUS,
   { label: 'Health', href: '/health' },
+  { label: 'Budget', href: '/budget' },
   { label: 'Progress', href: '/progress' },
 ];
