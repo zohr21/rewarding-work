@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HealthBody from '../components/HealthBody.astro';
-import HealthSpend from '../components/HealthSpend.astro';
+import HealthSpendSummary from '../components/HealthSpendSummary.astro';
 import { NATIVE_APP } from '../config/app';
 ---
 
@@ -15,11 +15,7 @@ import { NATIVE_APP } from '../config/app';
     <div class="health">
       {/* The Android app has body data to lead with; the site only has a line about it, which goes last. */}
       {NATIVE_APP && <HealthBody />}
-      <HealthSpend />
-      <p class="muted health__note">
-        Your entries and budget are kept on this device, and in your account when you are signed in. They are not part of
-        the backup file yet.
-      </p>
+      <HealthSpendSummary />
       {!NATIVE_APP && <HealthBody />}
     </div>
   </div>

@@ -1,6 +1,6 @@
 ---
 /**
- * The Android app's bottom bar (BaseLayout shows it only in the app build): four
+ * The Android app's bottom bar (BaseLayout shows it only in the app build): five
  * destinations, the current one marked with a pill behind its icon. The timer, tasks,
  * exam prep and the techniques all live under Focus, as its tabs (FocusTabs.astro).
  */
@@ -13,6 +13,7 @@ const ITEMS = [
   { label: 'Today', href: '/', icon: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z' },
   { ...FOCUS, icon: 'M12 5a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 9v4l2.5 2M9 2h6' },
   { label: 'Health', href: '/health', icon: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z' },
+  { label: 'Budget', href: '/budget', icon: 'M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM3 10h18M16 15h2' },
   { label: 'Progress', href: '/progress', icon: 'M5 20V11M12 20V5M19 20v-6' },
 ];
 ---
@@ -81,7 +82,7 @@ const ITEMS = [
 
   .app-nav ul {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     max-width: 34rem;
     margin-inline: auto;
     padding: 0 var(--space-1);
