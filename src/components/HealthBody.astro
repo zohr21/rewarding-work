@@ -1,6 +1,6 @@
 ---
 /**
- * Body data on /health: sleep, steps, exercise and resting heart rate, read from Health
+ * Body data on /health: sleep, steps, exercise, resting heart rate, calories and distance, read from Health
  * Connect by the Android app (src/lib/device.ts) and set next to focus time. The site
  * has nothing to read from, so it says where the numbers come from instead.
  */
@@ -8,12 +8,23 @@ import { NATIVE_APP } from '../config/app';
 import { HEALTH_KINDS } from '../lib/device';
 import { url } from '../lib/paths';
 
-const ASK = { sleep: 'Sleep', steps: 'Steps', exercise: 'Exercise', heart: 'Resting heart rate' };
+const ASK = {
+  sleep: 'Sleep',
+  steps: 'Steps',
+  exercise: 'Exercise',
+  heart: 'Resting heart rate',
+  calories: 'Total calories burned',
+  activeCalories: 'Active calories',
+  distance: 'Distance',
+};
 const TILES = [
   { kind: 'sleep', label: 'Sleep', icon: 'M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10z' },
   { kind: 'steps', label: 'Steps', icon: 'M3 12h4l3-7 4 14 3-7h4' },
   { kind: 'exercise', label: 'Active', icon: 'M4 9v6M7 7v10M17 7v10M20 9v6M7 12h10' },
   { kind: 'heart', label: 'Resting heart', icon: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z' },
+  // Total and active calories share one tile.
+  { kind: 'calories', label: 'Calories', icon: 'M12 21c-4 0-7-3-7-7 0-3 2-5 3-7 1 2 2 3 3 3 0-3 1-5 3-7 2 3 5 6 5 11 0 4-3 7-7 7z' },
+  { kind: 'distance', label: 'Distance', icon: 'M12 21s-6-5.3-6-11a6 6 0 0 1 12 0c0 5.7-6 11-6 11zM12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z' },
 ];
 const RANGES = [
   { id: 'today', label: 'Today' },
@@ -69,6 +80,7 @@ const CHECK = 'M5 12l5 5 9-10';
               <strong class="body__value" data-hb-value />
               <div class="body__bar well" data-hb-bar hidden><i /></div>
               <span class="muted body__sub" data-hb-sub />
+              <button type="button" class="body__link body__allow" data-hb-allow hidden>Allow</button>
             </div>
           ))}
         </section>
@@ -97,11 +109,11 @@ const CHECK = 'M5 12l5 5 9-10';
         </p>
       </div>
 
-      <p class="muted body__note" data-hb-none hidden>Sleep, steps and activity need Health Connect, which is part of Android 14 and later.</p>
+      <p class="muted body__note" data-hb-none hidden>Sleep, steps, calories and activity need Health Connect, which is part of Android 14 and later.</p>
     </div>
   ) : (
     <p class="muted body__note">
-      Sleep, steps, exercise and resting heart rate are read from Health Connect by the Android app, and stay on the phone. See the
+      Sleep, steps, exercise, resting heart rate, calories burned and distance are read from Health Connect by the Android app, and stay on the phone. See the
       <a href={url('/privacy')}>privacy page</a>.
     </p>
   )
@@ -126,6 +138,12 @@ const CHECK = 'M5 12l5 5 9-10';
 
   const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+  // Miles where people walk in miles, kilometres everywhere else.
+  const MILES = /^en-(US|LR)|^my/i.test(navigator.language);
+  const distance = (m: number) =>
+    MILES ? `${(m / 1609.344).toFixed(m < 16_093 ? 1 : 0)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
+  const kcal = (n: number) => `${Math.round(n).toLocaleString()} kcal`;
   const numbers = (days: BodyDay[], key: BodyField) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
 
   onPage('health-body', () => {
@@ -143,8 +161,12 @@ const CHECK = 'M5 12l5 5 9-10';
     // The last read is kept so the page has numbers before Health Connect answers.
     let days = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
 
-    function tile(kind: HealthKind, value: string, sub: string, share?: number): void {
+    /** `ask`: the kinds to ask for when the tile's Allow is tapped; without it there is no Allow. */
+    function tile(kind: HealthKind, value: string, sub: string, share?: number, ask?: HealthKind[]): void {
       const box = $<HTMLElement>(`[data-hb-tile="${kind}"]`);
+      const allow = box.querySelector<HTMLElement>('[data-hb-allow]')!;
+      allow.hidden = !ask;
+      allow.dataset.kinds = ask?.join(' ') ?? '';
       box.querySelector('[data-hb-value]')!.textContent = value;
       box.querySelector('[data-hb-sub]')!.textContent = sub;
       const bar = box.querySelector<HTMLElement>('[data-hb-bar]')!;
@@ -157,7 +179,7 @@ const CHECK = 'M5 12l5 5 9-10';
       const shown = days.slice(-SPAN[range]);
       const span = range === 'week' ? 'this week' : 'this month';
       const allowed = (kind: HealthKind) => !!state?.[kind];
-      const off = (kind: HealthKind) => tile(kind, 'Off', 'Not allowed in Health Connect');
+      const off = (kind: HealthKind, ask: HealthKind[] = [kind]) => tile(kind, 'Off', 'Not allowed in Health Connect', undefined, ask);
 
       const sleep = numbers(shown, 'sleepMin');
       const before = days[days.length - 2];
@@ -188,6 +210,23 @@ const CHECK = 'M5 12l5 5 9-10';
       if (!allowed('heart')) off('heart');
       else if (!heart.length) tile('heart', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
       else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
+
+      // Total burned leads, active is the part from moving; either one alone still fills the tile.
+      const burned = numbers(shown, 'totalKcal');
+      const moving = numbers(shown, 'activeKcal');
+      const askCalories = (['calories', 'activeCalories'] as const).filter((k) => !allowed(k));
+      if (askCalories.length === 2) off('calories', [...askCalories]);
+      else if (!burned.length && !moving.length) tile('calories', today ? '0 kcal' : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
+      else if (burned.length) {
+        const activePart = moving.length ? `${kcal(today ? moving[0]! : avg(moving))} active` : allowed('activeCalories') ? 'No active calories recorded' : 'Active not allowed';
+        tile('calories', kcal(today ? burned[0]! : avg(burned)), today ? `${activePart} · so far today` : `Daily average · ${activePart}`);
+      } else tile('calories', kcal(today ? moving[0]! : avg(moving)), today ? 'Active · so far today' : 'Active · daily average');
+
+      const walked = numbers(shown, 'distanceM');
+      if (!allowed('distance')) off('distance');
+      else if (!walked.length) tile('distance', today ? distance(0) : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
+      else if (today) tile('distance', distance(walked[0]!), 'Walked, run and cycled today');
+      else tile('distance', distance(avg(walked)), `Daily average · ${distance(sum(walked))} in all`);
     }
 
     /** Allowed, yet nothing in a month: no app on the phone is handing that kind to Health Connect. */
@@ -196,6 +235,8 @@ const CHECK = 'M5 12l5 5 9-10';
         ['sleep', 'sleepMin', 'sleep'],
         ['exercise', 'activeMin', 'exercise'],
         ['heart', 'restingHr', 'resting heart rate'],
+        ['activeCalories', 'activeKcal', 'active calories'],
+        ['distance', 'distanceM', 'distance'],
       ];
       const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(days, field).length).map(([, , name]) => name);
       const hint = $<HTMLElement>('[data-hb-hint]');
@@ -273,6 +314,19 @@ const CHECK = 'M5 12l5 5 9-10';
       refused.hidden = !after || HEALTH_KINDS.some((k) => after[k]);
       await refresh();
     });
+    // Kinds added after the first connect are asked for from their own tile. Android stops asking
+    // after two refusals, so a tile refused once already opens Health Connect's own screen instead.
+    const refusedOnce = new Set<string>();
+    root.querySelectorAll<HTMLElement>('[data-hb-allow]').forEach((b) =>
+      b.addEventListener('click', async () => {
+        const kinds = (b.dataset.kinds ?? '').split(' ').filter(Boolean) as HealthKind[];
+        if (!kinds.length) return;
+        if (refusedOnce.has(b.dataset.kinds!)) return openHealthSettings();
+        const after = await healthConnect(kinds);
+        if (after && !kinds.some((k) => after[k])) refusedOnce.add(b.dataset.kinds!);
+        await refresh();
+      }),
+    );
     root.querySelectorAll('[data-hb-manage]').forEach((b) => b.addEventListener('click', openHealthSettings));
     $('[data-hb-ranges]').addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest<HTMLElement>('[data-hb-range]');
@@ -441,6 +495,23 @@ const CHECK = 'M5 12l5 5 9-10';
 
   .body__tile--heart {
     --tint: var(--cat-time);
+  }
+
+  .body__tile--calories {
+    --tint: var(--cat-rest);
+  }
+
+  .body__tile--distance {
+    --tint: var(--cat-structure);
+  }
+
+  .body__allow[hidden] {
+    display: none;
+  }
+
+  .body__allow {
+    justify-self: start;
+    min-height: 44px;
   }
 
   .body__kind {
