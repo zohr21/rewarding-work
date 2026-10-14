@@ -46,7 +46,10 @@ import java.util.List;
         @Permission(strings = { "android.permission.health.READ_SLEEP" }, alias = HealthData.SLEEP),
         @Permission(strings = { "android.permission.health.READ_STEPS" }, alias = HealthData.STEPS),
         @Permission(strings = { "android.permission.health.READ_EXERCISE" }, alias = HealthData.EXERCISE),
-        @Permission(strings = { "android.permission.health.READ_RESTING_HEART_RATE" }, alias = HealthData.HEART)
+        @Permission(strings = { "android.permission.health.READ_RESTING_HEART_RATE" }, alias = HealthData.HEART),
+        @Permission(strings = { "android.permission.health.READ_TOTAL_CALORIES_BURNED" }, alias = HealthData.CALORIES),
+        @Permission(strings = { "android.permission.health.READ_ACTIVE_CALORIES_BURNED" }, alias = HealthData.ACTIVE_CALORIES),
+        @Permission(strings = { "android.permission.health.READ_DISTANCE" }, alias = HealthData.DISTANCE)
     }
 )
 public class DevicePlugin extends Plugin {
@@ -160,7 +163,7 @@ public class DevicePlugin extends Plugin {
 
     /** Health Connect is part of Android from version 14; older phones are told it isn't there. */
     private static final boolean HEALTH = Build.VERSION.SDK_INT >= 34;
-    private static final String[] HEALTH_KINDS = { HealthData.SLEEP, HealthData.STEPS, HealthData.EXERCISE, HealthData.HEART };
+    private static final String[] HEALTH_KINDS = { HealthData.SLEEP, HealthData.STEPS, HealthData.EXERCISE, HealthData.HEART, HealthData.CALORIES, HealthData.ACTIVE_CALORIES, HealthData.DISTANCE };
     private static final int HEALTH_DAYS_MAX = 60;
 
     @PluginMethod

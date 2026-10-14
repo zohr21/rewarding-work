@@ -26,7 +26,7 @@ export interface WidgetData {
   chain: { habit: string; days: string[] } | null;
 }
 
-export const HEALTH_KINDS = ['sleep', 'steps', 'exercise', 'heart'] as const;
+export const HEALTH_KINDS = ['sleep', 'steps', 'exercise', 'heart', 'calories', 'activeCalories', 'distance'] as const;
 export type HealthKind = (typeof HEALTH_KINDS)[number];
 
 /** `available` is false before Android 14, which has no Health Connect of its own; each kind is true once allowed. */
@@ -39,6 +39,12 @@ export interface BodyDay {
   steps?: number;
   activeMin?: number;
   restingHr?: number;
+  /** Everything burned that day, resting included, in kcal. */
+  totalKcal?: number;
+  /** Burned by moving, in kcal. */
+  activeKcal?: number;
+  /** Walked, run or cycled, in metres. */
+  distanceM?: number;
 }
 
 export type BodyField = keyof Omit<BodyDay, 'day'>;
