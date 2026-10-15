@@ -1,0 +1,891 @@
+---
+/**
+ * Expenses from bank alerts, on the Budget page in the Android app (src/lib/bank.ts):
+ * setting it up, the expenses that wait to be checked, and the last alerts read with
+ * what was done with each. The reading itself runs on every page (src/scripts/bank-sync.ts).
+ */
+import { BANK_SENDERS, SENDER_MAX } from '../lib/bank';
+import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } from '../lib/budget';
+---
+
+<section class="card bk" aria-labelledby="bk-title" data-bank>
+  <div class="bk__head">
+    <div class="bk__head-text">
+      <h2 class="panel-title" id="bk-title">From your bank</h2>
+      <p class="muted bk__status" data-bk-status></p>
+    </div>
+    <div class="bk__head-actions">
+      <button type="button" class="btn btn--ghost btn--small" data-bk-history>Past SMS</button>
+      <button type="button" class="btn btn--small" data-bk-setup></button>
+    </div>
+  </div>
+
+  <ul class="bk__list" role="list" data-bk-imports></ul>
+
+  <p class="bk__warn" data-bk-access hidden>
+    <span>Android has not allowed the app to read notifications yet, so no alerts come in.</span>
+    <button type="button" class="btn btn--ghost btn--small" data-bk-open-access>Allow</button>
+  </p>
+
+  <div data-bk-review hidden>
+    <div class="bk__sub-head">
+      <h3 class="bk__sub" data-bk-review-title></h3>
+      <button type="button" class="btn btn--ghost btn--small" data-bk-drop-all>Leave all out</button>
+    </div>
+    <ul class="bk__list" role="list" data-bk-list></ul>
+  </div>
+
+  <details class="bk__log" data-bk-log-box hidden>
+    <summary>Recently read</summary>
+    <p class="muted bk__note">The last alerts the app read on this phone, and what it did with each. Kept on this phone only.</p>
+    <ul class="bk__list" role="list" data-bk-log></ul>
+  </details>
+
+  <dialog class="bk-dialog" data-bk-s-dialog aria-labelledby="bk-s-title">
+    <form method="dialog" data-bk-s-form>
+      <h2 id="bk-s-title">Expenses from bank alerts</h2>
+      <p class="muted">
+        When your bank tells you about a payment, the app reads the alert and adds the expense to Budget. It reads only alerts from
+        the apps and SMS senders you pick here. One-time codes are never kept, and the alerts stay on this phone: only the
+        expenses go to your account.
+      </p>
+
+      <fieldset class="bk-group">
+        <legend>Bank apps</legend>
+        <div class="bk-picks" data-bk-apps></div>
+        <p class="muted bk__note" data-bk-no-apps hidden>None of the bank apps it knows are on this phone.</p>
+      </fieldset>
+
+      <fieldset class="bk-group">
+        <legend>SMS from</legend>
+        <div class="bk-picks" data-bk-senders></div>
+        <div class="bk-add">
+          <label class="visually-hidden" for="bk-sender">Another sender</label>
+          <input class="input" id="bk-sender" type="text" maxlength={SENDER_MAX} autocomplete="off" placeholder="Another sender, as your SMS app shows it" data-bk-sender />
+          <button type="button" class="btn btn--ghost btn--small" data-bk-add-sender>Add</button>
+        </div>
+      </fieldset>
+
+      <label class="bk-check">
+        <input type="checkbox" data-bk-auto />
+        <span>
+          Add expenses on their own
+          <span class="muted bk__note">
+            Payments in your Budget currency go straight in, with Undo. Other currencies, transfers and anything unclear wait
+            for you to check.
+          </span>
+        </span>
+      </label>
+
+      <div class="bk-access">
+        <p><strong>Notification access:</strong> <span data-bk-s-access></span></p>
+        <p class="muted bk__note">
+          Android asks you to allow it once. If it says the setting is restricted, open App info for Rewarding Work, then ⋮ →
+          Allow restricted settings, and try again.
+        </p>
+        <button type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
+      </div>
+
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn btn--ghost bk-dialog__off" data-bk-off hidden>Turn off</button>
+        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button type="submit" class="btn" data-bk-save>Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="bk-dialog" data-bk-h-dialog aria-labelledby="bk-h-title">
+    <form method="dialog" data-bk-h-form>
+      <h2 id="bk-h-title">Past bank SMS</h2>
+      <p class="muted">
+        Reads the SMS your banks sent before and shows what it found. Nothing is added until you say so, and you can undo the
+        whole import later. Android asks once to let the app read SMS; it reads them only when you press Read.
+      </p>
+      <div class="bk-dialog__pair">
+        <label class="bk-field">
+          <span>From</span>
+          <select class="input" data-bk-h-since>
+            <option value="3">The last 3 months</option>
+            <option value="12">The last year</option>
+            <option value="36">The last 3 years</option>
+            <option value="0" selected>As far back as there are</option>
+          </select>
+        </label>
+        <div class="bk-field bk-h-read">
+          <button type="button" class="btn btn--ghost" data-bk-h-read>Read SMS</button>
+        </div>
+      </div>
+      <p class="muted bk__note" data-bk-h-senders></p>
+      <p class="bk__warn" data-bk-h-error hidden></p>
+
+      <div class="bk-h-result" data-bk-h-result hidden>
+        <ul class="bk-h-sum" role="list" data-bk-h-sum></ul>
+        <table class="bk-h-months" data-bk-h-months>
+          <thead><tr><th scope="col">Month</th><th scope="col">Expenses</th><th scope="col">Total</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <label class="bk-check" data-bk-h-review-field>
+          <input type="checkbox" data-bk-h-review />
+          <span data-bk-h-review-text></span>
+        </label>
+      </div>
+
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button type="submit" class="btn" data-bk-h-add hidden>Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="bk-dialog" data-bk-r-dialog aria-labelledby="bk-r-title">
+    <form method="dialog" data-bk-r-form>
+      <h2 id="bk-r-title">Check expense</h2>
+      <p class="bk-quote" data-bk-r-text></p>
+      <p class="bk__warn" data-bk-r-why></p>
+      <div class="bk-dialog__pair">
+        <label class="bk-field">
+          <span>Amount <span class="muted" data-bk-r-sign></span></span>
+          <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bk-r-amount />
+        </label>
+        <label class="bk-field">
+          <span>Date</span>
+          <input class="input" type="date" required data-bk-r-day />
+        </label>
+      </div>
+      <label class="bk-field">
+        <span>What</span>
+        <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" data-bk-r-what />
+      </label>
+      <fieldset class="bk-cats">
+        <legend class="visually-hidden">Category</legend>
+        {
+          CATEGORIES.map((c) => (
+            <label class="bk-cat" style={`--c: ${CATEGORY_COLORS[c]}`}>
+              <input type="radio" name="bk-r-cat" value={c} class="visually-hidden" />
+              <i aria-hidden="true" />
+              {CATEGORY_SHORT[c]}
+            </label>
+          ))
+        }
+      </fieldset>
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn btn--ghost bk-dialog__off" data-bk-r-skip>Leave out</button>
+        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button type="submit" class="btn">Add</button>
+      </div>
+    </form>
+  </dialog>
+  <p class="visually-hidden" aria-live="polite" data-bk-live></p>
+</section>
+
+<script>
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { subscribe } from '../lib/storage';
+  import { bankSmsHistory, bankState, openBankSettings, type BankState } from '../lib/device';
+  import {
+    acceptPending,
+    applyPlan,
+    BANK_APPS,
+    BANK_SENDERS,
+    dropAllPending,
+    dropPending,
+    getBank,
+    OUTCOME_LABELS,
+    planAlerts,
+    setBankSettings,
+    undoImport,
+    type Pending,
+    type Planned,
+  } from '../lib/bank';
+  import { currencyCode, currencySign, formatMoney, getBudget, type Category } from '../lib/budget';
+  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { el } from '../lib/dom';
+
+  const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
+  const time = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
+  const count = new Intl.NumberFormat();
+  /** The senders most banks here send card alerts from: the start of a first setup, and of a past import before any setup. */
+  const FIRST_SENDERS = ['Azericard', 'ABB', 'Birbank', 'KapitalBank'];
+
+  onPage('bank-import', () => {
+    const root = document.querySelector<HTMLElement>('[data-bank]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element = HTMLElement>(s: string) => root.querySelector<E>(s)!;
+    const $$ = <E extends Element = HTMLElement>(s: string) => [...root.querySelectorAll<E>(s)];
+    const sDialog = $<HTMLDialogElement>('[data-bk-s-dialog]');
+    const rDialog = $<HTMLDialogElement>('[data-bk-r-dialog]');
+    let state: BankState | null = null;
+    /** The senders shown in setup: the known ones and any you added. */
+    let senders: string[] = [];
+    let reviewing: Pending | null = null;
+
+    const appName = (pkg: string) => state?.installed.find((a) => a.pkg === pkg)?.label ?? BANK_APPS.find((a) => a.pkg === pkg)?.name ?? pkg;
+
+    async function refreshState(): Promise<void> {
+      state = await bankState(BANK_APPS.map((a) => a.pkg));
+      render();
+    }
+
+    function render(): void {
+      const store = getBank();
+      const access = state?.access ?? false;
+      const sources = [...store.apps.map(appName), ...(store.senders.length ? [`SMS from ${list(store.senders)}`] : [])];
+      $('[data-bk-status]').textContent = !store.on
+        ? 'Add expenses from the alerts your bank sends, as they come.'
+        : sources.length
+          ? `Reading ${list(sources)}. ${store.auto ? 'Adds expenses on its own.' : 'Asks before adding.'}`
+          : 'Pick a bank app or SMS sender to read alerts from.';
+      $('[data-bk-setup]').textContent = store.on ? 'Settings' : 'Set up';
+      $('[data-bk-access]').hidden = !store.on || access || state === null;
+
+      const review = $('[data-bk-review]');
+      review.hidden = !store.pending.length;
+      $('[data-bk-review-title]').textContent = `To check (${store.pending.length})`;
+      const rows = $('[data-bk-list]');
+      rows.replaceChildren(
+        ...store.pending.map((p) => {
+          const li = el('li', 'bk__row');
+          const main = el('span', 'bk__row-main');
+          const why = p.why === 'currency' ? `in ${p.currency}` : p.why === 'transfer' ? 'a transfer?' : 'money out?';
+          main.append(el('strong', '', p.what), el('span', 'muted', `${p.from} · ${formatDay(fromDayKey(p.day))} · ${why}`));
+          const btn = el('button', 'btn btn--ghost btn--small', 'Check');
+          btn.type = 'button';
+          btn.setAttribute('aria-label', `Check ${p.what}`);
+          btn.addEventListener('click', () => openReview(p));
+          li.append(main, el('span', 'bk__amount', moneyOf(p)), btn);
+          return li;
+        }),
+      );
+
+      $('[data-bk-drop-all]').hidden = store.pending.length < 3;
+      $('[data-bk-imports]').replaceChildren(
+        ...store.imports.map((b) => {
+          const li = el('li', 'bk__row');
+          const main = el('span', 'bk__row-main');
+          const parts = [b.ids.length ? `${count.format(b.ids.length)} expenses added` : '', b.pendingIds.length ? `${count.format(b.pendingIds.length)} to check` : ''];
+          main.append(el('strong', '', 'Past SMS imported'), el('span', 'muted', `${time.format(b.at)} · ${parts.filter(Boolean).join(', ')}`));
+          const btn = el('button', 'btn btn--ghost btn--small', 'Undo');
+          btn.type = 'button';
+          btn.setAttribute('aria-label', `Undo the import of ${time.format(b.at)}`);
+          btn.addEventListener('click', () => undoImport(b.id));
+          li.append(main, btn);
+          return li;
+        }),
+      );
+
+      const box = $<HTMLDetailsElement>('[data-bk-log-box]');
+      box.hidden = !store.on || !store.log.length;
+      $('[data-bk-log]').replaceChildren(
+        ...store.log.map((l) => {
+          const li = el('li', 'bk__log-row');
+          li.append(el('span', 'bk__log-meta', `${time.format(l.at)} · ${l.from} · ${OUTCOME_LABELS[l.outcome]}`), el('span', 'muted bk__log-text', l.text));
+          return li;
+        }),
+      );
+    }
+
+    /** As the alert said it: in Budget's way when it's the Budget currency, else with its own code. */
+    function moneyOf(p: Pending): string {
+      const budget = getBudget().currency;
+      return p.currency === currencyCode(budget) ? formatMoney(p.amount, budget) : formatMoney(p.amount, p.currency);
+    }
+
+    // ---- Setup ----
+
+    function pick(container: HTMLElement, items: { value: string; label: string; checked: boolean }[]): void {
+      container.replaceChildren(
+        ...items.map((item) => {
+          const label = el('label', 'bk-pick');
+          const box = el('input');
+          box.type = 'checkbox';
+          box.value = item.value;
+          box.checked = item.checked;
+          label.append(box, el('span', '', item.label));
+          return label;
+        }),
+      );
+    }
+
+    const checked = (sel: string) => $$<HTMLInputElement>(`${sel} input:checked`).map((b) => b.value);
+
+    function openSetup(): void {
+      const store = getBank();
+      const fresh = !store.on && !store.apps.length && !store.senders.length;
+      const installed = state?.installed ?? [];
+      // A first setup starts with every bank app on the phone, and the senders most banks here use.
+      pick(
+        $('[data-bk-apps]'),
+        installed.map((a) => ({ value: a.pkg, label: appName(a.pkg), checked: fresh || store.apps.includes(a.pkg) })),
+      );
+      $('[data-bk-no-apps]').hidden = installed.length > 0;
+      senders = [...new Set([...BANK_SENDERS, ...store.senders])];
+      const chosen = fresh ? ['Azericard', 'ABB', 'Birbank', 'KapitalBank'] : store.senders;
+      pick(
+        $('[data-bk-senders]'),
+        senders.map((s) => ({ value: s, label: s, checked: chosen.includes(s) })),
+      );
+      $<HTMLInputElement>('[data-bk-auto]').checked = store.auto;
+      $('[data-bk-off]').hidden = !store.on;
+      $('[data-bk-s-access]').textContent = state?.access ? 'On' : 'Off';
+      sDialog.showModal();
+    }
+
+    $('[data-bk-setup]').addEventListener('click', openSetup);
+    $('[data-bk-add-sender]').addEventListener('click', () => {
+      const input = $<HTMLInputElement>('[data-bk-sender]');
+      const name = input.value.trim();
+      if (!name) return;
+      const keep = checked('[data-bk-senders]');
+      if (!senders.some((s) => s.toLowerCase() === name.toLowerCase())) senders.push(name);
+      pick(
+        $('[data-bk-senders]'),
+        senders.map((s) => ({ value: s, label: s, checked: keep.includes(s) || s === name })),
+      );
+      input.value = '';
+    });
+    $<HTMLFormElement>('[data-bk-s-form]').addEventListener('submit', () => {
+      setBankSettings({ on: true, apps: checked('[data-bk-apps]'), senders: checked('[data-bk-senders]'), auto: $<HTMLInputElement>('[data-bk-auto]').checked });
+      // Reading needs Android's say-so; ask right after the first save.
+      if (!state?.access) openBankSettings();
+    });
+    $('[data-bk-off]').addEventListener('click', () => {
+      setBankSettings({ on: false });
+      sDialog.close();
+      // The app stops keeping alerts at once; this is where you also take the access back.
+      if (state?.access) openBankSettings();
+    });
+    for (const btn of [$('[data-bk-open-access]'), $('[data-bk-s-open-access]')]) btn.addEventListener('click', () => openBankSettings());
+
+    // ---- Past SMS ----
+
+    const hDialog = $<HTMLDialogElement>('[data-bk-h-dialog]');
+    const hAdd = $<HTMLButtonElement>('[data-bk-h-add]');
+    const hReview = $<HTMLInputElement>('[data-bk-h-review]');
+    let plan: Planned[] = [];
+
+    const historySenders = () => {
+      const store = getBank();
+      return store.senders.length ? store.senders : FIRST_SENDERS;
+    };
+
+    function openHistory(): void {
+      plan = [];
+      $('[data-bk-h-result]').hidden = true;
+      $('[data-bk-h-error]').hidden = true;
+      $('[data-bk-h-senders]').textContent = `From ${list(historySenders())}. Change who in Settings.`;
+      hAdd.hidden = true;
+      hDialog.showModal();
+    }
+
+    async function readHistory(): Promise<void> {
+      const months = Number($<HTMLSelectElement>('[data-bk-h-since]').value);
+      const since = months ? new Date(new Date().getFullYear(), new Date().getMonth() - months, 1).getTime() : 0;
+      const btn = $<HTMLButtonElement>('[data-bk-h-read]');
+      const error = $('[data-bk-h-error]');
+      btn.disabled = true;
+      btn.textContent = 'Reading…';
+      error.hidden = true;
+      try {
+        const items = await bankSmsHistory(historySenders(), since);
+        plan = planAlerts(items ?? []);
+        showPlan();
+      } catch (e) {
+        error.textContent =
+          (e as { code?: string }).code === 'sms/denied'
+            ? 'Android did not let the app read SMS. If it no longer asks, allow SMS for Rewarding Work in App info → Permissions.'
+            : 'The SMS could not be read.';
+        error.hidden = false;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Read SMS again';
+      }
+    }
+
+    function showPlan(): void {
+      const sign = getBudget().currency;
+      const by = (o: Planned['outcome']) => plan.filter((p) => p.outcome === o);
+      const adds = by('added');
+      const checks = by('review');
+      const total = adds.reduce((sum, p) => sum + p.pending!.amount, 0);
+      const days = adds.map((p) => p.pending!.day).sort();
+      const span = days.length ? `${monthFmt.format(fromDayKey(days[0]!))} – ${monthFmt.format(fromDayKey(days.at(-1)!))}` : '';
+      const transfers = checks.filter((p) => p.pending!.why === 'transfer').length;
+      const foreign = checks.filter((p) => p.pending!.why === 'currency').length;
+      const lines: [string, string][] = [
+        [`${count.format(adds.length)} expenses to add`, adds.length ? `${formatMoney(Math.round(total), sign, 0)} · ${span}` : ''],
+        [`${count.format(checks.length)} to check yourself`, [transfers ? `${transfers} look like transfers or cash` : '', foreign ? `${foreign} in other currencies` : ''].filter(Boolean).join(', ')],
+        [`${count.format(by('already').length + by('duplicate').length + by('known').length)} already in Budget`, 'typed in by you, imported before, or told twice'],
+        [
+          `${count.format(by('income').length + by('declined').length + by('not-money').length)} left out`,
+          `${by('income').length} money in, ${by('declined').length} declined, ${by('not-money').length} not a payment`,
+        ],
+      ];
+      $('[data-bk-h-sum]').replaceChildren(
+        ...lines.map(([head, sub]) => {
+          const li = el('li');
+          li.append(el('strong', '', head), el('span', 'muted', sub));
+          return li;
+        }),
+      );
+      const months = new Map<string, { n: number; sum: number }>();
+      for (const p of adds) {
+        const m = p.pending!.day.slice(0, 7);
+        const row = months.get(m) ?? { n: 0, sum: 0 };
+        months.set(m, { n: row.n + 1, sum: row.sum + p.pending!.amount });
+      }
+      const table = $<HTMLTableElement>('[data-bk-h-months]');
+      table.hidden = !months.size;
+      table.tBodies[0]!.replaceChildren(
+        ...[...months]
+          .sort((a, b) => b[0].localeCompare(a[0]))
+          .map(([m, row]) => {
+            const tr = el('tr');
+            tr.append(el('td', '', monthFmt.format(fromDayKey(`${m}-01`))), el('td', '', count.format(row.n)), el('td', '', formatMoney(Math.round(row.sum), sign, 0)));
+            return tr;
+          }),
+      );
+      $('[data-bk-h-review-field]').hidden = !checks.length;
+      hReview.checked = checks.length > 0 && checks.length <= 30;
+      $('[data-bk-h-review-text]').textContent = `Put the ${count.format(checks.length)} to check in To check`;
+      $('[data-bk-h-result]').hidden = false;
+      updateAdd();
+    }
+
+    function updateAdd(): void {
+      const adds = plan.filter((p) => p.outcome === 'added').length;
+      const checks = hReview.checked ? plan.filter((p) => p.outcome === 'review').length : 0;
+      hAdd.hidden = false;
+      hAdd.disabled = !adds && !checks;
+      hAdd.textContent = adds ? `Add ${count.format(adds)} expenses` : checks ? 'Put in To check' : 'Nothing to add';
+    }
+
+    $('[data-bk-history]').addEventListener('click', openHistory);
+    $('[data-bk-h-read]').addEventListener('click', () => void readHistory());
+    hReview.addEventListener('change', updateAdd);
+    $<HTMLFormElement>('[data-bk-h-form]').addEventListener('submit', () => {
+      const done = applyPlan(plan, { add: true, review: hReview.checked, log: false, batch: true });
+      plan = [];
+      $('[data-bk-live]').textContent = `Added ${done.added.length} past expenses${done.review ? `, ${done.review} to check` : ''}.`;
+    });
+    $('[data-bk-drop-all]').addEventListener('click', () => dropAllPending());
+
+    // ---- Review ----
+
+    const rAmount = $<HTMLInputElement>('[data-bk-r-amount]');
+    const rWhat = $<HTMLInputElement>('[data-bk-r-what]');
+    const rDay = $<HTMLInputElement>('[data-bk-r-day]');
+
+    function openReview(p: Pending): void {
+      reviewing = p;
+      const budget = getBudget().currency;
+      const foreign = p.currency !== currencyCode(budget);
+      $('[data-bk-r-text]').textContent = p.text;
+      $('[data-bk-r-why]').textContent =
+        p.why === 'currency'
+          ? `This was paid in ${p.currency} (${formatMoney(p.amount, p.currency)}). Type what it cost in your Budget currency, from your bank app.`
+          : p.why === 'transfer'
+            ? 'This looks like money moved to your own account or wallet, or cash taken out. Add it only if it was spending.'
+            : 'The alert does not say whether money went out. Add it only if it did.';
+      $('[data-bk-r-sign]').textContent = `(${currencySign(budget)})`;
+      rAmount.value = foreign ? '' : String(p.amount);
+      rWhat.value = p.what;
+      rDay.value = p.day;
+      rDay.max = dayKey(new Date());
+      for (const r of $$<HTMLInputElement>('input[name="bk-r-cat"]')) r.checked = r.value === p.category;
+      rDialog.showModal();
+      if (foreign) rAmount.focus();
+    }
+
+    $<HTMLFormElement>('[data-bk-r-form]').addEventListener('submit', () => {
+      if (!reviewing) return;
+      const category = ($$<HTMLInputElement>('input[name="bk-r-cat"]:checked')[0]?.value ?? reviewing.category) as Category;
+      acceptPending(reviewing.id, { what: rWhat.value, category, amount: Number(rAmount.value), day: rDay.value });
+      reviewing = null;
+    });
+    $('[data-bk-r-skip]').addEventListener('click', () => {
+      if (reviewing) dropPending(reviewing.id);
+      reviewing = null;
+      rDialog.close();
+    });
+
+    for (const btn of $$<HTMLButtonElement>('[data-bk-cancel]')) btn.addEventListener('click', () => btn.closest('dialog')?.close());
+
+    render();
+    void refreshState();
+    c.add(subscribe('bank', render));
+    c.add(subscribe('health', render));
+    // Back from Android's settings: access may have changed.
+    c.add(listen(document, 'visibilitychange', () => document.visibilityState === 'visible' && void refreshState()));
+    return c.run;
+  });
+</script>
+
+<style>
+  .bk {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bk [hidden] {
+    display: none !important;
+  }
+
+  .bk__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .bk__head .panel-title {
+    margin: 0;
+  }
+
+  .bk__head-actions {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .bk__sub-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .bk__sub-head .bk__sub {
+    margin: 0;
+  }
+
+  .bk__list:empty {
+    display: none;
+  }
+
+  .bk__status,
+  .bk__note {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bk__warn {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+  }
+
+  .bk__sub {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .bk__list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bk :global(.bk__row) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 56px;
+  }
+
+  .bk :global(.bk__row-main) {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bk :global(.bk__row-main > *) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bk :global(.bk__row-main .muted) {
+    font-size: var(--text-xs);
+  }
+
+  .bk :global(.bk__amount) {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .bk__log summary {
+    min-height: 44px;
+    align-content: center;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .bk__log .bk__note {
+    margin-bottom: var(--space-3);
+  }
+
+  .bk :global(.bk__log-row) {
+    display: grid;
+    gap: 2px;
+    padding-block: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bk :global(.bk__log-meta) {
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  .bk :global(.bk__log-text) {
+    font-size: var(--text-xs);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Dialogs, as Budget's ---- */
+  .bk-dialog {
+    inline-size: min(100% - 2 * var(--space-4), 30rem);
+    max-block-size: calc(100dvh - 2 * var(--space-4));
+    margin: auto;
+    padding: var(--space-5);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-lg);
+    background: var(--popover-bg);
+    color: var(--color-text);
+    box-shadow: var(--popover-shadow);
+  }
+
+  :global(html[data-app]) .bk-dialog {
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    margin: 0;
+    padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border-width: 1px 0 0;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .bk-dialog::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .bk-dialog form {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bk-dialog h2 {
+    font-size: var(--text-lg);
+  }
+
+  .bk-dialog p {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bk-group {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bk-group legend {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bk-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .bk :global(.bk-pick) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .bk :global(.bk-pick input),
+  .bk-check input {
+    inline-size: 18px;
+    block-size: 18px;
+    accent-color: var(--color-accent);
+  }
+
+  .bk-add {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .bk-add .input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .bk-check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .bk-check > span {
+    display: grid;
+    gap: 2px;
+  }
+
+  .bk-access {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-2);
+  }
+
+  .bk-quote {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-xs) !important;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  .bk-h-read {
+    align-content: end;
+  }
+
+  .bk-h-result {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bk-h-sum {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bk :global(.bk-h-sum li) {
+    display: grid;
+    font-size: var(--text-sm);
+  }
+
+  .bk :global(.bk-h-sum .muted) {
+    font-size: var(--text-xs);
+  }
+
+  .bk-h-months {
+    display: block;
+    max-block-size: 14rem;
+    overflow-y: auto;
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bk-h-months th {
+    position: sticky;
+    top: 0;
+    background: var(--popover-bg);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-align: start;
+  }
+
+  .bk-h-months :is(th, td) {
+    padding: var(--space-1) var(--space-4) var(--space-1) 0;
+  }
+
+  .bk-field {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  .bk-dialog__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .bk-cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bk-cat {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .bk-cat i {
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 3px;
+    background: var(--c);
+  }
+
+  .bk-cat:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--c);
+  }
+
+  .bk-cat:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus, var(--color-accent));
+    outline-offset: 2px;
+  }
+
+  .bk-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .bk-dialog__off {
+    margin-inline-end: auto;
+    color: var(--color-danger);
+  }
+
+  :global(html[data-app]) .bk-dialog__actions .btn {
+    flex: 1;
+    min-height: 52px;
+  }
+</style>

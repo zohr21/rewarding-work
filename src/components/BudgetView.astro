@@ -260,6 +260,7 @@ const icon = (d: string, w = 2) =>
     type SpendEntry,
     type WellbeingKind,
   } from '../lib/budget';
+  import { learnCategory } from '../lib/bank';
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
@@ -383,7 +384,9 @@ const icon = (d: string, w = 2) =>
       const dot = el('i', 'bv__dot');
       dot.style.background = CATEGORY_COLORS[entry.category];
       const main = el('span', 'bv__entry-main');
-      const sub = [CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : ''].filter(Boolean).join(' · ');
+      const sub = [CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : '', entry.from ? `from ${entry.from}` : '']
+        .filter(Boolean)
+        .join(' · ');
       main.append(el('strong', '', entry.what), el('span', 'muted', sub));
       const edit = el('button', 'icon-btn');
       edit.type = 'button';
@@ -701,6 +704,8 @@ const icon = (d: string, w = 2) =>
       };
       const sign = getBudget().currency;
       if (editing) {
+        // A bank alert put it in the wrong category: payments there go to the new one from now on.
+        if (editing.from && editing.category !== input.category) learnCategory(editing.what, input.category);
         const entry = changeSpend(editing.id, input);
         if (entry) announce(`Changed ${entry.what}, ${formatMoney(entry.amount, sign)}`);
       } else if (xRepeat.checked) {

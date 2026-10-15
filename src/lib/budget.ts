@@ -70,6 +70,8 @@ export interface SpendEntry {
   createdAt: number;
   /** Set on entries a repeat added. */
   repeatId?: string;
+  /** Set on entries read from a bank alert: the bank's name (src/lib/bank.ts). */
+  from?: string;
   /**
    * Set when the entry was removed: a marker (what and amount stripped) that stays in
    * the store so the removal reaches other devices instead of the entry coming back.
@@ -143,6 +145,7 @@ function readEntry(v: unknown, legacy: boolean): SpendEntry | null {
   const entry: SpendEntry = { id: e.id, day: e.day, what: e.what, category, amount: e.amount as number, createdAt: e.createdAt };
   if (kind) entry.kind = kind;
   if (typeof e.repeatId === 'string') entry.repeatId = e.repeatId;
+  if (typeof e.from === 'string' && e.from) entry.from = e.from.slice(0, WHAT_MAX);
   if (removed) entry.deletedAt = e.deletedAt as number;
   return entry;
 }
@@ -258,6 +261,55 @@ export function addSpend(input: SpendInput): SpendEntry | null {
   const store = getStore();
   writeStore({ ...store, entries: [entry, ...store.entries] });
   return entry;
+}
+
+/**
+ * Expenses read from bank alerts, in one write, each with an id made from its alert, so the
+ * same alert never adds twice (not even after it was removed: the removal marker keeps the id).
+ */
+export function importSpends(items: { input: SpendInput; id: string; from: string }[]): SpendEntry[] {
+  const store = getStore();
+  const known = new Set(store.entries.map((e) => e.id));
+  const added: SpendEntry[] = [];
+  for (const { input, id, from } of items) {
+    if (known.has(id)) continue;
+    const entry = makeEntry(input, id);
+    if (!entry) continue;
+    entry.from = from.slice(0, WHAT_MAX);
+    known.add(id);
+    added.push(entry);
+  }
+  if (added.length) writeStore({ ...store, entries: [...added, ...store.entries] });
+  return added;
+}
+
+export const importSpend = (input: SpendInput, id: string, from: string): SpendEntry | null => importSpends([{ input, id, from }])[0] ?? null;
+
+/**
+ * Gives entries a new name, in one write. Like any change, each old entry is removed and a
+ * copy added under a new id (`<id>-r`), so the change reaches other devices.
+ */
+export function renameSpends(changes: { id: string; what: string }[]): number {
+  const names = new Map(changes.map((c) => [c.id, c.what.trim().slice(0, WHAT_MAX)]));
+  const store = getStore();
+  const now = Date.now();
+  const copies: SpendEntry[] = [];
+  const entries = store.entries.map((e) => {
+    const what = names.get(e.id);
+    if (!what || e.deletedAt !== undefined) return e;
+    copies.push({ ...e, id: `${e.id}-r`, what, createdAt: now });
+    return marker(e, now);
+  });
+  if (copies.length) writeStore({ ...store, entries: [...copies, ...entries] });
+  return copies.length;
+}
+
+/** Removes many at once (undoing an import), in one write. */
+export function removeSpends(ids: string[]): void {
+  const gone = new Set(ids);
+  const store = getStore();
+  const now = Date.now();
+  writeStore({ ...store, entries: store.entries.map((e) => (gone.has(e.id) && e.deletedAt === undefined ? marker(e, now) : e)) });
 }
 
 /**

@@ -29,15 +29,16 @@ export type StoreName =
   | 'sound'
   | 'health' // Budget: spend, budgets and repeats (src/lib/budget.ts); named for where it began
   | 'body' // the last read from Health Connect, in the Android app (HealthBody.astro)
+  | 'bank' // bank alerts read from notifications in the Android app: settings and what waits for review (src/lib/bank.ts)
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
  * The live timer and sound settings stay per device, and so does what the Android app
- * reads from Health Connect (`body`). Each name must also be allowed in firestore.rules. `breakdown` stays listed only so
+ * reads from Health Connect (`body`) and the bank alerts it reads (`bank`; the expenses they add are in `health`). Each name must also be allowed in firestore.rules. `breakdown` stays listed only so
  * its removal (after moving into `tasks`) reaches the account too.
  */
 export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
@@ -175,14 +176,28 @@ export function write<T>(name: StoreName, value: T): boolean {
     return false;
   }
   const ok = setRaw(storageKey(name), json);
+  markUnsent(name);
   notifyLocal(name);
   notifyWrite(name);
   return ok;
 }
 
+/**
+ * A change to a synced store, made while signed in on this device, is marked unsent at once.
+ * Account sync does this too once it runs, but a write before it starts (bank alerts and
+ * repeating bills taken in as the app opens) would otherwise look unchanged, and the
+ * account's older copy would replace it.
+ */
+function markUnsent(name: StoreName): void {
+  if (!isSyncedStore(name)) return;
+  const meta = getSyncMeta();
+  if (meta.uid && meta.active && !meta.dirty.includes(name)) setSyncMeta({ ...meta, dirty: [...meta.dirty, name] });
+}
+
 export function remove(name: StoreName): void {
   ensureMigrated();
   removeRaw(storageKey(name));
+  markUnsent(name);
   notifyLocal(name);
   notifyWrite(name);
 }

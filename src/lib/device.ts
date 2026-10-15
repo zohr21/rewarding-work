@@ -49,7 +49,40 @@ export interface BodyDay {
 
 export type BodyField = keyof Omit<BodyDay, 'day'>;
 
+/** A notification from a bank app or bank SMS, as the phone kept it (BankInbox.java). */
+export interface BankNotice {
+  id: string;
+  /** The app that posted it: the bank's app, or the SMS app. */
+  pkg: string;
+  app: string;
+  /** True when it is an SMS; `title` is then the sender. */
+  sms: boolean;
+  title: string;
+  text: string;
+  /** When it was posted, epoch ms. */
+  at: number;
+}
+
+/** `access`: Notification access is on for the app. `installed`: the apps asked about that are on the phone. */
+export interface BankState {
+  access: boolean;
+  installed: { pkg: string; label: string }[];
+}
+
+export interface BankSources {
+  apps: string[];
+  sms: string[];
+  senders: string[];
+}
+
 interface DevicePlugin {
+  bankState(options: { packages: string[] }): Promise<BankState>;
+  bankSettings(): Promise<void>;
+  bankSources(options: BankSources): Promise<void>;
+  bankPending(): Promise<{ items: BankNotice[] }>;
+  bankSmsHistory(options: { senders: string[]; since: number }): Promise<{ items: BankNotice[] }>;
+  bankAck(options: { ids: string[] }): Promise<void>;
+  addListener(event: 'bankNotice', fn: (notice: BankNotice) => void): Promise<{ remove: () => Promise<void> }>;
   healthState(): Promise<HealthState>;
   healthConnect(options: { kinds: HealthKind[] }): Promise<HealthState>;
   healthRead(options: { days: number }): Promise<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> }>;
@@ -103,4 +136,34 @@ export const takeRoute = () => call<string | null>(async (p) => (await p.takeRou
 export async function googleIdToken(clientId: string): Promise<string> {
   if (!plugin) throw Object.assign(new Error('No native side.'), { code: 'google/unavailable' });
   return (await (await plugin).device.googleSignIn({ clientId })).idToken;
+}
+
+/** null where there is no native side to ask. */
+export const bankState = (packages: string[]) => call<BankState | null>((p) => p.bankState({ packages }), null);
+export const openBankSettings = () => void call((p) => p.bankSettings(), undefined);
+export const setBankSources = (sources: BankSources) => call((p) => p.bankSources(sources), undefined);
+export const bankPending = () => call<BankNotice[]>(async (p) => (await p.bankPending()).items, []);
+/**
+ * Past SMS from the bank senders since `since`, oldest first. Asks for SMS access the first time.
+ * Throws with code `sms/denied` when it is refused, so the page can say so; null where there is no native side.
+ */
+export async function bankSmsHistory(senders: string[], since: number): Promise<BankNotice[] | null> {
+  if (!plugin) return null;
+  return (await (await plugin).device.bankSmsHistory({ senders, since })).items;
+}
+export const bankAck = (ids: string[]) => call((p) => p.bankAck({ ids }), undefined);
+
+/** Calls `fn` with each alert as it comes while the app is open. Returns the way to stop. */
+export function onBankNotice(fn: (notice: BankNotice) => void): () => void {
+  let stop: (() => void) | null = null;
+  let stopped = false;
+  void call(async (p) => {
+    const handle = await p.addListener('bankNotice', fn);
+    if (stopped) void handle.remove();
+    else stop = () => void handle.remove();
+  }, undefined);
+  return () => {
+    stopped = true;
+    stop?.();
+  };
 }
