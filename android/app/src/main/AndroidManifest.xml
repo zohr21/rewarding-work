@@ -39,6 +39,17 @@
         <!-- A timer phase ended while the app was in the background (TimerNotices.java). -->
         <receiver android:name=".TimerAlarmReceiver" android:exported="false" />
 
+        <!-- Bank alerts from notifications, once you allow Notification access (BankListener.java). -->
+        <service
+            android:name=".BankListener"
+            android:label="@string/bank_listener_name"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Home-screen widgets (Widgets.java). -->
         <receiver android:name=".FirstUpWidget" android:label="@string/widget_first_up_name" android:exported="false">
             <intent-filter>
@@ -64,9 +75,24 @@
         </provider>
     </application>
 
+    <!-- The bank apps the Budget page offers to read alerts from (src/lib/bank.ts, BANK_APPS), and the SMS apps: only to tell which are installed. -->
+    <queries>
+        <package android:name="iba.mobilbank" />
+        <package android:name="az.kapitalbank.mbanking" />
+        <package android:name="az.unibank.mbanking" />
+        <package android:name="com.rabitabank" />
+        <package android:name="com.ftfarm.leo" />
+        <package android:name="com.m10" />
+        <package android:name="com.paypal.android.p2pmobile" />
+        <package android:name="com.samsung.android.messaging" />
+        <package android:name="com.google.android.apps.messaging" />
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Importing past bank SMS into Budget, once, when you ask for it (DevicePlugin.bankSmsHistory). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
     <!-- The timer's notifications, and telling you on time that a session ended. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

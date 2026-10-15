@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import BudgetView from '../components/BudgetView.astro';
+import BankImport from '../components/BankImport.astro';
+import { NATIVE_APP } from '../config/app';
 ---
 
 <BaseLayout title="Budget" description="What you spend, against a monthly budget: what is left, your pace, and where it goes.">
@@ -10,6 +12,7 @@ import BudgetView from '../components/BudgetView.astro';
       <p>What is left this month, whether you are on pace, and where it goes.</p>
     </header>
 
+    {NATIVE_APP && <BankImport />}
     <BudgetView />
     <p class="muted budget__note">
       Your expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
@@ -22,5 +25,9 @@ import BudgetView from '../components/BudgetView.astro';
   .budget__note {
     margin-top: var(--space-5);
     font-size: var(--text-sm);
+  }
+
+  .container > :global(.bk) {
+    margin-bottom: var(--space-5);
   }
 </style>

@@ -11,6 +11,9 @@
     <string name="channel_alerts">Session ended</string>
     <string name="channel_alerts_about">Tells you when a focus session or break is over.</string>
 
+    <!-- How the bank-alert reader appears in Notification access. -->
+    <string name="bank_listener_name">Bank alerts for Budget</string>
+
     <!-- Home-screen widgets. -->
     <string name="widget_first_up_name">First up</string>
     <string name="widget_first_up_about">Your first task for today, with a button to start focusing on it.</string>
