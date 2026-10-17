@@ -83,7 +83,11 @@ const TABS = [
   </details>
   <p class="muted tasks__hint" data-tl-view-empty hidden></p>
   <div class="tasks__examples" data-tl-examples hidden>
-    <p class="muted">Tap one to put it on Today, or type your own above.</p>
+    <svg class="tasks__examples-icon" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
+      <path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+    <h3 class="tasks__examples-title">Plan today with 1 to 3 tasks</h3>
+    <p class="muted">Put the one you'd most like to avoid first. Tap one to add it:</p>
     <div class="tasks__example-list">
       {EXAMPLES.map((text) => <button type="button" class="tasks__example" data-tl-example>{text}</button>)}
     </div>
@@ -442,8 +446,9 @@ const TABS = [
         todayHint.textContent = today.length
           ? `That's ${today.length} for today. A short list is easier to finish — consider moving some to Next.`
           : "Plan today with 1 to 3 tasks. Put the one you'd most like to avoid first.";
-        // Someone with no tasks at all gets a few to start from.
+        // Someone with no tasks at all gets a few to start from, in place of the hint.
         examples.hidden = tasks.length > 0;
+        if (!examples.hidden) todayHint.hidden = true;
         const carried = today.filter((t) => isCarriedOver(t));
         carry.hidden = carried.length === 0;
         carryText.textContent = `${carried.length === 1 ? '1 task was' : `${carried.length} tasks were`} planned for an earlier day. Still for today?`;
@@ -794,10 +799,36 @@ const TABS = [
 
   /* The Android app: the lists sit on the page itself, with no card around them. */
   :global(html[data-app]) .tasks[data-view] {
+    display: flex;
+    flex-direction: column;
     padding: 0 0 var(--space-5);
     background: none;
     border: 0;
     box-shadow: none;
+  }
+
+  /* Adding comes first; the lists are underlined tabs below it, so the page has one row of pills (Focus's) and not two. */
+  :global(html[data-app]) .tasks[data-view] .tasks__form {
+    order: -2;
+    margin-bottom: var(--space-3);
+  }
+
+  :global(html[data-app]) .tasks[data-view] .tasks__tabs {
+    order: -1;
+    gap: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  :global(html[data-app]) .tasks[data-view] .tasks__tabs button {
+    padding: 0 2px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+  }
+
+  :global(html[data-app]) .tasks[data-view] .tasks__tabs button[aria-pressed='true'] {
+    background: none;
+    border-bottom-color: var(--color-accent);
   }
 
   .tasks__tabs {
@@ -907,8 +938,19 @@ const TABS = [
 
   .tasks__examples {
     display: grid;
+    justify-items: center;
     gap: var(--space-2);
+    padding-block: var(--space-5) var(--space-3);
+    text-align: center;
     font-size: var(--text-sm);
+  }
+
+  .tasks__examples-icon {
+    color: var(--color-accent);
+  }
+
+  .tasks__examples-title {
+    font-size: var(--text-base);
   }
 
   .tasks__examples[hidden] {
@@ -918,7 +960,9 @@ const TABS = [
   .tasks__example-list {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: var(--space-2);
+    margin-top: var(--space-2);
   }
 
   .tasks__example {

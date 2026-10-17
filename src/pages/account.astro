@@ -13,7 +13,7 @@ import { MODULES } from '../config/site';
 import pkg from '../../package.json';
 ---
 
-<BaseLayout title="Account" description="Your account, your data and how the site looks. Signing in is optional.">
+<BaseLayout title={NATIVE_APP ? 'You' : 'Account'} description="Your account, your data and how the site looks. Signing in is optional.">
   <div class="container account" data-account-page>
     <header class="page-header account__head">
       <div>

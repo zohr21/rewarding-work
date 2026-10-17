@@ -399,14 +399,14 @@ import { url } from '../lib/paths';
     list-style: none;
   }
 
-  .today__start-list li {
+  .today__start-list :global(li) {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     min-height: 36px;
   }
 
-  .today__start-list li.is-done {
+  .today__start-list :global(li.is-done) {
     color: var(--color-text-muted);
     text-decoration: line-through;
   }
@@ -421,7 +421,7 @@ import { url } from '../lib/paths';
     border-radius: 50%;
   }
 
-  .today__start-list li.is-done :global(.today__check) {
+  .today__start-list :global(li.is-done .today__check) {
     border-color: var(--color-accent);
     background: var(--color-accent);
     color: var(--color-on-accent);

@@ -42,7 +42,7 @@ import { url } from '../lib/paths';
         <ChainTracker />
       </div>
       <p class="muted progress__data">
-        Back up, move or delete your data under <a href={`${url('/account')}#acc-data`}>Account → Your data</a>.
+        Back up, move or delete your data under <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
       </p>
     </div>
   </div>

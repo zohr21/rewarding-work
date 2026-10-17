@@ -28,7 +28,8 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1>Focus timer</h1>
+      {/* In the app the Timer tab already names the screen. */}
+      <h1 class:list={{ 'visually-hidden': NATIVE_APP }}>Focus timer</h1>
       {/* The Android app keeps the top of the screen for the timer itself. */}
       {!NATIVE_APP && <p>Pick a rhythm, name your task if you like, and start.</p>}
     </header>
