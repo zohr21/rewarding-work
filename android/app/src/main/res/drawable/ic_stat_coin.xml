@@ -1,20 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Status-bar icon: the brand's coin and check, in one colour as the system requires. -->
+<!-- Status-bar icon: the Grovyn mark's three trees, in one colour as the system requires. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:viewportWidth="64"
+    android:viewportHeight="64">
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2"
-        android:pathData="M12,12m-9,0a9,9 0,1 1,18 0a9,9 0,1 1,-18 0" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16,28.5a6.5,6.5 0,1 1,0 13a6.5,6.5 0,1 1,0 -13zM14,38h4v14a2,2 0,0 1,-4 0z" />
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2.4"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M8,12.3l2.8,2.8l5.2,-5.8" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32,16a9,9 0,1 1,0 18a9,9 0,1 1,0 -18zM30,30h4v22a2,2 0,0 1,-4 0z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M48,9.5a7.5,7.5 0,1 1,0 15a7.5,7.5 0,1 1,0 -15zM46,23h4v29a2,2 0,0 1,-4 0z" />
 </vector>

@@ -1,0 +1,41 @@
+---
+/**
+ * The Grovyn mark: three trees of rising height (a grove, and a growth chart) with one
+ * sunlit leaf on the tallest. The trees follow the theme's accent; the leaf is the gold
+ * tier colour, kept for rewards. The same shapes are drawn in public/favicon.svg and
+ * scripts/make-icons.mjs.
+ */
+interface Props {
+  /** Width and height in px. */
+  size?: number;
+  class?: string;
+}
+
+const { size = 36, class: className } = Astro.props;
+---
+
+<svg class:list={['brand-mark', className]} viewBox="0 0 64 64" width={size} height={size} aria-hidden="true">
+  <g class="brand-mark__trees">
+    <rect x="14" y="38" width="4" height="16" rx="2"></rect>
+    <circle cx="16" cy="35" r="6.5"></circle>
+    <rect x="30" y="30" width="4" height="24" rx="2"></rect>
+    <circle cx="32" cy="25" r="9"></circle>
+    <rect x="46" y="23" width="4" height="31" rx="2"></rect>
+    <circle cx="48" cy="17" r="7.5"></circle>
+  </g>
+  <circle class="brand-mark__sun" cx="48" cy="17" r="2.75"></circle>
+</svg>
+
+<style>
+  .brand-mark {
+    flex-shrink: 0;
+  }
+
+  .brand-mark__trees {
+    fill: var(--color-accent);
+  }
+
+  .brand-mark__sun {
+    fill: var(--tier-3);
+  }
+</style>

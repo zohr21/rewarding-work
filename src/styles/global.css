@@ -246,6 +246,13 @@ a:hover {
   font-size: var(--text-sm);
 }
 
+/* On a touch screen a small button still gets a finger-sized target. */
+@media (pointer: coarse) {
+  .btn--small {
+    min-height: 44px;
+  }
+}
+
 .btn--danger {
   --btn-edge: #6e1510;
   background: linear-gradient(180deg, #c42e25, #b3261e);
@@ -837,4 +844,11 @@ html[data-motion='off'] .is-entering .ring__value {
   fill: var(--color-text-muted);
   font-family: var(--font-sans);
   font-size: 11px;
+}
+
+/* Optional sections (src/lib/profile.ts): their tabs and links show only while they are on. */
+html:not([data-mod-exam]) [data-module='exam'],
+html:not([data-mod-health]) [data-module='health'],
+html:not([data-mod-budget]) [data-module='budget'] {
+  display: none !important;
 }

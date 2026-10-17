@@ -5,6 +5,7 @@
  * anything is added), then practise them a round at a time. The answer and its
  * explanation show after each question; questions you flag or miss come back first.
  */
+import { NATIVE_APP } from '../config/app';
 ---
 
 <section class="card bank" data-exam-bank hidden aria-labelledby="bank-heading">
@@ -79,7 +80,7 @@
   </div>
 
   <div class="exam-dialog__foot">
-    <p class="muted exam-dialog__trust">Questions stay in this browser, and in your account if you're signed in. Only import material you're allowed to use.</p>
+    <p class="muted exam-dialog__trust">Questions stay {NATIVE_APP ? 'on this phone' : 'in this browser'}, and in your account if you're signed in. Only import material you're allowed to use.</p>
     <button type="button" class="btn" data-ei-go disabled>Import</button>
   </div>
 </dialog>

@@ -3,6 +3,9 @@
  * Home, on the site and in the Android app: what to work on now. The task that is
  * first up on Today with one button to start focusing on it, today's focus, the chain,
  * and the tier that is closest. Everything is read from stored data; nothing is kept here.
+ *
+ * Before the first session it is a first-day screen instead: one "plant your first seed"
+ * card and a short Get started list, with the numbers left out until there are some.
  */
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
@@ -13,7 +16,8 @@ import { url } from '../lib/paths';
   data-app-today
   data-timer-url={url('/timer')}
   data-tasks-url={url('/tasks')}
-  aria-labelledby="today-heading">
+  aria-labelledby="today-heading"
+  aria-busy="true">
   <header class="today__head">
     {/* The site's home page has its own heading above this. */}
     {NATIVE_APP ? <h1 id="today-heading">Today</h1> : <h2 id="today-heading" class="visually-hidden">Today</h2>}
@@ -22,7 +26,15 @@ import { url } from '../lib/paths';
 
   <div class="card today__first" data-td-first></div>
 
-  <div class="today__pair">
+  <div class="card today__start-list" data-td-steps hidden>
+    <div class="today__steps-head">
+      <h2>Get started</h2>
+      <span class="muted" data-td-steps-count></span>
+    </div>
+    <ul data-td-steps-list></ul>
+  </div>
+
+  <div class="today__pair" data-td-pair hidden>
     <a class="card today__stat" href={url('/progress')}>
       <span class="today__label">Focus today</span>
       <strong class="today__value" data-td-focus>0 min</strong>
@@ -44,6 +56,7 @@ import { url } from '../lib/paths';
 
 <script>
   import { getChain, getChains, getDone, getSessions, getTasks, subscribe } from '../lib/storage';
+  import { getProfile } from '../lib/profile';
   import { allProgress, chainInput, tierLabel } from '../lib/rewards';
   import { chainStats, dailyMinutes, totals } from '../lib/stats';
   import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
@@ -54,6 +67,10 @@ import { url } from '../lib/paths';
   import { el } from '../lib/dom';
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const SEED_SVG =
+    '<svg viewBox="0 0 56 44" width="72" height="56" aria-hidden="true"><ellipse cx="28" cy="40" rx="22" ry="4" fill="var(--well-bg)"/><path d="M28 39V24" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round"/><path d="M28 27c-8 0-11-6-11-10 6 0 11 3 11 10zM28 24c0-8 6-12 12-12 0 6-4 12-12 12z" fill="var(--color-accent)"/></svg>';
+  const CHECK_SVG =
+    '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const PLAY_SVG =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>';
 
@@ -65,10 +82,31 @@ import { url } from '../lib/paths';
     const timerUrl = root.dataset.timerUrl!;
     const tasksUrl = root.dataset.tasksUrl!;
 
+    /** No focus session yet: the first day. */
+    const isFirstDay = () => getSessions().length === 0;
+
     function renderFirst(): void {
       const box = $('[data-td-first]');
       const today = todayTasks(getTasks());
       const task = today[0];
+      if (!task && isFirstDay()) {
+        const seed = el('div', 'today__seed');
+        seed.innerHTML = SEED_SVG;
+        const title = el('h2', 'today__title', 'Plant your first seed');
+        const text = el('p', 'muted', 'One focus session starts your grove. Twenty-five minutes is plenty.');
+        const actions = el('div', 'today__actions');
+        const go = el('a', 'btn today__start');
+        go.href = timerUrl;
+        go.innerHTML = PLAY_SVG;
+        go.append('Start focus');
+        const add = el('a', 'btn btn--ghost', 'Add a task first');
+        add.href = tasksUrl;
+        actions.append(go, add);
+        box.classList.add('today__first--seed');
+        box.replaceChildren(seed, title, text, actions);
+        return;
+      }
+      box.classList.remove('today__first--seed');
       if (!task) {
         const title = el('h2', 'today__title', 'Nothing on Today yet');
         const text = el('p', 'muted', 'Pick one thing that matters and put it first, or just start the timer.');
@@ -109,6 +147,29 @@ import { url } from '../lib/paths';
       start.append('Start focusing');
       parts.push(start);
       box.replaceChildren(...parts);
+    }
+
+    /** Three first steps; the list goes away once they are all done. */
+    function renderSteps(): void {
+      const steps: [string, boolean][] = [
+        ['Pick what to grow', getProfile().welcomed],
+        ['Finish one focus session', !isFirstDay()],
+        ['Add one task', getTasks().length > 0],
+      ];
+      const done = steps.filter(([, ok]) => ok).length;
+      const box = $('[data-td-steps]');
+      box.hidden = done === steps.length;
+      $('[data-td-steps-count]').textContent = `${done} of ${steps.length}`;
+      $('[data-td-steps-list]').replaceChildren(
+        ...steps.map(([label, ok]) => {
+          const li = el('li', ok ? 'is-done' : '');
+          const mark = el('span', 'today__check');
+          if (ok) mark.innerHTML = CHECK_SVG;
+          li.append(mark, label);
+          if (ok) li.append(el('span', 'visually-hidden', ' (done)'));
+          return li;
+        }),
+      );
     }
 
     function renderFocus(): void {
@@ -160,8 +221,9 @@ import { url } from '../lib/paths';
           return [{ p, next, share: (p.value - prev) / (next - prev) }];
         })
         .sort((a, b) => b.share - a.share)[0];
-      nudge.hidden = !closest;
-      if (!closest) return;
+      // Tiers mean nothing yet on the first day; the seed card says what grows them.
+      nudge.hidden = !closest || isFirstDay();
+      if (nudge.hidden || !closest) return;
       const { p, next, share } = closest;
       const left = p.track.id === 'focus' ? Math.ceil((next - p.value) * 10) / 10 : Math.ceil(next - p.value);
       const coin = $('[data-td-nudge-coin]');
@@ -169,15 +231,19 @@ import { url } from '../lib/paths';
       coin.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
       coin.style.setProperty('--next', `var(--tier-${p.level})`);
       const text = $('[data-td-nudge-text]');
-      text.replaceChildren(el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} · ${p.track.title}`);
+      text.replaceChildren(el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
     }
 
     const render = () => {
       $('[data-td-date]').textContent = dateFmt.format(new Date());
       renderFirst();
+      renderSteps();
+      // The numbers wait until there is something to count.
+      $('[data-td-pair]').hidden = isFirstDay() && getChains().length === 0;
       renderFocus();
       renderChain();
       renderNudge();
+      root.removeAttribute('aria-busy');
     };
     render();
     (['tasks', 'sessions', 'chain', 'done'] as const).forEach((name) => c.add(subscribe(name, render)));
@@ -281,6 +347,84 @@ import { url } from '../lib/paths';
 
   .today__first :global(.today__actions .btn) {
     min-height: 52px;
+  }
+
+  /* The first day: the seed, centred. */
+  .today__first--seed {
+    justify-items: center;
+    text-align: center;
+    padding-block: var(--space-5);
+  }
+
+  .today__first--seed :global(.today__actions) {
+    justify-self: stretch;
+  }
+
+  /* Until the script has read your data: a quiet block the size of the card, not "Nothing yet". */
+  .today[aria-busy='true'] .today__first {
+    min-block-size: 13rem;
+    background: var(--color-surface-2);
+    box-shadow: none;
+  }
+
+  .today__pair[hidden],
+  .today__start-list[hidden] {
+    display: none;
+  }
+
+  .today__start-list {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+  }
+
+  .today__steps-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .today__steps-head h2 {
+    font-size: var(--text-base);
+  }
+
+  .today__steps-head span {
+    font-size: var(--text-sm);
+  }
+
+  .today__start-list ul {
+    display: grid;
+    gap: var(--space-1);
+    padding: 0;
+    list-style: none;
+  }
+
+  .today__start-list :global(li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 36px;
+  }
+
+  .today__start-list :global(li.is-done) {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+  }
+
+  .today__start-list :global(.today__check) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 24px;
+    block-size: 24px;
+    border: 2px solid var(--color-border-strong);
+    border-radius: 50%;
+  }
+
+  .today__start-list :global(li.is-done .today__check) {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
   }
 
   .today__pair {

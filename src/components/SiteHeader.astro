@@ -2,7 +2,7 @@
 import AppearanceMenu from './AppearanceMenu.astro';
 import SoundMenu from './SoundMenu.astro';
 import AccountButton from './AccountButton.astro';
-import CoinMark from './CoinMark.astro';
+import BrandMark from './BrandMark.astro';
 import { NAV, SITE } from '../config/site';
 import { NATIVE_APP } from '../config/app';
 import { url, isActive, isCurrent } from '../lib/paths';
@@ -13,7 +13,7 @@ const current = Astro.url.pathname;
 <header class:list={['site-header', { 'site-header--app': NATIVE_APP }]}>
   <div class="container site-header__inner">
     <a class="brand" href={url('/')} aria-current={isActive(current, '/') ? 'page' : undefined}>
-      <CoinMark size={36} />
+      <BrandMark size={36} />
       <span class="brand__name">{SITE.name}</span>
     </a>
 
@@ -23,7 +23,7 @@ const current = Astro.url.pathname;
         <nav class="site-nav" aria-label="Main">
           <ul>
             {NAV.map((item) => (
-              <li>
+              <li data-module={item.module}>
                 <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined}>
                   {item.label}
                 </a>
@@ -34,10 +34,11 @@ const current = Astro.url.pathname;
       )
     }
 
+    {/* In the app, Appearance and the account live under You in the bottom bar; Sound stays, since it holds the player. */}
     <div class="site-header__tools">
       <SoundMenu />
-      <AppearanceMenu />
-      <AccountButton />
+      {!NATIVE_APP && <AppearanceMenu />}
+      {!NATIVE_APP && <AccountButton />}
     </div>
   </div>
 </header>
@@ -111,8 +112,9 @@ const current = Astro.url.pathname;
     color: var(--color-text);
   }
 
-  .brand :global(.coin-mark) {
-    filter: drop-shadow(0 6px 6px var(--accent-glow));
+  /* The wordmark is lowercase; SITE.name stays "Grovyn" for titles and screen readers. */
+  .brand__name {
+    text-transform: lowercase;
   }
 
   /*

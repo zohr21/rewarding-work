@@ -15,7 +15,7 @@ const current = Astro.url.pathname;
   <nav class="focus-tabs" aria-label={FOCUS.label}>
     {
       FOCUS_TABS.map((tab) => (
-        <a href={url(tab.href)} aria-current={isCurrent(current, tab) ? 'page' : undefined}>
+        <a href={url(tab.href)} data-module={tab.module} aria-current={isCurrent(current, tab) ? 'page' : undefined}>
           {tab.label}
         </a>
       ))

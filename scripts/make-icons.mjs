@@ -1,42 +1,46 @@
 /**
- * Draws the app icons in public/icons from the coin mark.
+ * Draws the app icons in public/icons from the Grovyn mark.
  *
  *   node scripts/make-icons.mjs
  *
- * The coin here is the full cut (inner ring, lighter check); public/favicon.svg and the
- * header use the same shapes. Change the mark in all three places together.
+ * public/favicon.svg and src/components/BrandMark.astro draw the same shapes.
+ * Change the mark in all three places together.
  */
 import { mkdirSync } from 'node:fs';
 import sharp from 'sharp';
 
-const COIN = `
-  <path d="M6 29a26 26 0 0 1 52 0v6a26 26 0 0 1-52 0z" fill="#2e7a50"/>
-  <circle cx="32" cy="29" r="26" fill="#84dba6"/>
-  <circle cx="32" cy="29" r="24.75" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="1.5"/>
-  <circle cx="32" cy="29" r="19.5" fill="none" stroke="#0b3a22" stroke-opacity="0.22" stroke-width="1.5"/>
-  <path d="M21.5 29.5l7.5 7.5 14-15.5" fill="none" stroke="#07170f" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+const MARK = `
+  <g fill="#8fe0ae">
+    <rect x="14" y="38" width="4" height="16" rx="2"/>
+    <circle cx="16" cy="35" r="6.5"/>
+    <rect x="30" y="30" width="4" height="24" rx="2"/>
+    <circle cx="32" cy="25" r="9"/>
+    <rect x="46" y="23" width="4" height="31" rx="2"/>
+    <circle cx="48" cy="17" r="7.5"/>
+  </g>
+  <circle cx="48" cy="17" r="2.75" fill="#f2c14e"/>`;
 
-/** A night tile with the coin centred; `coin` is the coin's share of the width, `radius` the tile's. */
-function icon(size, coin, radius) {
-  const scale = (size * coin) / 64;
+/** A moss tile with the mark centred; `mark` is the mark's share of the width, `radius` the tile's. */
+function icon(size, mark, radius) {
+  const scale = (size * mark) / 64;
   const offset = (size - 64 * scale) / 2;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <rect width="${size}" height="${size}" rx="${size * radius}" fill="#16211b"/>
-  <g transform="translate(${offset} ${offset}) scale(${scale})">${COIN}</g>
+  <rect width="${size}" height="${size}" rx="${size * radius}" fill="#1a2620"/>
+  <g transform="translate(${offset} ${offset}) scale(${scale})">${MARK}</g>
 </svg>`;
 }
 
 const ICONS = [
-  ['icon-192.png', 192, 0.66, 0.22],
-  ['icon-512.png', 512, 0.66, 0.22],
-  // Maskable: full bleed, coin inside the 80% safe zone.
-  ['maskable-512.png', 512, 0.56, 0],
+  ['icon-192.png', 192, 0.8, 0.22],
+  ['icon-512.png', 512, 0.8, 0.22],
+  // Maskable: full bleed, mark inside the 80% safe zone.
+  ['maskable-512.png', 512, 0.62, 0],
   // iOS rounds the corners itself.
-  ['apple-touch-icon.png', 180, 0.64, 0],
+  ['apple-touch-icon.png', 180, 0.78, 0],
 ];
 
 mkdirSync('public/icons', { recursive: true });
-for (const [name, size, coin, radius] of ICONS) {
-  await sharp(Buffer.from(icon(size, coin, radius))).png().toFile(`public/icons/${name}`);
+for (const [name, size, mark, radius] of ICONS) {
+  await sharp(Buffer.from(icon(size, mark, radius))).png().toFile(`public/icons/${name}`);
   console.log(`public/icons/${name}`);
 }

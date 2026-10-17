@@ -14,7 +14,7 @@ const breakdown = { heading: 'Break it down', linkToTasks: false, intro: 'Steps 
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1>Tasks</h1>
+      <h1 class:list={{ 'visually-hidden': NATIVE_APP }}>Tasks</h1>
       {
         /* The Android app goes straight to the lists. */
         !NATIVE_APP && (

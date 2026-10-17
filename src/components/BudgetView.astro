@@ -50,7 +50,11 @@ const icon = (d: string, w = 2) =>
         <p class="bv__meter-foot muted"><span data-bv-spent></span><span data-bv-pace></span></p>
       </div>
       <p class="bv__status" data-bv-status></p>
-      <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
+      <div class="bv__start">
+        {/* Before anything is logged the first expense is a button here, not the floating one, which would sit on top of these. */}
+        {NATIVE_APP && <button type="button" class="btn bv__first" data-bv-add>Add your first expense</button>}
+        <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
+      </div>
     </section>
 
     <section class="card bv__chart-card" aria-labelledby="bv-pace-title">
@@ -409,6 +413,9 @@ const icon = (d: string, w = 2) =>
       const fmt = (n: number) => formatMoney(n, sign);
       const whole = (n: number) => formatMoney(Math.round(n), sign, 0);
       const name = monthName.format(fromDayKey(`${month}-01`));
+
+      // Nothing logged, no budget and no bills yet: the charts would only draw zeros, so they wait.
+      $('[data-bv-month]').closest<HTMLElement>('[data-budget]')!.toggleAttribute('data-fresh', store.entries.length === 0 && !budget && store.repeats.length === 0);
 
       setText('[data-bv-month]', monthLong.format(fromDayKey(`${month}-01`)));
       $<HTMLButtonElement>('[data-bv-next]').disabled = current;
@@ -852,6 +859,30 @@ const icon = (d: string, w = 2) =>
 </script>
 
 <style>
+  .bv[data-fresh] .bv__fab,
+  .bv:not([data-fresh]) .bv__first,
+  .bv[data-fresh] .bv__chart-card,
+  .bv[data-fresh] .bv__tiles,
+  .bv[data-fresh] .bv__pair:not(.bv__pair--list),
+  .bv[data-fresh] .bv__chips,
+  .bv[data-fresh] .bv__search {
+    display: none;
+  }
+
+  /* Room under the last card, so the floating Expense button never sits on it. */
+  .bv__start {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bv__start .bv__set[hidden] {
+    display: none;
+  }
+
+  :global(html[data-app]) .bv {
+    padding-bottom: 5rem;
+  }
+
   .bv {
     display: grid;
     gap: var(--space-5);

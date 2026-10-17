@@ -7,7 +7,7 @@
  * page keeps running on /timer, after a reload, or in another tab.
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import CoinMark from './CoinMark.astro';
+import BrandMark from './BrandMark.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES, TONE_LABELS } from '../lib/timer/cues';
@@ -36,17 +36,24 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   aria-labelledby="timer-heading">
   <div class="timer__head">
     <h2 id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
-    <fieldset class="timer__modes" data-modes>
-      <legend class="visually-hidden">Timer mode</legend>
-      {
-        TIMER_MODES.map((m) => (
-          <label class="seg">
-            <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
-            <span>{TIMER_MODE_LABELS[m]}</span>
-          </label>
-        ))
-      }
-    </fieldset>
+    {/* In the app the rhythm is a chip under the dial that opens the four choices; the site shows them all, always open. */}
+    <details class="timer__rhythm" data-rhythm open={!NATIVE_APP}>
+      <summary class="timer__rhythm-chip">
+        <span data-rhythm-label>{TIMER_MODE_LABELS[defaultMode ?? 'pomodoro']}</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </summary>
+      <fieldset class="timer__modes" data-modes>
+        <legend class="visually-hidden">Timer mode</legend>
+        {
+          TIMER_MODES.map((m) => (
+            <label class="seg">
+              <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
+              <span>{TIMER_MODE_LABELS[m]}</span>
+            </label>
+          ))
+        }
+      </fieldset>
+    </details>
     <p class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
   </div>
 
@@ -167,7 +174,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
             <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </button>
-        <CoinMark size={120} class="done__coin" />
+        <BrandMark size={120} class="done__coin" />
         <h2 id="done-title" class="done__title">Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
@@ -565,8 +572,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   .timer__sound input {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.5rem;
+    height: 1.5rem;
     accent-color: var(--color-accent);
   }
 
@@ -582,13 +589,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   .timer__tone {
     inline-size: auto;
-    min-height: 36px;
+    min-height: 44px;
     padding-block: 0;
     font-size: var(--text-sm);
   }
 
+  /* A taller box than the track, so a thumb is easy to land on. */
   .timer__volume {
-    inline-size: 5.5rem;
+    inline-size: 6.5rem;
+    block-size: 44px;
     accent-color: var(--color-accent);
   }
 
@@ -639,8 +648,46 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     box-shadow: none;
   }
 
+  /* The rhythm sits under the dial, as a chip. */
   :global(html[data-app]) .timer__head {
-    order: 1;
+    order: 4;
+    display: grid;
+    justify-items: center;
+    inline-size: 100%;
+  }
+
+  :global(html:not([data-app])) .timer__rhythm-chip {
+    display: none;
+  }
+
+  .timer__rhythm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding-inline: var(--space-4) var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  .timer__rhythm-chip::-webkit-details-marker {
+    display: none;
+  }
+
+  .timer__rhythm[open] .timer__rhythm-chip svg {
+    transform: rotate(180deg);
+  }
+
+  :global(html[data-app]) .timer__rhythm {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
   }
 
   :global(html[data-app]) .timer__custom {
@@ -658,7 +705,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   :global(html[data-app]) .timer__message {
-    order: 4;
+    order: 5;
   }
 
   :global(html[data-app]) .timer__message:empty {

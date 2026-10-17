@@ -6,6 +6,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SITE } from '../config/site';
 import { url } from '../lib/paths';
+import { NATIVE_APP } from '../config/app';
 
 const CONTACT = 'babazadezohr@gmail.com';
 const UPDATED = '13 October 2026';
@@ -33,7 +34,7 @@ const UPDATED = '13 October 2026';
         its own pages on the device so it works offline. None of this is sent to us.
       </p>
       <p>
-        You can save a backup file, or delete everything, under <a href={`${url('/account')}#acc-data`}>Account → Your data</a>.
+        You can save a backup file, or delete everything, under <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
         Clearing this site's data in your browser removes it too.
       </p>
 

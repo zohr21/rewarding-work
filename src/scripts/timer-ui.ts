@@ -9,6 +9,7 @@ import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, w
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { el } from '../lib/dom';
+import { NATIVE_APP } from '../config/app';
 import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
@@ -63,6 +64,19 @@ function spokenDuration(ms: number): string {
   return s === 0 ? `${m} minute${m === 1 ? '' : 's'}` : `${m} minute${m === 1 ? '' : 's'} ${s} seconds`;
 }
 
+/** The app's rhythm chip: the mode and its lengths, as in "Pomodoro · 25 / 5". */
+function rhythmText(mode: TimerMode, custom: CustomDurations): string {
+  const lengths =
+    mode === 'pomodoro'
+      ? `${T.POMODORO.workMin} / ${T.POMODORO.shortMin}`
+      : mode === '52-17'
+        ? ''
+        : mode === 'custom'
+          ? `${custom.workMin} / ${custom.breakMin}`
+          : 'counts up';
+  return lengths ? `${TIMER_MODE_LABELS[mode]} · ${lengths}` : TIMER_MODE_LABELS[mode];
+}
+
 function isSameLocalDay(a: number, b: number): boolean {
   const da = new Date(a);
   const db = new Date(b);
@@ -88,6 +102,8 @@ function mountTimer(root: HTMLElement): () => void {
   const els = {
     modes: Array.from(root.querySelectorAll<HTMLInputElement>('input[name="timer-mode"]')),
     modeHint: q<HTMLElement>('[data-mode-hint]'),
+    rhythm: root.querySelector<HTMLDetailsElement>('[data-rhythm]'),
+    rhythmLabel: root.querySelector<HTMLElement>('[data-rhythm-label]'),
     custom: q<HTMLElement>('[data-custom]'),
     customWork: q<HTMLInputElement>('[data-custom-work]'),
     customBreak: q<HTMLInputElement>('[data-custom-break]'),
@@ -302,6 +318,7 @@ function mountTimer(root: HTMLElement): () => void {
       input.disabled = inPhase && input.value !== mode;
     }
     els.modeHint.hidden = !inPhase;
+    if (els.rhythmLabel) els.rhythmLabel.textContent = rhythmText(mode, state.custom);
 
     els.custom.hidden = mode !== 'custom';
     els.customWork.disabled = els.customBreak.disabled = inPhase;
@@ -379,9 +396,14 @@ function mountTimer(root: HTMLElement): () => void {
   }
 
   function renderNotifyStatus(): void {
-    void notificationsGranted().then((granted) => {
-      if (granted !== null) els.notifyStatus.textContent = granted ? 'Notifications on' : 'Notifications are off for this app';
-    });
+    // The app asks on the first start (see the start handler); until then there is nothing to report.
+    if (NATIVE_APP) {
+      els.notifyStatus.textContent = '';
+      void notificationsGranted().then((granted) => {
+        if (granted) els.notifyStatus.textContent = 'Notifications on';
+      });
+      return;
+    }
     const p = notificationPermission();
     els.notifyStatus.textContent =
       p === 'granted'
@@ -570,6 +592,8 @@ function mountTimer(root: HTMLElement): () => void {
       setMessage('');
       commit(T.setMode(state, mode));
       announce(`${TIMER_MODE_LABELS[mode]} mode.`);
+      // The app's chip folds the choices away once one is picked (the site keeps them open).
+      if (NATIVE_APP && els.rhythm) els.rhythm.open = false;
     });
   }
 

@@ -185,7 +185,7 @@
     --header-bg: rgb(14 21 18 / 0.72);
     --amb-opacity: 0.22;
     --color-surface-2: #22302a;
-    --color-border: #26342d;
+    --color-border: #33463b; /* 1.6:1 on the moss surface, so cards keep an edge without their shadow */
     --color-border-strong: #4a5a50;
     --color-text: #eef1ec;
     --color-text-muted: #a7b3ab;
@@ -248,7 +248,7 @@
   --header-bg: rgb(14 21 18 / 0.72);
   --amb-opacity: 0.22;
   --color-surface-2: #22302a;
-  --color-border: #26342d;
+  --color-border: #33463b; /* 1.6:1 on the moss surface, so cards keep an edge without their shadow */
   --color-border-strong: #4a5a50;
   --color-text: #eef1ec;
   --color-text-muted: #a7b3ab;
