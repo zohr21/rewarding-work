@@ -6,6 +6,7 @@ import { friendlyError } from '../lib/account/errors';
 import { passwordProblem, passwordStrength, timesBreached } from '../lib/account/password';
 import { getAccount, loadAccount, onAccountChange, type AccountState } from '../lib/account/state';
 import { cleanups, onPage } from '../lib/page';
+import { NATIVE_APP } from '../config/app';
 
 type Runtime = Awaited<ReturnType<typeof loadAccount>>;
 
@@ -312,7 +313,7 @@ onPage('account-page', () => {
 
       $('[data-avatar]').textContent = guest ? '?' : (u.name ?? u.email ?? '?').trim().charAt(0).toUpperCase();
       $('[data-name]').textContent = guest ? 'Guest account' : (u.name ?? u.email ?? 'Your account');
-      $('[data-email]').textContent = guest ? 'Saved in this browser only' : u.name && u.email ? u.email : '';
+      $('[data-email]').textContent = guest ? (NATIVE_APP ? 'Saved on this phone only' : 'Saved in this browser only') : u.name && u.email ? u.email : '';
       const badges = guest
         ? ['Guest']
         : [...(hasPassword ? ['Email and password'] : []), ...(hasGoogle ? ['Google'] : []), ...(u.emailVerified ? ['Email confirmed'] : [])];

@@ -1,0 +1,173 @@
+---
+/**
+ * Welcome: the app's first screen for someone new (BaseLayout sends them here from Today).
+ * They pick the optional sections they want, then start a first focus session or sign in.
+ * Choices are saved with src/lib/profile.ts and can be changed under You › Sections.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BrandMark from '../components/BrandMark.astro';
+import { MODULES } from '../config/site';
+import { url } from '../lib/paths';
+---
+
+<BaseLayout title="Welcome" bare>
+  <div class="container welcome" data-welcome>
+    <header class="welcome__head">
+      <BrandMark size={88} />
+      <p class="welcome__word">grovyn</p>
+      <h1 class="welcome__lead">Every focus session grows your grove.</h1>
+    </header>
+
+    <section class="welcome__pick" aria-labelledby="welcome-pick-h">
+      <h2 id="welcome-pick-h">What should Grovyn help with?</h2>
+      <div class="chips">
+        <span class="chip chip--fixed" aria-label="Focus timer and tasks, always included">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          Focus and tasks
+        </span>
+        {
+          MODULES.map((m) => (
+            <button type="button" class="chip" aria-pressed="false" data-module-pick={m.id}>
+              {m.label}
+            </button>
+          ))
+        }
+      </div>
+      <p class="welcome__note">Only what you pick shows up. Change it any time under You.</p>
+    </section>
+
+    <div class="welcome__go">
+      <a class="btn welcome__start" href={url('/timer')} data-welcome-done>Start my first 25 minutes</a>
+      <a class="welcome__signin" href={url('/account')} data-welcome-done>I already have an account</a>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { onPage } from '../lib/page';
+  import { getProfile, setProfile } from '../lib/profile';
+  import type { ModuleId } from '../config/site';
+
+  onPage('welcome', () => {
+    const page = document.querySelector<HTMLElement>('[data-welcome]');
+    if (!page) return;
+    const picks = [...page.querySelectorAll<HTMLButtonElement>('[data-module-pick]')];
+    const current = getProfile().modules;
+    for (const b of picks) {
+      b.setAttribute('aria-pressed', String(current[b.dataset.modulePick as ModuleId]));
+      b.addEventListener('click', () => b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')));
+    }
+    // Either way out counts as seen, with the sections as picked.
+    for (const link of page.querySelectorAll('[data-welcome-done]')) {
+      link.addEventListener('click', () => {
+        const modules = { ...getProfile().modules };
+        for (const b of picks) modules[b.dataset.modulePick as ModuleId] = b.getAttribute('aria-pressed') === 'true';
+        setProfile({ welcomed: true, modules });
+      });
+    }
+  });
+</script>
+
+<style>
+  .welcome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    min-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    max-width: 30rem;
+    padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-8));
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-5));
+  }
+
+  .welcome__head {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-2);
+    text-align: center;
+  }
+
+  .welcome__word {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: -0.035em;
+    line-height: 1;
+  }
+
+  .welcome__lead {
+    max-width: 18rem;
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 400;
+    line-height: var(--leading-normal);
+    color: var(--color-text-muted);
+    text-wrap: balance;
+  }
+
+  .welcome__pick {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .welcome__pick h2 {
+    font-size: var(--text-lg);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 44px;
+    padding-inline: var(--space-4);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .chip[aria-pressed='true'],
+  .chip--fixed {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .chip--fixed {
+    cursor: default;
+  }
+
+  .welcome__note {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .welcome__go {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: auto;
+  }
+
+  .welcome__start {
+    width: 100%;
+    min-height: 3.25rem;
+  }
+
+  .welcome__signin {
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    color: var(--color-accent);
+    font-weight: 600;
+    text-decoration: none;
+  }
+</style>

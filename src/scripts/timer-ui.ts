@@ -9,6 +9,7 @@ import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, w
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { el } from '../lib/dom';
+import { NATIVE_APP } from '../config/app';
 import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
@@ -379,9 +380,14 @@ function mountTimer(root: HTMLElement): () => void {
   }
 
   function renderNotifyStatus(): void {
-    void notificationsGranted().then((granted) => {
-      if (granted !== null) els.notifyStatus.textContent = granted ? 'Notifications on' : 'Notifications are off for this app';
-    });
+    // The app asks on the first start (see the start handler); until then there is nothing to report.
+    if (NATIVE_APP) {
+      els.notifyStatus.textContent = '';
+      void notificationsGranted().then((granted) => {
+        if (granted) els.notifyStatus.textContent = 'Notifications on';
+      });
+      return;
+    }
     const p = notificationPermission();
     els.notifyStatus.textContent =
       p === 'granted'

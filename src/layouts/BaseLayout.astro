@@ -8,21 +8,27 @@ import RewardNotice from '../components/RewardNotice.astro';
 import UndoToast from '../components/UndoToast.astro';
 import { ClientRouter } from 'astro:transitions';
 import { NATIVE_APP } from '../config/app';
-import { SITE } from '../config/site';
+import { MODULES, SITE } from '../config/site';
 import { SCENES } from '../lib/storage';
 import { url } from '../lib/paths';
 
 interface Props {
   title?: string;
   description?: string;
+  /** A page on its own, with no header, footer or bottom bar (Welcome). */
+  bare?: boolean;
 }
 
-const { title, description = SITE.description } = Astro.props;
+const { title, description = SITE.description, bare = false } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE.name}` : SITE.name;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const swUrl = url('/sw.js');
 const swScope = url('/');
 const sceneIds = SCENES.join('|');
+const moduleIds = MODULES.map((m) => m.id);
+const homePath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
+// Only the app opens on Welcome; the site's home page explains itself.
+const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
 ---
 
 <!doctype html>
@@ -45,7 +51,7 @@ const sceneIds = SCENES.join('|');
       The client-side router resets <html> attributes to the new page's defaults on every
       navigation, so the same function runs again on astro:after-swap.
     -->
-    <script is:inline define:vars={{ sceneIds }}>
+    <script is:inline define:vars={{ sceneIds, moduleIds, homePath, welcomeUrl }}>
       (function () {
         var root = document.documentElement;
         var scenes = new RegExp('^(' + sceneIds + ')$');
@@ -65,9 +71,31 @@ const sceneIds = SCENES.join('|');
             root.dataset.bgKind = scenes.test(a.bg) ? 'scene' : 'glow';
           }
           if (a && a.motion === false) root.dataset.motion = 'off';
+          applyModules();
+        }
+        // Optional sections (src/lib/profile.ts): someone with data from before Welcome keeps them all.
+        function holds(v) {
+          if (Array.isArray(v)) return v.length > 0;
+          if (v && typeof v === 'object') return Object.keys(v).some(function (k) { return holds(v[k]); });
+          return false;
+        }
+        function hasData() {
+          return ['sessions', 'tasks', 'done', 'chain', 'exam', 'health'].some(function (n) { return holds(get(n)); });
+        }
+        function applyModules() {
+          var p = get('profile');
+          var old = !p && hasData();
+          moduleIds.forEach(function (id) {
+            if (old || (p && p.modules && p.modules[id])) root.setAttribute('data-mod-' + id, '');
+            else root.removeAttribute('data-mod-' + id);
+          });
+          return p || (old ? { welcomed: true } : null);
         }
         apply();
         document.addEventListener('astro:after-swap', apply);
+        // A brand-new user opening Today goes to Welcome first.
+        var here = location.pathname.replace(/index\.html$/, '');
+        if (welcomeUrl && here === homePath && !(applyModules() || {}).welcomed) location.replace(welcomeUrl);
       })();
     </script>
     <ClientRouter />
@@ -75,12 +103,12 @@ const sceneIds = SCENES.join('|');
   <body>
     <Ambient />
     <a class="skip-link" href="#main">Skip to content</a>
-    <SiteHeader />
+    {!bare && <SiteHeader />}
     <main id="main" tabindex="-1">
       <slot />
     </main>
     {/* The Android app has a bottom bar where the site has its footer. */}
-    {NATIVE_APP ? <AppNav /> : <SiteFooter />}
+    {!bare && (NATIVE_APP ? <AppNav /> : <SiteFooter />)}
     <RewardNotice />
     <UndoToast />
 

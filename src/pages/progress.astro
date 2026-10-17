@@ -12,25 +12,29 @@ import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 ---
 
-<BaseLayout title="Progress" description="Your focus history, done list and habit chain — stored only in this browser.">
+<BaseLayout title="Your grove" description="Your focus history, reward tiers, done list and habit chain.">
   <div class="container">
     <header class="page-header">
-      <h1>Your progress</h1>
+      <h1>Your grove</h1>
       <p>
-        Focus sessions from the <a href={url('/timer')}>timer</a>, the tiers they add up to, things you've finished, and your chain. Stored only in
-        this browser.
+        Focus sessions from the <a href={url('/timer')}>timer</a>, the tiers they add up to, things you've finished, and your chain.
+        Kept on this device, and in your account when you're signed in.
       </p>
     </header>
 
     <div class="progress">
       {/* In the Android app the grove leads the page. */}
       {NATIVE_APP && <RewardTiers />}
-      <ProgressStats />
-      <FocusTrend />
-      <Heatmap />
-      <div class="progress__pair progress__pair--even">
-        <TechniqueDonut />
-        <DoneWeeks />
+      {/* The history waits for a first session or finished thing; until then it is charts of zeros. */}
+      <p class="muted progress__later" data-progress-later hidden>Charts and your focus heatmap appear after your first session.</p>
+      <div class="progress__history" data-progress-history>
+        <ProgressStats />
+        <FocusTrend />
+        <Heatmap />
+        <div class="progress__pair progress__pair--even">
+          <TechniqueDonut />
+          <DoneWeeks />
+        </div>
       </div>
       {!NATIVE_APP && <RewardTiers />}
       <div class="progress__pair">
@@ -44,7 +48,38 @@ import { url } from '../lib/paths';
   </div>
 </BaseLayout>
 
+<script>
+  import { getDone, getSessions, subscribe } from '../lib/storage';
+  import { cleanups, onPage } from '../lib/page';
+
+  onPage('progress-history', () => {
+    const history = document.querySelector<HTMLElement>('[data-progress-history]');
+    const later = document.querySelector<HTMLElement>('[data-progress-later]');
+    if (!history || !later) return;
+    const c = cleanups();
+    const render = () => {
+      const empty = getSessions().length === 0 && getDone().length === 0;
+      history.hidden = empty;
+      later.hidden = !empty;
+    };
+    render();
+    c.add(subscribe('sessions', render));
+    c.add(subscribe('done', render));
+    return c.run;
+  });
+</script>
+
 <style>
+  .progress__history {
+    display: grid;
+    gap: var(--space-5);
+  }
+
+  .progress__history[hidden],
+  .progress__later[hidden] {
+    display: none;
+  }
+
   .progress {
     display: grid;
     gap: var(--space-5);

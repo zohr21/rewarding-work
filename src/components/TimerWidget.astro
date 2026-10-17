@@ -7,7 +7,7 @@
  * page keeps running on /timer, after a reload, or in another tab.
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import CoinMark from './CoinMark.astro';
+import BrandMark from './BrandMark.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES, TONE_LABELS } from '../lib/timer/cues';
@@ -167,7 +167,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
             <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </button>
-        <CoinMark size={120} class="done__coin" />
+        <BrandMark size={120} class="done__coin" />
         <h2 id="done-title" class="done__title">Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
@@ -565,8 +565,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   .timer__sound input {
-    width: 1.1rem;
-    height: 1.1rem;
+    width: 1.5rem;
+    height: 1.5rem;
     accent-color: var(--color-accent);
   }
 
@@ -582,13 +582,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   .timer__tone {
     inline-size: auto;
-    min-height: 36px;
+    min-height: 44px;
     padding-block: 0;
     font-size: var(--text-sm);
   }
 
+  /* A taller box than the track, so a thumb is easy to land on. */
   .timer__volume {
-    inline-size: 5.5rem;
+    inline-size: 6.5rem;
+    block-size: 44px;
     accent-color: var(--color-accent);
   }
 

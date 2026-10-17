@@ -410,6 +410,9 @@ const icon = (d: string, w = 2) =>
       const whole = (n: number) => formatMoney(Math.round(n), sign, 0);
       const name = monthName.format(fromDayKey(`${month}-01`));
 
+      // Nothing logged, no budget and no bills yet: the charts would only draw zeros, so they wait.
+      $('[data-bv-month]').closest<HTMLElement>('[data-budget]')!.toggleAttribute('data-fresh', store.entries.length === 0 && !budget && store.repeats.length === 0);
+
       setText('[data-bv-month]', monthLong.format(fromDayKey(`${month}-01`)));
       $<HTMLButtonElement>('[data-bv-next]').disabled = current;
 
@@ -852,6 +855,19 @@ const icon = (d: string, w = 2) =>
 </script>
 
 <style>
+  .bv[data-fresh] .bv__chart-card,
+  .bv[data-fresh] .bv__tiles,
+  .bv[data-fresh] .bv__pair:not(.bv__pair--list),
+  .bv[data-fresh] .bv__chips,
+  .bv[data-fresh] .bv__search {
+    display: none;
+  }
+
+  /* Room under the last card, so the floating Expense button never sits on it. */
+  :global(html[data-app]) .bv {
+    padding-bottom: 5rem;
+  }
+
   .bv {
     display: grid;
     gap: var(--space-5);

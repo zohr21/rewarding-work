@@ -4,6 +4,7 @@
  * readable copy to Google (when a Google client is configured), and delete everything.
  * Confirmations are inline.
  */
+import { NATIVE_APP } from '../config/app';
 import ExportDialog from './ExportDialog.astro';
 import RowIcon from './RowIcon.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
@@ -28,7 +29,7 @@ import { url } from '../lib/paths';
             <ul>
               <li>Kept in your account: focus sessions, done list, habit chain, tasks, timer settings, theme and background.</li>
               <li>Stays on each device: the running timer and sound settings.</li>
-              <li>Without an account everything is stored in this browser only.</li>
+              <li>Without an account everything is stored {NATIVE_APP ? 'on this phone' : 'in this browser'} only.</li>
               <li>Anything already here is added to your account when you sign in — nothing is overwritten.</li>
             </ul>
           </div>
@@ -86,7 +87,7 @@ import { url } from '../lib/paths';
       </summary>
       <div class="row-more__body">
         <p class="muted">
-          Removes your sessions, done list, tasks, chain and settings from this browser{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
+          Removes your sessions, done list, tasks, chain and settings from {NATIVE_APP ? 'this phone' : 'this browser'}{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
           Export first if you might want them back.
         </p>
         <div class="data__actions">

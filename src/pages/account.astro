@@ -2,28 +2,20 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthPanel from '../components/AuthPanel.astro';
 import PasswordField from '../components/PasswordField.astro';
-import CoinMark from '../components/CoinMark.astro';
+import BrandMark from '../components/BrandMark.astro';
 import DataTools from '../components/DataTools.astro';
 import AppearanceMenu from '../components/AppearanceMenu.astro';
 import RowIcon from '../components/RowIcon.astro';
 import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
+import { MODULES } from '../config/site';
 import pkg from '../../package.json';
 ---
 
 <BaseLayout title="Account" description="Your account, your data and how the site looks. Signing in is optional.">
   <div class="container account" data-account-page>
     <header class="page-header account__head">
-      {
-        NATIVE_APP && (
-          <a class="tool-btn account__back" href={url('/')} aria-label="Back to Today">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-              <path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </a>
-        )
-      }
       <div>
         <h1>{NATIVE_APP ? 'You' : 'Account'}</h1>
         {!NATIVE_APP && <p>Your sign-in, your data and how things look. Signing in is optional.</p>}
@@ -38,7 +30,7 @@ import pkg from '../../package.json';
           <circle class="coin-loader__track" cx="60" cy="60" r="54" fill="none" stroke-width="6"></circle>
           <circle class="coin-loader__arc" cx="60" cy="60" r="54" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="110 340"></circle>
         </svg>
-        <CoinMark size={54} />
+        <BrandMark size={54} />
       </span>
       <p class="muted">Loading your account…</p>
     </div>
@@ -155,7 +147,7 @@ import pkg from '../../package.json';
         <section class="card" aria-labelledby="acc-save-h" data-view="signed-in" data-guest-only hidden>
           <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
           <p class="muted account__lead">
-            Right now it only exists in this browser: clearing browser data would lose it. Add an email or Google to keep
+            Right now it only exists {NATIVE_APP ? "on this phone: clearing the app's data" : 'in this browser: clearing browser data'} would lose it. Add an email or Google to keep
             it safe and to sign in on your other devices.
           </p>
           <AuthPanel id="guest" guest />
@@ -210,6 +202,24 @@ import pkg from '../../package.json';
               <a class="btn btn--ghost btn--small" href={url('/health')}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
             </div>
             <p class="account__msg row-note" role="status" data-connect-msg></p>
+          </div>
+        </section>
+
+        <section class="group o-prefs" id="acc-sections" aria-labelledby="acc-sections-h">
+          <h2 id="acc-sections-h" class="group__title">Sections</h2>
+          <div class="rows">
+            {
+              MODULES.map((m) => (
+                <label class="row row--toggle">
+                  <span class="row__main">
+                    {m.label}
+                    <small>{m.hint}</small>
+                  </span>
+                  <input type="checkbox" role="switch" data-module-toggle={m.id} />
+                </label>
+              ))
+            }
+            <p class="row-note muted">Focus, Tasks and your grove are always on.</p>
           </div>
         </section>
 
@@ -318,6 +328,8 @@ import pkg from '../../package.json';
 </script>
 
 <script>
+  import { getProfile, setModule } from '../lib/profile';
+  import type { ModuleId } from '../config/site';
   import { getAppearance, getChain, getDone, getSessions, getSoundPrefs, getTheme, read, subscribe } from '../lib/storage';
   import { allProgress, chainInput, tierLabel } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
@@ -404,6 +416,16 @@ import pkg from '../../package.json';
       });
     });
 
+    // Sections: optional parts of the app, as picked on Welcome.
+    const toggles = [...page.querySelectorAll<HTMLInputElement>('[data-module-toggle]')];
+    const renderSections = () => {
+      const { modules } = getProfile();
+      for (const t of toggles) t.checked = modules[t.dataset.moduleToggle as ModuleId];
+    };
+    renderSections();
+    for (const t of toggles) t.addEventListener('change', () => setModule(t.dataset.moduleToggle as ModuleId, t.checked));
+    c.add(subscribe('profile', renderSections));
+
     const notify = q<HTMLButtonElement>('[data-notify]');
     if (notify) {
       const value = q('[data-pref-notify]')!;
@@ -462,9 +484,17 @@ import pkg from '../../package.json';
     gap: var(--space-3);
   }
 
-  .account__back {
+  /* A section switch: the whole row is the label, so the tap target is the row. */
+  .row--toggle {
+    cursor: pointer;
+  }
+
+  .row--toggle input {
     flex: none;
-    text-decoration: none;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    margin-left: auto;
+    accent-color: var(--color-accent);
   }
 
   /* The coin inside a turning ring. */

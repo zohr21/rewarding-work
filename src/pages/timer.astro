@@ -66,7 +66,7 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
 
         <p class="muted note">
           Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
-          minute or more are saved in this browser and shown on your <a href={url('/progress')}>progress page</a>.
+          minute or more are saved {NATIVE_APP ? 'on this phone' : 'in this browser'} and grow <a href={url('/progress')}>your grove</a>.
         </p>
       </aside>
     </div>
@@ -159,6 +159,19 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
   .side-card__head a,
   .rhythm a {
     font-weight: 600;
+  }
+
+  /* A link on its own, not in a sentence: a full-size tap target. */
+  .side-card__head a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-2);
+    margin-inline-end: calc(-1 * var(--space-2));
+  }
+
+  .side-card__head {
+    align-items: center;
   }
 
   .side-tasks {

@@ -7,13 +7,14 @@
  * opens Google's own permission window (src/lib/export/google.ts); the right-hand side
  * shows what will be in the file before you send it.
  */
+import { NATIVE_APP } from '../config/app';
 ---
 
 <dialog class="export popover" data-export-dialog aria-labelledby="export-heading">
   <div class="export__head">
     <div>
       <h2 id="export-heading" class="export__title">Export your data</h2>
-      <p class="muted export__sub">Your data stays in this browser until you send it somewhere.</p>
+      <p class="muted export__sub">Your data stays {NATIVE_APP ? 'on this phone' : 'in this browser'} until you send it somewhere.</p>
     </div>
     <button type="button" class="icon-btn" aria-label="Close" data-export-close>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>

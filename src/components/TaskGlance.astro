@@ -143,6 +143,9 @@ const progressUrl = url('/progress');
 
       function render(): void {
         const now = new Date();
+        // An empty glance is three cards of zeros; the list's own empty state says what to do.
+        root.hidden = getTasks().length === 0 && getSessions().length === 0 && getChains().length === 0;
+        if (root.hidden) return;
 
         // Today's plan
         const today = todayTasks(getTasks());
@@ -208,6 +211,10 @@ const progressUrl = url('/progress');
 </script>
 
 <style>
+  .glance[hidden] {
+    display: none;
+  }
+
   .glance {
     display: grid;
     gap: var(--space-4);
