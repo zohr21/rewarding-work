@@ -1,9 +1,14 @@
 package app.rewardingwork;
 
 import android.Manifest;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.health.connect.HealthConnectManager;
 import android.os.Build;
+import android.provider.Settings;
 
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
@@ -29,19 +34,23 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import org.json.JSONException;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * What the pages ask of the phone (src/lib/device.ts): the timer's notifications,
  * the home-screen widgets' data, where a notification or widget wanted to go,
- * Google's account picker for signing in, and reading from Health Connect.
- * The pages own all the data; nothing here changes it.
+ * Google's account picker for signing in, reading from Health Connect, and bank alerts
+ * read from notifications (BankInbox.java). The pages own all the data; nothing here changes it.
  */
 @CapacitorPlugin(
     name = "RewardDevice",
     permissions = {
         @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications"),
+        // Only for importing past bank SMS once, when you ask for it on the Budget page.
+        @Permission(strings = { Manifest.permission.READ_SMS }, alias = "sms"),
         // Health Connect, one per kind of data so each can be allowed on its own (HealthData.java).
         @Permission(strings = { "android.permission.health.READ_SLEEP" }, alias = HealthData.SLEEP),
         @Permission(strings = { "android.permission.health.READ_STEPS" }, alias = HealthData.STEPS),
@@ -55,10 +64,18 @@ import java.util.List;
 public class DevicePlugin extends Plugin {
     /** True while the app is on screen: the page then announces a finished session itself. */
     static volatile boolean foreground = false;
+    /** The plugin of the open app, for passing on bank alerts as they come; null while it is closed. */
+    private static volatile DevicePlugin open;
 
     @Override
     public void load() {
         foreground = true;
+        open = this;
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        if (open == this) open = null;
     }
 
     @Override
@@ -241,5 +258,150 @@ public class DevicePlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("route", MainActivity.takeRoute());
         call.resolve(result);
+    }
+
+    // ---------- Bank alerts (BankInbox.java, src/lib/bank.ts) ----------
+
+    /** A new alert while the app is open: the page takes it at once (it also stays in the inbox until acknowledged). */
+    static void bankNotice(org.json.JSONObject item) {
+        DevicePlugin plugin = open;
+        if (plugin == null) return;
+        try {
+            plugin.notifyListeners("bankNotice", JSObject.fromJSONObject(item));
+        } catch (JSONException e) {
+            /* The page picks it up from the inbox instead. */
+        }
+    }
+
+    /** Whether notification access is on, and which of the `packages` asked about are installed, with their names. */
+    @PluginMethod
+    public void bankState(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("access", NotificationManagerCompat.getEnabledListenerPackages(getContext()).contains(getContext().getPackageName()));
+        JSArray installed = new JSArray();
+        PackageManager pm = getContext().getPackageManager();
+        try {
+            for (String pkg : call.getArray("packages", new JSArray()).<String>toList()) {
+                try {
+                    JSObject app = new JSObject();
+                    app.put("pkg", pkg);
+                    app.put("label", pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString());
+                    installed.put(app);
+                } catch (PackageManager.NameNotFoundException e) {
+                    /* Not on this phone. */
+                }
+            }
+        } catch (JSONException e) {
+            /* Nothing asked about. */
+        }
+        result.put("installed", installed);
+        call.resolve(result);
+    }
+
+    /** Android's Notification access screen, open at this app where the phone allows it. */
+    @PluginMethod
+    public void bankSettings(PluginCall call) {
+        if (getActivity() != null) {
+            Intent intent;
+            if (Build.VERSION.SDK_INT >= 30) {
+                intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).putExtra(
+                    Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME,
+                    new ComponentName(getContext(), BankListener.class).flattenToString()
+                );
+            } else {
+                intent = new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS);
+            }
+            try {
+                getActivity().startActivity(intent);
+            } catch (RuntimeException e) {
+                try {
+                    getActivity().startActivity(new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS));
+                } catch (RuntimeException ignored) {
+                    /* No such screen on this phone. */
+                }
+            }
+        }
+        call.resolve();
+    }
+
+    /** Which apps and SMS senders to keep alerts from; all empty stops keeping any and clears the inbox. */
+    @PluginMethod
+    public void bankSources(PluginCall call) {
+        org.json.JSONObject sources = new org.json.JSONObject();
+        try {
+            sources.put("apps", call.getArray("apps", new JSArray()));
+            sources.put("sms", call.getArray("sms", new JSArray()));
+            sources.put("senders", call.getArray("senders", new JSArray()));
+        } catch (JSONException e) {
+            call.reject("Bad sources.");
+            return;
+        }
+        BankInbox.setSources(getContext(), sources);
+        call.resolve();
+    }
+
+    /**
+     * Past SMS from the bank `senders`, from `since` (epoch ms) on, oldest first, one-time codes
+     * left out. Asks for SMS access the first time; rejects with `sms/denied` if you say no.
+     */
+    @PluginMethod
+    public void bankSmsHistory(PluginCall call) {
+        if (getPermissionState("sms") != PermissionState.GRANTED) {
+            requestPermissionForAlias("sms", call, "smsResult");
+        } else {
+            readSms(call);
+        }
+    }
+
+    @PermissionCallback
+    private void smsResult(PluginCall call) {
+        if (getPermissionState("sms") == PermissionState.GRANTED) readSms(call);
+        else call.reject("SMS access was not allowed.", "sms/denied");
+    }
+
+    private void readSms(PluginCall call) {
+        JSArray senders = call.getArray("senders", new JSArray());
+        long since = call.getLong("since", 0L);
+        new Thread(() -> {
+            JSArray items = new JSArray();
+            String[] columns = { "_id", "address", "body", "date" };
+            try (Cursor c = getContext().getContentResolver().query(
+                Uri.parse("content://sms/inbox"), columns, "date >= ?", new String[] { String.valueOf(since) }, "date ASC"
+            )) {
+                while (c != null && c.moveToNext()) {
+                    String address = c.getString(1) == null ? "" : c.getString(1).trim();
+                    String body = c.getString(2) == null ? "" : BankInbox.mask(c.getString(2).trim());
+                    if (!BankInbox.containsName(senders, address) || !BankInbox.worthKeeping(body)) continue;
+                    JSObject item = new JSObject();
+                    item.put("id", "sms-" + c.getLong(0));
+                    item.put("pkg", "sms");
+                    item.put("app", "SMS");
+                    item.put("sms", true);
+                    item.put("title", address);
+                    item.put("text", body);
+                    item.put("at", c.getLong(3));
+                    items.put(item);
+                }
+            } catch (RuntimeException e) {
+                call.reject("Could not read SMS.", "sms/failed", e);
+                return;
+            }
+            JSObject result = new JSObject();
+            result.put("items", items);
+            call.resolve(result);
+        }).start();
+    }
+
+    @PluginMethod
+    public void bankPending(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("items", BankInbox.pending(getContext()));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void bankAck(PluginCall call) {
+        BankInbox.ack(getContext(), call.getArray("ids", new JSArray()));
+        call.resolve();
     }
 }

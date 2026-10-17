@@ -39,8 +39,10 @@ const ITEMS = [
 
 <script>
   import { mountDeviceSync } from '../scripts/device-sync';
+  import { mountBankSync } from '../scripts/bank-sync';
   import { onPage } from '../lib/page';
   onPage('device-sync', mountDeviceSync);
+  onPage('bank-sync', mountBankSync);
 </script>
 
 <style is:global>
