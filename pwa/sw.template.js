@@ -1,5 +1,5 @@
 /*
- * Service worker for Rewarding Work.
+ * Service worker for Grovyn.
  * Generated into dist/sw.js at build time by pwa/integration.mjs, which fills in
  * __VERSION__ (a hash of the build) and __PRECACHE__ (every file in the build).
  *

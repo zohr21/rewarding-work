@@ -1,4 +1,4 @@
-package app.rewardingwork;
+package app.grovyn;
 
 import android.app.PendingIntent;
 import android.content.Context;

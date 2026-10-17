@@ -80,7 +80,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       <div class="bk-access">
         <p><strong>Notification access:</strong> <span data-bk-s-access></span></p>
         <p class="muted bk__note">
-          Android asks you to allow it once. If it says the setting is restricted, open App info for Rewarding Work, then ⋮ →
+          Android asks you to allow it once. If it says the setting is restricted, open App info for Grovyn, then ⋮ →
           Allow restricted settings, and try again.
         </p>
         <button type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
@@ -394,7 +394,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       } catch (e) {
         error.textContent =
           (e as { code?: string }).code === 'sms/denied'
-            ? 'Android did not let the app read SMS. If it no longer asks, allow SMS for Rewarding Work in App info → Permissions.'
+            ? 'Android did not let the app read SMS. If it no longer asks, allow SMS for Grovyn in App info → Permissions.'
             : 'The SMS could not be read.';
         error.hidden = false;
       } finally {

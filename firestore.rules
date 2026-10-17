@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Security rules for Rewarding Work accounts. Paste into
+// Security rules for Grovyn accounts. Paste into
 // Firebase console → Firestore Database → Rules, then Publish.
 //
 // Each signed-in person (including guests) can read and write only their own

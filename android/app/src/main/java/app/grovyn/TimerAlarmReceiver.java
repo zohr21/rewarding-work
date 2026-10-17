@@ -1,4 +1,4 @@
-package app.rewardingwork;
+package app.grovyn;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;

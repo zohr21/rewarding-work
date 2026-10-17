@@ -342,7 +342,7 @@ function mountTimer(root: HTMLElement): () => void {
   function ongoingFor(s: TimerState, now: number): TimerOngoing | null {
     if (s.status === 'idle') return null;
     const title = PHASE_LABEL[s.phase];
-    const text = s.label || 'Rewarding Work';
+    const text = s.label || 'Grovyn';
     if (s.status === 'paused') {
       const rem = T.remaining(s, now);
       return { title: `${title} paused`, text: rem === null ? text : `${formatClock(rem, true)} left · ${text}` };

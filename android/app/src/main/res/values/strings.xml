@@ -1,9 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Rewarding Work</string>
-    <string name="title_activity_main">Rewarding Work</string>
-    <string name="package_name">app.rewardingwork</string>
-    <string name="custom_url_scheme">app.rewardingwork</string>
+    <string name="app_name">Grovyn</string>
+    <string name="title_activity_main">Grovyn</string>
+    <string name="package_name">app.grovyn</string>
+    <string name="custom_url_scheme">app.grovyn</string>
 
     <!-- Notification channels, as they appear in the phone's settings. -->
     <string name="channel_timer">Running timer</string>

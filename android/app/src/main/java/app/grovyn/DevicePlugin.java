@@ -1,4 +1,4 @@
-package app.rewardingwork;
+package app.grovyn;
 
 import android.Manifest;
 import android.content.ComponentName;

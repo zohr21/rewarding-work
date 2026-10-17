@@ -10,7 +10,7 @@ export const PASSWORD_MAX = 128;
 const COMMON = new Set([
   'password', 'password1', 'password123', '12345678', '123456789', '1234567890', 'qwertyui', 'qwerty123',
   'iloveyou', 'abcdefgh', 'abc12345', '11111111', '00000000', 'letmein1', 'welcome1', 'sunshine', 'football',
-  'baseball', 'princess', 'passw0rd', 'trustno1', 'rewarding', 'rewardingwork',
+  'baseball', 'princess', 'passw0rd', 'trustno1', 'rewarding', 'rewardingwork', 'grovyn',
 ]);
 
 /** A reason the password can't be used, or null if it's fine. */

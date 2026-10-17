@@ -2,7 +2,7 @@
 import { dayKey } from '../dates';
 import { chainsOf, exportBackup, type Backup } from '../storage';
 
-export const backupFileName = (now = new Date()) => `rewarding-work-${dayKey(now)}.json`;
+export const backupFileName = (now = new Date()) => `grovyn-${dayKey(now)}.json`;
 
 /** Saves the backup to the device and returns it (for a summary of what was saved). */
 export function downloadBackup(): Backup {

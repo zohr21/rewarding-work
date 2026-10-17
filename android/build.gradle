@@ -24,7 +24,7 @@ allprojects {
     }
     // Build output goes outside the project folder: inside a synced folder (OneDrive)
     // the sync client locks files mid-build and the build fails.
-    layout.buildDirectory = file("${System.getProperty('user.home')}/.cache/rewarding-work-android/${project.name}")
+    layout.buildDirectory = file("${System.getProperty('user.home')}/.cache/grovyn-android/${project.name}")
 }
 
 task clean(type: Delete) {

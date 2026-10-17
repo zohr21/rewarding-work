@@ -1174,7 +1174,9 @@ function migrateBreakdown(): void {
 
 // ---------- Export / import ----------
 
-export const BACKUP_APP_ID = 'rewarding-work';
+export const BACKUP_APP_ID = 'grovyn';
+/** Backups made before the app was renamed from Rewarding Work. They import the same way. */
+const OLD_BACKUP_APP_IDS: readonly string[] = ['rewarding-work'];
 
 /** Everything worth backing up. The live timer state is deliberately left out. */
 export interface BackupData {
@@ -1228,8 +1230,8 @@ export function parseBackup(text: string): ParseResult {
   } catch {
     return { ok: false, error: "This file isn't valid JSON." };
   }
-  if (!isObj(json) || json.app !== BACKUP_APP_ID || !isObj(json.data)) {
-    return { ok: false, error: "This doesn't look like a Rewarding Work export." };
+  if (!isObj(json) || (json.app !== BACKUP_APP_ID && !OLD_BACKUP_APP_IDS.includes(json.app as string)) || !isObj(json.data)) {
+    return { ok: false, error: "This doesn't look like a Grovyn export." };
   }
   if (typeof json.schemaVersion !== 'number' || json.schemaVersion > SCHEMA_VERSION) {
     return { ok: false, error: 'This export comes from a newer version of the site. Reload the page and try again.' };
