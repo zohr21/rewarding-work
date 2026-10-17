@@ -1,4 +1,4 @@
-# Rewarding Work
+# Grovyn
 
 A static site that teaches evidence-aware techniques for making tasks feel rewarding —
 and lets you try each one on the spot. Built with Astro, TypeScript and plain CSS.
@@ -115,7 +115,8 @@ The catch: a component's `<script>` runs **once per visit, not once per page**. 
   Every read has a type guard, so corrupted or hand-edited data falls back to a
   safe default instead of breaking the page.
 - Export/import (on `/progress`) writes and reads a JSON file:
-  `{ "app": "rewarding-work", "schemaVersion": 1, "exportedAt": "...", "data": { ... } }`.
+  `{ "app": "grovyn", "schemaVersion": 1, "exportedAt": "...", "data": { ... } }`.
+  Files from before the rename (`"app": "rewarding-work"`) still import.
   Import can **merge** (keep yours, add new entries by id/day) or **replace**.
   Unreadable entries in a file are skipped and counted, not fatal.
 - Calculations (totals, heatmap buckets, chain lengths) live in `src/lib/stats.ts`;

@@ -1,4 +1,4 @@
-package app.rewardingwork;
+package app.grovyn;
 
 import android.service.notification.NotificationListenerService;
 import android.service.notification.StatusBarNotification;

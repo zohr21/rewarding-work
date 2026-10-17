@@ -1,4 +1,4 @@
-package app.rewardingwork;
+package app.grovyn;
 
 import android.Manifest;
 import android.app.AlarmManager;
@@ -123,7 +123,7 @@ final class TimerNotices {
     }
 
     private static Intent alarmIntent(Context context, int index) {
-        return new Intent(context, TimerAlarmReceiver.class).setAction("app.rewardingwork.TIMER_ALERT_" + index);
+        return new Intent(context, TimerAlarmReceiver.class).setAction("app.grovyn.TIMER_ALERT_" + index);
     }
 
     private static void schedule(Context context, int index, JSONObject alert) {

@@ -72,7 +72,7 @@ export function buildDoc(data: ExportData): DocBuild {
   const focus = focusByTask(data.allSessions);
   const open = data.tasks.filter((t) => t.status === 'active');
 
-  w.para('REWARDING WORK · REPORT', undefined, { bold: true, fontSize: { magnitude: 9, unit: 'PT' } });
+  w.para('GROVYN · REPORT', undefined, { bold: true, fontSize: { magnitude: 9, unit: 'PT' } });
   w.para(options.range === 'week' ? `Week of ${data.rangeLabel}` : `${data.rangeLabel}, to ${longFmt.format(now)}`, 'TITLE');
   w.para(`Exported ${longFmt.format(now)}. Everything below comes from your own data.`);
   w.para('');
@@ -199,7 +199,7 @@ export function buildDoc(data: ExportData): DocBuild {
   }
 
   w.para('');
-  w.para('Created by Rewarding Work. This document lives in your Drive and is not updated automatically.', undefined, { italic: true });
+  w.para('Created by Grovyn. This document lives in your Drive and is not updated automatically.', undefined, { italic: true });
 
   return { requests: w.requests(), outline };
 }

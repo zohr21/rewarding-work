@@ -23,7 +23,7 @@ async function walk(dir) {
 
 export default function serviceWorker() {
   return {
-    name: 'rewarding-work:service-worker',
+    name: 'grovyn:service-worker',
     hooks: {
       'astro:build:done': async ({ dir, logger }) => {
         const out = fileURLToPath(dir);

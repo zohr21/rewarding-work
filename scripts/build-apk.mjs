@@ -42,10 +42,10 @@ try {
 if (built.status !== 0) process.exit(built.status ?? 1);
 
 // Same place as layout.buildDirectory in android/build.gradle.
-const apk = join(homedir(), '.cache/rewarding-work-android/app/outputs/apk/debug/app-debug.apk');
+const apk = join(homedir(), '.cache/grovyn-android/app/outputs/apk/debug/app-debug.apk');
 // A copy in the project folder, easy to find and send to a phone.
-copyFileSync(apk, join(root, 'rewarding-work.apk'));
-console.log('\nApp built: rewarding-work.apk');
+copyFileSync(apk, join(root, 'grovyn.apk'));
+console.log('\nApp built: grovyn.apk');
 
 const devices = spawnSync('adb', ['devices'], { encoding: 'utf8', shell: win }).stdout ?? '';
 if (/\tdevice/.test(devices)) {

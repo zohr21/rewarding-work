@@ -101,13 +101,13 @@
   const COPY: Record<Dest, { go: string; trust: string; caption: string; note: string }> = {
     sheets: {
       go: 'Create Google Sheet',
-      trust: 'Creates one new Sheet in your Drive. Rewarding Work can make files but cannot read your other Drive files.',
+      trust: 'Creates one new Sheet in your Drive. Grovyn can make files but cannot read your other Drive files.',
       caption: '· one tab per kind',
       note: "The Dashboard's numbers are formulas over the other tabs, so it keeps working if you add rows of your own.",
     },
     docs: {
       go: 'Create Google Doc',
-      trust: 'Creates one new Doc in your Drive. Rewarding Work can make files but cannot read your other Drive files.',
+      trust: 'Creates one new Doc in your Drive. Grovyn can make files but cannot read your other Drive files.',
       caption: '· a readable report',
       note: 'Good for a weekly review, or to share with a coach. It is a snapshot: it does not update itself.',
     },
@@ -150,7 +150,7 @@
 
     function defaultName(data: ExportData): string {
       if (dest === 'backup') return backupFileName();
-      if (dest === 'sheets') return `Rewarding Work · ${monthFmt.format(data.now)}`;
+      if (dest === 'sheets') return `Grovyn · ${monthFmt.format(data.now)}`;
       return data.options.range === 'week' ? `Weekly report · ${data.rangeLabel}` : `Report · ${RANGE_LABELS[data.options.range]}`;
     }
 
