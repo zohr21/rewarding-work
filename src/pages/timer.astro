@@ -108,7 +108,7 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
     /** The card under the list follows the mode picked in the timer. */
     const showRhythm = () => {
       const mode = document.querySelector<HTMLInputElement>('input[name="timer-mode"]:checked')?.value;
-      document.querySelectorAll<HTMLElement>('[data-rhythm]').forEach((card) => (card.hidden = card.dataset.rhythm !== mode));
+      document.querySelectorAll<HTMLElement>('.rhythm[data-rhythm]').forEach((card) => (card.hidden = card.dataset.rhythm !== mode));
     };
 
     renderTasks();

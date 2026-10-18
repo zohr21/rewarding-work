@@ -37,7 +37,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   <div class="timer__head">
     <h2 id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
     {/* In the app the rhythm is a chip under the dial that opens the four choices; the site shows them all, always open. */}
-    <details class="timer__rhythm" data-rhythm open={!NATIVE_APP}>
+    <details class="timer__rhythm" data-rhythm-menu open={!NATIVE_APP}>
       <summary class="timer__rhythm-chip">
         <span data-rhythm-label>{TIMER_MODE_LABELS[defaultMode ?? 'pomodoro']}</span>
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>

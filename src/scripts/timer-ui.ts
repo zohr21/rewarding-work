@@ -102,7 +102,7 @@ function mountTimer(root: HTMLElement): () => void {
   const els = {
     modes: Array.from(root.querySelectorAll<HTMLInputElement>('input[name="timer-mode"]')),
     modeHint: q<HTMLElement>('[data-mode-hint]'),
-    rhythm: root.querySelector<HTMLDetailsElement>('[data-rhythm]'),
+    rhythm: root.querySelector<HTMLDetailsElement>('[data-rhythm-menu]'),
     rhythmLabel: root.querySelector<HTMLElement>('[data-rhythm-label]'),
     custom: q<HTMLElement>('[data-custom]'),
     customWork: q<HTMLInputElement>('[data-custom-work]'),

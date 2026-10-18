@@ -177,6 +177,10 @@ const CHECK = 'M5 12l5 5 9-10';
     function renderTiles(): void {
       const today = range === 'today';
       const shown = days.slice(-SPAN[range]);
+      // Today is only part of a day, so daily averages leave it out (unless it is all there is).
+      const todayKey = dayKey(new Date());
+      const finished = shown.filter((d) => d.day !== todayKey);
+      const whole = today || !finished.length ? shown : finished;
       const span = range === 'week' ? 'this week' : 'this month';
       const allowed = (kind: HealthKind) => !!state?.[kind];
       const off = (kind: HealthKind, ask: HealthKind[] = [kind]) => tile(kind, 'Off', 'Not allowed in Health Connect', undefined, ask);
@@ -191,12 +195,12 @@ const CHECK = 'M5 12l5 5 9-10';
       else if (today) tile('sleep', hm(sleep[0]!), 'Last night · goal 8h', sleep[0]! / GOALS.sleepMin);
       else tile('sleep', hm(avg(sleep)), `Nightly average · ${sleep.length} nights`);
 
-      const steps = numbers(shown, 'steps');
+      const steps = numbers(whole, 'steps');
       if (!allowed('steps')) off('steps');
       else if (!steps.length && today) tile('steps', '0', `Goal ${GOALS.steps.toLocaleString()}`, 0);
       else if (!steps.length) tile('steps', 'No data', `Nothing recorded ${span}`);
       else if (today) tile('steps', steps[0]!.toLocaleString(), `Goal ${GOALS.steps.toLocaleString()}`, steps[0]! / GOALS.steps);
-      else tile('steps', Math.round(avg(steps)).toLocaleString(), `Daily average · ${steps.reduce((a, b) => a + b, 0).toLocaleString()} in all`);
+      else tile('steps', Math.round(avg(steps)).toLocaleString(), `Daily average · ${sum(numbers(shown, 'steps')).toLocaleString()} in all`);
 
       const active = numbers(shown, 'activeMin');
       const total = active.reduce((a, b) => a + b, 0);
@@ -212,21 +216,27 @@ const CHECK = 'M5 12l5 5 9-10';
       else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
 
       // Total burned leads, active is the part from moving; either one alone still fills the tile.
-      const burned = numbers(shown, 'totalKcal');
-      const moving = numbers(shown, 'activeKcal');
+      // Health Connect fills a day nothing was recorded for with the resting rate alone (the same
+      // ~1,500 kcal whether you walked 16,000 steps or none), so once a watch or app records active
+      // calories, only the days it covered count, and both numbers come from the same days.
+      const recorded = whole.filter((d) => typeof d.activeKcal === 'number');
+      const counted = recorded.length ? recorded : whole;
+      const burned = numbers(counted, 'totalKcal');
+      const moving = numbers(counted, 'activeKcal');
+      const dayCount = today || counted.length === shown.length ? '' : ` · ${counted.length} ${counted.length === 1 ? 'day' : 'days'}`;
       const askCalories = (['calories', 'activeCalories'] as const).filter((k) => !allowed(k));
       if (askCalories.length === 2) off('calories', [...askCalories]);
       else if (!burned.length && !moving.length) tile('calories', today ? '0 kcal' : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
       else if (burned.length) {
         const activePart = moving.length ? `${kcal(today ? moving[0]! : avg(moving))} active` : allowed('activeCalories') ? 'No active calories recorded' : 'Active not allowed';
-        tile('calories', kcal(today ? burned[0]! : avg(burned)), today ? `${activePart} · so far today` : `Daily average · ${activePart}`);
-      } else tile('calories', kcal(today ? moving[0]! : avg(moving)), today ? 'Active · so far today' : 'Active · daily average');
+        tile('calories', kcal(today ? burned[0]! : avg(burned)), today ? `${activePart} · so far today` : `Daily average · ${activePart}${dayCount}`);
+      } else tile('calories', kcal(today ? moving[0]! : avg(moving)), today ? 'Active · so far today' : `Active · daily average${dayCount}`);
 
-      const walked = numbers(shown, 'distanceM');
+      const walked = numbers(whole, 'distanceM');
       if (!allowed('distance')) off('distance');
       else if (!walked.length) tile('distance', today ? distance(0) : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
       else if (today) tile('distance', distance(walked[0]!), 'Walked, run and cycled today');
-      else tile('distance', distance(avg(walked)), `Daily average · ${distance(sum(walked))} in all`);
+      else tile('distance', distance(avg(walked)), `Daily average · ${distance(sum(numbers(shown, 'distanceM')))} in all`);
     }
 
     /** Allowed, yet nothing in a month: no app on the phone is handing that kind to Health Connect. */
