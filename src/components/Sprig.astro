@@ -1,0 +1,88 @@
+---
+/**
+ * Sprig, the mascot (drawing in src/lib/sprig.ts). With stage "auto" it shows the
+ * user's own Sprig, grown as far as their focus-time tier, and grows when a session
+ * lands. Scripts change its mood or stage with paintSprig().
+ */
+import { sprigSvg, type SprigMood } from '../lib/sprig';
+
+interface Props {
+  /** 0 (seed) to 5 (Grove), or "auto" for the user's own. */
+  stage?: number | 'auto';
+  mood?: SprigMood;
+  /** Width in px. */
+  size?: number;
+  /** Gently bob up and down, for a Sprig that is the centre of the screen. */
+  bob?: boolean;
+  class?: string;
+}
+
+const { stage = 'auto', mood = 'happy', size = 120, bob = false, class: className } = Astro.props;
+const auto = stage === 'auto';
+const first = auto ? 0 : stage;
+---
+
+<span
+  class:list={['sprig', { 'sprig--bob': bob }, className]}
+  data-sprig
+  data-sprig-auto={auto ? '' : undefined}
+  data-stage={first}
+  data-mood={mood}
+  data-size={size}
+  data-drawn={auto ? undefined : `${first}:${mood}`}
+  set:html={sprigSvg({ stage: first, mood, size })}
+/>
+
+<script>
+  import { getSessions, subscribe } from '../lib/storage';
+  import { paintSprig, sprigStage } from '../lib/sprig';
+  import { cleanups, onPage } from '../lib/page';
+
+  onPage('sprig', () => {
+    const hosts = [...document.querySelectorAll<HTMLElement>('[data-sprig-auto]')];
+    if (!hosts.length) return;
+    const c = cleanups();
+    const render = () => {
+      const stage = sprigStage(getSessions());
+      for (const host of hosts) paintSprig(host, { stage });
+    };
+    render();
+    c.add(subscribe('sessions', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .sprig {
+    display: inline-grid;
+    place-items: end center;
+    flex: none;
+    color: var(--color-text-muted);
+    line-height: 0;
+  }
+
+  .sprig :global(.sprig__art) {
+    overflow: visible;
+  }
+
+  /* An auto Sprig waits for the user's stage, so a Tree never flashes up as a seed. */
+  .sprig[data-sprig-auto]:not([data-drawn]) {
+    visibility: hidden;
+  }
+
+  .sprig--bob :global(.sprig__head) {
+    animation: sprig-bob 3.2s ease-in-out infinite;
+  }
+
+  @keyframes sprig-bob {
+    50% {
+      translate: 0 -3px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sprig--bob :global(.sprig__head) {
+      animation: none;
+    }
+  }
+</style>

@@ -7,7 +7,7 @@
  * page keeps running on /timer, after a reload, or in another tab.
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import BrandMark from './BrandMark.astro';
+import Sprig from './Sprig.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES, TONE_LABELS } from '../lib/timer/cues';
@@ -82,6 +82,14 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
         data-circumference={CIRCUMFERENCE}></circle>
     </svg>
     <div class="timer__readout">
+      {/* On /timer Sprig keeps you company: eyes closed while you focus, cheering when a session ends (timer-ui.ts). */}
+      {
+        standalone && (
+          <span class="timer__sprig" data-timer-sprig>
+            <Sprig size={58} />
+          </span>
+        )
+      }
       <p class="timer__phase" data-phase-label>Focus</p>
       <p class="timer__time" role="timer" aria-atomic="true" data-time>25:00</p>
       <p class="timer__dots" data-dots hidden>
@@ -174,8 +182,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
             <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </button>
-        <BrandMark size={120} class="done__coin" />
-        <h2 id="done-title" class="done__title">Session complete</h2>
+        <Sprig mood="cheer" size={132} class="done__coin" />
+        <h2 id="done-title" class="done__title" data-done-title>Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
         <div class="done__form" data-done-slot />
@@ -392,6 +400,11 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     display: grid;
     place-content: center;
     gap: var(--space-1);
+  }
+
+  .timer__sprig {
+    justify-self: center;
+    margin-bottom: calc(var(--space-1) * -1);
   }
 
   .timer__phase {

@@ -8,6 +8,7 @@ import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy
 import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
+import { paintSprig, sprigStage, sprigStageName, type SprigMood } from '../lib/sprig';
 import { el } from '../lib/dom';
 import { NATIVE_APP } from '../config/app';
 import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
@@ -152,7 +153,11 @@ function mountTimer(root: HTMLElement): () => void {
     done: root.querySelector<HTMLDialogElement>('[data-done]'),
     /** The app's row of tasks to pick from, under "What are you working on?". */
     picks: root.querySelector<HTMLElement>('[data-task-picks]'),
+    /** Sprig in the dial, on /timer only. */
+    sprig: root.querySelector<HTMLElement>('[data-timer-sprig] [data-sprig]'),
   };
+  /** Sprig cheers until this time after a phase ends. */
+  let cheerUntil = 0;
   // In the app the note form is part of that screen.
   els.done?.querySelector('[data-done-slot]')?.append(els.log);
   const circumference = Number(els.ring.dataset.circumference);
@@ -276,6 +281,21 @@ function mountTimer(root: HTMLElement): () => void {
     void els.dial.offsetWidth; // restart the animation
     els.dial.classList.add('is-complete');
     window.setTimeout(() => els.dial.classList.remove('is-complete'), 1000);
+    cheerUntil = Date.now() + 5000;
+    renderSprig();
+    window.setTimeout(renderSprig, 5050);
+  }
+
+  /** Sprig's face follows the timer: eyes closed while you focus, sleepy when Flowtime asks. */
+  function renderSprig(): void {
+    if (!els.sprig) return;
+    const now = Date.now();
+    let mood: SprigMood = 'happy';
+    if (cheerUntil > now) mood = 'cheer';
+    else if (T.checkInDue(state, now)) mood = 'sleepy';
+    else if (state.status === 'paused') mood = 'curious';
+    else if (state.status === 'running' && state.phase === 'work') mood = 'focus';
+    paintSprig(els.sprig, { mood });
   }
 
   // ---- Scheduling: display refresh + an exact one-shot timeout for the phase end ----
@@ -305,6 +325,7 @@ function mountTimer(root: HTMLElement): () => void {
     if (due) els.toggle.textContent = 'Keep going';
     if (due === askedCheckIn) return;
     askedCheckIn = due;
+    renderSprig();
     if (!due) return;
     const text = checkInText(T.checkInMs(state));
     setMessage(`Still focusing? ${text}`);
@@ -377,6 +398,7 @@ function mountTimer(root: HTMLElement): () => void {
     els.toggle.textContent = status === 'running' ? 'Pause' : status === 'paused' ? 'Resume' : phase === 'work' ? 'Start focus' : 'Start break';
     els.stop.hidden = !(mode === 'flowtime' && phase === 'work' && status !== 'idle');
     renderCheckIn(false);
+    renderSprig();
     els.skip.hidden = !T.isBreak(phase);
     els.reset.disabled = !inPhase;
 
@@ -498,6 +520,14 @@ function mountTimer(root: HTMLElement): () => void {
     if (!done) return;
     const what = session.label ? ` on “${session.label}”` : '';
     done.querySelector('[data-done-text]')!.textContent = `${minutesText(session.focusSeconds * 1000)} of focus${what}. ${next}`;
+
+    // Sprig cheers either way; when this session crossed a tier, the title says what it grew into.
+    const sessions = getSessions();
+    const stage = sprigStage(sessions);
+    const grew = stage > sprigStage(sessions.filter((s) => s.id !== session.id));
+    const sprig = done.querySelector<HTMLElement>('[data-sprig]');
+    if (sprig) paintSprig(sprig, { stage, mood: 'cheer' });
+    done.querySelector('[data-done-title]')!.textContent = grew ? `Sprig grew into ${sprigStageName(stage)}!` : 'Session complete';
 
     const p = trackProgress({ sessions: getSessions(), done: [], chainDays: [] }, TRACKS[0]!);
     const { track, level } = p;
