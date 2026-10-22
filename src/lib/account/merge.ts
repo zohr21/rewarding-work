@@ -47,7 +47,12 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
 
   switch (name) {
     case 'sessions': {
-      const all = unionById<FocusSession>(list(local, isFocusSession), list(remote, isFocusSession));
+      // A session removed on either side stays removed.
+      const removed = new Map(list(remote, isFocusSession).filter((s) => s.removedAt !== undefined).map((s) => [s.id, s]));
+      const all = unionById<FocusSession>(
+        list(local, isFocusSession).map((s) => (s.removedAt === undefined && removed.get(s.id)) || s),
+        list(remote, isFocusSession),
+      );
       return JSON.stringify(all.sort((x, y) => x.start - y.start));
     }
     case 'done': {
