@@ -3,11 +3,23 @@
  * Reward tiers on the progress page: a grove with one plant per track, then one
  * ladder of five tiers per track (src/lib/rewards.ts), with how far it is to the next one.
  * Before anything has counted towards a tier it is one seed instead, with the first goal.
+ * Sprig stands at the top, grown as far as the focus-time tier.
  */
+import Sprig from './Sprig.astro';
 ---
 
 <section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
   <h2 id="tiers-heading" class="panel-title">Your tiers</h2>
+  <div class="tiers__sprig" data-tiers-sprig>
+    <Sprig mood="auto" size={96} bob />
+    <div class="tiers__sprig-text">
+      <p class="tiers__sprig-name" data-tiers-sprig-name></p>
+      <p class="muted" data-tiers-sprig-next></p>
+      <div class="tiers__sprig-bar" role="progressbar" aria-label="Sprig's growth to the next stage" aria-valuemin="0" aria-valuemax="100" data-tiers-sprig-bar>
+        <span></span>
+      </div>
+    </div>
+  </div>
   <p class="muted tiers__intro">
     Markers along the way — there to show how far you've come, not to keep score. Green to start, then bronze, silver
     and gold, with diamond for the hardest runs. The chain counts your best run, so a missed day never takes a tier
@@ -17,17 +29,8 @@
   <ul class="tiers__grid" data-tiers-list></ul>
 
   <div class="seed" data-tiers-seed hidden>
-    <svg class="seed__art" viewBox="0 0 120 64" width="168" height="90" aria-hidden="true">
-      <ellipse cx="60" cy="58" rx="54" ry="6" fill="var(--well-bg)"></ellipse>
-      <g fill="var(--color-border)">
-        <circle cx="22" cy="40" r="9"></circle>
-        <circle cx="98" cy="34" r="12"></circle>
-        <circle cx="40" cy="30" r="12"></circle>
-        <circle cx="80" cy="22" r="15"></circle>
-      </g>
-      <circle cx="60" cy="52" r="5" fill="var(--tier-1)"></circle>
-    </svg>
-    <h3 class="seed__title">A seed, waiting</h3>
+    <Sprig stage={0} size={100} bob />
+    <h3 class="seed__title">Sprig is a seed, waiting</h3>
     <p class="muted" data-tiers-seed-text></p>
     <div class="seed__bar" aria-hidden="true"><span></span></div>
     <p class="muted seed__count" data-tiers-seed-count></p>
@@ -40,6 +43,7 @@
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
   import { allProgress, chainInput, tierLabel, TIER_MATERIALS, TIER_NAMES, type TrackProgress } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
+  import { sprigGrowth, sprigStageName } from '../lib/sprig';
   import { cleanups, onPage } from '../lib/page';
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -154,12 +158,13 @@
       const grove = root.querySelector<HTMLElement>('[data-tiers-grove]')!;
       const intro = root.querySelector<HTMLElement>('.tiers__intro')!;
       const seed = root.querySelector<HTMLElement>('[data-tiers-seed]')!;
+      const sprig = root.querySelector<HTMLElement>('[data-tiers-sprig]')!;
       const render = () => {
         const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
         // Nothing has counted yet: one seed and the first goal, not four ladders of "not yet".
         const bare = progress.every((p) => p.value === 0);
         seed.hidden = !bare;
-        grove.hidden = list.hidden = intro.hidden = bare;
+        grove.hidden = list.hidden = intro.hidden = sprig.hidden = bare;
         if (bare) {
           const focus = progress.find((p) => p.track.id === 'focus') ?? progress[0]!;
           const goal = focus.track.thresholds[0]!;
@@ -178,6 +183,23 @@
           );
           return;
         }
+        // Sprig grows with focus time only, so its size always means real focus.
+        const focus = progress.find((p) => p.track.id === 'focus')!;
+        const goal = focus.track.thresholds[focus.level];
+        root.querySelector('[data-tiers-sprig-name]')!.textContent = focus.level
+          ? `Sprig is a ${tierLabel(focus.level - 1)}`
+          : 'Sprig is still a seed';
+        root.querySelector('[data-tiers-sprig-next]')!.textContent =
+          goal === undefined
+            ? 'A whole grove. Sprig has grown as far as it can.'
+            : `${(Math.ceil((goal - focus.value) * 10) / 10).toLocaleString()} more ${focus.track.unit(goal - focus.value)} of focus to grow into ${sprigStageName(focus.level + 1)}.`;
+        // The bar fills in the next stage's colour, a bud for each quarter of it.
+        const bar = root.querySelector<HTMLElement>('[data-tiers-sprig-bar]')!;
+        const { share } = sprigGrowth(getSessions());
+        bar.hidden = goal === undefined;
+        bar.setAttribute('aria-valuenow', String(Math.round(share * 100)));
+        bar.style.setProperty('--share', `${share * 100}%`);
+        bar.style.setProperty('--next', `var(--tier-${Math.min(4, focus.level)})`);
         grove.replaceChildren(...progress.map(renderPlant));
         list.replaceChildren(...progress.map(renderTrack));
       };
@@ -193,6 +215,52 @@
 <style>
   .tiers [hidden] {
     display: none;
+  }
+
+  /* Sprig, on its own patch of ground, with what it is and how far to the next stage. */
+  .tiers__sprig {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-4);
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4) 0 var(--space-2);
+    background: var(--well-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .tiers__sprig-text {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    align-self: center;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .tiers__sprig-bar {
+    margin-top: var(--space-2);
+    block-size: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+    overflow: hidden;
+  }
+
+  .tiers__sprig-bar > span {
+    display: block;
+    inline-size: var(--share, 0%);
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--next);
+    transition: inline-size var(--duration-base) var(--ease-out);
+  }
+
+  .tiers__sprig-name {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: 1.15;
   }
 
   .seed {

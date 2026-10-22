@@ -9,6 +9,7 @@
  */
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
+import Sprig from './Sprig.astro';
 ---
 
 <section
@@ -48,8 +49,11 @@ import { url } from '../lib/paths';
   </div>
 
   <a class="today__nudge" href={`${url('/progress')}#tiers`} data-td-nudge hidden>
-    <span class="tier-coin tier-coin--blank" data-td-nudge-coin></span>
-    <span class="today__nudge-text" data-td-nudge-text></span>
+    <Sprig mood="auto" rest="curious" size={46} />
+    <span class="today__nudge-body">
+      <span class="today__nudge-text" data-td-nudge-text></span>
+      <span class="today__nudge-bar" aria-hidden="true" data-td-nudge-bar><span></span></span>
+    </span>
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
   </a>
 </section>
@@ -61,14 +65,14 @@ import { url } from '../lib/paths';
   import { chainStats, dailyMinutes, totals } from '../lib/stats';
   import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
   import { miniBars, ring } from '../lib/charts';
-  import { tierIcon } from '../lib/tier-icons';
+  import { sprigMood, sprigSvg } from '../lib/sprig';
   import { addDays, dayKey, startOfWeek } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
   import { el } from '../lib/dom';
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  const SEED_SVG =
-    '<svg viewBox="0 0 56 44" width="72" height="56" aria-hidden="true"><ellipse cx="28" cy="40" rx="22" ry="4" fill="var(--well-bg)"/><path d="M28 39V24" stroke="var(--color-accent)" stroke-width="2.5" stroke-linecap="round"/><path d="M28 27c-8 0-11-6-11-10 6 0 11 3 11 10zM28 24c0-8 6-12 12-12 0 6-4 12-12 12z" fill="var(--color-accent)"/></svg>';
+  /** Sprig, still a seed, waiting for the first session. */
+  const SEED_SVG = sprigSvg({ stage: 0, mood: 'happy', size: 84 });
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const PLAY_SVG =
@@ -226,12 +230,14 @@ import { url } from '../lib/paths';
       if (nudge.hidden || !closest) return;
       const { p, next, share } = closest;
       const left = p.track.id === 'focus' ? Math.ceil((next - p.value) * 10) / 10 : Math.ceil(next - p.value);
-      const coin = $('[data-td-nudge-coin]');
-      coin.innerHTML = tierIcon(p.level, 22);
-      coin.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
-      coin.style.setProperty('--next', `var(--tier-${p.level})`);
+      const bar = $('[data-td-nudge-bar]');
+      bar.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
+      bar.style.setProperty('--next', `var(--tier-${p.level})`);
       const text = $('[data-td-nudge-text]');
-      text.replaceChildren(el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
+      // Sprig's mood (Sprig.astro) gets a word to go with it.
+      const mood = sprigMood(getSessions(), 'curious');
+      const say = mood === 'cheer' ? 'Nice session! ' : mood === 'gentle' ? 'Welcome back! ' : '';
+      text.replaceChildren(say, el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
     }
 
     const render = () => {
@@ -486,13 +492,13 @@ import { url } from '../lib/paths';
     font-size: var(--text-xs);
   }
 
-  /* The closest tier: a blank coin with a ring that fills in the next material's colour. */
+  /* The closest tier: Sprig points at it, with a bar that fills in the next material's colour. */
   .today__nudge {
     display: flex;
     align-items: center;
     gap: var(--space-3);
     min-height: 56px;
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-3) var(--space-2) var(--space-1);
     border: 1px solid var(--color-border-strong);
     border-radius: 18px;
     background: var(--raised-grad);
@@ -508,20 +514,27 @@ import { url } from '../lib/paths';
     display: none;
   }
 
-  .today__nudge .tier-coin {
-    --coin-size: 38px;
-    margin: 0;
-    opacity: 1;
-    color: var(--next);
-    background:
-      radial-gradient(circle, var(--well-bg) 58%, transparent 60%),
-      conic-gradient(var(--next) var(--share), var(--color-border) 0);
-    box-shadow: none;
+  .today__nudge-body {
+    display: grid;
+    flex: 1;
+    gap: 6px;
+    min-width: 0;
   }
 
-  .today__nudge-text {
-    flex: 1;
-    min-width: 0;
+  .today__nudge-bar {
+    block-size: 6px;
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    overflow: hidden;
+  }
+
+  .today__nudge-bar > span {
+    display: block;
+    inline-size: var(--share, 0%);
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--next);
   }
 
   .today__nudge > svg {

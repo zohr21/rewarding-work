@@ -6,6 +6,7 @@
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import BrandMark from '../components/BrandMark.astro';
+import Sprig from '../components/Sprig.astro';
 import { MODULES } from '../config/site';
 import { url } from '../lib/paths';
 ---
@@ -13,9 +14,10 @@ import { url } from '../lib/paths';
 <BaseLayout title="Welcome" bare>
   <div class="container welcome" data-welcome>
     <header class="welcome__head">
-      <BrandMark size={88} />
-      <p class="welcome__word">grovyn</p>
-      <h1 class="welcome__lead">Every focus session grows your grove.</h1>
+      <p class="welcome__word"><BrandMark size={32} />grovyn</p>
+      <p class="welcome__say">Hi, I'm Sprig! I'm just a seed for now.</p>
+      <Sprig stage={0} size={124} bob />
+      <h1 class="welcome__lead">Every minute you focus helps Sprig grow, from a seed to a whole grove.</h1>
     </header>
 
     <section class="welcome__pick" aria-labelledby="welcome-pick-h">
@@ -87,15 +89,47 @@ import { url } from '../lib/paths';
   }
 
   .welcome__word {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
     font-family: var(--font-display);
     font-weight: 700;
-    font-size: 2rem;
+    font-size: 1.5rem;
     letter-spacing: -0.035em;
     line-height: 1;
   }
 
+  /* Sprig's speech bubble, with its tail pointing down at Sprig. */
+  .welcome__say {
+    position: relative;
+    max-width: 16rem;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+    font-weight: 500;
+  }
+
+  .welcome__say::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: 50%;
+    translate: -50% -50%;
+    rotate: 45deg;
+    inline-size: 14px;
+    block-size: 14px;
+    border-inline-end: 1px solid var(--color-border);
+    border-block-end: 1px solid var(--color-border);
+    background: var(--color-surface-solid);
+  }
+
   .welcome__lead {
-    max-width: 18rem;
+    max-width: 19rem;
     font-family: var(--font-sans);
     font-size: var(--text-base);
     font-weight: 400;

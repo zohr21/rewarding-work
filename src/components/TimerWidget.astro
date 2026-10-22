@@ -7,7 +7,7 @@
  * page keeps running on /timer, after a reload, or in another tab.
  */
 import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
-import BrandMark from './BrandMark.astro';
+import Sprig from './Sprig.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES, TONE_LABELS } from '../lib/timer/cues';
@@ -81,7 +81,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
         data-ring
         data-circumference={CIRCUMFERENCE}></circle>
     </svg>
-    <div class="timer__readout">
+    <div class:list={['timer__readout', { 'timer__readout--sprig': standalone }]}>
+      {/* On /timer Sprig keeps you company: eyes closed while you focus, cheering when a session ends (timer-ui.ts). */}
+      {
+        standalone && (
+          <span class="timer__sprig" data-timer-sprig>
+            <Sprig size={42} />
+          </span>
+        )
+      }
       <p class="timer__phase" data-phase-label>Focus</p>
       <p class="timer__time" role="timer" aria-atomic="true" data-time>25:00</p>
       <p class="timer__dots" data-dots hidden>
@@ -174,8 +182,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
             <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </button>
-        <BrandMark size={120} class="done__coin" />
-        <h2 id="done-title" class="done__title">Session complete</h2>
+        <Sprig mood="cheer" size={132} class="done__coin" />
+        <h2 id="done-title" class="done__title" data-done-title>Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
         <div class="done__form" data-done-slot />
@@ -392,6 +400,23 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     display: grid;
     place-content: center;
     gap: var(--space-1);
+  }
+
+  .timer__sprig {
+    justify-self: center;
+  }
+
+  /* With Sprig above them, the phase and time are a size smaller so the time clears the ring. */
+  .timer__readout--sprig {
+    gap: 2px;
+  }
+
+  .timer__readout--sprig .timer__phase {
+    font-size: var(--text-xs);
+  }
+
+  .timer--standalone .timer__readout--sprig .timer__time {
+    font-size: clamp(2.25rem, 11vw, 3.5rem);
   }
 
   .timer__phase {
@@ -702,6 +727,11 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   :global(html[data-app]) .timer .timer__time {
     font-size: 3.25rem;
+  }
+
+  /* Sprig takes the top of the dial, so the time steps down to stay inside the ring. */
+  :global(html[data-app]) .timer .timer__readout--sprig .timer__time {
+    font-size: 2.5rem;
   }
 
   :global(html[data-app]) .timer__message {
