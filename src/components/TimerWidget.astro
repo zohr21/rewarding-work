@@ -81,12 +81,12 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
         data-ring
         data-circumference={CIRCUMFERENCE}></circle>
     </svg>
-    <div class="timer__readout">
+    <div class:list={['timer__readout', { 'timer__readout--sprig': standalone }]}>
       {/* On /timer Sprig keeps you company: eyes closed while you focus, cheering when a session ends (timer-ui.ts). */}
       {
         standalone && (
           <span class="timer__sprig" data-timer-sprig>
-            <Sprig size={58} />
+            <Sprig size={42} />
           </span>
         )
       }
@@ -404,7 +404,19 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   .timer__sprig {
     justify-self: center;
-    margin-bottom: calc(var(--space-1) * -1);
+  }
+
+  /* With Sprig above them, the phase and time are a size smaller so the time clears the ring. */
+  .timer__readout--sprig {
+    gap: 2px;
+  }
+
+  .timer__readout--sprig .timer__phase {
+    font-size: var(--text-xs);
+  }
+
+  .timer--standalone .timer__readout--sprig .timer__time {
+    font-size: clamp(2.25rem, 11vw, 3.5rem);
   }
 
   .timer__phase {
@@ -715,6 +727,11 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   :global(html[data-app]) .timer .timer__time {
     font-size: 3.25rem;
+  }
+
+  /* Sprig takes the top of the dial, so the time steps down to stay inside the ring. */
+  :global(html[data-app]) .timer .timer__readout--sprig .timer__time {
+    font-size: 2.5rem;
   }
 
   :global(html[data-app]) .timer__message {
