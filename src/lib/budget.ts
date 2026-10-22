@@ -289,15 +289,16 @@ export const importSpend = (input: SpendInput, id: string, from: string): SpendE
  * Gives entries a new name, in one write. Like any change, each old entry is removed and a
  * copy added under a new id (`<id>-r`), so the change reaches other devices.
  */
-export function renameSpends(changes: { id: string; what: string }[]): number {
+export function renameSpends(changes: { id: string; what: string; category?: Category }[]): number {
   const names = new Map(changes.map((c) => [c.id, c.what.trim().slice(0, WHAT_MAX)]));
+  const categories = new Map(changes.map((c) => [c.id, c.category]));
   const store = getStore();
   const now = Date.now();
   const copies: SpendEntry[] = [];
   const entries = store.entries.map((e) => {
     const what = names.get(e.id);
     if (!what || e.deletedAt !== undefined) return e;
-    copies.push({ ...e, id: `${e.id}-r`, what, createdAt: now });
+    copies.push({ ...e, id: `${e.id}-r`, what, category: categories.get(e.id) ?? e.category, createdAt: now });
     return marker(e, now);
   });
   if (copies.length) writeStore({ ...store, entries: [...copies, ...entries] });
