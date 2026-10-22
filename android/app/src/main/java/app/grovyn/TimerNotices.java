@@ -29,6 +29,8 @@ final class TimerNotices {
     private static final String CHANNEL_ALERTS = "alerts";
     private static final int ID_ONGOING = 1;
     private static final int ID_ALERT = 2;
+    /** Flowtime's "Still focusing?", kept apart so it can be taken down once answered. */
+    private static final int ID_CHECK_IN = 3;
     /** A focus session, its break, and room to spare. */
     private static final int MAX_ALERTS = 4;
     private static final int ACCENT = 0xFF2E7A50;
@@ -39,6 +41,8 @@ final class TimerNotices {
     /** Replace everything: `ongoingJson` null clears the notification, and old alarms always go. */
     static void apply(Context context, String ongoingJson, String alertsJson) {
         cancelAlarms(context);
+        // The page has the latest state: any "Still focusing?" up now was answered or is set again below.
+        NotificationManagerCompat.from(context).cancel(ID_CHECK_IN);
         try {
             if (ongoingJson == null) {
                 NotificationManagerCompat.from(context).cancel(ID_ONGOING);
@@ -56,20 +60,26 @@ final class TimerNotices {
     static void onAlert(Context context, String alertJson) {
         try {
             JSONObject alert = new JSONObject(alertJson);
+            boolean checkIn = alert.optBoolean("checkIn", false);
+            // Flowtime stopped by itself: its unanswered question goes.
+            if (!checkIn) NotificationManagerCompat.from(context).cancel(ID_CHECK_IN);
             if (!DevicePlugin.foreground) {
-                post(
-                    context,
-                    ID_ALERT,
-                    new NotificationCompat.Builder(context, CHANNEL_ALERTS)
-                        .setSmallIcon(R.drawable.ic_stat_coin)
-                        .setColor(ACCENT)
-                        .setContentTitle(alert.optString("title"))
-                        .setContentText(alert.optString("text"))
-                        .setCategory(NotificationCompat.CATEGORY_ALARM)
-                        .setPriority(NotificationCompat.PRIORITY_HIGH)
-                        .setAutoCancel(true)
-                        .setContentIntent(Routes.open(context, "timer"))
-                );
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ALERTS)
+                    .setSmallIcon(R.drawable.ic_stat_coin)
+                    .setColor(ACCENT)
+                    .setContentTitle(alert.optString("title"))
+                    .setContentText(alert.optString("text"))
+                    .setStyle(new NotificationCompat.BigTextStyle().bigText(alert.optString("text")))
+                    .setCategory(NotificationCompat.CATEGORY_ALARM)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
+                    .setContentIntent(Routes.open(context, "timer"));
+                if (checkIn) {
+                    builder
+                        .addAction(0, context.getString(R.string.flow_keep), Routes.open(context, "timer?flow=keep"))
+                        .addAction(0, context.getString(R.string.flow_stop), Routes.open(context, "timer?flow=stop"));
+                }
+                post(context, checkIn ? ID_CHECK_IN : ID_ALERT, builder);
             }
             JSONObject then = alert.optJSONObject("then");
             if (then == null) NotificationManagerCompat.from(context).cancel(ID_ONGOING);
