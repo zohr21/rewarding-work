@@ -8,7 +8,7 @@ import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy
 import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
-import { paintSprig, sprigStage, sprigStageName, type SprigMood } from '../lib/sprig';
+import { paintSprig, sprigMood, sprigStage, sprigStageName, type SprigMood } from '../lib/sprig';
 import { el } from '../lib/dom';
 import { NATIVE_APP } from '../config/app';
 import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
@@ -295,6 +295,7 @@ function mountTimer(root: HTMLElement): () => void {
     else if (T.checkInDue(state, now)) mood = 'sleepy';
     else if (state.status === 'paused') mood = 'curious';
     else if (state.status === 'running' && state.phase === 'work') mood = 'focus';
+    else if (state.status === 'idle') mood = sprigMood(getSessions(), 'happy', now);
     paintSprig(els.sprig, { mood });
   }
 

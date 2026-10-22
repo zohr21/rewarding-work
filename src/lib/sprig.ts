@@ -19,6 +19,8 @@ export interface SprigOptions {
   mood?: SprigMood;
   /** Width of Sprig's own tree in px (the Grove's friends add to it); the height follows the stage. */
   size?: number;
+  /** 0–3 buds in the next stage's colour, showing how far along to it Sprig is. */
+  buds?: number;
   /** Accessible name. Without one the drawing is decoration (aria-hidden). */
   label?: string;
 }
@@ -77,7 +79,13 @@ const MOODS: Record<SprigMood, Mood> = {
   sleepy: { eyes: 'arc', l: 'M-19 1 L-9 1', r: 'M9 1 L19 1', mouth: 'M-2.5 12 a2.5 2.5 0 1 0 5 0 a2.5 2.5 0 1 0 -5 0', open: true, blush: 0.3, zz: true },
 };
 
-const LEAF = 'M0 2 C-13 -6 -14 -24 0 -36 C14 -24 13 -6 0 2 Z';
+/** Where buds sit on the round head, and on the leafy crown (head coordinates, in the order they appear). */
+const BUDS_BODY: [number, number][] = [[-27, -22], [27, -24], [-14, -33]];
+const BUDS_CROWN: [number, number][] = [[-38, -24], [36, -30], [-12, -54]];
+/** Buds for a green Seedling leaf, lighter than the body so they show. */
+const BUD_GREEN = '#d7f7e2';
+
+const LEAF ='M0 2 C-13 -6 -14 -24 0 -36 C14 -24 13 -6 0 2 Z';
 const SPARKLE = 'M0 -10 Q1.6 -1.6 10 0 Q1.6 1.6 0 10 Q-1.6 1.6 -10 0 Q-1.6 -1.6 0 -10 Z';
 
 const leaf = (rot: number, fill: string, edge: string, scale = 1) =>
@@ -90,7 +98,7 @@ const friend = (x: number, cy: number, r: number) =>
   `<path d="M${x - 9.5} ${cy + 1} q3 3.5 6 0 M${x + 3.5} ${cy + 1} q3 3.5 6 0" stroke="${FACE}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
 
 /** Sprig as SVG markup. */
-export function sprigSvg({ stage, mood = 'happy', size = 120, label }: SprigOptions): string {
+export function sprigSvg({ stage, mood = 'happy', size = 120, buds = 0, label }: SprigOptions): string {
   const n = Math.max(0, Math.min(5, Math.round(stage)));
   const st = STAGES[n]!;
   const md = MOODS[mood] ?? MOODS.happy;
@@ -122,6 +130,19 @@ export function sprigSvg({ stage, mood = 'happy', size = 120, label }: SprigOpti
   head.push(
     `<circle cx="0" cy="0" r="40" fill="${BODY}"/>`,
     `<ellipse cx="-14" cy="-20" rx="13" ry="7" fill="#fff" opacity="0.32" transform="rotate(-22 -14 -20)"/>`,
+  );
+  // Buds in the next stage's colour: one for each quarter of the way there.
+  if (n < 5 && buds > 0) {
+    const next = STAGES[n + 1]!;
+    const [fill, edge] = next.fill === BODY ? [BUD_GREEN, EDGE] : [next.fill, next.edge];
+    for (const [x, y] of (st.crown ? BUDS_CROWN : BUDS_BODY).slice(0, Math.min(3, buds))) {
+      head.push(
+        `<circle cx="${x}" cy="${y}" r="7" fill="${fill}" stroke="${edge}" stroke-width="2.4"/>`,
+        `<circle cx="${x - 2}" cy="${y - 2}" r="2" fill="#fff" opacity="0.75"/>`,
+      );
+    }
+  }
+  head.push(
     `<ellipse cx="-25" cy="10" rx="6.5" ry="3.8" fill="#f29a8e" opacity="${md.blush}"/>`,
     `<ellipse cx="25" cy="10" rx="6.5" ry="3.8" fill="#f29a8e" opacity="${md.blush}"/>`,
   );
@@ -165,9 +186,44 @@ export function sprigSvg({ stage, mood = 'happy', size = 120, label }: SprigOpti
   return `<svg class="sprig__art" viewBox="${left} ${top} ${width} ${BOTTOM - top}" width="${Math.round(width * scale)}" height="${Math.round((BOTTOM - top) * scale)}" ${a11y}>${parts.join('')}</svg>`;
 }
 
+export interface SprigGrowth {
+  /** How many focus-time tiers are reached (0 = still a seed). */
+  stage: number;
+  /** How far from this stage to the next, 0–1 (1 once Sprig is a Grove). */
+  share: number;
+  /** Buds to draw: one per quarter of the way to the next stage. */
+  buds: number;
+}
+
+/** Sprig's stage and how far along to the next one, from focus time. */
+export function sprigGrowth(sessions: FocusSession[]): SprigGrowth {
+  const p = trackProgress({ sessions, done: [], chainDays: [] }, TRACKS[0]!);
+  const next = p.track.thresholds[p.level];
+  if (next === undefined) return { stage: p.level, share: 1, buds: 0 };
+  const prev = p.level ? p.track.thresholds[p.level - 1]! : 0;
+  const share = Math.min(1, Math.max(0, (p.value - prev) / (next - prev)));
+  return { stage: p.level, share, buds: Math.min(3, Math.floor(share * 4)) };
+}
+
 /** Sprig's stage: how many focus-time tiers are reached (0 = still a seed). */
 export function sprigStage(sessions: FocusSession[]): number {
-  return trackProgress({ sessions, done: [], chainDays: [] }, TRACKS[0]!).level;
+  return sprigGrowth(sessions).stage;
+}
+
+const HOUR = 3_600_000;
+
+/**
+ * How Sprig feels when nothing else is going on: cheering for an hour after a session,
+ * gentle after two days or more without one, sleepy late at night, otherwise `rest`.
+ */
+export function sprigMood(sessions: FocusSession[], rest: SprigMood = 'happy', now = Date.now()): SprigMood {
+  const last = sessions.reduce((max, s) => Math.max(max, s.end), 0);
+  if (!last) return rest;
+  if (now - last < HOUR) return 'cheer';
+  if (now - last > 48 * HOUR) return 'gentle';
+  const hour = new Date(now).getHours();
+  if (hour >= 23 || hour < 5) return 'sleepy';
+  return rest;
 }
 
 /** "a seed", "a Sapling" — what Sprig is at a stage, for sentences. */
@@ -175,14 +231,16 @@ export function sprigStageName(stage: number): string {
   return stage <= 0 ? 'a seed' : `a ${TIER_NAMES[Math.min(5, stage) - 1]}`;
 }
 
-/** Redraw a [data-sprig] element after its data-stage or data-mood changed. */
-export function paintSprig(host: HTMLElement, change: { stage?: number; mood?: SprigMood } = {}): void {
+/** Redraw a [data-sprig] element after its stage, buds or mood changed. */
+export function paintSprig(host: HTMLElement, change: { stage?: number; buds?: number; mood?: SprigMood } = {}): void {
   if (change.stage !== undefined) host.dataset.stage = String(change.stage);
+  if (change.buds !== undefined) host.dataset.buds = String(change.buds);
   if (change.mood) host.dataset.mood = change.mood;
   const stage = Number(host.dataset.stage) || 0;
+  const buds = Number(host.dataset.buds) || 0;
   const mood = (host.dataset.mood as SprigMood) || 'happy';
-  const key = `${stage}:${mood}`;
+  const key = `${stage}:${buds}:${mood}`;
   if (host.dataset.drawn === key) return;
   host.dataset.drawn = key;
-  host.innerHTML = sprigSvg({ stage, mood, size: Number(host.dataset.size) || 120 });
+  host.innerHTML = sprigSvg({ stage, buds, mood, size: Number(host.dataset.size) || 120 });
 }

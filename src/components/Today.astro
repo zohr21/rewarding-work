@@ -49,7 +49,7 @@ import Sprig from './Sprig.astro';
   </div>
 
   <a class="today__nudge" href={`${url('/progress')}#tiers`} data-td-nudge hidden>
-    <Sprig mood="curious" size={46} />
+    <Sprig mood="auto" rest="curious" size={46} />
     <span class="today__nudge-body">
       <span class="today__nudge-text" data-td-nudge-text></span>
       <span class="today__nudge-bar" aria-hidden="true" data-td-nudge-bar><span></span></span>
@@ -65,7 +65,7 @@ import Sprig from './Sprig.astro';
   import { chainStats, dailyMinutes, totals } from '../lib/stats';
   import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
   import { miniBars, ring } from '../lib/charts';
-  import { sprigSvg } from '../lib/sprig';
+  import { sprigMood, sprigSvg } from '../lib/sprig';
   import { addDays, dayKey, startOfWeek } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
   import { el } from '../lib/dom';
@@ -234,7 +234,10 @@ import Sprig from './Sprig.astro';
       bar.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
       bar.style.setProperty('--next', `var(--tier-${p.level})`);
       const text = $('[data-td-nudge-text]');
-      text.replaceChildren(el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
+      // Sprig's mood (Sprig.astro) gets a word to go with it.
+      const mood = sprigMood(getSessions(), 'curious');
+      const say = mood === 'cheer' ? 'Nice session! ' : mood === 'gentle' ? 'Welcome back! ' : '';
+      text.replaceChildren(say, el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
     }
 
     const render = () => {

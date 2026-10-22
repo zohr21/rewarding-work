@@ -1,15 +1,19 @@
 ---
 /**
  * Sprig, the mascot (drawing in src/lib/sprig.ts). With stage "auto" it shows the
- * user's own Sprig, grown as far as their focus-time tier, and grows when a session
- * lands. Scripts change its mood or stage with paintSprig().
+ * user's own Sprig, grown as far as their focus-time tier with buds for the way to
+ * the next one, and grows when a session lands. With mood "auto" it cheers after a
+ * session, is gentle after a break and sleepy late at night, and otherwise shows
+ * `rest`. Scripts change its mood or stage with paintSprig().
  */
 import { sprigSvg, type SprigMood } from '../lib/sprig';
 
 interface Props {
   /** 0 (seed) to 5 (Grove), or "auto" for the user's own. */
   stage?: number | 'auto';
-  mood?: SprigMood;
+  mood?: SprigMood | 'auto';
+  /** With mood "auto": the mood when nothing else applies. */
+  rest?: SprigMood;
   /** Width in px. */
   size?: number;
   /** Gently bob up and down, for a Sprig that is the centre of the screen. */
@@ -17,37 +21,48 @@ interface Props {
   class?: string;
 }
 
-const { stage = 'auto', mood = 'happy', size = 120, bob = false, class: className } = Astro.props;
+const { stage = 'auto', mood = 'happy', rest = 'happy', size = 120, bob = false, class: className } = Astro.props;
 const auto = stage === 'auto';
 const first = auto ? 0 : stage;
+const face = mood === 'auto' ? rest : mood;
 ---
 
 <span
   class:list={['sprig', { 'sprig--bob': bob }, className]}
   data-sprig
   data-sprig-auto={auto ? '' : undefined}
+  data-sprig-rest={mood === 'auto' ? rest : undefined}
   data-stage={first}
-  data-mood={mood}
+  data-mood={face}
   data-size={size}
-  data-drawn={auto ? undefined : `${first}:${mood}`}
-  set:html={sprigSvg({ stage: first, mood, size })}
+  data-drawn={auto || mood === 'auto' ? undefined : `${first}:0:${face}`}
+  set:html={sprigSvg({ stage: first, mood: face, size })}
 />
 
 <script>
   import { getSessions, subscribe } from '../lib/storage';
-  import { paintSprig, sprigStage } from '../lib/sprig';
-  import { cleanups, onPage } from '../lib/page';
+  import { paintSprig, sprigGrowth, sprigMood, type SprigMood } from '../lib/sprig';
+  import { cleanups, listen, onPage } from '../lib/page';
 
   onPage('sprig', () => {
-    const hosts = [...document.querySelectorAll<HTMLElement>('[data-sprig-auto]')];
+    const hosts = [...document.querySelectorAll<HTMLElement>('[data-sprig-auto], [data-sprig-rest]')];
     if (!hosts.length) return;
     const c = cleanups();
     const render = () => {
-      const stage = sprigStage(getSessions());
-      for (const host of hosts) paintSprig(host, { stage });
+      const sessions = getSessions();
+      const { stage, buds } = sprigGrowth(sessions);
+      for (const host of hosts) {
+        const rest = host.dataset.sprigRest as SprigMood | undefined;
+        paintSprig(host, {
+          ...('sprigAuto' in host.dataset ? { stage, buds } : {}),
+          ...(rest ? { mood: sprigMood(sessions, rest) } : {}),
+        });
+      }
     };
     render();
     c.add(subscribe('sessions', render));
+    // Moods depend on the time too: check again when the app comes back to the front.
+    c.add(listen(document, 'visibilitychange', () => document.visibilityState === 'visible' && render()));
     return c.run;
   });
 </script>
@@ -65,8 +80,9 @@ const first = auto ? 0 : stage;
     overflow: visible;
   }
 
-  /* An auto Sprig waits for the user's stage, so a Tree never flashes up as a seed. */
-  .sprig[data-sprig-auto]:not([data-drawn]) {
+  /* An auto Sprig waits for the user's own stage and mood, so a Tree never flashes up as a seed. */
+  .sprig[data-sprig-auto]:not([data-drawn]),
+  .sprig[data-sprig-rest]:not([data-drawn]) {
     visibility: hidden;
   }
 

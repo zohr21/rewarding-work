@@ -11,10 +11,13 @@ import Sprig from './Sprig.astro';
 <section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
   <h2 id="tiers-heading" class="panel-title">Your tiers</h2>
   <div class="tiers__sprig" data-tiers-sprig>
-    <Sprig size={96} bob />
+    <Sprig mood="auto" size={96} bob />
     <div class="tiers__sprig-text">
       <p class="tiers__sprig-name" data-tiers-sprig-name></p>
       <p class="muted" data-tiers-sprig-next></p>
+      <div class="tiers__sprig-bar" role="progressbar" aria-label="Sprig's growth to the next stage" aria-valuemin="0" aria-valuemax="100" data-tiers-sprig-bar>
+        <span></span>
+      </div>
     </div>
   </div>
   <p class="muted tiers__intro">
@@ -40,7 +43,7 @@ import Sprig from './Sprig.astro';
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
   import { allProgress, chainInput, tierLabel, TIER_MATERIALS, TIER_NAMES, type TrackProgress } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
-  import { sprigStageName } from '../lib/sprig';
+  import { sprigGrowth, sprigStageName } from '../lib/sprig';
   import { cleanups, onPage } from '../lib/page';
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -190,6 +193,13 @@ import Sprig from './Sprig.astro';
           goal === undefined
             ? 'A whole grove. Sprig has grown as far as it can.'
             : `${(Math.ceil((goal - focus.value) * 10) / 10).toLocaleString()} more ${focus.track.unit(goal - focus.value)} of focus to grow into ${sprigStageName(focus.level + 1)}.`;
+        // The bar fills in the next stage's colour, a bud for each quarter of it.
+        const bar = root.querySelector<HTMLElement>('[data-tiers-sprig-bar]')!;
+        const { share } = sprigGrowth(getSessions());
+        bar.hidden = goal === undefined;
+        bar.setAttribute('aria-valuenow', String(Math.round(share * 100)));
+        bar.style.setProperty('--share', `${share * 100}%`);
+        bar.style.setProperty('--next', `var(--tier-${Math.min(4, focus.level)})`);
         grove.replaceChildren(...progress.map(renderPlant));
         list.replaceChildren(...progress.map(renderTrack));
       };
@@ -221,10 +231,29 @@ import Sprig from './Sprig.astro';
 
   .tiers__sprig-text {
     display: grid;
+    flex: 1;
     gap: 2px;
     align-self: center;
     min-width: 0;
     font-size: var(--text-sm);
+  }
+
+  .tiers__sprig-bar {
+    margin-top: var(--space-2);
+    block-size: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+    overflow: hidden;
+  }
+
+  .tiers__sprig-bar > span {
+    display: block;
+    inline-size: var(--share, 0%);
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--next);
+    transition: inline-size var(--duration-base) var(--ease-out);
   }
 
   .tiers__sprig-name {
