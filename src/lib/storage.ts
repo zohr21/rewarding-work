@@ -153,6 +153,12 @@ function ensureMigrated(): void {
   } catch {
     /* never break the page; it is retried on the next load */
   }
+  try {
+    // Unfinished tasks deleted before deleting took their focus time with them (deleteTask).
+    removeTaskSessions(getTaskStore().items.filter((t) => t.deletedAt !== undefined && t.status !== 'done').map((t) => t.id));
+  } catch {
+    /* retried on the next load */
+  }
 }
 
 // ---------- Typed read / write ----------
@@ -374,6 +380,11 @@ export interface FocusSession {
   completed: boolean;
   /** The task this session was for, when the label matched one. */
   taskId?: string;
+  /**
+   * Taken out of your history (its task was deleted): kept with no focus time, so the
+   * removal reaches your other devices instead of the old copy coming back.
+   */
+  removedAt?: number;
 }
 
 export function isFocusSession(v: unknown): v is FocusSession {
@@ -388,19 +399,41 @@ export function isFocusSession(v: unknown): v is FocusSession {
     typeof s.mode === 'string' &&
     typeof s.label === 'string' &&
     typeof s.completed === 'boolean' &&
-    (s.taskId === undefined || typeof s.taskId === 'string')
+    (s.taskId === undefined || typeof s.taskId === 'string') &&
+    (s.removedAt === undefined || typeof s.removedAt === 'number')
   );
 }
 
-/** All sessions, oldest first. Malformed entries are dropped rather than breaking the page. */
-export function getSessions(): FocusSession[] {
+/** Every stored session, removed ones too, oldest first. */
+function sessionRecords(): FocusSession[] {
   const raw = read<unknown>('sessions', []);
   if (!Array.isArray(raw)) return [];
   return raw.filter(isFocusSession).sort((a, b) => a.start - b.start);
 }
 
+/** All sessions, oldest first. Malformed and removed entries are left out rather than breaking the page. */
+export function getSessions(): FocusSession[] {
+  return sessionRecords().filter((s) => s.removedAt === undefined);
+}
+
+/** Takes the focus time of these tasks out of your history (and the grove). Returns the seconds taken out. */
+export function removeTaskSessions(taskIds: Iterable<string>): number {
+  const ids = new Set(taskIds);
+  const now = Date.now();
+  let seconds = 0;
+  let changed = false;
+  const all = sessionRecords().map((s) => {
+    if (s.removedAt !== undefined || !s.taskId || !ids.has(s.taskId)) return s;
+    seconds += s.focusSeconds;
+    changed = true;
+    return { ...s, focusSeconds: 0, removedAt: now };
+  });
+  if (changed) write('sessions', all);
+  return seconds;
+}
+
 export function addSession(session: FocusSession): void {
-  const all = getSessions().filter((s) => s.id !== session.id);
+  const all = sessionRecords().filter((s) => s.id !== session.id);
   all.push(session);
   all.sort((a, b) => a.start - b.start);
   write('sessions', all);
@@ -909,6 +942,9 @@ export function deleteTask(id: string): void {
   const now = Date.now();
   const { notes: _notes, log: _log, ...rest } = touched(old, { deletedAt: now });
   const marker: Task = { ...rest, title: '', steps: [] };
+  // An unfinished task takes its focus time with it, so a timer left running on it doesn't
+  // stay in the grove. A finished one keeps it: that work was done.
+  if (old.status !== 'done') removeTaskSessions([id]);
   writeTasks({
     items: store.items.map((t) => (t.id === id ? marker : t)),
     current: store.current === id ? null : store.current,
@@ -1290,7 +1326,7 @@ export function applyBackup(data: BackupData, mode: 'merge' | 'replace'): void {
     return;
   }
 
-  const sessions = new Map(getSessions().map((s) => [s.id, s]));
+  const sessions = new Map(sessionRecords().map((s) => [s.id, s]));
   data.sessions.forEach((s) => sessions.has(s.id) || sessions.set(s.id, s));
   write('sessions', [...sessions.values()].sort((a, b) => a.start - b.start));
 

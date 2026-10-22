@@ -258,13 +258,13 @@ const TABS = [
       }
 
       /** Delete with Undo (src/lib/undo.ts): hidden now, removed for real once the offer ends. */
-      function remove(task: Task, verb: string, extra = ''): void {
+      function remove(task: Task, verb: string, extra = '', note = ''): void {
         const name = taskName(task);
         input.focus();
         removing.add(task.id);
         render();
         offerUndo({
-          message: `${verb} “${name}”`,
+          message: `${verb} “${name}”${note}`,
           commit: () => {
             deleteTask(task.id);
             removing.delete(task.id);
@@ -409,7 +409,16 @@ const TABS = [
             }),
           );
         }
-        const del = iconButton(`Delete “${name}”`, () => remove(task, 'Deleted', ' Its focus sessions and Done entries stay in your history.'));
+        const del = iconButton(`Delete “${name}”`, () =>
+          remove(
+            task,
+            'Deleted',
+            active && seconds
+              ? ` Its ${formatFocus(seconds)} of focus leaves your history and the grove; Done entries stay.`
+              : ' Its focus sessions and Done entries stay in your history.',
+            active && seconds ? ` and its ${formatFocus(seconds)} of focus` : '',
+          ),
+        );
         const side = active ? [moveSelect(task), del] : [del];
 
         // The same numbers as the meta line, drawn: a ring, a segment per step, a focus bar.

@@ -98,6 +98,8 @@ const RECENT_MS = 2 * 86_400_000;
 /** The same amount from another source within this time is the same payment. */
 const TWICE_MS = 5 * 60_000;
 
+/** Rules an early version learned from labels it took for the place ("Məbləğ", a bonus notice): never a place. */
+const JUNK_RULE = /^(mebleg|bonus|balans|emeliyyat|kocurme|odenis)$/;
 const isCategory = (v: unknown): v is Category => (CATEGORIES as readonly unknown[]).includes(v);
 const strings = (v: unknown, max: number): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0).map((x) => x.slice(0, max)) : []);
 const obj = (v: unknown): Record<string, unknown> | null => (typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : null);
@@ -106,7 +108,7 @@ export function normaliseBank(raw: unknown): BankStore {
   const s = obj(raw);
   if (!s) return EMPTY_BANK;
   const rules: Record<string, Category> = {};
-  for (const [k, v] of Object.entries(obj(s.rules) ?? {})) if (isCategory(v)) rules[k] = v;
+  for (const [k, v] of Object.entries(obj(s.rules) ?? {})) if (isCategory(v) && !JUNK_RULE.test(k)) rules[k] = v;
   const pending = (Array.isArray(s.pending) ? s.pending : []).flatMap((x): Pending[] => {
     const p = obj(x);
     return p &&
@@ -228,17 +230,18 @@ const MONEY = new RegExp(String.raw`([+\-−])?\s?(${NUM})\s?(${CUR})(?![A-Za-z]
 const NOT_PAYMENT = /(balans|balance|qalig\w*|qaliq|qalıq|остаток|баланс|vergi|komissiya|commission|fee|limit)\s*:?\s*[+\-−]?\s*$/i;
 const AMOUNT_KEY = /(mebleg|məbləğ|amount|сумма)\s*:?\s*$/i;
 
-const DECLINED = /imtina|redd|ugursuz|declined|failed|insufficient|catismazlig|отказ|отклон|недостаточно/;
+const DECLINED = /imtina|redd|ugursuz|declined|failed|insufficient|catismazlig|yetersiz balans|kifayet qeder vesait|отказ|отклон|недостаточно/;
 const INCOME = /terminal payment|medaxil|daxil ol|emek haqqi|maas|mukafat|cashback|kesbek|gelir|qaytar|legv|refund|credited|received|зачисл|пополн|поступ|возврат/;
 /** Money moved to your own wallet or account (topping up m10, the ABB app's transfers) or taken out as cash: not spending, unless you say so. */
 const TRANSFER = /\batm|top ?up|abb mobile|card ?to ?card|\bc2c\b|\bp2p\b|kocurme|перевод|transfer/;
 const SPENT = /odenis|alis|mexaric|silin|tutul|kocurme|purchase|payment|paid|spent|debit|списан|оплат|покупк|abune haqqi|xidmet haqqi/;
 /**
  * Offers and notices with an amount in them: loans and cards offered ("10000 AZN-dek"),
- * repayments due, links to follow, a payment you are about to confirm.
+ * repayments due, links to follow, a payment you are about to confirm, and Birbank's bonus
+ * for a payment ("36 ₼-lıq ödənişinizdən 0.18 bonus qazandınız"), which comes with the payment's own alert.
  */
 const NOT_A_PAYMENT =
-  /https?:\/\/|www\.|teklif|kampaniya|endirim|muraciet edin|sifaris (edin|et)|lotereya|ipoteka|-dek\b|limitinedek|ayda cemi|minimum mebleg|odeme tarixi|odenilecek|kreditiniz uzre|credit limit|icra edilecek|istediyiniz|tesdiq ed/;
+  /https?:\/\/|www\.|bonus qazan|odenisinizden|teklif|kampaniya|endirim|muraciet edin|sifaris (edin|et)|lotereya|ipoteka|-dek\b|limitinedek|ayda cemi|minimum mebleg|odeme tarixi|odenilecek|kreditiniz uzre|credit limit|icra edilecek|istediyiniz|tesdiq ed/;
 /** One-time codes, which the phone already drops (BankInbox.java): never read, even if one slips through. */
 const CODE = /(otp|code|kod|şifr|sifr|parol|пароль|код)\D{0,25}\d{4,8}|\b\d{4,8}\b\D{0,25}(code|kod|код)|\b3ds\b|bu kodu/iu;
 
@@ -274,7 +277,7 @@ function placeGuess(text: string): string {
     .replace(/\d{4}-\d{2}-\d{2}|\d{2}[./]\d{2}[./]\d{4}|\d{1,2}:\d{2}(:\d{2})?/g, '\n')
     .split(/\n|\s{2,}|[|;]|,\s|\.\s/)
     .map((p) => p.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, '').replace(ACTION, ''))
-    .filter((p) => /\p{L}{2}/u.test(p) && !/^(balans|balance|hesab|kart|card|tarix|date|vergi|hormetli|hörmətli|sizin|dear)\b/i.test(p));
+    .filter((p) => /\p{L}{2}/u.test(p) && !/^(balans|balance|hesab|kart|card|tarix|date|vergi|hormetli|hörmətli|sizin|dear|məbləğ|mebleg|amount|сумма)(?!\p{L})/iu.test(p));
   // Words like "payment" say what happened, not where.
   const named = parts.filter((p) => !SPENT.test(plain(p)) || /[A-Z]{3}/.test(p));
   return (named[0] ?? parts[0] ?? '').slice(0, WHAT_MAX);
@@ -312,9 +315,16 @@ export function readAlert(raw: string): Reading | null {
   };
 }
 
-/** "AL MARKET 6077" → "Al Market", "PAYPAL *P1A2B3C4D" → "Paypal": terminal and order numbers off, shouting softened. */
+/**
+ * "AL MARKET 6077" → "Al Market", "PAYPAL *P1A2B3C4D" → "Paypal", Birbank's "ANTHROPIC* CLAUDE SUB abunəliyi"
+ * → "Anthropic Claude Sub": terminal and order numbers and "subscription" off, shouting softened.
+ */
 export function tidyPlace(place: string): string {
-  const words = place.split(/\s+/).filter(Boolean);
+  const words = place
+    .replace(/\s+(abunəliyi|abunəlik|abuneliyi|abunelik)$/iu, '')
+    .replace(/\*(?=\s)/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
   while (words.length > 1 && /\d/.test(words.at(-1)!)) words.pop();
   let out = words.join(' ').replace(/\s*\*\S*$/, '').trim() || place.trim();
   if (out === out.toUpperCase() && /\p{Lu}{2}/u.test(out)) out = out.toLowerCase().replace(/(^|[\s\-/(])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
@@ -531,11 +541,21 @@ export function takeAlerts(notices: BankNotice[], now = Date.now()): Taken {
 
 /**
  * Names an early version got wrong: "Balans: 598.74 AZN" (an empty "Merchant:" line read
- * the line after it) and ABB's "Əməliyyat" (operation). They become the bank's name.
+ * the line after it), ABB's "Əməliyyat" (operation) and Birbank's "Məbləğ" (amount). They are
+ * read again from the alert while it is still in Recently read, else they become the bank's name.
  */
 export function repairImportedNames(): number {
-  const wrong = /^(balans|balance)\s*:|^(əməliyyat|emeliyyat|köçürmə|kocurme)$/i;
-  return renameSpends(getBudget().entries.filter((e) => e.from && wrong.test(e.what)).map((e) => ({ id: e.id, what: e.from! })));
+  const wrong = /^(balans|balance)\s*:|^(əməliyyat|emeliyyat|köçürmə|kocurme|məbləğ|mebleg)$/iu;
+  const store = getBank();
+  return renameSpends(
+    getBudget()
+      .entries.filter((e) => e.from && e.deletedAt === undefined && wrong.test(e.what))
+      .map((e) => {
+        const text = store.log.find((l) => `b-${l.id}` === e.id)?.text;
+        const place = text ? (readAlert(text)?.place ?? '') : '';
+        return place ? { id: e.id, what: place, category: guessCategory(place, store.rules) } : { id: e.id, what: e.from! };
+      }),
+  );
 }
 
 /** Takes back an import: the expenses it added and what it put in To check. */

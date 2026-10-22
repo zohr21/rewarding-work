@@ -19,6 +19,8 @@ export interface TimerAlert {
   title: string;
   text: string;
   then: TimerOngoing | null;
+  /** Flowtime's "Still focusing?": shown with Keep going and Stop, and taken down once answered. */
+  checkIn?: boolean;
 }
 
 export interface WidgetData {

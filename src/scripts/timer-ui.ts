@@ -56,6 +56,18 @@ function minutesText(ms: number): string {
   return `${min} minute${min === 1 ? '' : 's'}`;
 }
 
+/** "Still focusing?" in words, for the page and the notification. */
+function checkInText(checkMs: number): string {
+  return `Tap Keep going, or in ${minutesText(T.FLOW_ANSWER_MS)} Flowtime stops and saves ${minutesText(checkMs)}.`;
+}
+
+/** Why Flowtime stopped by itself (TimerEvent `stopped`). */
+function stoppedText(reason: 'no-answer' | 'limit', focusMs: number): string {
+  return reason === 'limit'
+    ? `Flowtime stopped at its ${minutesText(T.FLOW_MAX_MS)} limit and saved ${minutesText(focusMs)}.`
+    : `No answer to “Still focusing?”, so Flowtime stopped and saved ${minutesText(focusMs)}, up to when it asked.`;
+}
+
 function spokenDuration(ms: number): string {
   const total = Math.round(ms / 1000);
   const m = Math.floor(total / 60);
@@ -156,6 +168,8 @@ function mountTimer(root: HTMLElement): () => void {
   let interval: number | undefined;
   let endTimer: number | undefined;
   let announcedLastMinute = false;
+  /** Flowtime's "Still focusing?" is showing (T.checkInDue). */
+  let askedCheckIn = false;
   let lastTimeText = '';
   /** The focus session waiting for its "what did you do / what's next" note. */
   let pendingLog: Omit<SessionLog, 'did' | 'next'> | null = null;
@@ -171,11 +185,14 @@ function mountTimer(root: HTMLElement): () => void {
       events.forEach((e) => handleEvent(e, true));
       if (events.length) {
         const focusMs = events.reduce((sum, e) => sum + (e.type === 'phase-complete' ? e.focusMs : 0), 0);
+        const stopped = events.find((e) => e.type === 'phase-complete' && e.stopped);
         const next = caught.status === 'idle' ? 'Start the next one when you are ready.' : 'You are on your break now.';
         setMessage(
-          focusMs > 0
-            ? `While you were away, your ${minutesText(focusMs)} focus session finished and was logged. ${next}`
-            : `Your break finished while you were away. ${next}`,
+          stopped?.type === 'phase-complete'
+            ? `${stoppedText(stopped.stopped!, stopped.focusMs)} ${next}`
+            : focusMs > 0
+              ? `While you were away, your ${minutesText(focusMs)} focus session finished and was logged. ${next}`
+              : `Your break finished while you were away. ${next}`,
         );
         write('timer', caught);
       }
@@ -225,7 +242,10 @@ function mountTimer(root: HTMLElement): () => void {
 
     let text: string;
     let title: string;
-    if (e.from === 'work') {
+    if (e.from === 'work' && e.stopped) {
+      title = 'Flowtime stopped';
+      text = `${stoppedText(e.stopped, e.focusMs)} Take a ${Math.round(e.breakMs / 60_000)}-minute break.`;
+    } else if (e.from === 'work') {
       title = 'Focus session done';
       text =
         e.to === 'work'
@@ -272,7 +292,26 @@ function mountTimer(root: HTMLElement): () => void {
   function onTick(): void {
     const { state: next, events } = T.tick(state, Date.now());
     if (events.length) commit(next, events);
-    else renderTime();
+    else {
+      renderTime();
+      renderCheckIn(true);
+    }
+  }
+
+  /** Flowtime's "Still focusing?": the Keep going button, and once, a sound and a notification. */
+  function renderCheckIn(fresh: boolean): void {
+    const due = T.checkInDue(state, Date.now());
+    // The main button answers it while it shows.
+    if (due) els.toggle.textContent = 'Keep going';
+    if (due === askedCheckIn) return;
+    askedCheckIn = due;
+    if (!due) return;
+    const text = checkInText(T.checkInMs(state));
+    setMessage(`Still focusing? ${text}`);
+    announce(`Still focusing? ${text}`);
+    if (!fresh) return;
+    if (prefs.sound) playChime('focus-end', prefs.tone, prefs.volume);
+    if (!NATIVE_APP) void notify('Still focusing?', text, icon);
   }
 
   // ---- Rendering ----
@@ -337,6 +376,7 @@ function mountTimer(root: HTMLElement): () => void {
 
     els.toggle.textContent = status === 'running' ? 'Pause' : status === 'paused' ? 'Resume' : phase === 'work' ? 'Start focus' : 'Start break';
     els.stop.hidden = !(mode === 'flowtime' && phase === 'work' && status !== 'idle');
+    renderCheckIn(false);
     els.skip.hidden = !T.isBreak(phase);
     els.reset.disabled = !inPhase;
 
@@ -365,7 +405,7 @@ function mountTimer(root: HTMLElement): () => void {
       return { title: `${title} paused`, text: rem === null ? text : `${formatClock(rem, true)} left · ${text}` };
     }
     const end = T.endsAt(s);
-    return end === null ? { title, text, since: now - T.elapsed(s, now) } : { title, text, endAt: end };
+    return end === null || s.durationMs === null ? { title, text, since: now - T.elapsed(s, now) } : { title, text, endAt: end };
   }
 
   /**
@@ -376,6 +416,10 @@ function mountTimer(root: HTMLElement): () => void {
     const ongoing = ongoingFor(state, Date.now());
     if (!ongoing) return clearTimerNotice();
     const alerts: TimerAlert[] = [];
+    // Flowtime's "Still focusing?", with Keep going and Stop on the notification.
+    const check = T.checkInMs(state);
+    const askAt = state.mode === 'flowtime' && state.phase === 'work' && check < T.FLOW_MAX_MS ? T.reachesAt(state, check) : null;
+    if (askAt !== null && askAt > Date.now()) alerts.push({ at: askAt, title: 'Still focusing?', text: checkInText(check), then: ongoing, checkIn: true });
     let s = state;
     while (alerts.length < 4 && s.status === 'running') {
       const end = T.endsAt(s);
@@ -384,12 +428,14 @@ function mountTimer(root: HTMLElement): () => void {
       const e = r.events.find((ev) => ev.type === 'phase-complete');
       if (e?.type !== 'phase-complete') break;
       const text =
-        e.from !== 'work'
+        e.from === 'work' && e.stopped
+          ? `${stoppedText(e.stopped, e.focusMs)} Break: ${minutesText(e.breakMs)}.`
+          : e.from !== 'work'
           ? 'Start the next focus session when you are ready.'
           : e.to === 'work'
             ? `${minutesText(e.focusMs)} of focus. Ready for the next one.`
             : `${minutesText(e.focusMs)} of focus. ${e.to === 'long-break' ? 'Long break' : 'Break'}: ${minutesText(e.breakMs)}.`;
-      alerts.push({ at: end, title: e.from === 'work' ? 'Focus session done' : 'Break over', text, then: ongoingFor(r.state, end) });
+      alerts.push({ at: end, title: e.stopped ? 'Flowtime stopped' : e.from === 'work' ? 'Focus session done' : 'Break over', text, then: ongoingFor(r.state, end) });
       s = r.state;
     }
     showTimerNotice(ongoing, alerts);
@@ -537,6 +583,7 @@ function mountTimer(root: HTMLElement): () => void {
   // ---- Actions ----
 
   async function onToggle(): Promise<void> {
+    if (T.checkInDue(state, Date.now())) return onKeep();
     const wasIdle = state.status === 'idle';
     const wasRunning = state.status === 'running';
     unlockAudio(); // needs this click as the user gesture
@@ -583,6 +630,12 @@ function mountTimer(root: HTMLElement): () => void {
     const r = T.stopFlow(state, Date.now());
     commit(r.state, r.events);
   });
+
+  function onKeep(): void {
+    commit(T.keepGoing(state, Date.now()));
+    setMessage(`Keep going. You'll be asked again at ${minutesText(T.checkInMs(state))} of focus.`);
+    announce('Keep going.');
+  }
 
   for (const input of els.modes) {
     input.addEventListener('change', () => {
@@ -740,6 +793,17 @@ function mountTimer(root: HTMLElement): () => void {
       write('timer', state);
     }
     history.replaceState(history.state, '', location.pathname);
+  }
+
+  // Keep going or Stop on the "Still focusing?" notification: /timer?flow=keep|stop
+  const flowAnswer = standalone ? new URLSearchParams(location.search).get('flow') : null;
+  if (flowAnswer) {
+    history.replaceState(history.state, '', location.pathname);
+    if (flowAnswer === 'keep' && T.checkInDue(state, Date.now())) onKeep();
+    else if (flowAnswer === 'stop' && state.mode === 'flowtime' && state.phase === 'work' && state.status !== 'idle') {
+      const r = T.stopFlow(state, Date.now());
+      commit(r.state, r.events);
+    }
   }
 
   // Arriving from "Focus" on the exam page: /timer?chapter=<id>

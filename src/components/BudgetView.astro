@@ -110,9 +110,8 @@ const icon = (d: string, w = 2) =>
         <button type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
         {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false">{CATEGORY_SHORT[c]}</button>)}
       </div>
-      <div data-bv-list></div>
+      <div class="bv__groups" data-bv-list></div>
       <p class="muted bv__note" data-bv-none hidden></p>
-      <button type="button" class="btn btn--ghost btn--small bv__more" data-bv-more hidden></button>
     </section>
 
     <section class="card bv__repeats" aria-labelledby="bv-repeats-title">
@@ -265,14 +264,13 @@ const icon = (d: string, w = 2) =>
     type WellbeingKind,
   } from '../lib/budget';
   import { learnCategory } from '../lib/bank';
-  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { addDays, dayKey, formatDay, formatShort, fromDayKey, startOfWeek } from '../lib/dates';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
 
   const monthLong = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
   const monthShort = new Intl.DateTimeFormat(undefined, { month: 'short' });
-  const PAGE = 25;
   const svgIcon = (d: string) =>
     `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const EDIT = svgIcon('M4 20h4L19 9l-4-4L4 16z');
@@ -365,7 +363,8 @@ const icon = (d: string, w = 2) =>
     let month = thisMonth();
     let filter: Category | null = null;
     let query = '';
-    let showAll = false;
+    /** Expense groups you opened or closed yourself this month, by group key; the rest follow the default in render. */
+    const toggled = new Map<string, boolean>();
     /** The entry being changed in the dialog, or null for a new one. */
     let editing: SpendEntry | null = null;
     /** Removed entries and repeats still offered for Undo (src/lib/undo.ts). */
@@ -383,12 +382,12 @@ const icon = (d: string, w = 2) =>
       p.innerHTML = (kind === 'ok' ? OK : WARN) + `<span>${html}</span>`;
     }
 
-    function entryRow(entry: SpendEntry, sign: string): HTMLLIElement {
+    function entryRow(entry: SpendEntry, sign: string, withDay: boolean): HTMLLIElement {
       const item = el('li', 'bv__entry');
       const dot = el('i', 'bv__dot');
       dot.style.background = CATEGORY_COLORS[entry.category];
       const main = el('span', 'bv__entry-main');
-      const sub = [CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : '', entry.from ? `from ${entry.from}` : '']
+      const sub = [withDay ? formatDay(fromDayKey(entry.day)) : '', CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : '', entry.from ? `from ${entry.from}` : '']
         .filter(Boolean)
         .join(' · ');
       main.append(el('strong', '', entry.what), el('span', 'muted', sub));
@@ -593,27 +592,28 @@ const icon = (d: string, w = 2) =>
       for (const chip of $$<HTMLButtonElement>('[data-bv-chip]')) chip.setAttribute('aria-pressed', String((chip.dataset.bvChip || null) === filter));
       const q = query.trim().toLowerCase();
       const list = spent.entries.filter((e) => (!filter || e.category === filter) && (!q || e.what.toLowerCase().includes(q)));
-      const visible = showAll ? list : list.slice(0, PAGE);
-      const groups: HTMLElement[] = [];
-      let lastDay = '';
-      let ul: HTMLUListElement | null = null;
-      for (const e of visible) {
-        if (e.day !== lastDay) {
-          lastDay = e.day;
-          const h = el('h3', 'bv__day', e.day === today() ? 'Today' : formatDay(fromDayKey(e.day)));
-          ul = el('ul', 'bv__list');
+      $('[data-bv-list]').replaceChildren(
+        ...groupEntries(list).map((g, i) => {
+          const box = el('details', 'disclosure bv__group');
+          // The newest group starts open; all of them do while you search or pick a category.
+          box.open = toggled.get(g.key) ?? (i === 0 || !!q || !!filter);
+          box.addEventListener('toggle', () => toggled.set(g.key, box.open));
+          const head = el('summary', 'bv__group-head');
+          head.append(
+            el('span', 'bv__group-name', g.label),
+            el('span', 'bv__group-meta muted', `${g.entries.length} ${g.entries.length === 1 ? 'expense' : 'expenses'}`),
+            el('span', 'bv__amount', fmt(g.entries.reduce((sum, e) => sum + e.amount, 0))),
+          );
+          const ul = el('ul', 'bv__list');
           ul.setAttribute('role', 'list');
-          groups.push(h, ul);
-        }
-        ul!.append(entryRow(e, sign));
-      }
-      $('[data-bv-list]').replaceChildren(...groups);
+          ul.append(...g.entries.map((e) => entryRow(e, sign, g.week)));
+          box.append(head, ul);
+          return box;
+        }),
+      );
       const none = $('[data-bv-none]');
       none.hidden = list.length > 0;
       none.textContent = q || filter ? 'Nothing matches.' : `No expenses in ${name}.`;
-      const more = $<HTMLButtonElement>('[data-bv-more]');
-      more.hidden = showAll || list.length <= PAGE;
-      more.textContent = `Show all ${list.length} expenses`;
 
       // ---- Repeats ----
       $('[data-bv-repeats]').replaceChildren(
@@ -647,9 +647,39 @@ const icon = (d: string, w = 2) =>
       if (!repeats.length) $('[data-bv-repeats]').append(el('li', 'muted bv__note', 'Rent, phone, memberships: add them once.'));
     }
 
+    /**
+     * The month's expenses, newest first, in a few groups instead of one long list: Today,
+     * Yesterday, the rest of this week, then one group per earlier week.
+     */
+    function groupEntries(list: SpendEntry[]): { key: string; label: string; week: boolean; entries: SpendEntry[] }[] {
+      const now = today();
+      const yesterday = dayKey(addDays(fromDayKey(now), -1));
+      const thisWeek = dayKey(startOfWeek(fromDayKey(now)));
+      const firstDay = fromDayKey(`${month}-01`);
+      const lastDay = fromDayKey(`${month}-${String(daysInMonth(month)).padStart(2, '0')}`);
+      const groups: { key: string; label: string; week: boolean; entries: SpendEntry[] }[] = [];
+      for (const e of list) {
+        let g: Omit<(typeof groups)[number], 'entries'>;
+        if (e.day === now) g = { key: 'today', label: 'Today', week: false };
+        else if (e.day === yesterday) g = { key: 'yesterday', label: 'Yesterday', week: false };
+        else if (e.day >= thisWeek && e.day < now) g = { key: 'week', label: 'Earlier this week', week: true };
+        else {
+          // Only the part of the week inside the month shown.
+          const start = startOfWeek(fromDayKey(e.day));
+          const from = start < firstDay ? firstDay : start;
+          const end = addDays(start, 6);
+          const to = end > lastDay ? lastDay : end;
+          g = { key: dayKey(start), label: `${formatShort(from)} – ${formatShort(to)}`, week: true };
+        }
+        const last = groups.at(-1);
+        if (last && last.key === g.key) last.entries.push(e);
+        else groups.push({ ...g, entries: [e] });
+      }
+      return groups;
+    }
+
     function setFilter(next: Category | null): void {
       filter = next;
-      showAll = false;
       render();
     }
 
@@ -792,12 +822,12 @@ const icon = (d: string, w = 2) =>
     // ---- The rest of the controls ----
     $('[data-bv-prev]').addEventListener('click', () => {
       month = shiftMonth(month, -1);
-      showAll = false;
+      toggled.clear();
       render();
     });
     $('[data-bv-next]').addEventListener('click', () => {
       month = shiftMonth(month, 1);
-      showAll = false;
+      toggled.clear();
       render();
     });
     for (const add of $$('[data-bv-add]')) add.addEventListener('click', () => openExpense(null));
@@ -805,10 +835,6 @@ const icon = (d: string, w = 2) =>
     for (const chip of $$<HTMLButtonElement>('[data-bv-chip]')) chip.addEventListener('click', () => setFilter((chip.dataset.bvChip || null) as Category | null));
     $<HTMLInputElement>('[data-bv-query]').addEventListener('input', (e) => {
       query = (e.target as HTMLInputElement).value;
-      render();
-    });
-    $('[data-bv-more]').addEventListener('click', () => {
-      showAll = true;
       render();
     });
 
@@ -1383,13 +1409,31 @@ const icon = (d: string, w = 2) =>
     color: var(--color-on-accent);
   }
 
-  .bv :global(.bv__day) {
-    margin: var(--space-3) 0 0;
-    color: var(--color-text-muted);
-    font-size: var(--text-xs);
+  .bv__groups {
+    display: grid;
+  }
+
+  .bv :global(.bv__group + .bv__group) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .bv :global(.bv__group-head) {
+    gap: var(--space-3);
+    min-height: 52px;
+  }
+
+  .bv :global(.bv__group-name) {
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  }
+
+  .bv :global(.bv__group-meta) {
+    flex: 1;
+    font-size: var(--text-xs);
+  }
+
+  .bv :global(.bv__group .bv__list) {
+    margin-block-end: var(--space-2);
+    padding-inline-start: var(--space-4);
   }
 
   .bv :global(.bv__entry),
@@ -1423,7 +1467,6 @@ const icon = (d: string, w = 2) =>
     white-space: nowrap;
   }
 
-  .bv__more,
   .bv__repeats .btn {
     justify-self: start;
     min-height: 44px;

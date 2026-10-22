@@ -32,4 +32,6 @@
         <item quantity="one">%d day</item>
         <item quantity="other">%d days</item>
     </plurals>
+    <string name="flow_keep">Keep going</string>
+    <string name="flow_stop">Stop</string>
 </resources>

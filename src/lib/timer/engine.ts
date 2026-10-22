@@ -37,10 +37,23 @@ export interface TimerState {
   /** Set when the label is one of your tasks; sessions are then linked to it. */
   taskId?: string;
   custom: CustomDurations;
+  /** Flowtime: the focus time (ms) at which you last answered "Still focusing?" with Keep going. */
+  keptMs?: number;
 }
 
 export type TimerEvent =
-  | { type: 'phase-complete'; from: Phase; to: Phase; autoStarted: boolean; at: number; focusMs: number; breakMs: number; session?: FocusSession }
+  | {
+      type: 'phase-complete';
+      from: Phase;
+      to: Phase;
+      autoStarted: boolean;
+      at: number;
+      focusMs: number;
+      breakMs: number;
+      session?: FocusSession;
+      /** Flowtime stopped by itself: no answer to the check-in, or the longest session reached. */
+      stopped?: 'no-answer' | 'limit';
+    }
   | { type: 'partial-session'; session: FocusSession }
   | { type: 'too-short' };
 
@@ -57,6 +70,14 @@ export const FIFTY_TWO = { workMin: 52, breakMin: 17 } as const;
 export const DEFAULT_CUSTOM: CustomDurations = { workMin: 15, breakMin: 5 };
 /** Sessions shorter than this aren't logged (accidental starts). */
 export const MIN_LOGGED_MS = MIN;
+/**
+ * Flowtime counts up with no end, so a forgotten timer would keep counting for days. Every
+ * 90 minutes of focus it asks "Still focusing?"; with no answer in 15 minutes it stops, and
+ * only the time up to the question counts. No session runs past 4 hours.
+ */
+export const FLOW_CHECK_MS = 90 * MIN;
+export const FLOW_ANSWER_MS = 15 * MIN;
+export const FLOW_MAX_MS = 240 * MIN;
 
 export const LIMITS = { workMin: [1, 240], breakMin: [0, 60] } as const;
 
@@ -113,8 +134,33 @@ export function remaining(s: TimerState, now: number): number | null {
   return s.durationMs === null ? null : Math.max(0, s.durationMs - elapsed(s, now));
 }
 
-/** Epoch ms at which the running phase ends, or null. */
+const isFlowFocus = (s: TimerState) => s.mode === 'flowtime' && s.phase === 'work' && s.durationMs === null;
+
+/** Flowtime focus: the focus time (ms) of the next "Still focusing?", or of the 4-hour limit. */
+export function checkInMs(s: TimerState): number {
+  return Math.min((s.keptMs ?? 0) + FLOW_CHECK_MS, FLOW_MAX_MS);
+}
+
+/** Flowtime focus: the focus time (ms) at which it stops by itself if nobody answers. */
+function autoStopMs(s: TimerState): number {
+  const check = checkInMs(s);
+  return check >= FLOW_MAX_MS ? FLOW_MAX_MS : check + FLOW_ANSWER_MS;
+}
+
+/** Flowtime focus that has reached its check-in and waits for Keep going or Stop. */
+export function checkInDue(s: TimerState, now: number): boolean {
+  return isFlowFocus(s) && s.status === 'running' && checkInMs(s) < FLOW_MAX_MS && elapsed(s, now) >= checkInMs(s);
+}
+
+/** Epoch ms at which focus reaches `focusMs` while running, or null. */
+export function reachesAt(s: TimerState, focusMs: number): number | null {
+  if (s.status !== 'running' || s.runStartedAt === null) return null;
+  return s.runStartedAt + (focusMs - s.elapsedMs);
+}
+
+/** Epoch ms at which the running phase ends (for Flowtime focus: when it would stop by itself), or null. */
 export function endsAt(s: TimerState): number | null {
+  if (isFlowFocus(s)) return reachesAt(s, autoStopMs(s));
   if (s.status !== 'running' || s.durationMs === null || s.runStartedAt === null) return null;
   return s.runStartedAt + (s.durationMs - s.elapsedMs);
 }
@@ -142,6 +188,7 @@ export function createState(mode: TimerMode, custom: CustomDurations, label = ''
 }
 
 function idleWork(s: TimerState, cycle = s.cycle): TimerState {
+  // createState leaves out `keptMs`: the next session asks again after 90 minutes.
   return createState(s.mode, s.custom, s.label, cycle, s.taskId);
 }
 
@@ -229,11 +276,29 @@ export function tick(s: TimerState, now: number): Result {
   for (let guard = 0; guard < 16; guard++) {
     const end = endsAt(state);
     if (end === null || now < end) break;
-    const r = finishPhase(state, end);
+    const r = isFlowFocus(state) ? flowStopsItself(state) : finishPhase(state, end);
     state = r.state;
     events.push(...r.events);
   }
   return { state, events };
+}
+
+/**
+ * Flowtime nobody answered: it ends where the question was asked (that time counts, the
+ * unanswered minutes after it don't), or at the 4-hour limit.
+ */
+function flowStopsItself(s: TimerState): Result {
+  const focusMs = checkInMs(s);
+  const at = reachesAt(s, focusMs)!;
+  const r = finishPhase({ ...s, elapsedMs: focusMs, runStartedAt: null, status: 'paused' }, at);
+  const stopped = focusMs >= FLOW_MAX_MS ? 'limit' : 'no-answer';
+  return { state: r.state, events: r.events.map((e) => (e.type === 'phase-complete' ? { ...e, stopped } : e)) };
+}
+
+/** Flowtime: "Still focusing?" answered with Keep going. Asks again after another 90 minutes. */
+export function keepGoing(s: TimerState, now: number): TimerState {
+  if (!checkInDue(s, now)) return s;
+  return { ...s, keptMs: elapsed(s, now) };
 }
 
 /** Flowtime: the user decides their focus is fading. Logs the session and starts the suggested break. */
@@ -296,6 +361,7 @@ export function isTimerState(v: unknown): v is TimerState {
     num(s.cycle) &&
     typeof s.label === 'string' &&
     (s.taskId === undefined || typeof s.taskId === 'string') &&
+    (s.keptMs === undefined || num(s.keptMs)) &&
     typeof custom === 'object' &&
     custom !== null &&
     num(custom.workMin) &&
