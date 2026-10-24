@@ -5,6 +5,8 @@ export const SITE = {
   description:
     'A guide and toolkit for making tasks feel rewarding: motivation techniques, visual progress, focus timers and task structuring.',
   lang: 'en',
+  /** Where people write for help, privacy questions and data deletion. */
+  supportEmail: 'grovyn.support@gmail.com',
 } as const;
 
 export interface NavItem {
