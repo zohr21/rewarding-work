@@ -5,6 +5,7 @@ import ExamChapters from '../components/ExamChapters.astro';
 import ExamBank from '../components/ExamBank.astro';
 import ExamPast from '../components/ExamPast.astro';
 import FocusTabs from '../components/FocusTabs.astro';
+import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 ---
 
@@ -13,10 +14,15 @@ import { url } from '../lib/paths';
     <FocusTabs />
     <header class="page-header">
       <h1>Exam prep</h1>
-      <p>
-        Set the goal, list the parts, and work through them one at a time. Focus opens the <a href={url('/timer')}>timer</a>{' '}
-        on a chapter, and the time shows up here.
-      </p>
+      {/* The app goes straight to the exam; the website explains the page first. */}
+      {
+        !NATIVE_APP && (
+          <p>
+            Set the goal, list the parts, and work through them one at a time. Focus opens the <a href={url('/timer')}>timer</a>{' '}
+            on a chapter, and the time shows up here.
+          </p>
+        )
+      }
     </header>
 
     <div class="exam-page">
