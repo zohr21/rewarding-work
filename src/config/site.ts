@@ -1,6 +1,8 @@
 /** Site-wide settings. Change the name here — it is used everywhere. */
 export const SITE = {
   name: 'Grovyn',
+  /** Who owns and makes Grovyn: shown in the footer, the privacy page and the page metadata. */
+  owner: 'Zohr Babazade',
   tagline: 'Small, evidence-aware techniques that make work feel worth doing — and let you try them right now.',
   description:
     'A guide and toolkit for making tasks feel rewarding: motivation techniques, visual progress, focus timers and task structuring.',

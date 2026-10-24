@@ -3,6 +3,8 @@
   "type": "module",
   "version": "0.1.0",
   "private": true,
+  "author": "Zohr Babazade",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "astro dev",
     "check": "astro check",

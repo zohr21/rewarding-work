@@ -1,0 +1,15 @@
+Grovyn
+Copyright (c) 2026 Zohr Babazade. All rights reserved.
+
+Grovyn, the Grovyn logo and the Sprig mascot are the work of Zohr Babazade.
+Official sources: the website linked from https://github.com/zohr21/rewarding-work
+and the Android app with package name app.grovyn. Any other copy is unofficial.
+
+Contact: grovyn.support@gmail.com
+
+Third-party material (each under its own license)
+
+- Nature sounds in public/sounds/: Freesound recordings released under CC0.
+  Details and authors in public/sounds/CREDITS.md.
+- Open-source libraries listed in package.json (Astro, Capacitor, Firebase and
+  others), each under the license in its own package.
