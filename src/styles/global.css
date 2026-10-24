@@ -849,6 +849,7 @@ html[data-motion='off'] .is-entering .ring__value {
 /* Optional sections (src/lib/profile.ts): their tabs and links show only while they are on. */
 html:not([data-mod-exam]) [data-module='exam'],
 html:not([data-mod-health]) [data-module='health'],
-html:not([data-mod-budget]) [data-module='budget'] {
+html:not([data-mod-budget]) [data-module='budget'],
+html:not([data-mod-screen]) [data-module='screen'] {
   display: none !important;
 }

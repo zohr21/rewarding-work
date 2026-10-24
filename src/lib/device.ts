@@ -1,6 +1,7 @@
 /**
  * The Android app's native side (android/…/DevicePlugin.java): the timer's notifications,
- * the home-screen widgets, where a notification or widget asked to go, and Health Connect. On the site
+ * the home-screen widgets, where a notification or widget asked to go, Health Connect, bank alerts
+ * and phone time (Usage access). On the site
  * every call here does nothing, and Capacitor isn't even loaded.
  */
 import { NATIVE_APP } from '../config/app';
@@ -77,6 +78,21 @@ export interface BankSources {
   senders: string[];
 }
 
+/** One day of phone time (UsageData.java): other apps only, most used first. */
+export interface UsageDay {
+  day: string;
+  totalMin: number;
+  apps: { pkg: string; label: string; min: number }[];
+}
+
+/** Other apps between two moments, a focus session: in all, how many times, which, and when. */
+export interface UsageSpan {
+  ms: number;
+  pickups: number;
+  apps: { pkg: string; label: string; ms: number }[];
+  spans: { start: number; end: number }[];
+}
+
 interface DevicePlugin {
   bankState(options: { packages: string[] }): Promise<BankState>;
   bankSettings(): Promise<void>;
@@ -89,6 +105,10 @@ interface DevicePlugin {
   healthConnect(options: { kinds: HealthKind[] }): Promise<HealthState>;
   healthRead(options: { days: number }): Promise<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> }>;
   healthSettings(): Promise<void>;
+  usageState(): Promise<{ access: boolean }>;
+  usageSettings(): Promise<void>;
+  usageDays(options: { days: number }): Promise<{ days: UsageDay[] }>;
+  usageBetween(options: { start: number; end: number }): Promise<UsageSpan>;
   showTimer(options: { ongoing: TimerOngoing | null; alerts: TimerAlert[] }): Promise<void>;
   clearTimer(): Promise<void>;
   notificationState(): Promise<{ granted: boolean }>;
@@ -129,6 +149,12 @@ export const healthConnect = (kinds: HealthKind[]) => call<HealthState | null>((
  */
 export const healthRead = (days: number) => call<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> } | null>((p) => p.healthRead({ days }), null);
 export const openHealthSettings = () => void call((p) => p.healthSettings(), undefined);
+/** null where there is no native side to ask. */
+export const usageAccess = () => call<boolean | null>(async (p) => (await p.usageState()).access, null);
+export const openUsageSettings = () => void call((p) => p.usageSettings(), undefined);
+/** null without Usage access or a native side. */
+export const usageDays = (days: number) => call<UsageDay[] | null>(async (p) => (await p.usageDays({ days })).days, null);
+export const usageBetween = (start: number, end: number) => call<UsageSpan | null>((p) => p.usageBetween({ start, end }), null);
 export const takeRoute = () => call<string | null>(async (p) => (await p.takeRoute()).route, null);
 
 /**

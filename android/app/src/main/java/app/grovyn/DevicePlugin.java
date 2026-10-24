@@ -42,8 +42,8 @@ import java.util.List;
 /**
  * What the pages ask of the phone (src/lib/device.ts): the timer's notifications,
  * the home-screen widgets' data, where a notification or widget wanted to go,
- * Google's account picker for signing in, reading from Health Connect, and bank alerts
- * read from notifications (BankInbox.java). The pages own all the data; nothing here changes it.
+ * Google's account picker for signing in, reading from Health Connect, bank alerts
+ * read from notifications (BankInbox.java), and phone time from usage events (UsageData.java). The pages own all the data; nothing here changes it.
  */
 @CapacitorPlugin(
     name = "RewardDevice",
@@ -251,6 +251,61 @@ public class DevicePlugin extends Plugin {
         result.put("available", HEALTH);
         for (String kind : HEALTH_KINDS) result.put(kind, HEALTH && getPermissionState(kind) == PermissionState.GRANTED);
         return result;
+    }
+
+    // ---------- Screen time (UsageData.java, src/lib/screen.ts) ----------
+
+    private static final int USAGE_DAYS_MAX = 14;
+
+    @PluginMethod
+    public void usageState(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("access", UsageData.access(getContext()));
+        call.resolve(result);
+    }
+
+    /** Android's Usage access screen, open at this app where the phone allows it. */
+    @PluginMethod
+    public void usageSettings(PluginCall call) {
+        if (getActivity() != null) {
+            try {
+                getActivity().startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS, Uri.parse("package:" + getContext().getPackageName())));
+            } catch (RuntimeException e) {
+                try {
+                    getActivity().startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+                } catch (RuntimeException ignored) {
+                    /* No such screen on this phone. */
+                }
+            }
+        }
+        call.resolve();
+    }
+
+    /** Minutes per app for each of the last `days` days. */
+    @PluginMethod
+    public void usageDays(PluginCall call) {
+        if (!UsageData.access(getContext())) {
+            call.reject("Usage access is off.", "usage/denied");
+            return;
+        }
+        int days = Math.max(1, Math.min(USAGE_DAYS_MAX, call.getInt("days", 7)));
+        call.resolve(UsageData.days(getContext(), days));
+    }
+
+    /** The other apps used between `start` and `end` (epoch ms): a focus session. */
+    @PluginMethod
+    public void usageBetween(PluginCall call) {
+        if (!UsageData.access(getContext())) {
+            call.reject("Usage access is off.", "usage/denied");
+            return;
+        }
+        Long start = call.getLong("start");
+        Long end = call.getLong("end");
+        if (start == null || end == null || end <= start) {
+            call.reject("No time given.");
+            return;
+        }
+        call.resolve(UsageData.between(getContext(), start, end));
     }
 
     @PluginMethod

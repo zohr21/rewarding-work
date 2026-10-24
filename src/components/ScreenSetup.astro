@@ -1,0 +1,186 @@
+---
+/**
+ * Turning screen time on, in the Android app: what Grovyn will and won't see, then Android's
+ * Usage access screen (there is no permission dialog for it). Opened by any button with
+ * [data-screen-setup-open]. When you come back with access on it closes and fires
+ * `screen:access` on the document, so the cards can read the phone straight away.
+ */
+import Sprig from './Sprig.astro';
+---
+
+<dialog class="screen-setup" data-screen-setup aria-labelledby="screen-setup-title">
+  <button type="button" class="screen-setup__close" data-screen-setup-close aria-label="Close">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+    </svg>
+  </button>
+  <Sprig mood="curious" size={96} />
+  <h2 id="screen-setup-title" class="screen-setup__title">See where your phone time goes</h2>
+  <p class="screen-setup__lead">
+    Grovyn puts yesterday's phone time next to your plan, and tells you after each focus session if the phone got in.
+  </p>
+  <ul class="screen-setup__list">
+    <li>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
+      <span>Stays on this phone. It is not synced to your account or put in backups.</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      <span>Grovyn sees app names and minutes only, never what you do inside them.</span>
+    </li>
+    <li>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>
+      <span>Turn it off any time in You › Sections.</span>
+    </li>
+  </ul>
+  <div class="screen-setup__go">
+    <p class="muted" data-screen-setup-hint>Android opens Usage access. Find Grovyn and switch it on.</p>
+    <button type="button" class="btn screen-setup__open" data-screen-open-settings>Open Usage access</button>
+    <button type="button" class="btn btn--ghost" data-screen-setup-close>Not now</button>
+  </div>
+</dialog>
+
+<script>
+  import { openUsageSettings } from '../lib/device';
+  import { hasAccess } from '../lib/screen';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  onPage('screen-setup', () => {
+    const dialog = document.querySelector<HTMLDialogElement>('[data-screen-setup]');
+    if (!dialog) return;
+    const c = cleanups();
+    const hint = dialog.querySelector<HTMLElement>('[data-screen-setup-hint]')!;
+    /** Sent to Settings from here: on coming back, look whether access is on now. */
+    let away = false;
+
+    c.add(
+      listen(document, 'click', (e) => {
+        const t = e.target as HTMLElement;
+        if (t.closest('[data-screen-setup-open]')) {
+          hint.textContent = 'Android opens Usage access. Find Grovyn and switch it on.';
+          dialog.showModal();
+        } else if (t.closest('[data-screen-setup-close]')) dialog.close();
+        else if (t.closest('[data-screen-open-settings]')) {
+          away = true;
+          openUsageSettings();
+        }
+      }),
+    );
+    c.add(
+      listen(document, 'visibilitychange', () => {
+        if (document.visibilityState !== 'visible' || !away) return;
+        away = false;
+        void hasAccess().then((on) => {
+          if (on) {
+            if (dialog.open) dialog.close();
+            document.dispatchEvent(new CustomEvent('screen:access'));
+          } else hint.textContent = 'Usage access is still off for Grovyn. Switch it on there, then come back.';
+        });
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .screen-setup {
+    position: fixed;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    max-inline-size: none;
+    max-block-size: none;
+    margin: 0;
+    padding: calc(var(--space-7) + env(safe-area-inset-top, 0px)) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    border: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    text-align: center;
+    overflow-y: auto;
+  }
+
+  .screen-setup[open] {
+    display: grid;
+    justify-items: center;
+    align-content: start;
+    gap: var(--space-4);
+  }
+
+  .screen-setup::backdrop {
+    background: var(--color-bg);
+  }
+
+  .screen-setup__close {
+    position: absolute;
+    inset-block-start: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    inset-inline-end: var(--space-3);
+    display: grid;
+    place-items: center;
+    inline-size: 48px;
+    block-size: 48px;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .screen-setup__title {
+    max-inline-size: 20rem;
+    font-size: var(--text-2xl);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .screen-setup__lead {
+    max-inline-size: 22rem;
+    color: var(--color-text-muted);
+  }
+
+  .screen-setup__list {
+    display: grid;
+    gap: var(--space-2);
+    inline-size: min(100%, 26rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: start;
+  }
+
+  .screen-setup__list li {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 2px 0 var(--edge);
+    font-size: var(--text-sm);
+  }
+
+  .screen-setup__list svg {
+    flex: none;
+    fill: none;
+    stroke: var(--cat-visual);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .screen-setup__go {
+    display: grid;
+    gap: var(--space-2);
+    inline-size: min(100%, 26rem);
+    margin-top: var(--space-2);
+  }
+
+  .screen-setup__go p {
+    font-size: var(--text-xs);
+  }
+
+  .screen-setup__go .btn {
+    min-height: 52px;
+  }
+</style>

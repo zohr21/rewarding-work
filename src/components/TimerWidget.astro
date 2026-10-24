@@ -186,6 +186,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
         <h2 id="done-title" class="done__title" data-done-title>Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
+        <section class="done__phone" data-done-phone data-module="screen" aria-label="Phone during focus" hidden />
         <div class="done__form" data-done-slot />
       </dialog>
     )
@@ -1056,6 +1057,88 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   .done__form {
     inline-size: min(100%, 26rem);
     margin-top: var(--space-2);
+  }
+
+  /* Screen time: what the phone did during this session (timer-ui.ts renderPhone). */
+  .done__phone {
+    display: grid;
+    gap: var(--space-2);
+    inline-size: min(100%, 26rem);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+    text-align: start;
+    font-size: var(--text-sm);
+  }
+
+  .done__phone[hidden] {
+    display: none;
+  }
+
+  .done__phone--clean {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .done__phone :global(.done__leaf) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 44px;
+    block-size: 44px;
+    border-radius: 14px;
+    background: var(--cat-reward-bg);
+    color: var(--tier-3);
+  }
+
+  .done__phone :global(.done__phone-text) {
+    display: grid;
+    gap: 2px;
+  }
+
+  .done__phone :global(.done__phone-leaf) {
+    color: var(--cat-reward);
+    font-weight: 600;
+  }
+
+  .done__phone :global(.done__phone-head),
+  .done__phone :global(.done__phone-ends),
+  .done__phone :global(.done__phone-apps li) {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .done__phone :global(.done__phone-line) {
+    position: relative;
+    block-size: 12px;
+    border-radius: var(--radius-pill);
+    background: var(--heat-1);
+    overflow: hidden;
+  }
+
+  .done__phone :global(.done__phone-line > span) {
+    position: absolute;
+    inset-block: 0;
+    background: var(--cat-visual);
+  }
+
+  .done__phone :global(.done__phone-ends) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .done__phone :global(.done__phone-apps) {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .done__form .timer__log {

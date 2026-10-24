@@ -21,8 +21,11 @@ export const MODULES = [
   { id: 'exam', label: 'Exam prep', hint: 'A study plan for one exam' },
   { id: 'health', label: 'Health', hint: 'Sleep, steps and wellbeing spend' },
   { id: 'budget', label: 'Budget', hint: 'Spending, from your bank alerts' },
+  { id: 'screen', label: 'Screen time', hint: 'Phone time next to your plan' },
 ] as const;
 export type ModuleId = (typeof MODULES)[number]['id'];
+/** Sections only the Android app can do; the site leaves them out of Welcome and You. */
+export const APP_ONLY_MODULES: readonly ModuleId[] = ['screen'];
 
 /** The pages inside Focus, in the order of its tabs (FocusTabs.astro). Focus opens on the first. */
 export const FOCUS_TABS: NavItem[] = [

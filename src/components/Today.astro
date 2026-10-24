@@ -10,6 +10,7 @@
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import Sprig from './Sprig.astro';
+import ScreenToday from './ScreenToday.astro';
 ---
 
 <section
@@ -47,6 +48,8 @@ import Sprig from './Sprig.astro';
       <span class="today__dots" data-td-dots></span>
     </a>
   </div>
+
+  {NATIVE_APP && <ScreenToday />}
 
   <a class="today__nudge" href={`${url('/progress')}#tiers`} data-td-nudge hidden>
     <Sprig mood="auto" rest="curious" size={46} />
