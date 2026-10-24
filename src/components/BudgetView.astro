@@ -1,8 +1,8 @@
 ---
 /**
- * The Budget page: what is left this month and whether spending is on pace, a chart of
- * the month so far, budgets per category, the last six months, the month's expenses and
- * the bills that repeat. Everything is typed in by hand (src/lib/budget.ts).
+ * The Budget page, list first like a bank app: what is left (or spent) this month and where
+ * it went, a row of short facts, the month's expenses, then budgets per category, the bills
+ * that repeat, and charts of the month and the months before. The data is in src/lib/budget.ts.
  */
 import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_SHORT, CURRENCIES, CURRENCY_MAX, KIND_LABELS, WELLBEING_KINDS, WHAT_MAX } from '../lib/budget';
 import { NATIVE_APP } from '../config/app';
@@ -40,41 +40,46 @@ const icon = (d: string, w = 2) =>
     </div>
   </div>
 
-  <div class="bv__top">
-    <section class="card bv__hero" aria-labelledby="bv-left-label">
-      <p class="bv__label" id="bv-left-label" data-bv-left-label></p>
-      <p class="bv__big"><strong data-bv-big></strong> <span class="muted" data-bv-of></span></p>
-      <div class="bv__meter" data-bv-meter>
-        <div class="bv__track well"><i data-bv-fill></i></div>
-        <span class="bv__tick" data-bv-tick aria-hidden="true"></span>
-        <p class="bv__meter-foot muted"><span data-bv-spent></span><span data-bv-pace></span></p>
-      </div>
-      <p class="bv__status" data-bv-status></p>
-      <div class="bv__start">
-        {/* Before anything is logged the first expense is a button here, not the floating one, which would sit on top of these. */}
-        {NATIVE_APP && <button type="button" class="btn bv__first" data-bv-add>Add your first expense</button>}
-        <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
-      </div>
-    </section>
+  <section class="card bv__hero" aria-labelledby="bv-left-label">
+    <p class="bv__label" id="bv-left-label" data-bv-left-label></p>
+    <p class="bv__big"><strong data-bv-big></strong> <span class="muted" data-bv-of></span></p>
+    <div class="bv__meter" data-bv-meter>
+      <div class="bv__track well"><i data-bv-fill></i></div>
+      <span class="bv__tick" data-bv-tick aria-hidden="true"></span>
+      <p class="bv__meter-foot muted"><span data-bv-spent></span><span data-bv-pace></span></p>
+    </div>
+    {/* Where the month's money went: one bar split by category, the biggest named under it. */}
+    <div class="bv__mix" data-bv-mix>
+      <div class="bv__mix-bar" role="img" data-bv-mix-bar></div>
+      <p class="bv__mix-key muted" data-bv-mix-key></p>
+    </div>
+    <p class="bv__status" data-bv-status></p>
+    <div class="bv__start">
+      {/* Before anything is logged the first expense is a button here, not the floating one, which would sit on top of these. */}
+      {NATIVE_APP && <button type="button" class="btn bv__first" data-bv-add>Add your first expense</button>}
+      <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
+    </div>
+  </section>
 
-    <section class="card bv__chart-card" aria-labelledby="bv-pace-title">
-      <div class="bv__card-head">
-        <h2 class="bv__label" id="bv-pace-title">Spending vs. pace</h2>
-        <p class="bv__legend muted">
-          <span><i class="bv__key bv__key--line"></i>Spent so far</span>
-          <span data-bv-pace-key><i class="bv__key bv__key--dash"></i><span data-bv-pace-key-text></span></span>
-        </p>
-      </div>
-      <div data-bv-pace-chart></div>
-    </section>
-  </div>
+  {/* Short facts in one row that scrolls sideways; a fact with nothing to say is left out. */}
+  <ul class="bv__insights" role="list" aria-label="This month in short" data-bv-insights></ul>
 
-  <div class="bv__tiles">
-    <div class="card bv__tile"><p class="bv__label">vs. last month</p><strong data-bv-t1></strong><span class="muted" data-bv-t1s></span></div>
-    <div class="card bv__tile"><p class="bv__label">Biggest category</p><strong data-bv-t2></strong><span class="muted" data-bv-t2s></span></div>
-    <div class="card bv__tile"><p class="bv__label">Due in 7 days</p><strong data-bv-t3></strong><span class="muted" data-bv-t3s></span></div>
-    <div class="card bv__tile"><p class="bv__label">Days with an entry</p><strong data-bv-t4></strong><span class="muted" data-bv-t4s></span></div>
-  </div>
+  <section class="card bv__entries" aria-labelledby="bv-entries-title">
+    <div class="bv__card-head">
+      <h2 class="panel-title" id="bv-entries-title">Expenses</h2>
+      <label class="bv__search">
+        <span class="visually-hidden">Search expenses</span>
+        <Fragment set:html={icon('M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4')} />
+        <input class="input" type="search" placeholder="Search" autocomplete="off" data-bv-query />
+      </label>
+    </div>
+    <div class="bv__chips" role="group" aria-label="Show category" data-bv-chips>
+      <button type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
+      {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false">{CATEGORY_SHORT[c]}</button>)}
+    </div>
+    <div class="bv__groups" data-bv-list></div>
+    <p class="muted bv__note" data-bv-none hidden></p>
+  </section>
 
   <div class="bv__pair">
     <section class="card bv__cats" aria-labelledby="bv-cats-title">
@@ -84,34 +89,6 @@ const icon = (d: string, w = 2) =>
       </div>
       <ul class="bv__cat-list" role="list" data-bv-cats></ul>
       <p class="muted bv__note" data-bv-cats-note></p>
-    </section>
-
-    <section class="card bv__months" aria-labelledby="bv-months-title">
-      <div class="bv__card-head">
-        <h2 class="panel-title" id="bv-months-title" data-bv-months-title>Last 6 months</h2>
-        <p class="bv__legend muted" data-bv-months-key><span><i class="bv__key bv__key--dash"></i><span data-bv-months-key-text></span></span></p>
-      </div>
-      <div data-bv-months-chart></div>
-      <p class="bv__finding" data-bv-finding></p>
-    </section>
-  </div>
-
-  <div class="bv__pair bv__pair--list">
-    <section class="card bv__entries" aria-labelledby="bv-entries-title">
-      <div class="bv__card-head">
-        <h2 class="panel-title" id="bv-entries-title">Expenses</h2>
-        <label class="bv__search">
-          <span class="visually-hidden">Search expenses</span>
-          <Fragment set:html={icon('M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4')} />
-          <input class="input" type="search" placeholder="Search" autocomplete="off" data-bv-query />
-        </label>
-      </div>
-      <div class="bv__chips" role="group" aria-label="Show category" data-bv-chips>
-        <button type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
-        {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false">{CATEGORY_SHORT[c]}</button>)}
-      </div>
-      <div class="bv__groups" data-bv-list></div>
-      <p class="muted bv__note" data-bv-none hidden></p>
     </section>
 
     <section class="card bv__repeats" aria-labelledby="bv-repeats-title">
@@ -125,11 +102,32 @@ const icon = (d: string, w = 2) =>
     </section>
   </div>
 
+  <div class="bv__pair bv__charts">
+    <section class="card bv__chart-card" aria-labelledby="bv-pace-title">
+      <div class="bv__card-head">
+        <h2 class="panel-title" id="bv-pace-title" data-bv-pace-title>This month</h2>
+        <p class="bv__legend muted">
+          <span><i class="bv__key bv__key--line"></i>Spent so far</span>
+          <span data-bv-pace-key><i class="bv__key bv__key--dash"></i><span data-bv-pace-key-text></span></span>
+        </p>
+      </div>
+      <div data-bv-pace-chart></div>
+    </section>
+
+    <section class="card bv__months" aria-labelledby="bv-months-title">
+      <div class="bv__card-head">
+        <h2 class="panel-title" id="bv-months-title" data-bv-months-title>By month</h2>
+        <p class="bv__legend muted" data-bv-months-key><span><i class="bv__key bv__key--dash"></i><span data-bv-months-key-text></span></span></p>
+      </div>
+      <div data-bv-months-chart></div>
+      <p class="bv__finding" data-bv-finding></p>
+    </section>
+  </div>
+
   {
     NATIVE_APP && (
-      <button type="button" class="btn bv__fab" data-bv-add>
+      <button type="button" class="btn bv__fab" data-bv-add aria-label="Add expense">
         <Fragment set:html={icon(PLUS, 2.6)} />
-        Expense
       </button>
     )
   }
@@ -462,12 +460,37 @@ const icon = (d: string, w = 2) =>
         setText('[data-bv-left-label]', current ? 'Spent this month' : `Spent in ${name}`);
         setText('[data-bv-big]', fmt(spent.total));
         setText('[data-bv-of]', '');
+        // The "Set a monthly budget" button under it says what a budget would add.
         $('[data-bv-status]').className = 'bv__status';
-        $('[data-bv-status]').innerHTML = '<span>Set a monthly budget to see what is left and whether you are on pace.</span>';
+        $('[data-bv-status]').replaceChildren();
       }
+
+      // ---- Where it went: one bar in category colours, the top three named ----
+      const byCat = [...spent.byCategory].filter(([, sum]) => sum > 0).sort((a, b) => b[1] - a[1]);
+      const share = (sum: number) => Math.round((sum / spent.total) * 100);
+      $('[data-bv-mix]').hidden = !byCat.length;
+      $('[data-bv-mix-bar]').replaceChildren(
+        ...byCat.map(([cat, sum]) => {
+          const part = el('i');
+          part.style.background = CATEGORY_COLORS[cat];
+          part.style.flexGrow = String(sum);
+          return part;
+        }),
+      );
+      $('[data-bv-mix-bar]').setAttribute('aria-label', byCat.map(([cat, sum]) => `${CATEGORY_SHORT[cat]} ${share(sum)}%`).join(', '));
+      $('[data-bv-mix-key]').replaceChildren(
+        ...byCat.slice(0, 3).map(([cat, sum]) => {
+          const item = el('span');
+          const dot = el('i', 'bv__dot');
+          dot.style.background = CATEGORY_COLORS[cat];
+          item.append(dot, `${CATEGORY_SHORT[cat]} ${share(sum)}%`);
+          return item;
+        }),
+      );
 
       const run = runningTotals(entries, month);
       $('[data-bv-pace-key]').hidden = !budget;
+      setText('[data-bv-pace-title]', budget ? 'Spending vs. pace' : current ? 'This month so far' : name);
       setText('[data-bv-pace-key-text]', budget ? `Pace to ${whole(budget)}` : '');
       $('[data-bv-pace-chart]').innerHTML = paceChart(
         run,
@@ -477,27 +500,28 @@ const icon = (d: string, w = 2) =>
         `Spent through ${name}: ${fmt(run[dom - 1] ?? 0)} by day ${dom}${budget ? `, against a pace of ${whole(pace)}` : ''}.`,
       );
 
-      // ---- Tiles ----
+      // ---- Short facts: only the ones with something to say ----
+      const facts: [string, string][] = [];
       const prevMonth = shiftMonth(month, -1);
       const prev = monthSpend(entries, prevMonth, dom).total;
-      const prevName = monthName.format(fromDayKey(`${prevMonth}-01`));
-      if (prev > 0) {
+      const prevShort = monthShort.format(fromDayKey(`${prevMonth}-01`));
+      if (prev > 0 && spent.total > 0) {
         const pct = Math.round(((spent.total - prev) / prev) * 100);
-        setText('[data-bv-t1]', `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`);
-        setText('[data-bv-t1s]', current ? `${whole(prev)} by the same day in ${prevName}` : `${whole(prev)} in ${prevName}`);
-      } else {
-        setText('[data-bv-t1]', '—');
-        setText('[data-bv-t1s]', `Nothing logged in ${prevName}`);
+        facts.push([`${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`, current ? `vs. ${prevShort} by this day` : `vs. ${prevShort}`]);
       }
-      const biggest = [...spent.byCategory].sort((a, b) => b[1] - a[1])[0];
-      setText('[data-bv-t2]', biggest ? CATEGORY_SHORT[biggest[0]] : '—');
-      setText('[data-bv-t2s]', biggest ? `${whole(biggest[1])} · ${Math.round((biggest[1] / spent.total) * 100)}% of spending` : 'Nothing spent yet');
-      const due = dueSoon(store.repeats.filter((r) => !removing.has(r.id)));
-      setText('[data-bv-t3]', whole(due.reduce((sum, d) => sum + d.repeat.amount, 0)));
-      setText('[data-bv-t3s]', due.length ? due.map((d) => d.repeat.what).join(', ') : 'No repeating bills due');
+      if (spent.total > 0) facts.push([whole(spent.total / dom), current ? 'a day so far' : 'a day']);
+      const due = current ? dueSoon(repeats) : [];
+      if (due.length) facts.push([whole(due.reduce((sum, d) => sum + d.repeat.amount, 0)), `due in 7 days: ${due.map((d) => d.repeat.what).join(', ')}`]);
       const logged = new Set(spent.entries.map((e) => e.day)).size;
-      setText('[data-bv-t4]', `${logged} of ${dom}`);
-      setText('[data-bv-t4s]', current ? 'days so far this month' : `days in ${name}`);
+      if (logged) facts.push([`${logged} of ${dom}`, 'days with spending']);
+      $('[data-bv-insights]').replaceChildren(
+        ...facts.map(([big, small]) => {
+          const li = el('li', 'bv__insight');
+          li.append(el('strong', '', big), el('span', 'muted', small));
+          return li;
+        }),
+      );
+      $('[data-bv-insights]').hidden = !facts.length;
 
       // ---- Categories ----
       const shown = CATEGORIES.filter((cat) => store.budgets[cat] || spent.byCategory.has(cat));
@@ -512,7 +536,7 @@ const icon = (d: string, w = 2) =>
           btn.style.setProperty('--c', CATEGORY_COLORS[cat]);
           const head = el('span', 'bv__cat-head');
           const nameEl = el('span', 'bv__cat-name');
-          nameEl.append(el('i', 'bv__dot'), CATEGORY_LABELS[cat]);
+          nameEl.append(el('i', 'bv__dot'), CATEGORY_SHORT[cat]);
           const nums = el('span', 'bv__cat-nums', whole(sum));
           if (own) nums.append(el('span', 'muted', ` / ${whole(own)}`));
           head.append(nameEl, nums);
@@ -543,8 +567,6 @@ const icon = (d: string, w = 2) =>
               n.innerHTML = WARN + `<span>${esc(note)}</span>`;
               btn.append(n);
             }
-          } else {
-            btn.append(el('span', 'bv__cat-sub muted', 'No budget'));
           }
           btn.addEventListener('click', () => setFilter(filter === cat ? null : cat));
           li.append(btn);
@@ -554,15 +576,22 @@ const icon = (d: string, w = 2) =>
       const notes: string[] = [];
       if (!shown.length) notes.push(`Nothing spent in ${name} yet.`);
       else notes.push('Choose a category to see only its expenses and months.');
+      // Said once for the list, not under every row.
+      if (shown.length && !shown.some((cat) => store.budgets[cat])) notes.unshift('No category budgets yet.');
       if (current && shown.some((cat) => store.budgets[cat])) notes.push('The white tick is where your pace would be today: repeating bills count on their day, the rest is spread evenly.');
       const assigned = Object.values(store.budgets).reduce((a, b) => a + (b ?? 0), 0);
       if (store.budget && assigned > 0 && assigned < store.budget) notes.push(`${whole(store.budget - assigned)} of your budget is not given to a category.`);
       setText('[data-bv-cats-note]', notes.join(' '));
 
       // ---- Months ----
-      const months = monthTotals(entries, month, 6, filter ?? undefined);
+      // From the first month with an expense, so a new budget is not five empty bars; 2 to 6 months.
+      const first = entries.reduce((min, e) => (e.day < min ? e.day : min), today());
+      let span = 1;
+      while (span < 6 && shiftMonth(month, -span) >= monthOf(first)) span++;
+      span = Math.max(2, span);
+      const months = monthTotals(entries, month, span, filter ?? undefined);
       const line = filter ? (store.budgets[filter] ?? null) : budget;
-      setText('[data-bv-months-title]', filter ? `Last 6 months · ${CATEGORY_SHORT[filter]}` : 'Last 6 months');
+      setText('[data-bv-months-title]', `Last ${span} months${filter ? ` · ${CATEGORY_SHORT[filter]}` : ''}`);
       $('[data-bv-months-key]').hidden = !line;
       setText('[data-bv-months-key-text]', line ? `Budget ${whole(line)}` : '');
       $('[data-bv-months-chart]').innerHTML = monthBars(
@@ -595,8 +624,8 @@ const icon = (d: string, w = 2) =>
       $('[data-bv-list]').replaceChildren(
         ...groupEntries(list).map((g, i) => {
           const box = el('details', 'disclosure bv__group');
-          // The newest group starts open; all of them do while you search or pick a category.
-          box.open = toggled.get(g.key) ?? (i === 0 || !!q || !!filter);
+          // The two newest groups start open; all of them do while you search or pick a category.
+          box.open = toggled.get(g.key) ?? (i < 2 || !!q || !!filter);
           box.addEventListener('toggle', () => toggled.set(g.key, box.open));
           const head = el('summary', 'bv__group-head');
           head.append(
@@ -887,9 +916,9 @@ const icon = (d: string, w = 2) =>
 <style>
   .bv[data-fresh] .bv__fab,
   .bv:not([data-fresh]) .bv__first,
-  .bv[data-fresh] .bv__chart-card,
-  .bv[data-fresh] .bv__tiles,
-  .bv[data-fresh] .bv__pair:not(.bv__pair--list),
+  .bv[data-fresh] .bv__charts,
+  .bv[data-fresh] .bv__insights,
+  .bv[data-fresh] .bv__cats,
   .bv[data-fresh] .bv__chips,
   .bv[data-fresh] .bv__search {
     display: none;
@@ -960,21 +989,74 @@ const icon = (d: string, w = 2) =>
   .bv__label {
     margin: 0;
     color: var(--color-text-muted);
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
-  .bv__top {
+  /* One bar split by category, and the top three named under it. */
+  .bv__mix {
     display: grid;
-    gap: var(--space-5);
+    gap: var(--space-2);
   }
 
-  @media (min-width: 60rem) {
-    .bv__top {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1.9fr);
-    }
+  .bv__mix-bar {
+    display: flex;
+    gap: 2px;
+    block-size: 10px;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+  }
+
+  .bv__mix-bar :global(i) {
+    flex-basis: 0;
+    min-inline-size: 4px;
+  }
+
+  .bv__mix-key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    font-size: var(--text-sm);
+  }
+
+  .bv__mix-key :global(span) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  /* Short facts in a row that scrolls sideways on a phone. */
+  .bv__insights {
+    display: flex;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0 0 var(--space-1);
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .bv__insights :global(.bv__insight) {
+    display: grid;
+    flex: none;
+    gap: 2px;
+    max-inline-size: 16rem;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .bv__insights :global(.bv__insight strong) {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bv__insights :global(.bv__insight span) {
+    overflow: hidden;
+    font-size: var(--text-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .bv__hero {
@@ -1065,6 +1147,10 @@ const icon = (d: string, w = 2) =>
     border-radius: var(--radius-md);
     background: var(--color-surface-2);
     font-size: var(--text-sm);
+  }
+
+  .bv__status:empty {
+    display: none;
   }
 
   .bv__status :global(svg) {
@@ -1233,29 +1319,6 @@ const icon = (d: string, w = 2) =>
     font-size: var(--text-sm);
   }
 
-  .bv__tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
-    gap: var(--space-4);
-  }
-
-  .bv__tile {
-    display: grid;
-    align-content: start;
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-5);
-  }
-
-  .bv__tile strong {
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .bv__tile .muted {
-    font-size: var(--text-xs);
-  }
-
   .bv__pair {
     display: grid;
     gap: var(--space-5);
@@ -1265,10 +1328,6 @@ const icon = (d: string, w = 2) =>
   @media (min-width: 56rem) {
     .bv__pair {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    }
-
-    .bv__pair--list {
-      grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
     }
   }
 
@@ -1358,10 +1417,6 @@ const icon = (d: string, w = 2) =>
     block-size: 14px;
   }
 
-  .bv :global(.bv__cat-sub) {
-    font-size: var(--text-xs);
-  }
-
   .bv__note,
   .bv :global(.bv__note) {
     font-size: var(--text-sm);
@@ -1389,6 +1444,21 @@ const icon = (d: string, w = 2) =>
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  /* On a phone the chips are one row that scrolls, not two that push the list down. */
+  @media (max-width: 40rem) {
+    .bv__chips {
+      flex-wrap: nowrap;
+      margin-inline: calc(-1 * var(--space-5));
+      padding-inline: var(--space-5);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .bv__chip {
+      flex: none;
+    }
   }
 
   .bv__chip {
@@ -1478,9 +1548,18 @@ const icon = (d: string, w = 2) =>
     inset-inline-end: var(--space-4);
     inset-block-end: calc(var(--app-nav-h, 0px) + var(--space-4));
     z-index: 15;
+    display: grid;
+    place-items: center;
+    inline-size: 56px;
+    block-size: 56px;
     min-height: 56px;
-    padding-inline: var(--space-5);
-    border-radius: 18px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  .bv__fab :global(svg) {
+    inline-size: 24px;
+    block-size: 24px;
   }
 
   :global(html[data-app]) .bv {

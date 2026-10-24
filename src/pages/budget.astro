@@ -7,9 +7,10 @@ import { NATIVE_APP } from '../config/app';
 
 <BaseLayout title="Budget" description="What you spend, against a monthly budget: what is left, your pace, and where it goes.">
   <div class="container">
-    <header class="page-header">
+    {/* In the app the bottom bar already says Budget: the money comes first. */}
+    <header class={NATIVE_APP ? 'visually-hidden' : 'page-header'}>
       <h1>Budget</h1>
-      <p>What is left this month, whether you are on pace, and where it goes.</p>
+      {!NATIVE_APP && <p>What is left this month, whether you are on pace, and where it goes.</p>}
     </header>
 
     {NATIVE_APP && <BankImport />}
@@ -29,5 +30,9 @@ import { NATIVE_APP } from '../config/app';
 
   .container > :global(.bk) {
     margin-bottom: var(--space-5);
+  }
+
+  :global(html[data-app]) .container > :global(.bk) {
+    margin-top: var(--space-4);
   }
 </style>
