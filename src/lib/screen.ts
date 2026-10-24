@@ -21,6 +21,8 @@ export interface SessionPhone {
   apps: { label: string; ms: number }[];
   /** When, as [start, end] in epoch ms, for the session's timeline. */
   spans: [number, number][];
+  /** How it was worked out; older checks miscounted (see CHECK_VERSION). */
+  v?: number;
 }
 
 export interface ScreenStore {
@@ -33,6 +35,12 @@ const KEEP_DAYS = 90;
 const KEEP_SESSIONS = 300;
 /** How far back the phone is asked; it has about a week. */
 const READ_DAYS = 8;
+/**
+ * Version 1 missed the first pick-up and cut an app's time short when it changed screens.
+ * Unversioned checks this recent are redone; older ones stay, as the phone may have forgotten them.
+ */
+const CHECK_VERSION = 2;
+const REDO_WITHIN = 3 * 86_400_000;
 
 const EMPTY: ScreenStore = { days: [], sessions: {} };
 
@@ -75,7 +83,7 @@ export async function refreshDays(): Promise<boolean> {
 /** What other apps did during `session`, kept with it. null without Usage access. */
 export async function checkSession(session: Pick<FocusSession, 'id' | 'start' | 'end'>): Promise<SessionPhone | null> {
   const had = getScreen().sessions[session.id];
-  if (had) return had;
+  if (had && !stale(had, session.start)) return had;
   const used = await usageBetween(session.start, session.end);
   if (!used) return null;
   const phone: SessionPhone = {
@@ -83,6 +91,7 @@ export async function checkSession(session: Pick<FocusSession, 'id' | 'start' | 
     pickups: used.pickups,
     apps: used.apps.map((a) => ({ label: a.label, ms: a.ms })),
     spans: used.spans.map((s) => [s.start, s.end]),
+    v: CHECK_VERSION,
   };
   const store = getScreen();
   save({ ...store, sessions: { ...store.sessions, [session.id]: phone } });
@@ -94,10 +103,15 @@ export async function checkRecentSessions(sessions: FocusSession[], now = Date.n
   const since = now - 7 * 86_400_000;
   const kept = getScreen().sessions;
   for (const s of sessions) {
-    if (s.start >= since && s.focusSeconds >= 60 && !s.removedAt && !kept[s.id]) {
+    const had = kept[s.id];
+    if (s.start >= since && s.focusSeconds >= 60 && !s.removedAt && (!had || stale(had, s.start, now))) {
       if (!(await checkSession(s))) return;
     }
   }
+}
+
+function stale(check: SessionPhone, start: number, now = Date.now()): boolean {
+  return check.v !== CHECK_VERSION && now - start < REDO_WITHIN;
 }
 
 export function dayOf(store: ScreenStore, key: string): ScreenDay | undefined {

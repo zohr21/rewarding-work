@@ -130,12 +130,12 @@ final class UsageData {
         JSArray spanList = new JSArray();
         long total = 0;
         int pickups = 0;
-        long lastEnd = Long.MIN_VALUE;
+        long lastEnd = 0;
         for (Span span : spans) {
             total += span.end - span.start;
             Long had = perApp.get(span.pkg);
             perApp.put(span.pkg, (had == null ? 0 : had) + (span.end - span.start));
-            if (span.start - lastEnd > SAME_PICKUP) pickups++;
+            if (pickups == 0 || span.start - lastEnd > SAME_PICKUP) pickups++;
             lastEnd = span.end;
             JSObject s = new JSObject();
             s.put("start", span.start);
@@ -162,7 +162,12 @@ final class UsageData {
         return result;
     }
 
-    /** Every stretch an app the user opens was on screen between `from` and `to`, in order, clipped to the window. */
+    /**
+     * Every stretch an app the user opens was on screen between `from` and `to`, in order, clipped to the window.
+     * An app is on screen from its first resume until another app (or the home screen) resumes or the
+     * screen goes off. Pauses and stops are not used: when an app swaps one of its own screens for
+     * another, the old one's pause or stop can come after the new one's resume.
+     */
     private static List<Span> spans(Context context, long from, long to) {
         List<Span> out = new ArrayList<>();
         UsageStatsManager usm = context.getSystemService(UsageStatsManager.class);
@@ -194,9 +199,6 @@ final class UsageData {
                 if (!ok) continue;
                 current = pkg;
                 since = t;
-            } else if ((type == UsageEvents.Event.ACTIVITY_PAUSED || type == UsageEvents.Event.ACTIVITY_STOPPED) && pkg.equals(current)) {
-                add(out, current, since, t, from, to);
-                current = null;
             } else if (type == UsageEvents.Event.SCREEN_NON_INTERACTIVE || type == UsageEvents.Event.DEVICE_SHUTDOWN) {
                 if (current != null) add(out, current, since, t, from, to);
                 current = null;
