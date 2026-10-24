@@ -1,8 +1,8 @@
 ---
 /**
  * Expenses from bank alerts, on the Budget page in the Android app (src/lib/bank.ts):
- * setting it up, the expenses that wait to be checked, and the last alerts read with
- * what was done with each. The reading itself runs on every page (src/scripts/bank-sync.ts).
+ * one line saying it is on, the expenses that wait to be checked, and in Settings the
+ * past SMS import and the last alerts read with what was done with each. The reading itself runs on every page (src/scripts/bank-sync.ts).
  */
 import { BANK_SENDERS, SENDER_MAX } from '../lib/bank';
 import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } from '../lib/budget';
@@ -11,12 +11,11 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 <section class="card bk" aria-labelledby="bk-title" data-bank>
   <div class="bk__head">
     <div class="bk__head-text">
-      <h2 class="panel-title" id="bk-title">From your bank</h2>
+      <h2 class="panel-title" id="bk-title">Bank alerts</h2>
       <p class="muted bk__status" data-bk-status></p>
     </div>
     <div class="bk__head-actions">
-      <button type="button" class="btn btn--ghost btn--small" data-bk-history>Past SMS</button>
-      <button type="button" class="btn btn--small" data-bk-setup></button>
+      <button type="button" class="btn btn--ghost btn--small" data-bk-setup></button>
     </div>
   </div>
 
@@ -35,11 +34,6 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     <ul class="bk__list" role="list" data-bk-list></ul>
   </div>
 
-  <details class="bk__log" data-bk-log-box hidden>
-    <summary>Recently read</summary>
-    <p class="muted bk__note">The last alerts the app read on this phone, and what it did with each. Kept on this phone only.</p>
-    <ul class="bk__list" role="list" data-bk-log></ul>
-  </details>
 
   <dialog class="bk-dialog" data-bk-s-dialog aria-labelledby="bk-s-title">
     <form method="dialog" data-bk-s-form>
@@ -85,6 +79,19 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
         </p>
         <button type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
       </div>
+
+      <div class="bk-past">
+        <p><strong>Past SMS</strong></p>
+        <p class="muted bk__note">Bring in the payments your banks texted you before.</p>
+        <button type="button" class="btn btn--ghost btn--small" data-bk-history>Read past SMS</button>
+      </div>
+
+      <details class="bk__log" data-bk-log-box hidden>
+        <summary>Recently read</summary>
+        <p class="muted bk__note">The last alerts the app read on this phone, and what it did with each. Kept on this phone only.</p>
+        <ul class="bk__list" role="list" data-bk-log></ul>
+      </details>
+
 
       <div class="bk-dialog__actions">
         <button type="button" class="btn btn--ghost bk-dialog__off" data-bk-off hidden>Turn off</button>
@@ -211,6 +218,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
   onPage('bank-import', () => {
     const root = document.querySelector<HTMLElement>('[data-bank]');
     if (!root) return;
+    const card: HTMLElement = root;
     const c = cleanups();
     const $ = <E extends Element = HTMLElement>(s: string) => root.querySelector<E>(s)!;
     const $$ = <E extends Element = HTMLElement>(s: string) => [...root.querySelectorAll<E>(s)];
@@ -232,12 +240,16 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       const store = getBank();
       const access = state?.access ?? false;
       const sources = [...store.apps.map(appName), ...(store.senders.length ? [`SMS from ${list(store.senders)}`] : [])];
+      // Once it is on, one short line: which banks are in Settings.
+      const n = store.apps.length + store.senders.length;
       $('[data-bk-status]').textContent = !store.on
         ? 'Add expenses from the alerts your bank sends, as they come.'
-        : sources.length
-          ? `Reading ${list(sources)}. ${store.auto ? 'Adds expenses on its own.' : 'Asks before adding.'}`
+        : n
+          ? `On · ${n} ${n === 1 ? 'source' : 'sources'} · ${store.auto ? 'adds expenses on its own' : 'asks before adding'}`
           : 'Pick a bank app or SMS sender to read alerts from.';
+      $('[data-bk-status]').title = sources.length ? `Reading ${list(sources)}` : '';
       $('[data-bk-setup]').textContent = store.on ? 'Settings' : 'Set up';
+      card.classList.toggle('bk--quiet', store.on && n > 0 && !store.pending.length && !store.imports.length && (access || state === null));
       $('[data-bk-access]').hidden = !store.on || access || state === null;
 
       const review = $('[data-bk-review]');
@@ -461,7 +473,11 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       hAdd.textContent = adds ? `Add ${count.format(adds)} expenses` : checks ? 'Put in To check' : 'Nothing to add';
     }
 
-    $('[data-bk-history]').addEventListener('click', openHistory);
+    // Past SMS sits in Settings: that dialog closes and this one opens.
+    $('[data-bk-history]').addEventListener('click', () => {
+      sDialog.close();
+      openHistory();
+    });
     $('[data-bk-h-read]').addEventListener('click', () => void readHistory());
     hReview.addEventListener('change', updateAdd);
     $<HTMLFormElement>('[data-bk-h-form]').addEventListener('submit', () => {
@@ -542,6 +558,29 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 
   .bk__head .panel-title {
     margin: 0;
+  }
+
+  /* On, with nothing to check: a single slim row. */
+  .bk.bk--quiet {
+    padding-block: var(--space-3);
+  }
+
+  .bk--quiet .bk__head {
+    flex-wrap: nowrap;
+  }
+
+  .bk--quiet .panel-title {
+    font-size: var(--text-base);
+  }
+
+  .bk--quiet .bk__status {
+    font-size: var(--text-xs);
+  }
+
+  .bk-past {
+    display: grid;
+    justify-items: start;
+    gap: var(--space-1);
   }
 
   .bk__head-actions {
