@@ -36,12 +36,12 @@ import Sprig from './Sprig.astro';
   </div>
 
   <div class="today__pair" data-td-pair hidden>
-    <a class="card today__stat" href={url('/progress')}>
+    <a class="card today__stat" href={`${url('/progress')}#stats`}>
       <span class="today__label">Focus today</span>
       <strong class="today__value" data-td-focus>0 min</strong>
       <span class="today__chart" data-td-bars></span>
     </a>
-    <a class="card today__stat" href={url('/progress')}>
+    <a class="card today__stat" href={`${url('/progress')}#chains`}>
       <span class="today__label" data-td-chain-label>Chain</span>
       <strong class="today__value" data-td-chain>None yet</strong>
       <span class="today__dots" data-td-dots></span>

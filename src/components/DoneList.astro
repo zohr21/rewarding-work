@@ -2,8 +2,8 @@
 /**
  * "Done" list: log finished tasks. One tap to add from today's timer labels,
  * or type and press Enter. Each new item gets a small check-off animation.
- * Groups fold away (older ones start closed) and the list scrolls inside a fixed-height
- * box. Long groups show their newest few with "Show more"; removing offers Undo.
+ * Groups fold away (older ones start closed). Long groups show their newest few with
+ * "Show more"; removing offers Undo.
  */
 ---
 
@@ -26,7 +26,6 @@
     <p class="muted" data-done-total></p>
     <button type="button" class="btn btn--ghost btn--small" data-done-all></button>
   </div>
-  <!-- Fixed height: a long list scrolls in here instead of stretching the page. -->
   <div class="done__well" data-done-groups hidden></div>
   <p class="muted done__empty" data-done-empty>Nothing logged yet. Small things count.</p>
   <p class="visually-hidden" aria-live="polite" data-done-live></p>
@@ -100,14 +99,18 @@
         check.className = 'done__check';
         check.innerHTML = CHECK_SVG;
 
+        // The name and, under it, when: the list already says "done", so a task's "Finished: " is dropped.
         const body = document.createElement('span');
         body.className = 'done__text';
-        body.textContent = item.text;
+        const name = document.createElement('span');
+        name.className = 'done__name';
+        name.textContent = item.text.replace(/^Finished:\s*/, '');
 
         const when = document.createElement('time');
         when.className = 'done__time muted';
         when.dateTime = new Date(item.doneAt).toISOString();
         when.textContent = showDay ? dayFmt.format(item.doneAt) : timeFmt.format(item.doneAt);
+        body.append(name, when);
 
         const del = document.createElement('button');
         del.type = 'button';
@@ -136,7 +139,7 @@
           announce(`Removed: ${item.text}. Press Undo to bring it back.`);
         });
 
-        li.append(check, body, when, del);
+        li.append(check, body, del);
         return li;
       }
 
@@ -336,21 +339,13 @@
   }
 
   .done__well {
-    max-height: min(30rem, 70vh);
     margin-top: var(--space-2);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border-strong) transparent;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
+    overflow: hidden;
   }
 
-  /* Group headers stay in view while their items scroll under them. */
   .done :global(.done__group) {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     max-width: none;
     font-size: var(--text-sm);
     background: var(--color-surface-solid);
@@ -424,15 +419,17 @@
   }
 
   .done :global(.done__text) {
+    display: grid;
     flex: 1;
+    gap: 2px;
     min-width: 0;
     overflow-wrap: anywhere;
-    padding-block: var(--space-2);
+    padding-block: var(--space-3);
+    line-height: 1.35;
   }
 
   .done :global(.done__time) {
     font-size: var(--text-xs);
-    white-space: nowrap;
   }
 
   /* Check mark */
