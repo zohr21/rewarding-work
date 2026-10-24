@@ -17,9 +17,15 @@ import { NATIVE_APP } from '../config/app';
     <select id="eb-scope" class="input" data-eb-scope></select>
     <button type="button" class="btn" data-eb-start>Practice</button>
   </div>
-  <button type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
-  <p class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
-  <button type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
+  {/* Importing and removing are occasional: folded away once there are questions. */}
+  <details class="disclosure bank__manage" data-eb-manage>
+    <summary>Import or remove questions</summary>
+    <div class="bank__manage-body">
+      <button type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
+      <p class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
+      <button type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
+    </div>
+  </details>
   <p class="visually-hidden" aria-live="polite" data-eb-live></p>
 </section>
 
@@ -202,6 +208,8 @@ import { NATIVE_APP } from '../config/app';
       if (worst) weak.textContent = `Weakest so far: ${worst.chapter.name}, ${worst.correct} of ${worst.seen} correct`;
 
       practiceRow.hidden = clear.hidden = n === 0;
+      // With no questions yet, importing is the only thing to do here.
+      if (n === 0) $<HTMLDetailsElement>('[data-eb-manage]').open = true;
       const before = scope.value || 'all';
       const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
       scope.replaceChildren(option('all', `All chapters (${n})`), ...withQuestions.map((ch) => option(ch.id, `${ch.name} (${poolSize(exam.questions, ch.id)})`)));
@@ -590,6 +598,19 @@ import { NATIVE_APP } from '../config/app';
   .bank__note {
     margin-top: calc(-1 * var(--space-1));
     font-size: var(--text-xs);
+  }
+
+  .bank__manage > summary {
+    min-height: 44px;
+    align-content: center;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .bank__manage-body {
+    display: grid;
+    gap: var(--space-3);
+    padding-top: var(--space-2);
   }
 
   .bank__clear {

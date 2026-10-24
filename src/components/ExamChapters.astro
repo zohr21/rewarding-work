@@ -1,8 +1,9 @@
 ---
 /**
- * The chapters (or parts) of the exam. Each shows the focus time spent against the time
- * planned and has its own Focus button, which starts a timer session linked to it.
- * "Edit" opens the chapter's name, planned hours, notes, order and removal.
+ * The chapters (or parts) of the exam. The ones still to do come first, each with the focus
+ * time spent against the time planned and its own Focus button, which starts a timer session
+ * linked to it. Finished ones fold into one row, each a single line with Review.
+ * "Edit" opens the chapter's name, planned hours, notes, order, reopening and removal.
  */
 import { url } from '../lib/paths';
 
@@ -10,13 +11,21 @@ const timerUrl = url('/timer');
 ---
 
 <section class="card chapters" data-exam-chapters data-timer-url={timerUrl} hidden aria-labelledby="chapters-heading">
-  <h2 id="chapters-heading" class="panel-title">Chapters</h2>
-  <p class="muted chapters__intro">Time spent against the time you planned for each part. Press Focus to work on one.</p>
+  <div class="chapters__head">
+    <h2 id="chapters-heading" class="panel-title">Chapters</h2>
+    <p class="muted chapters__count" data-ec-count></p>
+  </div>
 
   <ol class="chapters__items" data-ec-list></ol>
   <p class="muted chapters__empty" data-ec-empty>No chapters yet. Add the parts you need to study below.</p>
 
-  <form class="chapters__form" data-ec-form>
+  <details class="disclosure chapters__done" data-ec-done-box hidden>
+    <summary data-ec-done-title></summary>
+    <ol class="chapters__items chapters__items--done" data-ec-done></ol>
+  </details>
+
+  <button type="button" class="btn btn--ghost btn--small chapters__add" data-ec-add-open>+ Add chapter</button>
+  <form class="chapters__form" data-ec-form hidden>
     <label for="ec-new" class="visually-hidden">New chapter name</label>
     <input id="ec-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a chapter or part…" data-ec-name />
     <label for="ec-new-hours" class="visually-hidden">Planned hours</label>
@@ -44,6 +53,9 @@ const timerUrl = url('/timer');
     const c = cleanups();
     const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
     const list = $<HTMLOListElement>('[data-ec-list]');
+    const doneBox = $<HTMLDetailsElement>('[data-ec-done-box]');
+    const doneList = $<HTMLOListElement>('[data-ec-done]');
+    const addOpen = $<HTMLButtonElement>('[data-ec-add-open]');
     const empty = $<HTMLElement>('[data-ec-empty]');
     const form = $<HTMLFormElement>('[data-ec-form]');
     const nameInput = $<HTMLInputElement>('[data-ec-name]');
@@ -132,6 +144,14 @@ const timerUrl = url('/timer');
       down.disabled = index === count - 1;
       const del = button('Remove', () => remove(chapter));
       del.classList.add('chapter__remove');
+      // Reopening is rare, so it lives here rather than beside Review.
+      if (chapter.done)
+        tools.append(
+          button('Reopen', () => {
+            updateChapter(chapter.id, { done: false });
+            announce(`Reopened: ${chapter.name}`);
+          }),
+        );
       tools.append(up, down, del);
 
       const body = el('div', 'chapter__edit-body');
@@ -142,6 +162,8 @@ const timerUrl = url('/timer');
 
     function renderChapter(chapter: ExamChapter, index: number, count: number, seconds: number, questions: number, isNext: boolean): HTMLLIElement {
       const li = el('li', `chapter${chapter.done ? ' is-done' : ''}`);
+      const time = seconds >= 60 ? formatHM(seconds) : '';
+      const qs = questions ? plural(questions, 'question') : 'No questions yet';
 
       const num = el('span', 'chapter__num');
       if (chapter.done) num.innerHTML = CHECK_SVG;
@@ -149,12 +171,23 @@ const timerUrl = url('/timer');
       num.setAttribute('aria-hidden', 'true');
 
       const body = el('div', 'chapter__body');
-      const status = chapter.done ? 'Finished' : seconds >= 60 ? 'In progress' : 'To do';
-      body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', `${status} · ${questions ? plural(questions, 'question') : 'No questions yet'}`));
+      if (chapter.done) {
+        // Finished: one line, with Review and Edit.
+        body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', [time, qs].filter(Boolean).join(' · ')));
+        const review = el('a', 'btn btn--ghost btn--small', 'Review');
+        review.href = `${timerUrl}?chapter=${encodeURIComponent(chapter.id)}`;
+        review.setAttribute('aria-label', `Review “${chapter.name}” in a focus session`);
+        const actions = el('div', 'chapter__actions');
+        actions.append(review);
+        li.append(num, body, actions, editPanel(chapter, index, count));
+        return li;
+      }
+      const status = seconds >= 60 ? 'In progress' : 'To do';
+      body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', `${status} · ${qs}`));
 
       const progress = el('div', 'chapter__progress');
       const line = el('p', 'chapter__time');
-      line.append(el('strong', '', seconds >= 60 ? formatHM(seconds) : 'Not started'));
+      line.append(el('strong', '', time || 'Not started'));
       if (chapter.plannedHours) line.append(el('span', 'muted', `of ${chapter.plannedHours} h planned`));
       progress.append(line);
       if (chapter.plannedHours) {
@@ -167,21 +200,16 @@ const timerUrl = url('/timer');
       }
 
       const actions = el('div', 'chapter__actions');
-      const focus = el('a', `btn btn--small${isNext ? '' : ' btn--ghost'}`, chapter.done ? 'Review' : seconds >= 60 ? 'Focus' : 'Start');
+      const focus = el('a', `btn btn--small${isNext ? '' : ' btn--ghost'}`, seconds >= 60 ? 'Focus' : 'Start');
       focus.href = `${timerUrl}?chapter=${encodeURIComponent(chapter.id)}`;
       focus.setAttribute('aria-label', `Start a focus session on “${chapter.name}”`);
       actions.append(
         focus,
-        chapter.done
-          ? button('Reopen', () => {
-              updateChapter(chapter.id, { done: false });
-              announce(`Reopened: ${chapter.name}`);
-            })
-          : button('Done', () => {
-              updateChapter(chapter.id, { done: true });
-              celebrate();
-              announce(`Finished: ${chapter.name}`);
-            }),
+        button('Done', () => {
+          updateChapter(chapter.id, { done: true });
+          celebrate();
+          announce(`Finished: ${chapter.name}`);
+        }),
       );
 
       li.append(num, body, progress, actions, editPanel(chapter, index, count));
@@ -204,14 +232,32 @@ const timerUrl = url('/timer');
       const counts = new Map<string, number>();
       for (const q of exam.questions) if (q.chapterId) counts.set(q.chapterId, (counts.get(q.chapterId) ?? 0) + 1);
       empty.hidden = chapters.length > 0;
-      list.replaceChildren(
-        ...chapters.map((ch, i) => renderChapter(ch, i, chapters.length, time.byChapter.get(ch.id) ?? 0, counts.get(ch.id) ?? 0, ch.id === next?.id)),
-      );
+      // Numbers and Move up/down keep the plan's order; only the finished ones fold away.
+      const rows = chapters.map((ch, i) => ({ ch, li: renderChapter(ch, i, chapters.length, time.byChapter.get(ch.id) ?? 0, counts.get(ch.id) ?? 0, ch.id === next?.id) }));
+      const done = rows.filter((r) => r.ch.done);
+      list.replaceChildren(...rows.filter((r) => !r.ch.done).map((r) => r.li));
+      list.hidden = rows.length > 0 && done.length === rows.length;
+      doneList.replaceChildren(...done.map((r) => r.li));
+      doneBox.hidden = !done.length;
+      $<HTMLElement>('[data-ec-done-title]').textContent = `${done.length} finished`;
+      const todo = rows.length - done.length;
+      $<HTMLElement>('[data-ec-count]').textContent = rows.length ? (todo ? `${todo} to do · ${done.length} finished` : 'All finished') : '';
+      // The add form waits behind its button, except when there is nothing yet.
+      if (!rows.length) showForm();
     }
 
     list.addEventListener('focusout', () => {
       // After the field's own change handler has saved.
       window.setTimeout(() => stale && render(), 0);
+    });
+
+    function showForm(): void {
+      form.hidden = false;
+      addOpen.hidden = true;
+    }
+    addOpen.addEventListener('click', () => {
+      showForm();
+      nameInput.focus();
     });
 
     form.addEventListener('submit', (e) => {
@@ -233,13 +279,80 @@ const timerUrl = url('/timer');
 
 <style>
   .chapters[hidden],
-  .chapters__empty[hidden] {
+  .chapters [hidden] {
     display: none;
   }
 
-  .chapters__intro {
-    margin-top: calc(-1 * var(--space-2));
+  .chapters__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+  }
+
+  .chapters__head .panel-title {
+    margin: 0;
+  }
+
+  .chapters__count {
     font-size: var(--text-sm);
+  }
+
+  .chapters__done {
+    margin-top: var(--space-4);
+  }
+
+  .chapters__done > summary {
+    min-height: 44px;
+    align-content: center;
+    font-weight: 600;
+  }
+
+  .chapters__items--done {
+    margin-top: var(--space-2);
+  }
+
+  /* A finished chapter is one quiet line: check, name, Review, Edit. */
+  .chapters__items--done {
+    gap: 0;
+  }
+
+  .chapters :global(.chapters__items--done .chapter) {
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) 0;
+    border: 0;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .chapters :global(.chapters__items--done .chapter:last-child) {
+    border-bottom: 0;
+  }
+
+  .chapters :global(.chapters__items--done .chapter__num) {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Name beside the check; Review and Edit on the line under it. */
+  .chapters :global(.chapters__items--done .chapter__body) {
+    flex: 1 1 calc(100% - 28px - var(--space-3));
+  }
+
+  .chapters :global(.chapters__items--done .chapter__actions) {
+    margin-inline-start: calc(28px + var(--space-3));
+  }
+
+  .chapters :global(.chapters__items--done .chapter__actions .btn) {
+    min-height: 40px;
+  }
+
+  .chapters__add {
+    margin-top: var(--space-4);
+    min-height: 44px;
   }
 
   .chapters__items {
