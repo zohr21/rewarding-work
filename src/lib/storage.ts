@@ -31,10 +31,11 @@ export type StoreName =
   | 'body' // the last read from Health Connect, in the Android app (HealthBody.astro)
   | 'bank' // bank alerts read from notifications in the Android app: settings and what waits for review (src/lib/bank.ts)
   | 'profile' // first run: whether Welcome was seen, and which optional sections are on (src/lib/profile.ts)
+  | 'coach' // Focus › Coach: your plan and what has helped you (src/lib/coach.ts)
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).

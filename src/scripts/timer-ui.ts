@@ -815,6 +815,17 @@ function mountTimer(root: HTMLElement): () => void {
     announce(`Working on ${pick.dataset.pick}.`);
   });
 
+  // Arriving from Start in Coach: /timer?mode=<mode>, picked as if you had tapped it.
+  const wantedMode = standalone ? new URLSearchParams(location.search).get('mode') : null;
+  if (wantedMode) {
+    const input = els.modes.find((m) => m.value === wantedMode);
+    if (input && !input.checked && state.status === 'idle') {
+      input.checked = true;
+      input.dispatchEvent(new Event('change'));
+    }
+    history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&]mode=[^&]*/, '').replace(/^&/, '?'));
+  }
+
   // Arriving from "Focus on this" on the tasks page: /timer?task=<id>
   const wantedTask = standalone ? new URLSearchParams(location.search).get('task') : null;
   if (wantedTask) {
