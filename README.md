@@ -338,3 +338,7 @@ base `/<repo>`, a `<user>.github.io` repo gets base `/`. For a custom domain, ad
   `npm run build && npm run preview`, open the site, then stop the server and reload.
 - Timer notifications are shown through the service worker where available
   (required on Android), and clicking one brings the app back to the front.
+
+## License
+
+© 2026 Zohr Babazade. All rights reserved. The code is public to read, not to reuse: see [LICENSE](LICENSE) and [NOTICE](NOTICE).
