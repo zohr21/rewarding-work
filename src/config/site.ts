@@ -29,7 +29,7 @@ export const FOCUS_TABS: NavItem[] = [
   { label: 'Timer', href: '/timer' },
   { label: 'Tasks', href: '/tasks' },
   { label: 'Exam prep', href: '/exam', module: 'exam' },
-  { label: 'Learn', href: '/techniques', under: ['/techniques', '/problems'] },
+  { label: 'Coach', href: '/techniques', under: ['/techniques', '/problems'] },
 ];
 
 export const FOCUS: NavItem = {

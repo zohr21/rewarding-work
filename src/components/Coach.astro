@@ -1,0 +1,986 @@
+---
+/**
+ * Focus › Coach: tap what is in the way and get one technique to try now, or answer four
+ * more questions for a week's plan. Remembers whether what you tried helped and ranks
+ * those first next time. Questions and scoring: src/data/coach.ts. Store: src/lib/coach.ts.
+ */
+import { BLOCKERS, QUESTIONS, START, SESSION, WHEN, REWARD, TIE_BREAK, TIMER_FOR, START_TEXT, SESSION_TEXT, PLAN_TITLES } from '../data/coach';
+import { EVIDENCE } from '../data/taxonomy';
+import { getTechniques } from '../lib/techniques';
+import { url } from '../lib/paths';
+
+// Build-time check: every slug in the Coach data must be a real technique.
+const techniques = await getTechniques();
+const known = new Set(techniques.map((t) => t.id));
+const used = [
+  ...[...BLOCKERS, ...QUESTIONS.flatMap((q) => q.options)].flatMap((o) => Object.keys(o.points)),
+  ...START,
+  ...SESSION,
+  WHEN,
+  REWARD,
+  ...TIE_BREAK,
+  ...Object.keys(TIMER_FOR),
+  ...Object.keys(START_TEXT),
+  ...Object.keys(SESSION_TEXT),
+];
+for (const slug of used) if (!known.has(slug)) throw new Error(`coach.ts uses unknown technique slug "${slug}"`);
+for (const b of BLOCKERS) if (!PLAN_TITLES[b.id]) throw new Error(`coach.ts: PLAN_TITLES has no title for blocker "${b.id}"`);
+
+// Only what the script needs, embedded as JSON.
+const info = Object.fromEntries(
+  techniques.map((t) => [
+    t.id,
+    { title: t.data.title, summary: t.data.summary, evidence: EVIDENCE[t.data.evidence].label, href: url(`/techniques/${t.id}`) },
+  ]),
+);
+const json = JSON.stringify({ info, timer: url('/timer') }).replace(/</g, '\\u003c');
+const steps = QUESTIONS.length + 2; // the blocker, the questions, the task
+
+const ICONS: Record<string, string> = {
+  start: 'M4 20l6-14 4 8 2-3 4 9z',
+  focus: 'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16zM12 1v4M12 19v4',
+  list: 'M4 7h16M4 12h16M4 17h10',
+  progress: 'M4 18h4v-6H4zM10 18h4V8h-4zM16 18h4V4h-4z',
+  energy: 'M7 5h10v4H7zM9 9v11h6V9',
+  bored: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18zM8 15h8M9 9h.01M15 9h.01',
+};
+---
+
+<div class="coach" data-coach>
+  <script type="application/json" data-coach-info set:html={json} />
+
+  {/* Asked once after you started something from here. */}
+  <section class="card coach-ask" data-ask aria-labelledby="ask-heading" hidden>
+    <h2 id="ask-heading" class="coach-ask__q" data-ask-q>Did it help?</h2>
+    <div class="coach-ask__answers">
+      <button type="button" class="btn btn--ghost" data-help="1">Yes</button>
+      <button type="button" class="btn btn--ghost" data-help="0.5">A bit</button>
+      <button type="button" class="btn btn--ghost" data-help="0">No</button>
+    </div>
+    <button type="button" class="coach-link" data-help="skip">I didn't try it</button>
+  </section>
+
+  {/* This week's plan, once you have one. */}
+  <section class="card coach-plan" data-plan aria-labelledby="plan-heading" hidden>
+    <div class="coach-plan__top">
+      <p class="coach-eyebrow">Your plan for this week</p>
+      <span class="muted coach-plan__day" data-plan-day></span>
+    </div>
+    <h2 id="plan-heading" class="coach-plan__title" data-plan-title></h2>
+    <ol class="coach-days" role="list" data-plan-days></ol>
+    <ol class="coach-steps" role="list" data-plan-steps></ol>
+    <p class="coach-note" data-plan-note hidden></p>
+    <a class="btn coach-go" href={url('/timer')} data-plan-go>Start</a>
+    <details class="coach-edit" data-plan-edit>
+      <summary>Change the plan</summary>
+      <form class="coach-edit__form" data-plan-form>
+        <label class="coach-field">
+          <span>When</span>
+          <input name="cue" maxlength="80" autocomplete="off" required />
+        </label>
+        <label class="coach-field">
+          <span>I open</span>
+          <input name="task" maxlength="120" autocomplete="off" required />
+        </label>
+        <div class="coach-edit__actions">
+          <button type="submit" class="btn btn--small">Save</button>
+          <button type="button" class="btn btn--ghost btn--small" data-plan-renew hidden>Keep it another week</button>
+          <button type="button" class="btn btn--ghost btn--small" data-plan-new>New check-in</button>
+          <button type="button" class="coach-link coach-link--danger" data-plan-drop>Drop the plan</button>
+        </div>
+      </form>
+    </details>
+  </section>
+
+  {/* One tap: what is in the way. */}
+  <section class="coach-way" data-way aria-labelledby="way-heading">
+    <h2 id="way-heading" class="coach-way__title" data-way-title>What's in the way right now?</h2>
+    <ul class="coach-tiles" role="list">
+      {
+        BLOCKERS.map((b) => (
+          <li>
+            <button type="button" class="coach-tile" data-blocker={b.id}>
+              <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+                <path d={ICONS[b.icon]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>{b.label}</span>
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+    <section class="coach-worked" data-worked aria-labelledby="worked-heading" hidden>
+      <h3 id="worked-heading">Worked for you before</h3>
+      <ul role="list" data-worked-list></ul>
+    </section>
+  </section>
+
+  {/* The one-tap answer. */}
+  <section class="card coach-answer" data-answer aria-labelledby="answer-heading" tabindex="-1" hidden>
+    <button type="button" class="coach-back" data-answer-back>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+      <span data-answer-blocker></span>
+    </button>
+    <p class="coach-eyebrow">Try this now</p>
+    <h2 id="answer-heading" class="coach-answer__title" data-answer-title></h2>
+    <p class="coach-answer__summary" data-answer-summary></p>
+    <p class="muted coach-answer__why" data-answer-why></p>
+    <a class="btn coach-go" href={url('/timer')} data-answer-go>Start</a>
+    <button type="button" class="btn btn--ghost coach-go" data-answer-plan>Make it a plan · {steps - 1} questions</button>
+    <div class="coach-answer__more">
+      <button type="button" class="coach-link" data-answer-next>Another idea</button>
+      <a class="coach-link" href="#" data-answer-how>How it works</a>
+    </div>
+  </section>
+
+  {/* The check-in: the questions after the blocker, then the task. */}
+  <form class="card coach-check" data-check aria-label="Coach check-in" novalidate hidden>
+    <div class="coach-check__top">
+      <button type="button" class="coach-back" data-check-close aria-label="Close the check-in">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+      </button>
+      <span class="muted" data-check-count></span>
+    </div>
+    <div class="coach-bar" aria-hidden="true">
+      {Array.from({ length: steps }, () => <span />)}
+    </div>
+    {
+      QUESTIONS.map((q) => (
+        <fieldset class="coach-step" data-step tabindex="-1" hidden>
+          <legend class="coach-step__q">{q.question}</legend>
+          <div class="coach-options">
+            {q.options.map((o) => (
+              <label class="coach-option">
+                <input type="radio" name={q.id} value={o.id} />
+                <span>{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))
+    }
+    <fieldset class="coach-step" data-step tabindex="-1" hidden>
+      <legend class="coach-step__q">Which task is it for?</legend>
+      <div class="coach-options" data-task-options></div>
+      <label class="coach-option coach-option--other">
+        <input type="radio" name="task" value="" data-task-other />
+        <input type="text" class="coach-other" name="other" maxlength="120" placeholder="Something else, e.g. Revise chapter 4" aria-label="Something else" autocomplete="off" data-task-text />
+      </label>
+    </fieldset>
+    <div class="coach-check__nav">
+      <button type="button" class="btn btn--ghost" data-check-back>Back</button>
+      <button type="submit" class="btn" data-check-next disabled>Next</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  import { BLOCKERS, CUES, PLAN_TITLES, REWARD_TEXT, SESSION_TEXT, START_TEXT, TIMER_FOR, forBlocker, makePlan } from '../data/coach';
+  import { answerTried, getCoach, markTried, setCoach, PLAN_DAYS, type CoachPlan } from '../lib/coach';
+  import { getSessions, getTasks } from '../lib/storage';
+  import { todayTasks } from '../lib/tasks';
+  import { addDays, dayKey, startOfDay } from '../lib/dates';
+  import { el } from '../lib/dom';
+  import { onPage } from '../lib/page';
+
+  interface Info {
+    title: string;
+    summary: string;
+    evidence: string;
+    href: string;
+  }
+
+  onPage('coach', () => {
+    const root = document.querySelector<HTMLElement>('[data-coach]');
+    if (!root) return;
+    const { info, timer } = JSON.parse(root.querySelector('[data-coach-info]')!.textContent!) as { info: Record<string, Info>; timer: string };
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const title = (slug: string) => info[slug]?.title ?? slug;
+    const blockerLabel = (id: string) => BLOCKERS.find((b) => b.id === id)?.label ?? '';
+
+    const ask = $('[data-ask]');
+    const plan = $('[data-plan]');
+    const way = $('[data-way]');
+    const answer = $('[data-answer]');
+    const check = $<HTMLFormElement>('[data-check]');
+    const library = document.querySelector<HTMLElement>('[data-library]');
+
+    /** Where Start goes for a technique: the timer in its mode, else the technique's own page. */
+    function startHref(slug: string, fallbackSlug?: string, taskId?: string): string | null {
+      const mode = TIMER_FOR[slug] ?? (fallbackSlug ? TIMER_FOR[fallbackSlug] : undefined);
+      if (!mode) return null;
+      const q = new URLSearchParams({ mode });
+      if (taskId) q.set('task', taskId);
+      return `${timer}?${q}`;
+    }
+
+    // ---------- Did it help? ----------
+    function renderAsk(): void {
+      const { tried } = getCoach();
+      // Give it a few minutes before asking.
+      ask.hidden = !tried || Date.now() - tried.at < 5 * 60_000 || !info[tried.slug];
+      if (!ask.hidden) $('[data-ask-q]').textContent = `You tried ${title(tried!.slug)}. Did it help?`;
+    }
+    ask.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-help]');
+      if (!b) return;
+      if (b.dataset.help === 'skip') setCoach({ tried: null });
+      else answerTried(Number(b.dataset.help));
+      renderAll();
+    });
+
+    // ---------- The plan ----------
+    /** Days of the plan with a focus session of at least a minute (on the plan's task, when it has one). */
+    function focusByDay(p: CoachPlan): Map<string, number> {
+      const days = new Map<string, number>();
+      for (const s of getSessions()) {
+        if (s.start < startOfDay(p.created).getTime() || s.focusSeconds < 60) continue;
+        if (p.taskId && s.taskId !== p.taskId) continue;
+        const k = dayKey(s.start);
+        days.set(k, Math.max(days.get(k) ?? 0, s.focusSeconds));
+      }
+      return days;
+    }
+
+    function stepRow(label: string, text: string, slug: string, reward = false): HTMLLIElement {
+      const li = el('li', reward ? 'coach-step-row coach-step-row--reward' : 'coach-step-row');
+      const body = el('div');
+      const tech = el('a', 'coach-step-row__tech');
+      tech.href = info[slug]?.href ?? '#';
+      tech.textContent = `${title(slug)} · ${info[slug]?.evidence ?? ''}`;
+      body.append(el('strong', '', text), tech);
+      li.append(el('span', 'coach-step-row__label', label), body);
+      return li;
+    }
+
+    function renderPlan(): void {
+      const p = getCoach().plan;
+      plan.hidden = !p;
+      $('[data-way-title]').textContent = p ? 'Something else in the way?' : "What's in the way right now?";
+      if (!p) return;
+      const task = p.task || 'it';
+      const first = startOfDay(p.created);
+      const today = Math.floor((startOfDay(Date.now()).getTime() - first.getTime()) / 86_400_000);
+      const over = today >= PLAN_DAYS;
+      const focus = focusByDay(p);
+
+      $('[data-plan-title]').textContent = PLAN_TITLES[p.blocker]!.replace('{task}', p.task ? `“${p.task}”` : 'it');
+      $('[data-plan-day]').textContent = over ? 'Week done' : `Day ${today + 1} of ${PLAN_DAYS}`;
+
+      const dots = $('[data-plan-days]');
+      let done = 0;
+      dots.replaceChildren(
+        ...Array.from({ length: PLAN_DAYS }, (_, i) => {
+          const k = dayKey(addDays(first, i));
+          const on = focus.has(k);
+          if (on) done += 1;
+          const li = el('li', `coach-day${on ? ' coach-day--on' : ''}${i === today ? ' coach-day--today' : ''}`);
+          li.append(el('span', 'visually-hidden', `Day ${i + 1}: ${on ? 'done' : i < today ? 'missed' : 'to do'}`));
+          return li;
+        }),
+      );
+      dots.setAttribute('aria-label', `${done} of ${PLAN_DAYS} days done`);
+
+      $('[data-plan-steps]').replaceChildren(
+        stepRow('When', `${p.cue}, I open ${task}.`, p.when),
+        stepRow('Start with', START_TEXT[p.start] ?? info[p.start]?.summary ?? '', p.start),
+        stepRow('Keep going', SESSION_TEXT[p.session] ?? info[p.session]?.summary ?? '', p.session),
+        stepRow('Reward', REWARD_TEXT, p.reward, true),
+      );
+
+      // Grow the start once the small one keeps turning into real sessions.
+      const note = $('[data-plan-note]');
+      const longDays = [...focus.values()].filter((sec) => sec >= 600).length;
+      if (over) note.textContent = done ? `You showed up on ${done} of ${PLAN_DAYS} days. Keep the plan another week, or do a new check-in.` : 'Your week is up. Try a new check-in, or keep this plan another week.';
+      else if (p.start === 'two-minute-rule' && longDays >= 3) note.textContent = `You kept going past two minutes on ${longDays} days. Next week, start with a full session?`;
+      else note.textContent = '';
+      note.hidden = !note.textContent;
+
+      const go = $<HTMLAnchorElement>('[data-plan-go]');
+      go.href = startHref(p.start, p.session, p.taskId) ?? timer;
+      go.textContent = p.start === 'two-minute-rule' ? 'Start the 2 minutes' : 'Start';
+      go.onclick = () => markTried(p.start);
+
+      const form = $<HTMLFormElement>('[data-plan-form]');
+      (form.elements.namedItem('cue') as HTMLInputElement).value = p.cue;
+      (form.elements.namedItem('task') as HTMLInputElement).value = p.task;
+      $('[data-plan-renew]').hidden = !over;
+      if (over) $<HTMLDetailsElement>('[data-plan-edit]').open = true;
+    }
+
+    $<HTMLFormElement>('[data-plan-form]').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const p = getCoach().plan;
+      const form = e.currentTarget as HTMLFormElement;
+      const cue = (form.elements.namedItem('cue') as HTMLInputElement).value.trim();
+      const task = (form.elements.namedItem('task') as HTMLInputElement).value.trim();
+      if (!p || !cue || !task) return;
+      // A new name means it is no longer that task.
+      setCoach({ plan: { ...p, cue, task, taskId: task === p.task ? p.taskId : undefined } });
+      $<HTMLDetailsElement>('[data-plan-edit]').open = false;
+      renderPlan();
+    });
+    $('[data-plan-renew]').addEventListener('click', () => {
+      const p = getCoach().plan;
+      if (p) setCoach({ plan: { ...p, created: Date.now() } });
+      $<HTMLDetailsElement>('[data-plan-edit]').open = false;
+      renderPlan();
+    });
+    $('[data-plan-new]').addEventListener('click', () => {
+      const p = getCoach().plan;
+      openCheck(p?.blocker ?? BLOCKERS[0]!.id, p?.answers);
+    });
+    $('[data-plan-drop]').addEventListener('click', () => {
+      setCoach({ plan: null });
+      renderAll();
+    });
+
+    // ---------- Worked for you ----------
+    function renderWorked(): void {
+      const { worked } = getCoach();
+      const rows = Object.entries(worked)
+        .filter(([slug, w]) => w.tries > 0 && info[slug])
+        .sort((a, b) => b[1].helped / b[1].tries - a[1].helped / a[1].tries || b[1].tries - a[1].tries)
+        .slice(0, 3);
+      $('[data-worked]').hidden = !rows.length;
+      $('[data-worked-list]').replaceChildren(
+        ...rows.map(([slug, w]) => {
+          const li = el('li');
+          const a = el('a');
+          a.href = info[slug]!.href;
+          a.append(el('strong', '', title(slug)), el('span', 'muted', ` · helped ${Math.round(w.helped)} of ${w.tries} ${w.tries === 1 ? 'time' : 'times'}`));
+          li.append(a);
+          return li;
+        }),
+      );
+    }
+
+    // ---------- One tap ----------
+    let blocker = '';
+    let picks: string[] = [];
+    let pick = 0;
+
+    function showView(view: 'home' | 'answer' | 'check'): void {
+      const home = view === 'home';
+      way.hidden = !home;
+      answer.hidden = view !== 'answer';
+      check.hidden = view !== 'check';
+      if (library) library.hidden = !home;
+      if (home) {
+        renderAsk();
+        renderPlan();
+        renderWorked();
+      } else {
+        ask.hidden = true;
+        plan.hidden = true;
+      }
+    }
+
+    function renderAnswer(): void {
+      const slug = picks[pick]!;
+      const t = info[slug]!;
+      const w = getCoach().worked[slug];
+      $('[data-answer-blocker]').textContent = blockerLabel(blocker);
+      $('[data-answer-title]').textContent = t.title;
+      $('[data-answer-summary]').textContent = t.summary;
+      $('[data-answer-why]').textContent =
+        w && w.tries && w.helped / w.tries >= 0.5
+          ? `Picked because it helped you ${Math.round(w.helped)} of ${w.tries} ${w.tries === 1 ? 'time' : 'times'}. ${t.evidence}.`
+          : `Fits “${blockerLabel(blocker)}”. ${t.evidence}.`;
+      const go = $<HTMLAnchorElement>('[data-answer-go]');
+      const href = startHref(slug);
+      go.href = href ?? t.href;
+      go.textContent = slug === 'two-minute-rule' ? 'Start the 2 minutes' : href ? 'Start' : 'Try it';
+      go.onclick = () => markTried(slug);
+      $<HTMLAnchorElement>('[data-answer-how]').href = t.href;
+      $('[data-answer-next]').hidden = picks.length < 2;
+    }
+
+    function openAnswer(id: string): void {
+      blocker = id;
+      picks = forBlocker(id, getCoach().worked).filter((s) => info[s]);
+      pick = 0;
+      if (!picks.length) return;
+      showView('answer');
+      renderAnswer();
+      answer.focus();
+    }
+
+    way.addEventListener('click', (e) => {
+      const tile = (e.target as HTMLElement).closest<HTMLElement>('[data-blocker]');
+      if (tile) openAnswer(tile.dataset.blocker!);
+    });
+    $('[data-answer-back]').addEventListener('click', () => showView('home'));
+    $('[data-answer-next]').addEventListener('click', () => {
+      pick = (pick + 1) % picks.length;
+      renderAnswer();
+    });
+    $('[data-answer-plan]').addEventListener('click', () => openCheck(blocker, getCoach().plan?.answers));
+
+    // ---------- The check-in ----------
+    const steps = Array.from(check.querySelectorAll<HTMLFieldSetElement>('[data-step]'));
+    const bar = Array.from(check.querySelectorAll<HTMLElement>('.coach-bar span'));
+    const next = $<HTMLButtonElement>('[data-check-next]');
+    const back = $<HTMLButtonElement>('[data-check-back]');
+    const other = $<HTMLInputElement>('[data-task-other]');
+    const otherText = $<HTMLInputElement>('[data-task-text]');
+    let current = 0;
+
+    function answered(i: number): boolean {
+      const s = steps[i]!;
+      const checked = s.querySelector<HTMLInputElement>('input[type="radio"]:checked');
+      if (!checked) return false;
+      return checked !== other || !!otherText.value.trim();
+    }
+
+    function showStep(i: number, moveFocus: boolean): void {
+      current = i;
+      steps.forEach((s, j) => (s.hidden = j !== i));
+      // The blocker was the first step.
+      bar.forEach((b, j) => b.classList.toggle('on', j <= i + 1));
+      $('[data-check-count]').textContent = `${i + 2} of ${steps.length + 1}`;
+      next.textContent = i === steps.length - 1 ? 'Make my plan' : 'Next';
+      next.disabled = !answered(i);
+      if (moveFocus) steps[i]!.focus();
+    }
+
+    /** Your open tasks, Today's first, as answers to "Which task is it for?". */
+    function fillTasks(): void {
+      const all = getTasks().filter((t) => t.status === 'active' && !t.deletedAt);
+      const today = todayTasks(all);
+      const rest = all.filter((t) => !today.includes(t)).sort((a, b) => b.updatedAt - a.updatedAt);
+      $('[data-task-options]').replaceChildren(
+        ...[...today, ...rest].slice(0, 4).map((t) => {
+          const label = el('label', 'coach-option');
+          const input = el('input');
+          input.type = 'radio';
+          input.name = 'task';
+          input.value = t.id;
+          input.dataset.title = t.title;
+          label.append(input, el('span', '', t.title));
+          return label;
+        }),
+      );
+    }
+
+    function openCheck(id: string, prior?: Record<string, string>): void {
+      blocker = id;
+      check.reset();
+      fillTasks();
+      for (const [q, v] of Object.entries(prior ?? {})) {
+        const input = check.querySelector<HTMLInputElement>(`input[name="${q}"][value="${CSS.escape(v)}"]`);
+        if (input) input.checked = true;
+      }
+      showView('check');
+      showStep(0, true);
+    }
+
+    otherText.addEventListener('input', () => {
+      other.checked = !!otherText.value.trim() || other.checked;
+      next.disabled = !answered(current);
+    });
+    otherText.addEventListener('focus', () => (other.checked = true));
+    check.addEventListener('change', () => (next.disabled = !answered(current)));
+    back.addEventListener('click', () => (current ? showStep(current - 1, true) : openAnswer(blocker)));
+    $('[data-check-close]').addEventListener('click', () => showView('home'));
+
+    check.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!answered(current)) return;
+      if (current < steps.length - 1) return showStep(current + 1, true);
+      const data = new FormData(check);
+      const answers: Record<string, string> = {};
+      for (const q of ['law', 'focus', 'when']) answers[q] = String(data.get(q) ?? '');
+      const chosen = check.querySelector<HTMLInputElement>('input[name="task"]:checked');
+      const taskId = chosen && chosen !== other ? chosen.value : undefined;
+      const task = taskId ? chosen!.dataset.title! : otherText.value.trim();
+      const picked = makePlan(blocker, answers, getCoach().worked);
+      setCoach({ plan: { ...picked, created: Date.now(), blocker, answers, cue: CUES[answers.when!] ?? CUES.varies!, task, taskId } });
+      showView('home');
+      plan.scrollIntoView({ block: 'start' });
+      $('[data-plan-title]').setAttribute('tabindex', '-1');
+      $('[data-plan-title]').focus({ preventScroll: true });
+    });
+
+    function renderAll(): void {
+      showView('home');
+    }
+
+    // Arriving from Today's "Something in the way?": /techniques?way=<blocker>
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('way');
+    if (wanted && BLOCKERS.some((b) => b.id === wanted)) {
+      history.replaceState(history.state, '', location.pathname);
+      openAnswer(wanted);
+    } else renderAll();
+  });
+</script>
+
+<style>
+  .coach {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .coach [hidden] {
+    display: none !important;
+  }
+
+  .coach-eyebrow {
+    margin: 0;
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .coach-link {
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .coach-link--danger {
+    color: var(--color-danger);
+  }
+
+  .coach-go {
+    width: 100%;
+    min-height: 52px;
+    justify-content: center;
+  }
+
+  .coach-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 var(--space-3) 0 var(--space-2);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    justify-self: start;
+  }
+
+  /* Did it help? */
+  .coach-ask {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .coach-ask__q {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+
+  .coach-ask__answers {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .coach-ask .coach-link {
+    justify-self: start;
+  }
+
+  /* The plan */
+  .coach-plan {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .coach-plan__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-3);
+  }
+
+  .coach-plan__day {
+    font-size: var(--text-sm);
+  }
+
+  .coach-plan__title {
+    margin: 0;
+    font-size: var(--text-xl);
+    line-height: var(--leading-tight);
+  }
+
+  .coach-plan__title:focus {
+    outline: none;
+  }
+
+  .coach-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .coach :global(.coach-day) {
+    height: 24px;
+    border-radius: 7px;
+    background: var(--color-surface-2);
+  }
+
+  .coach :global(.coach-day--on) {
+    background: var(--color-accent);
+  }
+
+  .coach :global(.coach-day--today:not(.coach-day--on)) {
+    outline: 2px dashed var(--color-accent);
+    outline-offset: -2px;
+    background: transparent;
+  }
+
+  .coach-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .coach :global(.coach-step-row) {
+    display: grid;
+    grid-template-columns: 5.25rem 1fr;
+    gap: var(--space-3);
+    padding-block: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .coach :global(.coach-step-row:first-child) {
+    border-top: 0;
+  }
+
+  .coach :global(.coach-step-row__label) {
+    padding-top: 2px;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .coach :global(.coach-step-row--reward .coach-step-row__label) {
+    color: var(--cat-reward);
+  }
+
+  .coach :global(.coach-step-row strong) {
+    display: block;
+    font-weight: 600;
+  }
+
+  .coach :global(.coach-step-row__tech) {
+    display: inline-block;
+    margin-top: 2px;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .coach-note {
+    margin: 0;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--cat-reward-bg);
+    font-size: var(--text-sm);
+  }
+
+  .coach-edit > summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .coach-edit > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .coach-edit__form {
+    display: grid;
+    gap: var(--space-3);
+    padding-top: var(--space-2);
+  }
+
+  .coach-field {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .coach-field input,
+  .coach-other {
+    width: 100%;
+    min-height: 44px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 400;
+  }
+
+  .coach-edit__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  /* One tap */
+  .coach-way {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .coach-way__title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .coach-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (min-width: 40rem) {
+    .coach-tiles {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .coach-tile {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+    height: 100%;
+    min-height: 100px;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 18px);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+    color: var(--color-text);
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .coach-tile svg {
+    color: var(--color-accent);
+  }
+
+  .coach-tile:active {
+    transform: translateY(2px);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 1px 0 var(--edge);
+  }
+
+  .coach-worked {
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .coach-worked h3 {
+    margin: 0 0 var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .coach-worked ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .coach-worked :global(a) {
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    text-decoration: none;
+  }
+
+  .coach-worked :global(a .muted) {
+    margin-left: 0.25em;
+  }
+
+  /* The answer */
+  .coach-answer {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .coach-answer:focus {
+    outline: none;
+  }
+
+  .coach-answer__title {
+    margin: 0;
+    font-size: var(--text-2xl, 1.75rem);
+    line-height: 1.1;
+  }
+
+  .coach-answer__summary {
+    margin: 0;
+    font-size: var(--text-base);
+  }
+
+  .coach-answer__why {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .coach-answer__more {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .coach-answer__more .coach-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+
+  /* The check-in */
+  .coach-check {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .coach-check__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--text-sm);
+  }
+
+  .coach-bar {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .coach-bar span {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--color-surface-2);
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+
+  .coach-bar span.on {
+    background: var(--color-accent);
+  }
+
+  .coach-step {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .coach-step:focus {
+    outline: none;
+  }
+
+  .coach-step__q {
+    margin-bottom: var(--space-4);
+    padding: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    line-height: var(--leading-tight);
+  }
+
+  .coach-options {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .coach-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 56px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .coach :global(.coach-option input[type='radio']) {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex-shrink: 0;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  .coach :global(.coach-option:has(input[type='radio']:checked)) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    font-weight: 600;
+  }
+
+  .coach-option--other {
+    margin-top: var(--space-2);
+  }
+
+  .coach-other {
+    min-height: 40px;
+  }
+
+  .coach-check__nav {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .coach-check__nav [data-check-next] {
+    flex: 1;
+    justify-content: center;
+  }
+</style>

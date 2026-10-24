@@ -2,266 +2,136 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import TechniqueRow from '../../components/TechniqueRow.astro';
 import FocusTabs from '../../components/FocusTabs.astro';
-import Quiz from '../../components/Quiz.astro';
+import Coach from '../../components/Coach.astro';
 import { getTechniques } from '../../lib/techniques';
 import { CATEGORIES, CATEGORY_SLUGS, PROBLEMS, PROBLEM_SLUGS } from '../../data/taxonomy';
 import { NATIVE_APP } from '../../config/app';
-import { url } from '../../lib/paths';
 
 const techniques = await getTechniques();
-/** How many techniques help with each problem, for its row. */
-const helps = (p: string) => techniques.filter((t) => (t.data.problems as string[]).includes(p)).length;
-/** Your timer modes and the technique each one is. */
-const MODE_TECHNIQUES = { pomodoro: 'pomodoro', '52-17': 'fifty-two-seventeen', flowtime: 'flowtime' };
-const titles = Object.fromEntries(techniques.map((t) => [t.id, t.data.title]));
 ---
 
-<BaseLayout title="Learn" description="Browse techniques for making work feel rewarding, filtered by category or problem.">
+<BaseLayout title="Coach" description="Tap what is in the way and get a technique to try now, or answer four questions for a plan that fits how you work.">
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1>Technique library</h1>
-      {!NATIVE_APP && <p>Every technique explains the idea and lets you try it on the spot.</p>}
+      <h1>Coach</h1>
+      {!NATIVE_APP && <p>Tap what is in the way. Four more questions turn it into a plan for the week.</p>}
     </header>
 
-    {/* The techniques your timer already uses, with their share of your focus. Filled in by the script. */}
-    <section class="learn-yours" aria-labelledby="yours-heading" data-yours data-modes={JSON.stringify(MODE_TECHNIQUES)} data-titles={JSON.stringify(titles)} data-base={url('/techniques/')} hidden>
-      <h2 id="yours-heading" class="learn-heading">Yours</h2>
-      <ul class="learn-yours__list" role="list" data-yours-list></ul>
-    </section>
+    <Coach />
 
-    {/* Start from what is in the way: each opens the problem's page with the techniques for it. */}
-    <section class="learn-problems" aria-labelledby="problems-heading">
-      <h2 id="problems-heading" class="learn-heading">What's in the way?</h2>
-      <ul class="learn-problems__list" role="list">
-        {
-          PROBLEM_SLUGS.map((p) => (
-            <li>
-              <a class="learn-problem" href={url(`/problems/${p}`)}>
-                <span class="learn-problem__text">
-                  <strong>{PROBLEMS[p].title}</strong>
-                  <span class="muted">{PROBLEMS[p].teaser}</span>
-                </span>
-                <span class="learn-problem__count muted">
-                  {helps(p)}
-                  <span class="visually-hidden">techniques</span>
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                </span>
-              </a>
-            </li>
-          ))
-        }
-      </ul>
-      <a class="learn-quiz" href="#quiz">Not sure? Four quick questions</a>
-    </section>
-
-    <h2 class="learn-heading learn-all" id="all-heading">All {techniques.length} techniques</h2>
-    <!-- Works without JS (all rows shown); the script below adds filtering. -->
-    <form class="filters" role="search" aria-label="Filter techniques" data-filters>
-      <div class="filters__search">
-        <label for="q" class="visually-hidden">Search by title</label>
-        <input id="q" name="q" type="search" autocomplete="off" placeholder="Search, e.g. Pomodoro" />
-      </div>
-      {/* Opens by itself when a link arrives with ?problem= or ?category=. */}
-      <details class="filters__more" data-filters-more>
-        <summary>Filter</summary>
-        <div class="filters__body">
-          <fieldset class="chips">
-            <legend>What's in the way?</legend>
-            <label class="chip"><input type="radio" name="problem" value="" checked /> <span>All</span></label>
-            {
-              PROBLEM_SLUGS.map((p) => (
-                <label class="chip">
-                  <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].title}</span>
-                </label>
-              ))
-            }
-          </fieldset>
-          <fieldset class="chips">
-            <legend>Type</legend>
-            <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
-            {
-              CATEGORY_SLUGS.map((c) => (
-                <label class="chip">
-                  <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
-                </label>
-              ))
-            }
-          </fieldset>
+    {/* The whole library, folded away. Opens by itself when a link arrives with a filter. */}
+    <details class="library-fold" data-library>
+      <summary>
+        <span id="all-heading">All {techniques.length} techniques</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </summary>
+      <!-- Works without JS (all rows shown); the script below adds filtering. -->
+      <form class="filters" role="search" aria-label="Filter techniques" data-filters>
+        <div class="filters__search">
+          <label for="q" class="visually-hidden">Search by title</label>
+          <input id="q" name="q" type="search" autocomplete="off" placeholder="Search, e.g. Pomodoro" />
         </div>
-      </details>
-    </form>
+        {/* Opens by itself when a link arrives with ?problem= or ?category=. */}
+        <details class="filters__more" data-filters-more>
+          <summary>Filter</summary>
+          <div class="filters__body">
+            <fieldset class="chips">
+              <legend>What's in the way?</legend>
+              <label class="chip"><input type="radio" name="problem" value="" checked /> <span>All</span></label>
+              {
+                PROBLEM_SLUGS.map((p) => (
+                  <label class="chip">
+                    <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].title}</span>
+                  </label>
+                ))
+              }
+            </fieldset>
+            <fieldset class="chips">
+              <legend>Type</legend>
+              <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
+              {
+                CATEGORY_SLUGS.map((c) => (
+                  <label class="chip">
+                    <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
+                  </label>
+                ))
+              }
+            </fieldset>
+          </div>
+        </details>
+      </form>
 
-    <section class="card library" aria-labelledby="all-heading">
-      <div class="library__head">
-        <p class="muted" aria-live="polite" data-count>Showing all {techniques.length} techniques</p>
+      <section class="card library" aria-labelledby="all-heading">
+        <div class="library__head">
+          <p class="muted" aria-live="polite" data-count>Showing all {techniques.length} techniques</p>
+        </div>
+        <ul class="library__list" role="list" data-grid>
+          {techniques.map((t) => <TechniqueRow technique={t} />)}
+        </ul>
+      </section>
+
+      <div class="empty card" data-empty hidden>
+        <p>No techniques match these filters.</p>
+        <button type="button" class="btn btn--ghost" data-reset>Clear filters</button>
       </div>
-      <ul class="library__list" role="list" data-grid>
-        {techniques.map((t) => <TechniqueRow technique={t} />)}
-      </ul>
-    </section>
 
-    <div class="empty card" data-empty hidden>
-      <p>No techniques match these filters.</p>
-      <button type="button" class="btn btn--ghost" data-reset>Clear filters</button>
-    </div>
-
-    <section class="quiz-section" id="quiz" aria-labelledby="quiz-heading">
-      <div>
-        <h2 id="quiz-heading">Not sure? Four quick questions.</h2>
-        <p class="muted quiz-section__intro">Answer honestly and get 2–3 techniques to try first. Nothing is saved or sent anywhere.</p>
-      </div>
-      <Quiz />
-    </section>
+    </details>
   </div>
 </BaseLayout>
 
 <script>
   import { initLibraryFilters } from '../../scripts/library-filters';
-  import { getChain, getSessions } from '../../lib/storage';
-  import { el } from '../../lib/dom';
   import { onPage } from '../../lib/page';
   onPage('library-filters', () => {
     initLibraryFilters();
     // A link with a filter in it shows the filters it set.
     const more = document.querySelector<HTMLDetailsElement>('[data-filters-more]');
+    const fold = document.querySelector<HTMLDetailsElement>('[data-library]');
     const params = new URLSearchParams(location.search);
     if (more && (params.get('problem') || params.get('category'))) more.open = true;
-  });
-
-  /** "Yours": the timer modes you focus with, biggest share first, and your chain if it has days. */
-  onPage('learn-yours', () => {
-    const root = document.querySelector<HTMLElement>('[data-yours]');
-    if (!root) return;
-    const modes = JSON.parse(root.dataset.modes!) as Record<string, string>;
-    const titles = JSON.parse(root.dataset.titles!) as Record<string, string>;
-    const base = root.dataset.base!;
-    const byMode = new Map<string, number>();
-    let total = 0;
-    for (const s of getSessions()) {
-      total += s.focusSeconds;
-      if (modes[s.mode]) byMode.set(s.mode, (byMode.get(s.mode) ?? 0) + s.focusSeconds);
-    }
-    const items = [...byMode]
-      .filter(([, sec]) => sec >= 60)
-      .sort((a, b) => b[1] - a[1])
-      .map(([mode, sec]) => ({ id: modes[mode]!, note: `${Math.round((sec / total) * 100)}% of your focus` }));
-    if (getChain().days.length) items.push({ id: 'dont-break-the-chain', note: 'your chain' });
-    root.hidden = !items.length;
-    root.querySelector('[data-yours-list]')!.replaceChildren(
-      ...items
-        .filter((it) => titles[it.id])
-        .map((it) => {
-          const li = el('li');
-          const a = el('a', 'learn-yours__item');
-          a.href = `${base}${it.id}`;
-          a.append(el('strong', '', titles[it.id]!), el('span', 'muted', it.note));
-          li.append(a);
-          return li;
-        }),
-    );
+    if (fold && (params.get('problem') || params.get('category') || params.get('q'))) fold.open = true;
   });
 </script>
 
 <style>
-  .learn-heading {
-    margin: 0 0 var(--space-3);
-    font-size: var(--text-lg);
+  .library-fold {
+    margin-top: var(--space-6);
   }
 
-  .learn-yours[hidden] {
-    display: none;
-  }
-
-  .learn-yours {
-    margin-bottom: var(--space-5);
-  }
-
-  /* Your techniques: a row that scrolls sideways on a phone. */
-  .learn-yours__list {
-    display: flex;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0 0 var(--space-1);
-    list-style: none;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .learn-yours :global(.learn-yours__item) {
-    display: grid;
-    gap: 2px;
-    padding: var(--space-2) var(--space-4);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-text);
-    white-space: nowrap;
-    text-decoration: none;
-  }
-
-  .learn-yours :global(.learn-yours__item .muted) {
-    font-size: var(--text-xs);
-  }
-
-  .learn-problems {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .learn-problems__list {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .learn-problem {
+  .library-fold > summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
     min-height: 56px;
-    padding: var(--space-3) var(--space-4);
+    padding: 0 var(--space-4);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--raised-grad);
-    box-shadow:
-      inset 0 1px 0 var(--raised-hl),
-      0 2px 0 var(--edge);
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .learn-problem__text {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .learn-problem__text .muted {
-    font-size: var(--text-xs);
-  }
-
-  .learn-problem__count {
-    flex: none;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-1);
-    font-size: var(--text-sm);
+    background: var(--color-surface);
     font-weight: 600;
+    cursor: pointer;
+    list-style: none;
   }
 
-  .learn-quiz {
-    justify-self: start;
-    min-height: 44px;
-    align-content: center;
-    font-weight: 600;
+  .library-fold > summary::-webkit-details-marker {
+    display: none;
   }
 
-  .learn-all {
-    margin-top: var(--space-6);
+  .library-fold > summary svg {
+    color: var(--color-text-muted);
+    transition: transform var(--duration-fast) var(--ease-out);
+  }
+
+  .library-fold[open] > summary {
+    margin-bottom: var(--space-4);
+  }
+
+  .library-fold[open] > summary svg {
+    transform: rotate(180deg);
+  }
+
+  .library-fold[hidden] {
+    display: none;
   }
 
   .filters {
@@ -423,21 +293,4 @@ const titles = Object.fromEntries(techniques.map((t) => [t.id, t.data.title]));
     display: none;
   }
 
-  .quiz-section {
-    display: grid;
-    gap: var(--space-4) var(--space-6);
-    margin-top: var(--space-7);
-    scroll-margin-top: var(--space-5);
-  }
-
-  .quiz-section__intro {
-    margin-top: var(--space-1);
-  }
-
-  @media (min-width: 56rem) {
-    .quiz-section {
-      grid-template-columns: 1fr 1.6fr;
-      align-items: start;
-    }
-  }
 </style>

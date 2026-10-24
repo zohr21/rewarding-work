@@ -29,12 +29,12 @@ GitHub Pages. Change it in `astro.config.mjs` (or set `BASE_PATH`).
 ```
 src/
   config/site.ts        site name, tagline, main navigation
-  data/                 taxonomy (problems, categories, evidence), quiz
+  data/                 taxonomy (problems, categories, evidence), Coach questions and scoring
   content/techniques/   one Markdown file per technique
   styles/tokens.css     all colours, type, spacing, motion, background palettes
   styles/global.css     reset, base elements, shared .btn / .card / .input …
   layouts/BaseLayout.astro
-  components/           UI pieces (timer, heatmap, chain, quiz, look + sound menus …)
+  components/           UI pieces (timer, heatmap, chain, Coach, look + sound menus …)
   lib/                  storage, timer engine, stats, dates, paths, appearance, page lifecycle
   lib/scene/            WebGL background scenes (runner + one shader per scene)
   lib/sound/            background sound: synthesised soundscapes, YouTube, player
@@ -288,34 +288,25 @@ live in `src/data/taxonomy.ts`.
 > If `npm run dev` was already running when you created `content.config.ts` or changed
 > the schema, restart it.
 
-## Editing the quiz
+## Editing the Coach
 
-Everything lives in `src/data/quiz.ts`, as plain data:
+Focus › Coach (`/techniques`) lives in `src/data/coach.ts`, as plain data:
 
-```ts
-{
-  id: 'blocker',                                  // unique per question
-  question: "What's getting in the way most right now?",
-  hint: 'optional line under the question',
-  options: [
-    {
-      id: 'start',                                // unique within the question
-      label: 'Getting started',
-      points: { 'two-minute-rule': 3, pomodoro: 2 }, // technique slug → points
-    },
-    // …
-  ],
-}
-```
+- `BLOCKERS`: the six "What's in the way?" tiles. One tap shows the best technique
+  for that tile, from its `points` (technique slug → points).
+- `QUESTIONS`: the questions that turn a tap into a plan. The first one is built on the
+  four laws of Atomic Habits (obvious, attractive, easy, satisfying). Each answer has
+  `points` too. `CUES` turns the "When do you usually get to it?" answer into the
+  plan's if-then line.
+- A plan has four steps: an if-then plan (`WHEN`), the best scorer among `START`, the
+  best among `SESSION`, and the chain (`REWARD`). Each step's text is in `START_TEXT`,
+  `SESSION_TEXT` and `REWARD_TEXT`, and the heading in `PLAN_TITLES`.
+- After you start something from Coach, it asks whether it helped. `workedBonus` adds up
+  to ±4 points for that technique next time, so what works for you rises to the top.
+- `TIMER_FOR` says which timer mode Start opens (`/timer?mode=…`).
+- A misspelled technique slug fails the build.
 
-- **Scoring:** points from the chosen answers are added up per technique. The top 2
-  are shown, plus a 3rd if it scores at least `THIRD_PICK_RATIO` (default 0.6) of the
-  top score. Ties are broken by the order of `TIE_BREAK`.
-- Each result shows "Because you said: …" using the labels of the answers that gave
-  it points, so keep labels short and in the user's voice.
-- You can add or remove questions and options freely; the UI adapts ("Question 2 of N").
-- A misspelled technique slug fails the build with a message naming the question and option.
-- Problem card text (title, teaser, explanation) is in `src/data/taxonomy.ts`.
+Your plan and answers are kept on the device (`rw:v1:coach`, `src/lib/coach.ts`).
 
 ## Deploying (GitHub Pages)
 

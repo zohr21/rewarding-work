@@ -1,14 +1,14 @@
 ---
 /**
- * Home's one way into the techniques: name what is in the way and get the techniques
- * for it. The site lists the five problems as chips; the Android app keeps them in a
+ * Home's one way into the techniques: name what is in the way and Coach answers with one
+ * technique to try now (/techniques?way=<problem>). The site lists the five problems as chips; the Android app keeps them in a
  * sheet behind a single row, so Today stays one screen.
  */
 import { NATIVE_APP } from '../config/app';
 import { PROBLEMS, PROBLEM_SLUGS } from '../data/taxonomy';
 import { url } from '../lib/paths';
 
-const quizUrl = url('/techniques#quiz');
+const coachUrl = url('/techniques');
 const CHEVRON = 'M9 6l6 6-6 6';
 ---
 
@@ -34,11 +34,11 @@ const CHEVRON = 'M9 6l6 6-6 6';
       <dialog class="way-sheet" data-way-sheet aria-labelledby="way-heading">
         <span class="way-sheet__handle" aria-hidden="true" />
         <h2 id="way-heading">What's in the way?</h2>
-        <p class="muted way-sheet__intro">Pick the one that fits best. Each leads to techniques you can try in minutes.</p>
+        <p class="muted way-sheet__intro">Pick the one that fits best. Each gives you one technique to try in minutes.</p>
         <ul class="way-sheet__list" role="list">
           {PROBLEM_SLUGS.map((slug) => (
             <li>
-              <a href={url(`/problems/${slug}`)}>
+              <a href={url(`/techniques?way=${slug}`)}>
                 <span>{PROBLEMS[slug].title}</span>
                 <svg class="way-chevron" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
                   <path d={CHEVRON} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -47,7 +47,7 @@ const CHEVRON = 'M9 6l6 6-6 6';
             </li>
           ))}
         </ul>
-        <a class="btn btn--ghost way-sheet__quiz" href={quizUrl}>Not sure? Four quick questions</a>
+        <a class="btn btn--ghost way-sheet__quiz" href={coachUrl}>Not sure? Ask Coach</a>
       </dialog>
     </>
   ) : (
@@ -55,14 +55,14 @@ const CHEVRON = 'M9 6l6 6-6 6';
       <div class="way__head">
         <div>
           <h2 id="way-heading">Something in the way?</h2>
-          <p class="muted">Pick what fits and get techniques to try in the next few minutes.</p>
+          <p class="muted">Pick what fits and get one technique to try in the next few minutes.</p>
         </div>
-        <a class="way__quiz" href={quizUrl}>Not sure? Four quick questions</a>
+        <a class="way__quiz" href={coachUrl}>Not sure? Ask Coach</a>
       </div>
       <ul class="way__chips" role="list">
         {PROBLEM_SLUGS.map((slug) => (
           <li>
-            <a href={url(`/problems/${slug}`)}>{PROBLEMS[slug].title}</a>
+            <a href={url(`/techniques?way=${slug}`)}>{PROBLEMS[slug].title}</a>
           </li>
         ))}
       </ul>
