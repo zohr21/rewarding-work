@@ -1,6 +1,7 @@
 ---
 /**
- * GitHub-style heatmap of focus minutes, last 12 weeks. Rendered client-side
+ * GitHub-style heatmap of focus minutes, up to the last 12 weeks (fewer while the history is
+ * short, so it is not mostly empty squares). Rendered client-side
  * (data lives in localStorage). Columns = weeks, rows = Mon…Sun.
  * Sequential single-hue scale; hover/tap tooltip per cell; a side panel with
  * the key numbers; a table view for screen readers and anyone who prefers numbers.
@@ -24,7 +25,7 @@ const LEGEND = [
 
 <section class="card heat" data-heatmap data-view="flat" aria-labelledby="heat-heading">
   <div class="heat__head">
-    <h2 id="heat-heading" class="panel-title">Focus, last 12 weeks</h2>
+    <h2 id="heat-heading" class="panel-title" data-heat-title>Focus, last 12 weeks</h2>
     <div class="heat__views well" role="group" aria-label="Heatmap view">
       <button type="button" class="heat__view" data-heat-view="flat" aria-pressed="true">Flat</button>
       <button type="button" class="heat__view" data-heat-view="3d" aria-pressed="false">3D</button>
@@ -72,7 +73,7 @@ const LEGEND = [
     <summary>Show as a table</summary>
     <div class="heat__table-scroll">
       <table>
-        <caption class="visually-hidden">Focus per week, last 12 weeks, newest first</caption>
+        <caption class="visually-hidden">Focus per week, newest first</caption>
         <thead>
           <tr>
             <th scope="col">Week of</th>
@@ -110,6 +111,18 @@ const LEGEND = [
     return node;
   }
 
+  const MIN_WEEKS = 8;
+  const MAX_WEEKS = 12;
+
+  /** Weeks back to the first session's week, kept between MIN_WEEKS and MAX_WEEKS. */
+  function weekSpan(sessions: { start: number }[]): number {
+    if (!sessions.length) return MAX_WEEKS;
+    const first = Math.min(...sessions.map((s) => s.start));
+    // Rounded, since a week across a clock change is an hour off.
+    const weeks = Math.round((startOfWeek(new Date()).getTime() - startOfWeek(first).getTime()) / (7 * 86_400_000)) + 1;
+    return Math.min(MAX_WEEKS, Math.max(MIN_WEEKS, weeks));
+  }
+
   onPage('heatmap', () => {
     const c = cleanups();
     document.querySelectorAll<HTMLElement>('[data-heatmap]').forEach((root) => {
@@ -119,6 +132,7 @@ const LEGEND = [
       const tfoot = root.querySelector<HTMLElement>('[data-heat-foot]')!;
       const empty = root.querySelector<HTMLElement>('[data-heat-empty]')!;
       const iso = root.querySelector<HTMLElement>('[data-heat-iso]')!;
+      const title = root.querySelector<HTMLElement>('[data-heat-title]')!;
       const viewButtons = root.querySelectorAll<HTMLButtonElement>('[data-heat-view]');
       viewButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -135,7 +149,9 @@ const LEGEND = [
 
       function render(): void {
         const sessions = getSessions();
-        const weeks = heatmapWeeks(sessions, 12);
+        const weeks = heatmapWeeks(sessions, weekSpan(sessions));
+        root.style.setProperty('--heat-weeks', String(weeks.length));
+        title.textContent = `Focus, last ${weeks.length} weeks`;
         const todayKey = dayKey(new Date());
         cellsByKey = new Map(weeks.flat().map((c) => [c.key, c]));
         const frag = document.createDocumentFragment();
@@ -339,7 +355,7 @@ const LEGEND = [
   .heat__iso {
     --c: 16px;
     display: grid;
-    grid-template-columns: repeat(12, var(--c));
+    grid-template-columns: repeat(var(--heat-weeks, 12), var(--c));
     gap: 4px;
     transform-style: preserve-3d;
     transform: rotateX(58deg) rotateZ(-38deg);
@@ -421,10 +437,10 @@ const LEGEND = [
     position: relative;
   }
 
-  /* 2.25rem label column + 12 equal week columns; cells are square. */
+  /* 2.25rem label column + one equal column per week; cells are square. */
   .heat__grid {
     display: grid;
-    grid-template-columns: 2.25rem repeat(12, minmax(0, 1fr));
+    grid-template-columns: 2.25rem repeat(var(--heat-weeks, 12), minmax(0, 1fr));
     grid-template-rows: auto;
     gap: 4px;
   }

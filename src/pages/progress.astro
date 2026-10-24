@@ -10,39 +10,70 @@ import DoneList from '../components/DoneList.astro';
 import ChainTracker from '../components/ChainTracker.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
+
+/** The grove's tabs, in order. `hash` is what links use to open one (#stats); the first is the default. */
+const TABS = [
+  { id: 'grove', label: 'Grove' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'done', label: 'Done' },
+  { id: 'chains', label: 'Chains' },
+];
 ---
 
 <BaseLayout title="Your grove" description="Your focus history, reward tiers, done list and habit chain.">
   <div class="container">
-    <header class="page-header">
-      <h1>Your grove</h1>
-      <p>
-        Focus sessions from the <a href={url('/timer')}>timer</a>, the tiers they add up to, things you've finished, and your chain.
-        Kept on this device, and in your account when you're signed in.
-      </p>
-    </header>
+    <div class="grove-bar">
+      <h1 class="grove-bar__title">Your grove</h1>
+      <div class="grove-tabs" role="tablist" aria-label="Your grove" data-grove-tabs>
+        {
+          TABS.map((tab, i) => (
+            <button
+              type="button"
+              role="tab"
+              id={`grove-tab-${tab.id}`}
+              aria-controls={`grove-panel-${tab.id}`}
+              aria-selected={i === 0 ? 'true' : 'false'}
+              tabindex={i === 0 ? 0 : -1}
+              data-grove-tab={tab.id}
+            >
+              {tab.label}
+            </button>
+          ))
+        }
+      </div>
+    </div>
 
+    {/* Panel ids differ from the hashes, so opening #done does not scroll the tabs away. */}
     <div class="progress">
-      {/* In the Android app the grove leads the page. */}
-      {NATIVE_APP && <RewardTiers />}
-      {/* The history waits for a first session or finished thing; until then it is charts of zeros. */}
-      <p class="muted progress__later" data-progress-later hidden>Charts and your focus heatmap appear after your first session.</p>
-      <div class="progress__history" data-progress-history>
-        <ProgressStats />
-        <FocusTrend />
-        <Heatmap />
-        <div class="progress__pair progress__pair--even">
-          <TechniqueDonut />
-          <DoneWeeks />
+      <section class="grove-panel" role="tabpanel" id="grove-panel-grove" aria-labelledby="grove-tab-grove" data-grove-panel="grove">
+        <RewardTiers />
+      </section>
+
+      <section class="grove-panel" role="tabpanel" id="grove-panel-stats" aria-labelledby="grove-tab-stats" data-grove-panel="stats" hidden>
+        {/* The history waits for a first session or finished thing; until then it is charts of zeros. */}
+        <p class="muted progress__later" data-progress-later hidden>Charts and your focus heatmap appear after your first session.</p>
+        <div class="progress__history" data-progress-history>
+          <ProgressStats />
+          <FocusTrend />
+          <Heatmap />
+          <div class="progress__pair progress__pair--even">
+            <TechniqueDonut />
+            <DoneWeeks />
+          </div>
         </div>
-      </div>
-      {!NATIVE_APP && <RewardTiers />}
-      <div class="progress__pair">
+      </section>
+
+      <section class="grove-panel" role="tabpanel" id="grove-panel-done" aria-labelledby="grove-tab-done" data-grove-panel="done" hidden>
         <DoneList />
+      </section>
+
+      <section class="grove-panel" role="tabpanel" id="grove-panel-chains" aria-labelledby="grove-tab-chains" data-grove-panel="chains" hidden>
         <ChainTracker />
-      </div>
+      </section>
+
       <p class="muted progress__data">
-        Back up, move or delete your data under <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
+        Kept on this {NATIVE_APP ? 'phone' : 'device'}, and in your account when you're signed in. Back up, move or delete it under
+        <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
       </p>
     </div>
   </div>
@@ -50,7 +81,7 @@ import { url } from '../lib/paths';
 
 <script>
   import { getDone, getSessions, subscribe } from '../lib/storage';
-  import { cleanups, onPage } from '../lib/page';
+  import { cleanups, listen, onPage } from '../lib/page';
 
   onPage('progress-history', () => {
     const history = document.querySelector<HTMLElement>('[data-progress-history]');
@@ -67,17 +98,177 @@ import { url } from '../lib/paths';
     c.add(subscribe('done', render));
     return c.run;
   });
+
+  /** Old links to #tiers mean the Grove tab. */
+  const ALIASES: Record<string, string> = { tiers: 'grove' };
+
+  onPage('grove-tabs', () => {
+    const bar = document.querySelector<HTMLElement>('[data-grove-tabs]');
+    if (!bar) return;
+    const tabs = [...bar.querySelectorAll<HTMLButtonElement>('[data-grove-tab]')];
+    const panels = [...document.querySelectorAll<HTMLElement>('[data-grove-panel]')];
+    const ids = tabs.map((t) => t.dataset.groveTab!);
+
+    const fromHash = (): string => {
+      const h = location.hash.slice(1);
+      const id = ALIASES[h] ?? h;
+      return ids.includes(id) ? id : ids[0]!;
+    };
+
+    const show = (id: string, focus = false) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.groveTab === id;
+        t.setAttribute('aria-selected', String(on));
+        t.tabIndex = on ? 0 : -1;
+        if (on && focus) t.focus();
+      });
+      panels.forEach((p) => (p.hidden = p.dataset.grovePanel !== id));
+    };
+
+    const pick = (id: string, focus = false) => {
+      show(id, focus);
+      // The first tab keeps a clean URL; the others can be linked to and survive a reload.
+      const hash = id === ids[0] ? '' : `#${id}`;
+      history.replaceState(history.state, '', `${location.pathname}${location.search}${hash}`);
+      window.scrollTo({ top: 0 });
+    };
+
+    show(fromHash());
+    const c = cleanups();
+    tabs.forEach((t) => {
+      const onClick = () => pick(t.dataset.groveTab!);
+      t.addEventListener('click', onClick);
+      c.add(() => t.removeEventListener('click', onClick));
+    });
+    // Arrow keys move between tabs, as in any tab list.
+    const onKey = (e: KeyboardEvent) => {
+      const i = tabs.indexOf(document.activeElement as HTMLButtonElement);
+      if (i < 0) return;
+      const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+        pick(ids[e.key === 'Home' ? 0 : ids.length - 1]!, true);
+      } else if (step) {
+        e.preventDefault();
+        pick(ids[(i + step + ids.length) % ids.length]!, true);
+      }
+    };
+    bar.addEventListener('keydown', onKey);
+    c.add(() => bar.removeEventListener('keydown', onKey));
+    c.add(listen(window, 'hashchange', () => show(fromHash())));
+    return c.run;
+  });
 </script>
 
 <style>
-  .progress__history {
+  .grove-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-5);
+    padding-block: var(--space-5) var(--space-4);
+  }
+
+  .grove-bar__title {
+    font-size: var(--text-2xl);
+  }
+
+  /* The same well-and-raised-tab look as the Focus tabs. */
+  .grove-tabs {
+    display: flex;
+    gap: var(--space-1);
+    max-width: 100%;
+    padding: 5px;
+    border-radius: 17px;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .grove-tabs button {
+    flex: 1 0 auto;
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-4);
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-out);
+  }
+
+  .grove-tabs button:hover {
+    color: var(--color-text);
+  }
+
+  .grove-tabs button[aria-selected='true'] {
+    background: var(--raised-grad);
+    color: var(--color-text);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 3px 0 var(--edge);
+  }
+
+  /* In the app the bottom bar already says Grove: the tabs stand alone, full width, and stay
+     at the top while a long tab scrolls (the app's header scrolls away). */
+  :global(html[data-app]) .grove-bar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    background: var(--header-bg);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+    backdrop-filter: saturate(1.4) blur(14px);
+  }
+
+  :global(html[data-app]) .progress {
+    margin-top: var(--space-2);
+  }
+
+  :global(html[data-app]) .grove-bar__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  :global(html[data-app]) .grove-tabs {
+    flex: 1;
+  }
+
+  @media (max-width: 30rem) {
+    .grove-tabs {
+      flex: 1 1 100%;
+    }
+
+    .grove-tabs button {
+      padding-inline: var(--space-2);
+    }
+  }
+
+  .grove-panel {
     display: grid;
     gap: var(--space-5);
   }
 
+  .grove-panel[hidden],
   .progress__history[hidden],
   .progress__later[hidden] {
     display: none;
+  }
+
+  .progress__history {
+    display: grid;
+    gap: var(--space-5);
   }
 
   .progress {
