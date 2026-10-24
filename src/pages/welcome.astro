@@ -7,7 +7,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import BrandMark from '../components/BrandMark.astro';
 import Sprig from '../components/Sprig.astro';
-import { MODULES } from '../config/site';
+import { NATIVE_APP } from '../config/app';
+import { APP_ONLY_MODULES, MODULES } from '../config/site';
 import { url } from '../lib/paths';
 ---
 
@@ -28,7 +29,7 @@ import { url } from '../lib/paths';
           Focus and tasks
         </span>
         {
-          MODULES.map((m) => (
+          MODULES.filter((m) => NATIVE_APP || !APP_ONLY_MODULES.includes(m.id)).map((m) => (
             <button type="button" class="chip" aria-pressed="false" data-module-pick={m.id}>
               {m.label}
             </button>

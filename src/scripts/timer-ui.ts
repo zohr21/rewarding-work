@@ -16,6 +16,8 @@ import { isTone, notify, notificationPermission, playChime, requestNotificationP
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
 import { jot, listOf, logSession, taskName, todayTasks, type SessionLog } from '../lib/tasks';
+import { checkSession, formatShort, type SessionPhone } from '../lib/screen';
+import { getProfile } from '../lib/profile';
 
 interface TimerPrefs {
   mode: TimerMode;
@@ -557,7 +559,61 @@ function mountTimer(root: HTMLElement): () => void {
     body.append(head, pips, foot);
     done.querySelector('[data-done-tier]')!.replaceChildren(coin, body);
 
+    const phone = done.querySelector<HTMLElement>('[data-done-phone]');
+    if (phone) {
+      phone.hidden = true;
+      if (getProfile().modules.screen) {
+        void checkSession(session).then((used) => {
+          if (used) renderPhone(phone, session, used);
+        });
+      }
+    }
+
     if (!done.open) done.showModal();
+  }
+
+  /**
+   * Screen time on the "Session complete" screen: a bonus leaf when no other app came up,
+   * or when the phone got in, how often, which apps, and where on the session's timeline.
+   */
+  function renderPhone(box: HTMLElement, session: FocusSession, used: SessionPhone): void {
+    if (!used.pickups) {
+      const leaf = el('span', 'done__leaf');
+      leaf.innerHTML =
+        '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 22V12M12 12c-4 0-6-3-6-6 3 0 6 2 6 6zM12 15c3 0 6-2 6-6-3 0-6 2-6 6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const text = el('div', 'done__phone-text');
+      text.append(el('strong', '', 'No phone the whole time'), el('span', 'done__phone-leaf', '+1 phone-free leaf for your grove'));
+      box.className = 'done__phone done__phone--clean';
+      box.replaceChildren(leaf, text);
+      box.hidden = false;
+      return;
+    }
+    const head = el('div', 'done__phone-head');
+    head.append(el('strong', '', 'Phone during focus'), el('span', 'muted', `${used.pickups} ${used.pickups === 1 ? 'time' : 'times'} · ${formatShort(used.ms)}`));
+    const length = Math.max(1, session.end - session.start);
+    const line = el('div', 'done__phone-line');
+    line.setAttribute('role', 'img');
+    line.setAttribute('aria-label', `Timeline of the session, with the ${used.pickups === 1 ? 'time' : 'times'} another app was open`);
+    for (const [start, end] of used.spans) {
+      const mark = el('span');
+      mark.style.insetInlineStart = `${((start - session.start) / length) * 100}%`;
+      mark.style.inlineSize = `${Math.max(1.5, ((end - start) / length) * 100)}%`;
+      line.append(mark);
+    }
+    const ends = el('div', 'done__phone-ends');
+    ends.setAttribute('aria-hidden', 'true');
+    ends.append(el('span', '', '0 min'), el('span', '', `${Math.round(length / 60_000)} min`));
+    const apps = el('ul', 'done__phone-apps');
+    for (const a of used.apps.slice(0, 3)) {
+      const li = el('li');
+      li.append(el('span', '', a.label), el('span', 'muted', formatShort(a.ms)));
+      apps.append(li);
+    }
+    const left = Math.max(0, session.focusSeconds * 1000 - used.ms);
+    const tip = el('p', 'muted', `Still ${minutesText(left)} of real focus. Next time, try putting the phone in another room.`);
+    box.className = 'done__phone';
+    box.replaceChildren(head, line, ends, apps, tip);
+    box.hidden = false;
   }
 
   if (els.done) {
@@ -832,6 +888,16 @@ function mountTimer(root: HTMLElement): () => void {
     const task = getTask(wantedTask);
     if (task && state.status === 'idle' && state.phase === 'work') {
       state = T.setLabel(state, task.title, task.id);
+      write('timer', state);
+    }
+    history.replaceState(history.state, '', location.pathname);
+  }
+
+  // Arriving from "Plan a phone-free block" on Today: /timer?label=<text>
+  const wantedLabel = standalone ? new URLSearchParams(location.search).get('label') : null;
+  if (wantedLabel) {
+    if (state.status === 'idle' && state.phase === 'work') {
+      state = T.setLabel(state, wantedLabel.slice(0, 120), taskForLabel(wantedLabel)?.id);
       write('timer', state);
     }
     history.replaceState(history.state, '', location.pathname);

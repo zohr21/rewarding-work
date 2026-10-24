@@ -9,7 +9,7 @@ import RowIcon from '../components/RowIcon.astro';
 import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
-import { MODULES } from '../config/site';
+import { APP_ONLY_MODULES, MODULES } from '../config/site';
 import pkg from '../../package.json';
 ---
 
@@ -209,7 +209,7 @@ import pkg from '../../package.json';
           <h2 id="acc-sections-h" class="group__title">Sections</h2>
           <div class="rows">
             {
-              MODULES.map((m) => (
+              MODULES.filter((m) => NATIVE_APP || !APP_ONLY_MODULES.includes(m.id)).map((m) => (
                 <label class="row row--toggle">
                   <span class="row__main">
                     {m.label}
