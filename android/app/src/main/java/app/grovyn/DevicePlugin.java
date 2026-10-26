@@ -49,7 +49,7 @@ import java.util.List;
     name = "RewardDevice",
     permissions = {
         @Permission(strings = { Manifest.permission.POST_NOTIFICATIONS }, alias = "notifications"),
-        // Only for importing past bank SMS once, when you ask for it on the Budget page.
+        // Only for importing past bank SMS once, when you ask for it on the Budget page; full version only (bankSmsHistory).
         @Permission(strings = { Manifest.permission.READ_SMS }, alias = "sms"),
         // Health Connect, one per kind of data so each can be allowed on its own (HealthData.java).
         @Permission(strings = { "android.permission.health.READ_SLEEP" }, alias = HealthData.SLEEP),
@@ -350,6 +350,8 @@ public class DevicePlugin extends Plugin {
             /* Nothing asked about. */
         }
         result.put("installed", installed);
+        // Only the full version can import past SMS (build.gradle, productFlavors).
+        result.put("sms", BuildConfig.SMS);
         call.resolve(result);
     }
 
@@ -401,7 +403,9 @@ public class DevicePlugin extends Plugin {
      */
     @PluginMethod
     public void bankSmsHistory(PluginCall call) {
-        if (getPermissionState("sms") != PermissionState.GRANTED) {
+        if (!BuildConfig.SMS) {
+            call.reject("This version can't read SMS.", "sms/unavailable");
+        } else if (getPermissionState("sms") != PermissionState.GRANTED) {
             requestPermissionForAlias("sms", call, "smsResult");
         } else {
             readSms(call);

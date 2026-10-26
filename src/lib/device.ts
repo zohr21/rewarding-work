@@ -66,10 +66,14 @@ export interface BankNotice {
   at: number;
 }
 
-/** `access`: Notification access is on for the app. `installed`: the apps asked about that are on the phone. */
+/**
+ * `access`: Notification access is on for the app. `installed`: the apps asked about that are on the phone.
+ * `sms`: this version can import past SMS (the full one; the Play version can't).
+ */
 export interface BankState {
   access: boolean;
   installed: { pkg: string; label: string }[];
+  sms?: boolean;
 }
 
 export interface BankSources {

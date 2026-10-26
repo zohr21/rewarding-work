@@ -11,7 +11,8 @@
     "build": "astro check && astro build",
     "preview": "astro preview",
     "build:app": "node scripts/build-app.mjs",
-    "apk": "node scripts/build-app.mjs && node scripts/build-apk.mjs"
+    "apk": "node scripts/build-app.mjs && node scripts/build-apk.mjs full",
+    "apk:play": "node scripts/build-app.mjs && node scripts/build-apk.mjs play"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

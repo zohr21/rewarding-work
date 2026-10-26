@@ -101,8 +101,7 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Importing past bank SMS into Budget, once, when you ask for it (DevicePlugin.bankSmsHistory). -->
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- READ_SMS is only in the full version: src/full/AndroidManifest.xml. -->
     <!-- The timer's notifications, and telling you on time that a session ended. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />

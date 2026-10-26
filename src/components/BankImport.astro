@@ -80,7 +80,8 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
         <button type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
       </div>
 
-      <div class="bk-past">
+      <!-- Only in the full Android version: the Play version can't read SMS (BankState.sms). -->
+      <div class="bk-past" data-bk-past hidden>
         <p><strong>Past SMS</strong></p>
         <p class="muted bk__note">Bring in the payments your banks texted you before.</p>
         <button type="button" class="btn btn--ghost btn--small" data-bk-history>Read past SMS</button>
@@ -233,6 +234,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 
     async function refreshState(): Promise<void> {
       state = await bankState(BANK_APPS.map((a) => a.pkg));
+      $('[data-bk-past]').hidden = !state?.sms;
       render();
     }
 
