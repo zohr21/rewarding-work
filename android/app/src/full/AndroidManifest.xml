@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only in the `full` version (build.gradle, productFlavors): what the Play version leaves out. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Importing past bank SMS into Budget, once, when you ask for it (DevicePlugin.bankSmsHistory). -->
+    <uses-permission android:name="android.permission.READ_SMS" />
+</manifest>

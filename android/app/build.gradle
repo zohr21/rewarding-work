@@ -22,6 +22,25 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    buildFeatures {
+        buildConfig = true
+    }
+    // Two versions of the app from the same code (docs/play-store-readiness.md):
+    // `play` is the one on Google Play; `full` is installed by hand and also reads past bank SMS,
+    // which Play allows only after a declaration and review. Its own ID lets both sit on one phone.
+    flavorDimensions = ["store"]
+    productFlavors {
+        play {
+            dimension "store"
+            buildConfigField "boolean", "SMS", "false"
+        }
+        full {
+            dimension "store"
+            applicationIdSuffix ".full"
+            versionNameSuffix "-full"
+            buildConfigField "boolean", "SMS", "true"
+        }
+    }
 }
 
 repositories {

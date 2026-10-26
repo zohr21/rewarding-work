@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- The `full` version's name, so it can be told apart from the Play version on the same phone. -->
+<resources>
+    <string name="app_name">Grovyn Full</string>
+    <string name="title_activity_main">Grovyn Full</string>
+</resources>
