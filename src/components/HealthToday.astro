@@ -103,6 +103,8 @@ import { NATIVE_APP } from '../config/app';
       ['var(--color-surface-2)', `${circ} ${circ}`],
       [color, `${circ * Math.min(1, Math.max(0, share))} ${circ}`],
     ] as const) {
+      // An empty arc would still draw its round cap as a dot.
+      if (stroke === color && share <= 0) continue;
       const c = document.createElementNS(SVG_NS, 'circle');
       c.setAttribute('cx', '32');
       c.setAttribute('cy', '32');
