@@ -1,25 +1,42 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HealthBody from '../components/HealthBody.astro';
+import HealthCalendar from '../components/HealthCalendar.astro';
 import HealthGarden from '../components/HealthGarden.astro';
 import HealthSpendSummary from '../components/HealthSpendSummary.astro';
+import HealthToday from '../components/HealthToday.astro';
+import Sheet from '../components/Sheet.astro';
+import WorkoutLog from '../components/WorkoutLog.astro';
 import { NATIVE_APP } from '../config/app';
 ---
 
 <BaseLayout title="Health" description="Rest, movement and what you put into feeling well, next to your focus.">
   <div class="container">
-    <header class="page-header">
+    <header class="page-header health__header">
       <h1>Health</h1>
-      <p>Rest, movement and what you put into feeling well, next to your focus.</p>
     </header>
 
+    {/* One day on the page; the detail opens over it in sheets. */}
     <div class="health">
-      <HealthGarden />
-      {/* The Android app has body data to lead with; the site only has a line about it, which goes last. */}
-      {NATIVE_APP && <HealthBody />}
-      <HealthSpendSummary />
+      <HealthToday />
       {!NATIVE_APP && <HealthBody />}
     </div>
+
+    <WorkoutLog />
+    <HealthCalendar />
+    {
+      NATIVE_APP && (
+        <Sheet id="body" title="Sleep and movement">
+          <HealthBody />
+        </Sheet>
+      )
+    }
+    <Sheet id="garden" labelledby="garden-heading">
+      <HealthGarden />
+    </Sheet>
+    <Sheet id="spend" labelledby="ws-heading">
+      <HealthSpendSummary />
+    </Sheet>
   </div>
 </BaseLayout>
 
@@ -27,10 +44,11 @@ import { NATIVE_APP } from '../config/app';
   .health {
     display: grid;
     gap: var(--space-5);
+    max-inline-size: 40rem;
   }
 
-  .health__note {
-    font-size: var(--text-sm);
+  .health__header {
+    margin-bottom: var(--space-3);
   }
 
   .health :global(.body__note) {
