@@ -6,6 +6,7 @@ import BrandMark from '../components/BrandMark.astro';
 import DataTools from '../components/DataTools.astro';
 import AppearanceMenu from '../components/AppearanceMenu.astro';
 import RowIcon from '../components/RowIcon.astro';
+import BoardJoin from '../components/BoardJoin.astro';
 import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
@@ -94,6 +95,7 @@ import pkg from '../../package.json';
         <ul>
           <li data-view="signed-out" hidden><a href="#acc-signin">Sign in</a></li>
           <li data-view="signed-in" data-member-only hidden><a href="#acc-security">Sign-in and security</a></li>
+          {ACCOUNTS_ENABLED && <li><a href="#acc-board">Weekly board</a></li>}
           <li><a href="#acc-data">Data and sync</a></li>
           <li><a href="#acc-connections">Connections</a></li>
           <li><a href="#acc-prefs">Preferences</a></li>
@@ -144,7 +146,7 @@ import pkg from '../../package.json';
           <p class="account__msg" role="status" data-guest-msg></p>
         </section>
 
-        <section class="card" aria-labelledby="acc-save-h" data-view="signed-in" data-guest-only hidden>
+        <section class="card" id="acc-save" aria-labelledby="acc-save-h" data-view="signed-in" data-guest-only hidden>
           <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
           <p class="muted account__lead">
             Right now it only exists {NATIVE_APP ? "on this phone: clearing the app's data" : 'in this browser: clearing browser data'} would lose it. Add an email or Google to keep
@@ -179,6 +181,63 @@ import pkg from '../../package.json';
             <p class="account__msg row-note" role="status" data-security-msg></p>
           </div>
         </section>
+
+        {
+          ACCOUNTS_ENABLED && (
+            <section class="group o-board" id="acc-board" aria-labelledby="acc-board-h" data-board-card>
+              <h2 id="acc-board-h" class="group__title">Weekly board</h2>
+              <div class="rows">
+                <label class="row row--toggle">
+                  <RowIcon name="leaf" />
+                  <span class="row__main">
+                    Show me on the weekly board<small data-board-line>Off · nobody sees you</small>
+                  </span>
+                  <input type="checkbox" role="switch" data-board-switch />
+                </label>
+                <a class="row" href={`${url('/progress')}#board`} data-board-on hidden>
+                  <span class="board-rank" data-board-rank>#–</span>
+                  <span class="row__main">
+                    <span data-board-league>Your league</span>
+                    <small data-board-sub>Open the board</small>
+                  </span>
+                  <RowIcon chevron />
+                </a>
+                <details class="row-more" data-board-on hidden>
+                  <summary class="row">
+                    <RowIcon name="people" />
+                    <span class="row__main">Nickname</span>
+                    <span class="row__value" data-board-nick></span>
+                    <RowIcon chevron />
+                  </summary>
+                  <div class="row-more__body">
+                    <form class="auth__form" data-form="board-nick" novalidate>
+                      <div class="field">
+                        <label for="acc-board-nick">Nickname on the board</label>
+                        <input id="acc-board-nick" class="input" type="text" name="nick" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" />
+                      </div>
+                      <div class="account__actions">
+                        <button type="submit" class="btn btn--small">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+                <fieldset class="row board-vis" data-board-on hidden>
+                  <legend class="board-vis__legend">Who can see me</legend>
+                  <span class="board-vis__opts">
+                    <label><input type="radio" name="board-vis" value="all" data-board-vis /> Everyone</label>
+                    <label><input type="radio" name="board-vis" value="friends" data-board-vis /> Friends only</label>
+                  </span>
+                </fieldset>
+                <div class="row" data-board-on hidden>
+                  <RowIcon name="link" />
+                  <span class="row__main">My friend code<small>Share it or add friends in Grove › Board › Friends</small></span>
+                  <span class="row__value board-code" data-board-code></span>
+                </div>
+                <p class="account__msg row-note" role="status" data-board-msg></p>
+              </div>
+            </section>
+          )
+        }
 
         {/* For everyone, signed in or not: the data is in this browser either way. */}
         <div class="o-data" id="acc-data">
@@ -321,6 +380,7 @@ import pkg from '../../package.json';
       </div>
     </div>
   </div>
+  {ACCOUNTS_ENABLED && <BoardJoin />}
 </BaseLayout>
 
 <script>
@@ -457,6 +517,137 @@ import pkg from '../../package.json';
     });
     c.add(() => io.disconnect());
 
+    return c.run;
+  });
+</script>
+
+<script>
+  import { getAccount, onAccountChange } from '../lib/account/state';
+  import { friendlyError } from '../lib/account/errors';
+  import { formatMinutes, getBoard, leaveBoard, leagueName, loadLeague, myTier, nicknameProblem, pushEntry, setBoard, weekMinutes, type Visibility } from '../lib/board';
+  import { getSessions, subscribe } from '../lib/storage';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  onPage('account-board', () => {
+    const found = document.querySelector<HTMLElement>('[data-board-card]');
+    if (!found) return;
+    const card: HTMLElement = found;
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => card.querySelector<T>(sel)!;
+    const c = cleanups();
+    const toggle = $<HTMLInputElement>('[data-board-switch]');
+    const msg = $('[data-board-msg]');
+    const nickForm = $<HTMLFormElement>('[data-form="board-nick"]');
+    /** Your place in your league, once looked up; null until then. */
+    let rank: number | null = null;
+
+    const joined = () => getBoard().joined && !!getAccount().user;
+
+    function render(): void {
+      const settings = getBoard();
+      const on = joined();
+      toggle.checked = on;
+      $('[data-board-line]').textContent = !on
+        ? 'Off · nobody sees you'
+        : settings.visibility === 'all'
+          ? 'On · everyone sees your nickname'
+          : 'On · only friends see you';
+      card.querySelectorAll<HTMLElement>('[data-board-on]').forEach((n) => (n.hidden = !on));
+      if (!on) return;
+      const sessions = getSessions();
+      $('[data-board-rank]').textContent = rank === null || settings.visibility === 'friends' ? '#–' : `#${rank}`;
+      $('[data-board-league]').textContent = leagueName(myTier(sessions));
+      $('[data-board-sub]').textContent = `${formatMinutes(weekMinutes(sessions))} this week · open the board`;
+      $('[data-board-nick]').textContent = settings.name;
+      $('[data-board-code]').textContent = settings.code || '…';
+      card.querySelectorAll<HTMLInputElement>('[data-board-vis]').forEach((r) => (r.checked = r.value === settings.visibility));
+    }
+
+    async function lookUpRank(): Promise<void> {
+      if (!joined()) return;
+      const uid = getAccount().user!.uid;
+      try {
+        const rows = await loadLeague(myTier());
+        const mine = weekMinutes(getSessions());
+        const others = rows.filter((r) => r.uid !== uid);
+        rank = others.filter((r) => r.minutes > mine).length + 1;
+      } catch {
+        rank = null;
+      }
+      render();
+    }
+
+    c.add(
+      listen(toggle, 'change', () => {
+        msg.textContent = '';
+        if (toggle.checked) {
+          // Joining needs a nickname: the sheet asks for it, and the switch follows once you have joined.
+          toggle.checked = false;
+          document.dispatchEvent(new CustomEvent('board:join'));
+          return;
+        }
+        leaveBoard()
+          .then(() => {
+            msg.textContent = 'You left the board. Your row was removed.';
+            render();
+          })
+          .catch((err: unknown) => (msg.textContent = friendlyError(err)));
+      }),
+    );
+
+    c.add(
+      listen(card, 'change', (e) => {
+        const t = e.target as HTMLInputElement;
+        if (!t.matches('[data-board-vis]')) return;
+        setBoard({ visibility: t.value as Visibility });
+        render();
+        pushEntry()
+          .then(() => void lookUpRank())
+          .catch((err: unknown) => (msg.textContent = friendlyError(err)));
+      }),
+    );
+
+    c.add(
+      listen(nickForm, 'submit', (e) => {
+        e.preventDefault();
+        const input = nickForm.querySelector<HTMLInputElement>('input')!;
+        const nick = input.value.trim();
+        const problem = nicknameProblem(nick);
+        if (problem) {
+          msg.textContent = problem;
+          return;
+        }
+        setBoard({ name: nick });
+        nickForm.closest('details')!.open = false;
+        render();
+        pushEntry()
+          .then(() => (msg.textContent = 'Nickname saved.'))
+          .catch((err: unknown) => (msg.textContent = friendlyError(err)));
+      }),
+    );
+    c.add(
+      listen(card, 'toggle', (e) => {
+        const d = e.target as HTMLDetailsElement;
+        if (d.open) nickForm.querySelector<HTMLInputElement>('input')!.value = getBoard().name;
+      }, { capture: true }),
+    );
+
+    c.add(listen(document, 'board:changed', () => {
+      msg.textContent = 'You are on the board.';
+      void lookUpRank();
+    }));
+    c.add(subscribe('board', render));
+    c.add(subscribe('sessions', render));
+    let lastUid: string | null | undefined;
+    c.add(
+      onAccountChange((s) => {
+        const uid = s.user?.uid ?? null;
+        render();
+        if (uid !== lastUid) {
+          lastUid = uid;
+          void lookUpRank();
+        }
+      }),
+    );
     return c.run;
   });
 </script>
@@ -1137,5 +1328,57 @@ import pkg from '../../package.json';
     :global([data-theme='auto']) .account :global(.pw__hint.is-problem) {
       color: #ff8a80;
     }
+  }
+
+  /* ---------- Weekly board ---------- */
+  .board-rank {
+    flex: none;
+    min-width: 36px;
+    color: var(--firefly);
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+  }
+
+  .board-vis {
+    flex-wrap: wrap;
+    margin: 0;
+    border: 0;
+    min-inline-size: 0;
+  }
+
+  /* A legend can't be a flex item, so it floats into the row as a label would. */
+  .board-vis__legend {
+    float: left;
+    padding: 0;
+    margin-right: auto;
+    font-weight: 600;
+  }
+
+  .board-vis__opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    margin-left: auto;
+  }
+
+  .board-vis__opts label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .board-vis__opts input {
+    inline-size: 1.15rem;
+    block-size: 1.15rem;
+    margin: 0;
+    accent-color: var(--color-accent);
+  }
+
+  .board-code {
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
   }
 </style>

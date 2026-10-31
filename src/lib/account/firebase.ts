@@ -40,9 +40,25 @@ import {
   type AuthCredential,
   type User,
 } from 'firebase/auth';
-import { collection, connectFirestoreEmulator, deleteDoc, doc, getDocs, getFirestore, onSnapshot, setDoc, type Firestore } from 'firebase/firestore';
+import {
+  collection,
+  connectFirestoreEmulator,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  limit,
+  onSnapshot,
+  query,
+  setDoc,
+  where,
+  type DocumentData,
+  type Firestore,
+} from 'firebase/firestore';
 import { NATIVE_APP } from '../../config/app';
 import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
+import { getBoard, weekKey, type BoardEntry } from '../board';
 import { googleIdToken } from '../device';
 import {
   SYNCED_AT_FIRST,
@@ -276,6 +292,12 @@ async function flush(ms = 6000): Promise<boolean> {
 async function deleteCloudData(uid: string): Promise<void> {
   const snap = await getDocs(collection(db, 'users', uid, 'stores'));
   await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  // The board: this week's and last week's rows, and the friend code (a new account claims it again).
+  const now = Date.now();
+  await Promise.all([
+    ...[weekKey(now), weekKey(now - 7 * 86_400_000)].map((week) => deleteDoc(entryRef(week, uid)).catch(() => {})),
+    releaseFriendCode(getBoard().code, uid),
+  ]);
 }
 
 /** Forget this device's copy of the synced data (after sign-out or account deletion). */
@@ -457,4 +479,82 @@ export async function deleteAccount(password?: string): Promise<void> {
     throw err;
   }
   clearLocal();
+}
+
+// ---------- Weekly board (src/lib/board.ts) ----------
+
+const entryRef = (week: string, uid: string) => doc(db, 'boards', week, 'entries', uid);
+const codeRef = (code: string) => doc(db, 'codes', code);
+
+function toEntry(uid: string, d: DocumentData): BoardEntry | null {
+  if (typeof d.name !== 'string' || typeof d.minutes !== 'number' || typeof d.tier !== 'number') return null;
+  return {
+    uid,
+    name: d.name,
+    minutes: d.minutes,
+    tier: d.tier,
+    guest: d.guest === true,
+    visibility: d.visibility === 'friends' ? 'friends' : 'all',
+    friends: Array.isArray(d.friends) ? d.friends : [],
+    updatedAt: typeof d.updatedAt === 'number' ? d.updatedAt : 0,
+  };
+}
+
+/** Everyone in a league this week who shows to everyone (sorted by the caller). Readable signed out too. */
+export async function boardLeague(week: string, tier: number): Promise<BoardEntry[]> {
+  const snap = await getDocs(query(collection(db, 'boards', week, 'entries'), where('visibility', '==', 'all'), where('tier', '==', tier), limit(500)));
+  return snap.docs.map((d) => toEntry(d.id, d.data())).filter((e): e is BoardEntry => e !== null);
+}
+
+/** These people's rows this week; anyone without one, or hidden from you, is left out. */
+export async function boardEntries(week: string, uids: string[]): Promise<BoardEntry[]> {
+  const rows = await Promise.all(
+    uids.map((uid) =>
+      getDoc(entryRef(week, uid)).then(
+        (d) => (d.exists() ? toEntry(d.id, d.data()) : null),
+        () => null,
+      ),
+    ),
+  );
+  return rows.filter((e): e is BoardEntry => e !== null);
+}
+
+export async function saveBoardEntry(week: string, entry: BoardEntry): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid || uid !== entry.uid) throw new Error('Not signed in.');
+  const { uid: _uid, ...data } = entry;
+  await setDoc(entryRef(week, uid), data);
+}
+
+export async function removeBoardEntries(weeks: string[]): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await Promise.all(weeks.map((week) => deleteDoc(entryRef(week, uid))));
+}
+
+/** True when the code is now (or already was) this account's. */
+export async function claimFriendCode(code: string): Promise<boolean> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return false;
+  const current = await getDoc(codeRef(code));
+  if (current.exists()) return current.get('uid') === uid;
+  await setDoc(codeRef(code), { uid });
+  return true;
+}
+
+/** Whose code this is, or null. */
+export async function findFriendCode(code: string): Promise<string | null> {
+  const d = await getDoc(codeRef(code));
+  const uid = d.exists() ? d.get('uid') : null;
+  return typeof uid === 'string' ? uid : null;
+}
+
+async function releaseFriendCode(code: string, uid: string): Promise<void> {
+  if (!code) return;
+  try {
+    const d = await getDoc(codeRef(code));
+    if (d.exists() && d.get('uid') === uid) await deleteDoc(codeRef(code));
+  } catch {
+    /* someone else's, or already gone */
+  }
 }

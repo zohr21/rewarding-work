@@ -4,7 +4,8 @@ rules_version = '2';
 // Firebase console → Firestore Database → Rules, then Publish.
 //
 // Each signed-in person (including guests) can read and write only their own
-// documents: users/{uid}/stores/{store}. Everything else is denied.
+// documents: users/{uid}/stores/{store}. The weekly board (src/lib/board.ts) adds
+// boards/{week}/entries/{uid} and codes/{code}. Everything else is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/stores/{store} {
@@ -12,11 +13,53 @@ service cloud.firestore {
 
       allow create, update: if request.auth != null
         && request.auth.uid == uid
-        && store in ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance']
+        && store in ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance', 'board']
         && request.resource.data.keys().hasOnly(['data', 'updatedAt'])
         && request.resource.data.data is string
         && request.resource.data.data.size() <= 800000
         && request.resource.data.updatedAt is number;
+    }
+
+    // One row per person per week ({week} is its Monday, YYYY-MM-DD). Rows that show to
+    // everyone can be read by anyone, so the board can be seen before joining; a
+    // "Friends only" row by its owner and the friends it lists. Minutes are capped at
+    // 4 hours a day, as the app counts them.
+    match /boards/{week}/entries/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid)
+        || resource.data.visibility == 'all'
+        || (request.auth != null && request.auth.uid in resource.data.friends);
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
+
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && week.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['name', 'minutes', 'tier', 'guest', 'visibility', 'friends', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.minutes is int
+        && request.resource.data.minutes >= 0
+        && request.resource.data.minutes <= 1680
+        && request.resource.data.tier is int
+        && request.resource.data.tier >= 0
+        && request.resource.data.tier <= 5
+        && request.resource.data.guest is bool
+        && request.resource.data.visibility in ['all', 'friends']
+        && request.resource.data.friends is list
+        && request.resource.data.friends.size() <= 30
+        && request.resource.data.updatedAt is number;
+    }
+
+    // Friend codes: anyone signed in can look one up; you can only claim a free code for
+    // yourself, and only release your own.
+    match /codes/{code} {
+      allow get: if request.auth != null;
+      allow create: if request.auth != null
+        && code.matches('^[A-Z2-9]{3}-[A-Z2-9]{4}$')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
   }
 }

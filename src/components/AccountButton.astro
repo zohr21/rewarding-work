@@ -33,6 +33,7 @@ const current = Astro.url.pathname;
 
 <script>
   import { onAccountChange, startAccount, type AccountState } from '../lib/account/state';
+  import { startBoard } from '../lib/board';
   import { onPage } from '../lib/page';
 
   const SYNC_TEXT: Record<AccountState['sync'], string> = {
@@ -45,6 +46,7 @@ const current = Astro.url.pathname;
 
   onPage('account-button', () => {
     startAccount();
+    startBoard();
     const btn = document.querySelector<HTMLAnchorElement>('[data-account-btn]');
     if (!btn) return;
     const label = btn.querySelector<HTMLElement>('[data-account-label]')!;

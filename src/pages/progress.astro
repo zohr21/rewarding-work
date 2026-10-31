@@ -9,6 +9,7 @@ import RewardTiers from '../components/RewardTiers.astro';
 import DoneList from '../components/DoneList.astro';
 import ChainTracker from '../components/ChainTracker.astro';
 import ScreenStats from '../components/ScreenStats.astro';
+import BoardPanel from '../components/BoardPanel.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'stats', label: 'Stats' },
   { id: 'done', label: 'Done' },
   { id: 'chains', label: 'Chains' },
+  { id: 'board', label: 'Board' },
 ];
 ---
 
@@ -71,6 +73,10 @@ const TABS = [
 
       <section class="grove-panel" role="tabpanel" id="grove-panel-chains" aria-labelledby="grove-tab-chains" data-grove-panel="chains" hidden>
         <ChainTracker />
+      </section>
+
+      <section class="grove-panel" role="tabpanel" id="grove-panel-board" aria-labelledby="grove-tab-board" data-grove-panel="board" hidden>
+        <BoardPanel />
       </section>
 
       <p class="muted progress__data">

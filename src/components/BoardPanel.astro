@@ -1,0 +1,690 @@
+---
+/**
+ * Grove › Board: this week's league, the top three, and the people around you; or you
+ * and your friends. Anyone can look; joining is BoardJoin.astro. Firebase is only loaded
+ * the first time the tab is shown.
+ */
+import BoardJoin from './BoardJoin.astro';
+import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { NATIVE_APP } from '../config/app';
+import { url } from '../lib/paths';
+---
+
+<div class="board" data-board data-enabled={ACCOUNTS_ENABLED ? '' : undefined}>
+  {
+    !ACCOUNTS_ENABLED && (
+      <p class="card muted">The weekly board needs accounts, which aren't set up on this copy of the site.</p>
+    )
+  }
+
+  <div class="board__guest" data-board-guest hidden>
+    <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+    <p><strong>You're on as a guest.</strong> Save with email or Google so your rank survives a new phone.</p>
+    <a class="btn btn--small board__guest-save" href={`${url('/account')}#acc-save`}>Save</a>
+  </div>
+
+  <div class="board-seg" role="group" aria-label="Who to compare with">
+    <button type="button" aria-pressed="true" data-board-tab="all">Everyone</button>
+    <button type="button" aria-pressed="false" data-board-tab="friends">Friends</button>
+  </div>
+
+  <div class="board__view" data-board-view="all">
+    <div class="board__league">
+      <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path d="M12 22v-7"></path><path d="M12 15c-4 0-6-3-6-6 3 0 6 2 6 6z"></path><path d="M12 13c0-4 2-7 6-7 0 4-2 7-6 7z"></path></svg>
+      <div class="board__league-text">
+        <strong data-board-league>Your league</strong>
+        <span class="muted" data-board-week></span>
+      </div>
+      <span class="muted board__count" data-board-count></span>
+    </div>
+
+    <ol class="board__podium" data-board-podium aria-label="Top three"></ol>
+
+    <div class="board__head" data-board-around-head>
+      <h2 class="board__h">Around you</h2>
+      <span class="muted">People at your stage of the grove</span>
+    </div>
+    <ol class="board__list" data-board-around></ol>
+    <p class="muted board__empty" data-board-empty hidden></p>
+
+    <div class="board__join" data-board-joincard hidden>
+      <h2 class="board__join-title">Your focus is only on this {NATIVE_APP ? 'phone' : 'device'}</h2>
+      <p class="muted">To appear on the board, Grovyn needs somewhere to keep your weekly total. A guest account takes one tap, no email.</p>
+      <button type="button" class="btn" data-board-join-open data-board-join-label>Join as a guest</button>
+      <a class="btn btn--ghost" href={`${url('/account')}#acc-signin`} data-board-signin>Sign in with Google or email</a>
+    </div>
+  </div>
+
+  <div class="board__view" data-board-view="friends" hidden>
+    <div data-board-friends-on>
+      <p class="muted board__friends-count" data-board-friends-count></p>
+      <ol class="board__list" data-board-friends></ol>
+      <div class="board__invite">
+        <h2 class="board__join-title">Grow with friends</h2>
+        <p class="muted">Share your code. Friends see your nickname, stage and weekly focus, nothing else.</p>
+        <div class="board__code-row">
+          <span class="board__code" data-board-code>…</span>
+          <button type="button" class="btn btn--small" data-board-share>Share</button>
+        </div>
+        <form class="board__add" data-board-add novalidate>
+          <label for="board-add-code" class="board__add-label">Add a friend's code</label>
+          <div class="board__add-row">
+            <input id="board-add-code" class="input" name="code" placeholder="OAK-7Q4K" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+            <button type="submit" class="btn btn--ghost btn--small">Add</button>
+          </div>
+        </form>
+        <p class="board__msg" role="status" data-board-friend-msg></p>
+      </div>
+    </div>
+    <div class="board__join" data-board-friends-off hidden>
+      <h2 class="board__join-title">Join to add friends</h2>
+      <p class="muted">Once you're on the board you get a friend code to share, and can add theirs.</p>
+      <button type="button" class="btn" data-board-join-open>Join the board</button>
+    </div>
+  </div>
+
+  <p class="board__status" role="status" data-board-status></p>
+  <button type="button" class="btn btn--ghost btn--small board__retry" data-board-retry hidden>Try again</button>
+  <p class="muted board__note" data-board-note hidden>
+    Up to 4 hours of focus a day counts. <a href={`${url('/account')}#acc-board`}>Your board settings</a>
+  </p>
+</div>
+
+{ACCOUNTS_ENABLED && <BoardJoin />}
+
+<script>
+  import { getAccount, onAccountChange } from '../lib/account/state';
+  import {
+    addFriend,
+    formatMinutes,
+    getBoard,
+    leagueName,
+    loadFriends,
+    loadLeague,
+    myTier,
+    removeFriend,
+    resetsIn,
+    weekLabel,
+    weekMinutes,
+    type BoardEntry,
+  } from '../lib/board';
+  import { friendlyError } from '../lib/account/errors';
+  import { el } from '../lib/dom';
+  import { getSessions, subscribe } from '../lib/storage';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  /** A row to draw: a stored entry, you, or where you would be. */
+  interface Row {
+    uid: string;
+    name: string;
+    minutes: number;
+    guest: boolean;
+    you?: boolean;
+    ghost?: boolean;
+  }
+
+  onPage('board', () => {
+    const found = document.querySelector<HTMLElement>('[data-board]');
+    if (!found || !('enabled' in found.dataset)) return;
+    const root: HTMLElement = found;
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+    const c = cleanups();
+
+    let tab: 'all' | 'friends' = 'all';
+    let league: BoardEntry[] | null = null;
+    let friends: BoardEntry[] | null = null;
+    let leagueTier = -1;
+    let loading = false;
+    let started = false;
+
+    const joined = () => getBoard().joined && !!getAccount().user;
+
+    /** The league as stored, with your row as this device knows it right now. */
+    function leagueRows(): { rows: Row[]; me: number } {
+      const sessions = getSessions();
+      const uid = getAccount().user?.uid;
+      const mine: Row = { uid: uid ?? 'you', name: getBoard().name, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous };
+      const rows: Row[] = (league ?? []).filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
+      const isIn = joined();
+      if (isIn) rows.push({ ...mine, name: `You · ${mine.name}`, you: true });
+      else rows.push({ ...mine, name: "You'd be here", ghost: true });
+      rows.sort((a, b) => b.minutes - a.minutes || Number(!!b.you || !!b.ghost) - Number(!!a.you || !!a.ghost));
+      return { rows, me: rows.findIndex((r) => r.you || r.ghost) };
+    }
+
+    function avClass(name: string): string {
+      let h = 0;
+      for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return `board-row__av board-row__av--${h % 4}`;
+    }
+
+    function rowEl(r: Row, rank: number, extra?: HTMLElement): HTMLLIElement {
+      const li = el('li', `board-row${r.you ? ' board-row--you' : ''}${r.ghost ? ' board-row--ghost' : ''}`);
+      li.append(el('span', 'board-row__rank', r.ghost ? `${rank}?` : String(rank)));
+      const av = el('span', r.ghost ? 'board-row__av board-row__av--ghost' : avClass(r.name), r.ghost ? '' : r.name.replace('You · ', '').charAt(0).toUpperCase());
+      av.setAttribute('aria-hidden', 'true');
+      const name = el('span', 'board-row__name');
+      name.append(el('span', 'board-row__nick', r.name));
+      if (r.guest && !r.ghost) name.append(el('span', 'board-row__guest', 'guest'));
+      li.append(av, name, el('span', 'board-row__time', formatMinutes(r.minutes)));
+      if (extra) li.append(extra);
+      return li;
+    }
+
+    function renderAll(): void {
+      const tier = myTier();
+      $('[data-board-league]').textContent = leagueName(tier);
+      $('[data-board-week]').textContent = `${weekLabel()} · resets in ${resetsIn()}`;
+      const podium = $('[data-board-podium]');
+      const around = $('[data-board-around]');
+      const empty = $('[data-board-empty]');
+      $('[data-board-joincard]').hidden = joined() || league === null;
+      const user = getAccount().user;
+      $('[data-board-join-label]').textContent = user ? 'Join the board' : 'Join as a guest';
+      $('[data-board-signin]').hidden = !!user;
+      if (league === null) {
+        podium.replaceChildren();
+        around.replaceChildren();
+        $('[data-board-count]').textContent = '';
+        $('[data-board-around-head]').hidden = true;
+        empty.hidden = true;
+        return;
+      }
+      const { rows, me } = leagueRows();
+      const others = rows.length - 1;
+      $('[data-board-count]').textContent = others === 1 ? '1 other' : `${others} others`;
+      empty.hidden = others > 0;
+      empty.textContent = `Nobody else is in the ${leagueName(tier)} this week yet.${joined() ? '' : ' Be the first.'}`;
+
+      // The top three real rows, drawn second–first–third so the winner stands in the middle.
+      const onPodium = rows.flatMap((r, i) => (r.ghost ? [] : [i])).slice(0, 3);
+      podium.hidden = others === 0;
+      podium.replaceChildren(
+        ...onPodium.map((index, place) => {
+          const r = rows[index]!;
+          const li = el('li', `board-podium__p board-podium__p--${place + 1}${r.you ? ' board-row--you' : ''}`);
+          li.append(el('span', 'board-podium__rank', `#${index + 1}`));
+          const av = el('span', avClass(r.name), r.name.replace('You · ', '').charAt(0).toUpperCase());
+          av.setAttribute('aria-hidden', 'true');
+          li.append(av, el('span', 'board-podium__name', r.name), el('span', 'board-podium__time', formatMinutes(r.minutes)));
+          return li;
+        }),
+      );
+
+      // Up to two above and two below you, leaving out whoever is already on the podium.
+      const from = Math.max(0, Math.min(me - 2, rows.length - 5));
+      const near = rows
+        .slice(from, from + 5)
+        .map((r, k) => ({ r, index: from + k }))
+        .filter(({ index }) => !onPodium.includes(index));
+      $('[data-board-around-head]').hidden = near.length === 0;
+      around.replaceChildren(...near.map(({ r, index }) => rowEl(r, index + 1)));
+    }
+
+    function renderFriends(): void {
+      const isIn = joined();
+      $('[data-board-friends-on]').hidden = !isIn;
+      $('[data-board-friends-off]').hidden = isIn;
+      if (!isIn) return;
+      const settings = getBoard();
+      $('[data-board-code]').textContent = settings.code || '…';
+      const list = $('[data-board-friends]');
+      const uid = getAccount().user?.uid;
+      if (friends === null) {
+        list.replaceChildren();
+        $('[data-board-friends-count]').textContent = '';
+        return;
+      }
+      const sessions = getSessions();
+      const rows: Row[] = friends.filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
+      rows.push({ uid: uid!, name: `You · ${settings.name}`, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true });
+      rows.sort((a, b) => b.minutes - a.minutes);
+      list.replaceChildren(
+        ...rows.map((r, i) => {
+          if (r.you) return rowEl(r, i + 1);
+          const remove = el('button', 'board-row__remove');
+          remove.type = 'button';
+          remove.dataset.boardRemove = r.uid;
+          remove.setAttribute('aria-label', `Remove ${r.name} from your friends`);
+          remove.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>';
+          return rowEl(r, i + 1, remove);
+        }),
+      );
+      const n = settings.friends.length;
+      const quiet = n - (rows.length - 1);
+      $('[data-board-friends-count]').textContent =
+        n === 0 ? 'No friends yet. Share your code below.' : `This week · ${n} ${n === 1 ? 'friend' : 'friends'}${quiet > 0 ? ` · ${quiet} not on the board yet` : ''}`;
+    }
+
+    function render(): void {
+      root.querySelectorAll<HTMLButtonElement>('[data-board-tab]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.boardTab === tab)));
+      root.querySelectorAll<HTMLElement>('[data-board-view]').forEach((v) => (v.hidden = v.dataset.boardView !== tab));
+      $('[data-board-guest]').hidden = !(joined() && getAccount().user?.isAnonymous);
+      $('[data-board-note]').hidden = !joined();
+      renderAll();
+      renderFriends();
+    }
+
+    function status(text: string, retry = false): void {
+      $('[data-board-status]').textContent = text;
+      $('[data-board-retry]').hidden = !retry;
+    }
+
+    async function load(): Promise<void> {
+      if (loading) return;
+      loading = true;
+      status(league === null ? 'Loading the board…' : '');
+      try {
+        const tier = myTier();
+        const [rows, mine] = await Promise.all([loadLeague(tier), joined() ? loadFriends() : Promise.resolve(null)]);
+        league = rows;
+        leagueTier = tier;
+        friends = mine;
+        status('');
+      } catch (err) {
+        const code = (err as { code?: string })?.code;
+        status(code === 'permission-denied' ? "The board isn't switched on for this project yet." : `Couldn't load the board. ${friendlyError(err)}`, true);
+      } finally {
+        loading = false;
+        render();
+      }
+    }
+
+    /** Load the first time the Board tab is shown. */
+    const panel = root.closest<HTMLElement>('[data-grove-panel]');
+    const startIfShown = () => {
+      if (started || panel?.hidden) return;
+      started = true;
+      void load();
+    };
+    if (panel) {
+      const watch = new MutationObserver(startIfShown);
+      watch.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+      c.add(() => watch.disconnect());
+    }
+    render();
+    startIfShown();
+
+    c.add(
+      listen(root, 'click', (e) => {
+        const t = e.target as HTMLElement;
+        const tabBtn = t.closest<HTMLButtonElement>('[data-board-tab]');
+        if (tabBtn) {
+          tab = tabBtn.dataset.boardTab === 'friends' ? 'friends' : 'all';
+          render();
+          return;
+        }
+        if (t.closest('[data-board-retry]')) void load();
+        const rm = t.closest<HTMLButtonElement>('[data-board-remove]');
+        if (rm) {
+          const uid = rm.dataset.boardRemove!;
+          friends = (friends ?? []).filter((f) => f.uid !== uid);
+          render();
+          void removeFriend(uid).catch((err: unknown) => ($('[data-board-friend-msg]').textContent = friendlyError(err)));
+        }
+        if (t.closest('[data-board-share]')) void shareCode();
+      }),
+    );
+
+    async function shareCode(): Promise<void> {
+      const code = getBoard().code;
+      if (!code) return;
+      const text = `Grow with me on Grovyn. My friend code is ${code}.`;
+      const msg = $('[data-board-friend-msg]');
+      try {
+        if (navigator.share) await navigator.share({ text });
+        else {
+          await navigator.clipboard.writeText(code);
+          msg.textContent = 'Code copied.';
+        }
+      } catch {
+        /* closed the share sheet */
+      }
+    }
+
+    const addForm = $<HTMLFormElement>('[data-board-add]');
+    c.add(
+      listen(addForm, 'submit', (e) => {
+        e.preventDefault();
+        const input = addForm.querySelector<HTMLInputElement>('input')!;
+        const msg = $('[data-board-friend-msg]');
+        msg.textContent = 'Looking for that code…';
+        addFriend(input.value)
+          .then((problem) => {
+            msg.textContent = problem ?? 'Added. They show up here once they focus this week.';
+            if (!problem) {
+              input.value = '';
+              void load();
+            }
+          })
+          .catch((err: unknown) => (msg.textContent = friendlyError(err)));
+      }),
+    );
+
+    c.add(listen(document, 'board:changed', () => void load()));
+    // A finished session moves you on the board at once; a new stage means a new league.
+    c.add(subscribe('sessions', () => (started && myTier() !== leagueTier ? void load() : render())));
+    c.add(subscribe('board', render));
+    let lastUid: string | null | undefined;
+    c.add(
+      onAccountChange((s) => {
+        const uid = s.user?.uid ?? null;
+        if (uid === lastUid) return render();
+        lastUid = uid;
+        if (started) void load();
+        else render();
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .board {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .board[hidden],
+  .board [hidden] {
+    display: none !important;
+  }
+
+  .board__guest {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-focus) 40%, var(--color-border));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-focus) 14%, var(--color-surface-solid));
+    font-size: var(--text-xs);
+  }
+
+  .board__guest p {
+    flex: 1;
+    margin: 0;
+  }
+
+  .board__guest svg {
+    flex: none;
+    fill: none;
+    stroke: var(--color-focus);
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .board-seg {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    max-width: 28rem;
+  }
+
+  .board-seg button {
+    min-height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .board-seg button[aria-pressed='true'] {
+    background: var(--raised-grad);
+    color: var(--color-text);
+    box-shadow: inset 0 1px 0 var(--raised-hl);
+  }
+
+  .board__view {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 40rem;
+  }
+
+  .board__league {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow: inset 0 1px 0 var(--raised-hl);
+  }
+
+  .board__league svg {
+    flex: none;
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .board__league-text {
+    flex: 1;
+    display: grid;
+    font-size: var(--text-xs);
+  }
+
+  .board__league-text strong {
+    font-size: var(--text-base);
+  }
+
+  .board__count {
+    font-size: var(--text-xs);
+    text-align: right;
+  }
+
+  .board__podium {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: end;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  :global(.board-podium__p) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    min-width: 0;
+    padding: var(--space-3) var(--space-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow: inset 0 1px 0 var(--raised-hl);
+  }
+
+  :global(.board-podium__p--1) {
+    order: 2;
+    min-height: 150px;
+  }
+
+  :global(.board-podium__p--2) {
+    order: 1;
+    min-height: 132px;
+  }
+
+  :global(.board-podium__p--3) {
+    order: 3;
+    min-height: 120px;
+  }
+
+  :global(.board-podium__p .board-row__av) {
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+  }
+
+  :global(.board-podium__rank) {
+    color: var(--firefly);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+
+  :global(.board-podium__name) {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.board-podium__time) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .board__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
+    font-size: var(--text-xs);
+  }
+
+  .board__h {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .board__list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .board__empty,
+  .board__friends-count {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .board__join,
+  .board__invite {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-grad);
+    box-shadow: var(--shadow-card);
+  }
+
+  .board__invite {
+    border-style: dashed;
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-solid);
+    box-shadow: none;
+  }
+
+  .board__join-title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .board__join p,
+  .board__invite p {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .board__code-row,
+  .board__add-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .board__code {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border-radius: 10px;
+    background: var(--well-bg);
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    letter-spacing: 0.14em;
+  }
+
+  .board__add {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .board__add-label {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .board__add-row .input {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .board__msg,
+  .board__status {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .board__msg:empty,
+  .board__status:empty {
+    display: none;
+  }
+
+  .board__retry {
+    justify-self: start;
+  }
+
+  .board__note {
+    margin: 0;
+    font-size: var(--text-xs);
+  }
+
+  :global(.board-row__remove) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    margin-right: -8px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  :global(.board-row__remove svg) {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+</style>

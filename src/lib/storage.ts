@@ -33,10 +33,11 @@ export type StoreName =
   | 'profile' // first run: whether Welcome was seen, and which optional sections are on (src/lib/profile.ts)
   | 'coach' // Focus › Coach: your plan and what has helped you (src/lib/coach.ts)
   | 'screen' // phone time read in the Android app, per day and per focus session (src/lib/screen.ts); never synced
+  | 'board' // the weekly board: whether you joined, your nickname, friend code and friends (src/lib/board.ts)
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen', 'board'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
@@ -44,7 +45,7 @@ const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'ti
  * reads from Health Connect (`body`), the phone time it reads (`screen`) and the bank alerts it reads (`bank`; the expenses they add are in `health`). Each name must also be allowed in firestore.rules. `breakdown` stays listed only so
  * its removal (after moving into `tasks`) reaches the account too.
  */
-export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance'] as const;
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance', 'board'] as const;
 export type SyncedStore = (typeof SYNCED_STORES)[number];
 
 export function isSyncedStore(name: string): name is SyncedStore {

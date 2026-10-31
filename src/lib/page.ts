@@ -55,6 +55,8 @@ export function listen<K extends keyof WindowEventMap>(
   fn: (e: WindowEventMap[K]) => void,
   options?: AddEventListenerOptions,
 ): () => void;
+/** Any element, or an event of our own (`board:changed`). */
+export function listen(target: EventTarget, type: string, fn: (e: Event) => void, options?: AddEventListenerOptions): () => void;
 export function listen(target: EventTarget, type: string, fn: (e: Event) => void, options?: AddEventListenerOptions): () => void {
   target.addEventListener(type, fn, options);
   return () => target.removeEventListener(type, fn, options);

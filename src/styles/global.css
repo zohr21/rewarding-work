@@ -853,3 +853,96 @@ html:not([data-mod-budget]) [data-module='budget'],
 html:not([data-mod-screen]) [data-module='screen'] {
   display: none !important;
 }
+
+/* ---------- The weekly board's rows (BoardPanel, BoardJoin, You) ---------- */
+.board-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-solid);
+}
+
+/* You: the one row that glows, in the reward colour. */
+.board-row--you {
+  border-color: var(--firefly);
+  background: color-mix(in srgb, var(--firefly) 12%, var(--color-surface-solid));
+  box-shadow: 0 0 18px -6px var(--firefly);
+}
+
+.board-row--ghost {
+  border: 1.5px dashed var(--firefly);
+  background: transparent;
+  color: var(--firefly);
+}
+
+.board-row__rank {
+  flex: none;
+  width: 28px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.board-row--ghost .board-row__rank {
+  color: inherit;
+}
+
+.board-row__av {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.board-row__av--0 { background: var(--cat-structure-bg); color: var(--cat-structure); }
+.board-row__av--1 { background: var(--cat-visual-bg); color: var(--cat-visual); }
+.board-row__av--2 { background: var(--cat-time-bg); color: var(--cat-time); }
+.board-row__av--3 { background: var(--cat-reward-bg); color: var(--cat-reward); }
+
+.board-row__av--ghost {
+  border: 1.5px dashed currentColor;
+}
+
+.board-row__name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-weight: 500;
+}
+
+.board-row__nick {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-row__guest {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.board-row__league {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.board-row__time {
+  flex: none;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
