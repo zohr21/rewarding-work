@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import BudgetPlan from '../components/BudgetPlan.astro';
 import BudgetView from '../components/BudgetView.astro';
 import BankImport from '../components/BankImport.astro';
 import { NATIVE_APP } from '../config/app';
@@ -14,9 +15,11 @@ import { NATIVE_APP } from '../config/app';
     </header>
 
     {NATIVE_APP && <BankImport />}
-    <BudgetView />
+    <BudgetView>
+      <BudgetPlan />
+    </BudgetView>
     <p class="muted budget__note">
-      Your expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
+      Your income, goals, expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
       backup file yet.
     </p>
   </div>
