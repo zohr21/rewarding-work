@@ -393,14 +393,12 @@ const TABS = [
           focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
           focusLink.textContent = 'Focus';
           focusLink.setAttribute('aria-label', `Start a focus session on “${name}”`);
-          actions.append(
-            focusLink,
-            button('Done', () => {
-              finishTask(task.id);
-              celebrate();
-              announce(`Finished: ${name}`);
-            }),
-          );
+          const done = button('Done', () => {
+            celebrate(done); // before finishing: the list re-renders and the button goes away
+            finishTask(task.id);
+            announce(`Finished: ${name}`);
+          });
+          actions.append(focusLink, done);
         } else {
           actions.append(
             button('Reopen', () => {

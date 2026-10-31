@@ -254,11 +254,11 @@ const {
         announce(`Step added: ${text}`);
       });
 
-      $<HTMLButtonElement>('[data-bd-done]').addEventListener('click', () => {
+      $<HTMLButtonElement>('[data-bd-done]').addEventListener('click', (e) => {
         const task = getCurrentTask();
         if (!task) return;
+        celebrate(e.currentTarget as HTMLElement);
         finishTask(task.id);
-        celebrate();
         announce('Task finished and logged in your Done list.');
         reopen.focus();
       });

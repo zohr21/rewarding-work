@@ -1,0 +1,150 @@
+---
+/**
+ * When you finish a task, a few firefly sparks fly from the Done button to the Grove link
+ * (the app's bottom bar, or the site header) and the link pulses once: what you finished
+ * goes into your grove. Started by `celebrate(element)` (src/lib/appearance.ts).
+ *
+ * - No Grove link on screen (header scrolled away, folded nav): the sparks rise and fade
+ *   where you tapped.
+ * - Motion off / prefers-reduced-motion: no sparks, the link only pulses.
+ *
+ * transition:persist keeps the layer across client-side navigations.
+ */
+---
+
+<div class="grove-spark" aria-hidden="true" data-grove-spark transition:persist="grove-spark"></div>
+
+<script>
+  import { onCelebrate } from '../lib/appearance';
+
+  const layer = document.querySelector<HTMLElement>('[data-grove-spark]');
+
+  if (layer) {
+    const root = document.documentElement;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const motionOn = () => root.dataset.motion !== 'off' && !reduced.matches;
+    const SPARKS = 7;
+    const FLIGHT_MS = 900;
+
+    /** The Grove link in the main navigation, if it's visible right now. */
+    function groveLink(): HTMLElement | null {
+      const links = document.querySelectorAll<HTMLElement>('.app-nav a[href*="/progress"], .site-nav a[href*="/progress"]');
+      for (const a of links) {
+        const r = a.getBoundingClientRect();
+        if (r.width && r.height && r.bottom > 0 && r.top < window.innerHeight && getComputedStyle(a).visibility !== 'hidden') return a;
+      }
+      return null;
+    }
+
+    function pulse(link: HTMLElement): void {
+      link.classList.remove('grove-pulse');
+      void link.offsetWidth; // restart the animation if it's still running
+      link.classList.add('grove-pulse');
+      link.addEventListener('animationend', () => link.classList.remove('grove-pulse'), { once: true });
+    }
+
+    function spark(i: number): HTMLElement {
+      const s = document.createElement('span');
+      s.className = i === 0 ? 'grove-spark__dot grove-spark__dot--lead' : 'grove-spark__dot';
+      layer!.append(s);
+      return s;
+    }
+
+    onCelebrate(({ from }) => {
+      if (!from) return;
+      const target = groveLink();
+      if (!motionOn()) {
+        if (target) pulse(target);
+        return;
+      }
+      const x0 = from.left + from.width / 2;
+      const y0 = from.top + from.height / 2;
+
+      if (!target) {
+        // Nowhere to fly to: a small burst that rises and fades.
+        for (let i = 0; i < SPARKS; i++) {
+          const a = (i / SPARKS) * Math.PI * 2;
+          const dx = Math.cos(a) * 28;
+          const dy = Math.sin(a) * 18 - 36;
+          const s = spark(i);
+          s.animate(
+            [
+              { transform: `translate(${x0}px, ${y0}px) scale(0.5)`, opacity: 1 },
+              { transform: `translate(${x0 + dx}px, ${y0 + dy}px) scale(0.2)`, opacity: 0 },
+            ],
+            { duration: 700, easing: 'cubic-bezier(.2,.7,.3,1)' },
+          ).onfinish = () => s.remove();
+        }
+        return;
+      }
+
+      const t = target.getBoundingClientRect();
+      const x1 = t.left + t.width / 2;
+      const y1 = t.top + t.height / 2;
+      // Arc over the straight line, bending towards the middle of the screen so it never hugs an edge.
+      const mid = (x0 + x1) / 2;
+      const mx = mid + (window.innerWidth / 2 >= mid ? 70 : -70);
+      const my = Math.min(y0, y1) - 70;
+      for (let i = 0; i < SPARKS; i++) {
+        const s = spark(i);
+        s.animate(
+          [
+            { transform: `translate(${x0}px, ${y0}px) scale(0.4)`, opacity: 1 },
+            { transform: `translate(${mx + i * 4}px, ${my + i * 3}px) scale(1)`, opacity: 1, offset: 0.55 },
+            { transform: `translate(${x1}px, ${y1}px) scale(0.3)`, opacity: i ? 0 : 0.4 },
+          ],
+          { duration: FLIGHT_MS, delay: i * 40, easing: 'cubic-bezier(.45,0,.25,1)' },
+        ).onfinish = () => s.remove();
+      }
+      window.setTimeout(() => pulse(target), FLIGHT_MS);
+    });
+  }
+</script>
+
+<style>
+  .grove-spark {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .grove-spark :global(.grove-spark__dot) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    background: var(--firefly);
+    box-shadow:
+      0 0 calc(8px * var(--glow-strength)) calc(2px * var(--glow-strength)) var(--firefly),
+      0 0 calc(18px * var(--glow-strength)) calc(5px * var(--glow-strength)) color-mix(in srgb, var(--firefly) 35%, transparent);
+    will-change: transform, opacity;
+  }
+
+  .grove-spark :global(.grove-spark__dot--lead) {
+    width: 13px;
+    height: 13px;
+    margin: -6.5px 0 0 -6.5px;
+  }
+
+  :global(.grove-pulse) {
+    animation: grove-pulse 650ms var(--ease-out);
+  }
+
+  @keyframes grove-pulse {
+    35% {
+      transform: scale(1.12);
+      filter: drop-shadow(0 0 calc(10px * var(--glow-strength)) var(--firefly));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.grove-pulse) {
+      animation-duration: 1ms;
+    }
+  }
+</style>
