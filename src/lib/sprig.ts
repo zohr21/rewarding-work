@@ -13,6 +13,19 @@ import type { FocusSession } from './storage';
 export const SPRIG_MOODS = ['happy', 'cheer', 'focus', 'curious', 'gentle', 'sleepy'] as const;
 export type SprigMood = (typeof SPRIG_MOODS)[number];
 
+/**
+ * The real tree Sprig is at each stage in 3D (public/sprig/sprig-<stage>.glb, made by
+ * art/sprig/sprig3d.py): common trees first, rarer ones as focus grows.
+ */
+export const SPRIG_TREES = [
+  'An acorn, just sprouting',
+  'An oak seedling',
+  'A field maple, leaves gone bronze',
+  'A silver birch',
+  'A ginkgo, the living fossil, in gold',
+  'A Persian ironwood, from the Hyrcanian forests',
+] as const;
+
 export interface SprigOptions {
   /** 0 (seed) to 5 (Grove). */
   stage: number;
