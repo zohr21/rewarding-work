@@ -1,0 +1,332 @@
+---
+/**
+ * The health garden at the top of /health: one plant per area you have numbers for.
+ *
+ * - A plant is as tall as you are close to that area's goal, and flowers once you reach it.
+ * - It fades when its numbers are stale (nothing new for two days), so a glance shows what
+ *   needs logging, not only what's going well.
+ * - Plants appear only for areas with data: sleep, steps and active minutes come from Health
+ *   Connect in the Android app (the `body` store HealthBody.astro keeps), screen time from
+ *   usage access (src/lib/screen.ts), budget from the Budget page once a month budget is set.
+ *   Focus is always there.
+ * - Dark theme: plants glow (--glow, scaled by --glow-strength and freshness). Light: no glow.
+ */
+---
+
+<section class="card garden" aria-labelledby="garden-heading" data-garden hidden>
+  <div class="garden__head">
+    <h2 id="garden-heading" class="panel-title">Your garden today</h2>
+    <span class="muted garden__hint" data-garden-hint></span>
+  </div>
+  <svg class="garden__bed" data-garden-bed role="img" preserveAspectRatio="xMidYMax meet"></svg>
+  <ul class="garden__list" role="list" data-garden-list></ul>
+</section>
+
+<script>
+  import { getBudget, monthBudget, monthOf, monthSpend, paceLine, formatMoney } from '../lib/budget';
+  import { getScreen } from '../lib/screen';
+  import { getSessions, read, subscribe } from '../lib/storage';
+  import { minutesByDay } from '../lib/stats';
+  import { formatFocus } from '../lib/tasks';
+  import { dayKey, fromDayKey } from '../lib/dates';
+  import type { BodyDay } from '../lib/device';
+  import { cleanups, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  interface Plant {
+    id: string;
+    label: string;
+    value: string;
+    goal: string;
+    /** 0..1: how close to the goal. */
+    share: number;
+    /** 0..1: 1 when the numbers are current, lower as they go stale. */
+    fresh: number;
+  }
+
+  const DAY = 86_400_000;
+  const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30, focusMin: 120 };
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const W = 320;
+  const H = 170;
+  const GROUND = 140;
+  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  /** Full today or yesterday, fading over the next days. */
+  const freshness = (ageDays: number) => (ageDays <= 1 ? 1 : ageDays <= 2 ? 0.6 : 0.3);
+  const ageInDays = (day: string, today: string) => Math.round((fromDayKey(today).getTime() - fromDayKey(day).getTime()) / DAY);
+
+  function bodyPlants(today: string): Plant[] {
+    const days = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+    if (!days.length) return [];
+    const plants: Plant[] = [];
+    const latest = (field: keyof BodyDay) => [...days].reverse().find((d) => typeof d[field] === 'number');
+
+    const sleep = latest('sleepMin');
+    if (sleep?.sleepMin !== undefined) {
+      plants.push({ id: 'sleep', label: 'Sleep', value: hm(sleep.sleepMin), goal: 'goal 8h', share: sleep.sleepMin / GOALS.sleepMin, fresh: freshness(ageInDays(sleep.day, today)) });
+    }
+    const steps = latest('steps');
+    if (steps?.steps !== undefined) {
+      const isToday = steps.day === today;
+      plants.push({
+        id: 'steps',
+        label: 'Steps',
+        value: (isToday ? steps.steps : 0).toLocaleString(),
+        goal: `goal ${GOALS.steps.toLocaleString()}`,
+        share: isToday ? steps.steps / GOALS.steps : 0,
+        fresh: freshness(ageInDays(steps.day, today)),
+      });
+    }
+    const active = latest('activeMin');
+    if (active?.activeMin !== undefined) {
+      const isToday = active.day === today;
+      plants.push({
+        id: 'active',
+        label: 'Active',
+        value: `${isToday ? active.activeMin : 0} min`,
+        goal: `goal ${GOALS.activeMin} min`,
+        share: isToday ? active.activeMin / GOALS.activeMin : 0,
+        fresh: freshness(ageInDays(active.day, today)),
+      });
+    }
+    return plants;
+  }
+
+  function focusPlant(today: string): Plant {
+    const min = Math.round(minutesByDay(getSessions()).get(today) ?? 0);
+    const last = getSessions().reduce((m, s) => Math.max(m, s.end), 0);
+    return {
+      id: 'focus',
+      label: 'Focus',
+      value: min ? formatFocus(min * 60) : '0 min',
+      goal: 'goal 2h',
+      share: min / GOALS.focusMin,
+      fresh: last ? freshness(Math.floor((Date.now() - last) / DAY)) : 0.3,
+    };
+  }
+
+  /** On pace or under it is a full plant; over the pace line it shrinks. */
+  function budgetPlant(today: string): Plant | null {
+    const store = getBudget();
+    const budget = monthBudget(store);
+    if (!budget) return null;
+    const month = monthOf(today);
+    const dayOfMonth = fromDayKey(today).getDate();
+    const spent = monthSpend(store.entries, month, dayOfMonth).total;
+    const pace = paceLine(store.repeats, month, budget).line[dayOfMonth - 1] ?? budget;
+    const lastAdded = store.entries.reduce((m, e) => Math.max(m, e.createdAt), 0);
+    const left = budget - spent;
+    return {
+      id: 'budget',
+      label: 'Budget',
+      value: `${formatMoney(Math.round(Math.abs(left)), store.currency, 0)} ${left >= 0 ? 'left' : 'over'}`,
+      goal: spent <= pace ? 'on pace' : 'over pace',
+      share: spent <= pace ? 1 : clamp01(pace / spent),
+      fresh: lastAdded ? freshness(Math.floor((Date.now() - lastAdded) / DAY)) : 0.3,
+    };
+  }
+
+  /** Yesterday against your usual day: at or under the 7-day average is a full plant. */
+  function screenPlant(today: string): Plant | null {
+    const days = getScreen().days.filter((d) => d.day < today);
+    const yesterday = days[days.length - 1];
+    if (!yesterday || days.length < 2) return null;
+    const week = days.slice(-8, -1);
+    const usual = week.reduce((a, d) => a + d.totalMin, 0) / week.length;
+    return {
+      id: 'screen',
+      label: 'Screen',
+      value: hm(yesterday.totalMin),
+      goal: usual ? `usual ${hm(usual)}` : 'yesterday',
+      share: yesterday.totalMin <= usual ? 1 : clamp01(usual / yesterday.totalMin),
+      fresh: freshness(ageInDays(yesterday.day, today) - 1),
+    };
+  }
+
+  function svg<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] {
+    const node = document.createElementNS(SVG_NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+    return node;
+  }
+
+  function drawPlant(p: Plant, x: number, i: number): SVGGElement {
+    const share = clamp01(p.share);
+    const h = 22 + 96 * share;
+    const top = GROUND - h;
+    const bend = (i % 2 ? 1 : -1) * 7;
+    const g = svg('g', { class: 'garden__plant' });
+    g.style.setProperty('--fresh', String(p.fresh));
+    g.style.setProperty('--sway', `${4 + (i % 3) * 0.8}s`);
+    g.append(svg('path', { class: 'garden__stem', d: `M${x} ${GROUND} Q${x + bend} ${GROUND - h / 2} ${x} ${top}` }));
+    for (let y = GROUND - 18, j = 0; y > top + 8; y -= 17, j++) {
+      const side = j % 2 ? 1 : -1;
+      const s = 1 - (GROUND - y) / (h * 1.7);
+      const cx = x + side * 9 * s;
+      g.append(svg('ellipse', { class: 'garden__leaf', cx, cy: y, rx: 9 * s, ry: 4 * s, transform: `rotate(${side * -28} ${cx} ${y})` }));
+    }
+    g.append(share >= 1 ? svg('circle', { class: 'garden__bud', cx: x, cy: top - 4, r: 6 }) : svg('ellipse', { class: 'garden__leaf', cx: x, cy: top - 3, rx: 3.5, ry: 6 }));
+    return g;
+  }
+
+  onPage('health-garden', () => {
+    const root = document.querySelector<HTMLElement>('[data-garden]');
+    if (!root) return;
+    const bed = root.querySelector<SVGSVGElement>('[data-garden-bed]')!;
+    const list = root.querySelector<HTMLElement>('[data-garden-list]')!;
+    const hint = root.querySelector<HTMLElement>('[data-garden-hint]')!;
+    const c = cleanups();
+
+    function render(): void {
+      const today = dayKey(new Date());
+      const plants = [...bodyPlants(today), focusPlant(today), budgetPlant(today), screenPlant(today)].filter((p): p is Plant => !!p);
+      root!.hidden = plants.length < 2; // focus alone isn't a garden yet
+
+      const gap = W / plants.length;
+      bed.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      bed.replaceChildren(svg('rect', { class: 'garden__soil', x: 4, y: GROUND, width: W - 8, height: 22, rx: 10 }));
+      plants.forEach((p, i) => {
+        const x = gap * (i + 0.5);
+        bed.append(drawPlant(p, x, i));
+        const label = svg('text', { class: 'garden__label', x, y: GROUND + 15 });
+        label.textContent = p.label.toUpperCase();
+        bed.append(label);
+      });
+      bed.setAttribute('aria-label', plants.map((p) => `${p.label}: ${p.value}, ${p.goal}${p.fresh < 1 ? ', not updated lately' : ''}`).join('; '));
+
+      list.replaceChildren(
+        ...plants.map((p) => {
+          const li = el('li', p.fresh < 1 ? 'garden__item is-stale' : 'garden__item');
+          li.append(el('span', 'garden__name', p.label), el('strong', 'garden__value', p.value), el('span', 'muted garden__goal', p.goal));
+          return li;
+        }),
+      );
+      const stale = plants.filter((p) => p.fresh < 1).map((p) => p.label.toLowerCase());
+      hint.textContent = stale.length ? `Faded: ${stale.join(', ')} needs an update` : 'All up to date';
+    }
+
+    render();
+    for (const name of ['body', 'sessions', 'health', 'screen'] as const) c.add(subscribe(name, render));
+    // Day rollover and "how long ago" both move with the clock.
+    const tick = window.setInterval(render, 5 * 60_000);
+    c.add(() => window.clearInterval(tick));
+    return c.run;
+  });
+</script>
+
+<style>
+  .garden {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .garden__head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .garden__hint {
+    font-size: var(--text-sm);
+  }
+
+  .garden__bed {
+    width: 100%;
+    max-height: 220px;
+    overflow: visible;
+  }
+
+  .garden__bed :global(.garden__soil) {
+    fill: var(--well-bg);
+  }
+
+  .garden__bed :global(.garden__label) {
+    fill: var(--color-text-muted);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-anchor: middle;
+  }
+
+  .garden__bed :global(.garden__plant) {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    opacity: calc(0.3 + 0.7 * var(--fresh, 1));
+    filter: drop-shadow(0 0 calc(6px * var(--glow-strength) * var(--fresh, 1)) var(--glow-soft));
+    animation: garden-sway var(--sway, 5s) ease-in-out infinite alternate;
+  }
+
+  .garden__bed :global(.garden__stem) {
+    fill: none;
+    stroke: var(--glow);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+  }
+
+  .garden__bed :global(.garden__leaf) {
+    fill: var(--glow);
+  }
+
+  .garden__bed :global(.garden__bud) {
+    fill: var(--firefly);
+  }
+
+  @keyframes garden-sway {
+    from {
+      transform: rotate(-2deg);
+    }
+    to {
+      transform: rotate(2deg);
+    }
+  }
+
+  :global(html[data-motion='off']) .garden__bed :global(.garden__plant) {
+    animation: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .garden__bed :global(.garden__plant) {
+      animation: none;
+    }
+  }
+
+  .garden__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .garden__list :global(.garden__item) {
+    display: grid;
+    gap: 2px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .garden__list :global(.garden__item.is-stale .garden__value) {
+    opacity: 0.6;
+  }
+
+  .garden__list :global(.garden__name) {
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+
+  .garden__list :global(.garden__value) {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .garden__list :global(.garden__goal) {
+    font-size: var(--text-xs);
+  }
+</style>
