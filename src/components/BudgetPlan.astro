@@ -1,0 +1,1241 @@
+---
+/**
+ * The plan above the expenses: income split into needs, wants and savings (50/30/20 by
+ * default), savings paid first, and one number from it all, what is safe to spend today.
+ * Income, goals, the plan and a calendar of the month open in sheets (Sheet.astro) instead of
+ * pages. It follows the month shown in BudgetView (the `budget:month` event); the data is in
+ * src/lib/budget.ts.
+ */
+import Sheet from './Sheet.astro';
+import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_LABELS, INCOME_SOURCES, SOURCE_LABELS, SPLITS, WHAT_MAX } from '../lib/budget';
+
+const TAGS = [
+  ['need', 'Need'],
+  ['want', 'Want'],
+  ['mixed', 'Mixed'],
+] as const;
+---
+
+<section class="card bp" data-bplan aria-labelledby="bp-label">
+  <div class="bp__empty" data-bp-empty>
+    <h2 class="panel-title" id="bp-label-empty">Plan the month</h2>
+    <p class="muted">
+      Add what comes in. It is split into needs, wants and savings, and the savings are put aside first. Then you get one number: what is safe to
+      spend today.
+    </p>
+    <button type="button" class="btn" data-sheet-open="income">Add income</button>
+  </div>
+
+  <div class="bp__main" data-bp-main hidden>
+    <div class="bp__hero">
+      <p class="bp__label" id="bp-label" data-bp-label></p>
+      <p class="bp__big" data-bp-big></p>
+      <p class="muted bp__line" data-bp-line></p>
+      <p class="bp__saved" data-bp-saved></p>
+    </div>
+    <ul class="bp__bars" role="list" data-bp-bars></ul>
+    <p class="bp__unsorted" data-bp-unsorted hidden></p>
+    <div class="bp__actions">
+      <button type="button" class="btn" data-bp-expense>Add expense</button>
+      <button type="button" class="btn btn--ghost" data-sheet-open="income">Income</button>
+    </div>
+    <div class="bp__tiles">
+      <button type="button" class="bp__tile" data-sheet-open="goals"><span class="muted">Goals</span><strong data-bp-goals></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="plan"><span class="muted">Plan</span><strong data-bp-split></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="budget-cal"><span class="muted">No-spend days</span><strong data-bp-nospend></strong></button>
+    </div>
+  </div>
+</section>
+
+<Sheet id="income" title="Income">
+  <form class="bp-form" data-bp-i-form>
+    <label class="bp-amount">
+      <span class="visually-hidden">Amount</span>
+      <span class="bp-amount__sign" data-bp-sign aria-hidden="true"></span>
+      <input type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bp-i-amount />
+    </label>
+    <fieldset class="bp-seg">
+      <legend class="visually-hidden">Source</legend>
+      {
+        INCOME_SOURCES.map((s, i) => (
+          <label class="bp-seg__opt">
+            <input type="radio" name="bp-i-source" value={s} class="visually-hidden" checked={i === 0} />
+            {SOURCE_LABELS[s]}
+          </label>
+        ))
+      }
+    </fieldset>
+    <div class="bp-pair">
+      <label class="bp-field">
+        <span>What <span class="muted">(optional)</span></span>
+        <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. October salary" data-bp-i-what />
+      </label>
+      <label class="bp-field">
+        <span>Date</span>
+        <input class="input" type="date" required data-bp-i-day />
+      </label>
+    </div>
+    <label class="bp-check"><input type="checkbox" data-bp-i-repeat /><span>Comes every month on this day</span></label>
+    <label class="bp-check"><input type="checkbox" checked data-bp-i-save /><span data-bp-i-save-label></span></label>
+    <button type="submit" class="btn bp-form__save">Save income</button>
+  </form>
+  <h3 class="bp-sub" data-bp-i-list-title></h3>
+  <ul class="bp-list" role="list" data-bp-i-list></ul>
+  <h3 class="bp-sub" data-bp-ir-title hidden>Every month</h3>
+  <ul class="bp-list" role="list" data-bp-ir-list></ul>
+</Sheet>
+
+<Sheet id="goals" title="Savings goals">
+  <p class="muted bp-intro" data-bp-g-intro></p>
+  <ul class="bp-goals" role="list" data-bp-g-list></ul>
+  <button type="button" class="btn btn--ghost bp-suggest" data-bp-g-suggest hidden></button>
+  <form class="bp-form bp-goal-form" data-bp-g-form hidden>
+    <h3 class="bp-sub" data-bp-g-form-title>New goal</h3>
+    <label class="bp-field">
+      <span>Name</span>
+      <input class="input" type="text" maxlength={WHAT_MAX} required autocomplete="off" placeholder="e.g. Laptop" data-bp-g-name />
+    </label>
+    <div class="bp-pair">
+      <label class="bp-field">
+        <span>Target</span>
+        <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-g-target />
+      </label>
+      <label class="bp-field">
+        <span>Each month</span>
+        <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bp-g-monthly />
+      </label>
+    </div>
+    <label class="bp-field">
+      <span>By <span class="muted">(optional)</span></span>
+      <input class="input" type="month" data-bp-g-by />
+    </label>
+    <div class="bp-row">
+      <button type="button" class="btn btn--ghost" data-bp-g-delete hidden>Delete</button>
+      <button type="button" class="btn btn--ghost" data-bp-g-cancel>Cancel</button>
+      <button type="submit" class="btn">Save goal</button>
+    </div>
+  </form>
+  <button type="button" class="btn bp-form__save" data-bp-g-new>New goal</button>
+  <form class="bp-form bp-put" data-bp-s-form>
+    <h3 class="bp-sub">Put money aside</h3>
+    <div class="bp-pair">
+      <label class="bp-field">
+        <span>For</span>
+        <select class="input" data-bp-s-goal></select>
+      </label>
+      <label class="bp-field">
+        <span>Amount</span>
+        <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-s-amount />
+      </label>
+    </div>
+    <button type="submit" class="btn btn--ghost">Put aside</button>
+  </form>
+</Sheet>
+
+<Sheet id="plan" title="Your plan">
+  <p class="muted bp-intro">How income is split. Savings come off first, when the income comes in.</p>
+  <fieldset class="bp-splits">
+    <legend class="bp-sub">Needs · wants · savings</legend>
+    {
+      SPLITS.map((s) => (
+        <label class="bp-seg__opt bp-split">
+          <input type="radio" name="bp-split" value={s.join('/')} class="visually-hidden" />
+          <strong>{s.join('/')}</strong>
+          <span class="muted" data-bp-split-amounts={s.join('/')} />
+        </label>
+      ))
+    }
+  </fieldset>
+  <h3 class="bp-sub">Each category counts as</h3>
+  <p class="muted bp-intro">Mixed asks each time, like food: groceries are a need, eating out is a want. One expense can always differ.</p>
+  <ul class="bp-tags" role="list">
+    {
+      CATEGORIES.map((c) => (
+        <li class="bp-tags__row">
+          <span class="bp-tags__name">
+            <i style={`background: ${CATEGORY_COLORS[c]}`} aria-hidden="true" />
+            {CATEGORY_LABELS[c]}
+          </span>
+          <fieldset class="bp-seg bp-seg--small">
+            <legend class="visually-hidden">{CATEGORY_LABELS[c]} counts as</legend>
+            {TAGS.map(([value, label]) => (
+              <label class="bp-seg__opt">
+                <input type="radio" name={`bp-tag-${c}`} value={value} class="visually-hidden" data-bp-tag={c} />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+        </li>
+      ))
+    }
+  </ul>
+</Sheet>
+
+<Sheet id="budget-cal" labelledby="bp-cal-title">
+  <h2 class="sheet__title bp-cal__title" id="bp-cal-title" data-bp-cal-title></h2>
+  <div class="bp-cal__week" aria-hidden="true" data-bp-cal-week></div>
+  <div class="bp-cal__grid" data-bp-cal-grid></div>
+  <ul class="bp-cal__key muted" role="list" data-bp-cal-key></ul>
+  <div class="bp-cal__day" aria-live="polite" data-bp-cal-day></div>
+  <div class="bp-cal__stats" data-bp-cal-stats></div>
+</Sheet>
+
+<p class="visually-hidden" aria-live="polite" data-bp-live></p>
+
+<script>
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { subscribe } from '../lib/storage';
+  import {
+    addIncome,
+    addSave,
+    CATEGORY_SHORT,
+    categoryTag,
+    currencySign,
+    daysInMonth,
+    formatMoney,
+    getBudget,
+    monthOf,
+    monthPlan,
+    needOf,
+    removeGoal,
+    removeIncome,
+    removeIncomeRepeat,
+    repeatDay,
+    saveGoal,
+    savedFor,
+    setPlan,
+    shiftMonth,
+    SOURCE_LABELS,
+    type Category,
+    type CategoryTag,
+    type Goal,
+    type IncomeSource,
+    type MonthKey,
+    type Split,
+  } from '../lib/budget';
+  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { el } from '../lib/dom';
+  import { offerUndo } from '../lib/undo';
+
+  const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
+  const monthLong = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const CROSS =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
+  onPage('budget-plan', () => {
+    const found = document.querySelector<HTMLElement>('[data-bplan]');
+    if (!found) return;
+    const card = found;
+    const c = cleanups();
+    const $ = <E extends Element = HTMLElement>(s: string) => document.querySelector<E>(s)!;
+    const $$ = <E extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<E>(s)];
+    const today = () => dayKey(new Date());
+    let month: MonthKey = monthOf(today());
+    /** The day picked in the calendar. */
+    let picked: string | null = null;
+    /** Removals still offered for Undo. */
+    const removing = new Set<string>();
+
+    const setText = (sel: string, text: string) => ($(sel).textContent = text);
+    const announce = (text: string) => {
+      const live = $('[data-bp-live]');
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    };
+    const store = () => {
+      const s = getBudget();
+      return {
+        ...s,
+        incomes: s.incomes.filter((i) => !removing.has(i.id)),
+        incomeRepeats: s.incomeRepeats.filter((r) => !removing.has(r.id)),
+        goals: s.goals.filter((g) => !removing.has(g.id)),
+      };
+    };
+    const whole = (n: number, sign: string) => formatMoney(Math.round(n), sign, 0);
+    const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
+
+    function iconButton(label: string, onClick: () => void): HTMLButtonElement {
+      const b = el('button', 'icon-btn');
+      b.type = 'button';
+      b.setAttribute('aria-label', label);
+      b.innerHTML = CROSS;
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    /** Days with nothing spent (bills left out) up to today, and the longest run of them. */
+    function noSpend(byDay: number[], upto: number): { days: number; best: number } {
+      let days = 0;
+      let run = 0;
+      let best = 0;
+      for (let i = 0; i < upto; i++) {
+        if (byDay[i] === 0) {
+          days++;
+          best = Math.max(best, ++run);
+        } else run = 0;
+      }
+      return { days, best };
+    }
+
+    // ---- The card ----
+    function render(): void {
+      const s = store();
+      const sign = s.currency;
+      const p = monthPlan(s, month, today());
+      const current = month === monthOf(today());
+      const name = monthName.format(fromDayKey(`${month}-01`));
+      const planned = p.income > 0;
+      card.querySelector<HTMLElement>('[data-bp-empty]')!.hidden = planned;
+      card.querySelector<HTMLElement>('[data-bp-main]')!.hidden = !planned;
+      document.querySelector('[data-budget]')?.toggleAttribute('data-planned', planned);
+      setText('#bp-label-empty', current ? 'Plan the month' : `Nothing came in for ${name}`);
+
+      if (planned) {
+        const keep = Math.max(p.saved, p.planned.savings);
+        if (current) {
+          const over = p.leftToday < 0;
+          setText('[data-bp-label]', over ? 'Over for today' : `Safe to spend today · ${formatDay(fromDayKey(today()))}`);
+          setText('[data-bp-big]', whole(Math.abs(over ? p.leftToday : Math.max(0, p.leftToday)), sign));
+          $('[data-bp-big]').classList.toggle('is-over', over || p.free < 0);
+          const bills = p.billsLater ? `, after ${whole(p.billsLater, sign)} of bills still to come` : '';
+          setText(
+            '[data-bp-line]',
+            p.free > 0
+              ? `${whole(p.free - p.spentToday, sign)} left for ${plural(p.daysLeft, 'day')}${bills}`
+              : `${whole(-p.free, sign)} over the plan for ${name}${bills}`,
+          );
+        } else {
+          const left = p.income - keep - p.spent;
+          setText('[data-bp-label]', left >= 0 ? `Left from ${name}` : `Over in ${name}`);
+          setText('[data-bp-big]', whole(Math.abs(left), sign));
+          $('[data-bp-big]').classList.toggle('is-over', left < 0);
+          setText('[data-bp-line]', `${whole(p.income, sign)} came in, ${whole(p.spent, sign)} spent`);
+        }
+        setText(
+          '[data-bp-saved]',
+          p.saved
+            ? `${whole(p.saved, sign)} put in savings${p.saved < p.planned.savings ? `, ${whole(p.planned.savings - p.saved, sign)} still to put aside` : ''}`
+            : `${whole(p.planned.savings, sign)} to put in savings, kept out of what is safe to spend`,
+        );
+        const [n, w, sv] = s.plan.split;
+        const bars = [
+          { label: 'Needs', got: p.needs, of: p.planned.needs, pct: n, color: 'var(--cat-visual)' },
+          { label: 'Wants', got: p.wants, of: p.planned.wants, pct: w, color: 'var(--cat-reward)' },
+          { label: 'Savings', got: p.saved, of: p.planned.savings, pct: sv, color: 'var(--cat-structure)' },
+        ];
+        $('[data-bp-bars]').replaceChildren(
+          ...bars.map((b) => {
+            const li = el('li', 'bp__bar');
+            const head = el('span', 'bp__bar-head');
+            const over = b.label !== 'Savings' && b.got > b.of;
+            head.append(el('strong', '', b.label), el('span', over ? 'bp__over' : 'muted', `${whole(b.got, sign)} of ${whole(b.of, sign)} · ${b.pct}%`));
+            const track = el('span', 'bp__track');
+            const fill = el('i');
+            fill.style.width = `${b.of ? Math.min(100, (b.got / b.of) * 100) : 0}%`;
+            fill.style.background = over ? 'var(--color-danger)' : b.color;
+            track.append(fill);
+            li.append(head, track);
+            return li;
+          }),
+        );
+        const unsorted = $('[data-bp-unsorted]');
+        unsorted.hidden = !p.unsorted;
+        unsorted.textContent = `${whole(p.unsorted, sign)} not sorted into need or want yet: tap “Need or want?” on those expenses.`;
+        const goals = s.goals.filter((g) => g.deletedAt === undefined);
+        setText('[data-bp-goals]', goals.length ? `${goals.length} · ${whole(savedFor(s.saves, '') + goals.reduce((a, g) => a + savedFor(s.saves, g.id), 0), sign)}` : 'Add one');
+        setText('[data-bp-split]', s.plan.split.join('/'));
+        const upto = current ? Number(today().slice(8)) : daysInMonth(month);
+        const ns = noSpend(p.byDay, upto);
+        setText('[data-bp-nospend]', `${ns.days}${ns.best > 1 ? ` · best run ${ns.best}` : ''}`);
+      }
+      renderIncome();
+      renderGoals();
+      renderPlan();
+      renderCalendar();
+    }
+
+    // ---- Income ----
+    const iForm = $<HTMLFormElement>('[data-bp-i-form]');
+    const iAmount = $<HTMLInputElement>('[data-bp-i-amount]');
+    const iDay = $<HTMLInputElement>('[data-bp-i-day]');
+
+    function renderIncome(): void {
+      const s = store();
+      const sign = s.currency;
+      setText('[data-bp-sign]', currencySign(sign));
+      setText('[data-bp-i-save-label]', `Put ${s.plan.split[2]}% into savings first${s.goals.length ? ', shared over your goals' : ''}`);
+      const name = monthName.format(fromDayKey(`${month}-01`));
+      const mine = s.incomes.filter((i) => monthOf(i.day) === month);
+      setText('[data-bp-i-list-title]', mine.length ? `In ${name}` : `Nothing in ${name} yet`);
+      $('[data-bp-i-list]').replaceChildren(
+        ...mine.map((i) => {
+          const li = el('li', 'bp-list__row');
+          const main = el('span', 'bp-list__main');
+          main.append(el('strong', '', i.what), el('span', 'muted', [formatDay(fromDayKey(i.day)), SOURCE_LABELS[i.source], i.repeatId ? 'monthly' : ''].filter(Boolean).join(' · ')));
+          li.append(
+            main,
+            el('span', 'bp-list__amount', `+${formatMoney(i.amount, sign)}`),
+            iconButton(`Delete ${i.what}`, () => {
+              removing.add(i.id);
+              render();
+              offerUndo({
+                message: `Deleted “${i.what}”`,
+                commit: () => {
+                  removing.delete(i.id);
+                  removeIncome(i.id);
+                },
+                undo: () => {
+                  removing.delete(i.id);
+                  render();
+                },
+              });
+            }),
+          );
+          return li;
+        }),
+      );
+      const repeats = s.incomeRepeats;
+      $('[data-bp-ir-title]').hidden = !repeats.length;
+      $('[data-bp-ir-list]').replaceChildren(
+        ...repeats.map((r) => {
+          const li = el('li', 'bp-list__row');
+          const main = el('span', 'bp-list__main');
+          main.append(el('strong', '', r.what), el('span', 'muted', `Day ${r.dayOfMonth} · ${SOURCE_LABELS[r.source]}${r.saveFirst ? ' · savings first' : ''}`));
+          li.append(
+            main,
+            el('span', 'bp-list__amount', `+${formatMoney(r.amount, sign)}`),
+            iconButton(`Stop ${r.what}`, () => {
+              removing.add(r.id);
+              render();
+              offerUndo({
+                message: `${r.what} stopped repeating`,
+                commit: () => {
+                  removing.delete(r.id);
+                  removeIncomeRepeat(r.id);
+                },
+                undo: () => {
+                  removing.delete(r.id);
+                  render();
+                },
+              });
+            }),
+          );
+          return li;
+        }),
+      );
+    }
+
+    function fillIncome(): void {
+      iForm.reset();
+      iDay.value = month === monthOf(today()) ? today() : `${month}-01`;
+      renderIncome();
+    }
+
+    c.add(listen($('[data-sheet="income"]'), 'sheet:open', fillIncome));
+    c.add(
+      listen(iForm, 'submit', (e) => {
+        e.preventDefault();
+        const source = ($<HTMLInputElement>('input[name="bp-i-source"]:checked')?.value ?? 'salary') as IncomeSource;
+        const income = addIncome(
+          { what: $<HTMLInputElement>('[data-bp-i-what]').value, source, amount: Number(iAmount.value), day: iDay.value },
+          { repeat: $<HTMLInputElement>('[data-bp-i-repeat]').checked, saveFirst: $<HTMLInputElement>('[data-bp-i-save]').checked },
+        );
+        if (!income) return;
+        month = monthOf(income.day);
+        announce(`Added ${income.what}, ${formatMoney(income.amount, getBudget().currency)}`);
+        $<HTMLDialogElement>('[data-sheet="income"]').close();
+      }),
+    );
+
+    // ---- Goals ----
+    const gForm = $<HTMLFormElement>('[data-bp-g-form]');
+    let editingGoal: Goal | null = null;
+
+    function renderGoals(): void {
+      const s = store();
+      const sign = s.currency;
+      const goals = s.goals;
+      const loose = savedFor(s.saves, '');
+      const p = monthPlan(s, month, today());
+      const monthly = goals.reduce((a, g) => a + g.monthly, 0);
+      setText(
+        '[data-bp-g-intro]',
+        p.planned.savings
+          ? `${whole(p.planned.savings, sign)} a month goes to savings (${s.plan.split[2]}% of income), shared over your goals by what each one asks for.${monthly > p.planned.savings ? ` They ask for ${whole(monthly, sign)}.` : ''}`
+          : 'Savings are shared over your goals when income comes in, by what each one asks for a month.',
+      );
+      const now = monthOf(today());
+      $('[data-bp-g-list]').replaceChildren(
+        ...goals.map((g) => {
+          const saved = savedFor(s.saves, g.id);
+          const li = el('li', 'bp-goal');
+          const head = el('span', 'bp-goal__head');
+          head.append(el('strong', '', g.name), el('span', 'muted', `${whole(saved, sign)} of ${whole(g.target, sign)}`));
+          const track = el('span', 'bp__track');
+          const fill = el('i');
+          fill.style.width = `${Math.min(100, (saved / g.target) * 100)}%`;
+          fill.style.background = 'var(--cat-structure)';
+          track.append(fill);
+          let note = g.monthly ? `${whole(g.monthly, sign)} a month` : 'No monthly amount';
+          if (saved >= g.target) note = 'Reached';
+          else if (g.by) {
+            let months = 0;
+            for (let m = now; m <= g.by && months < 600; m = shiftMonth(m, 1)) months++;
+            const need = months ? (g.target - saved) / months : g.target - saved;
+            const by = monthLong.format(fromDayKey(`${g.by}-01`));
+            note += g.monthly >= need ? ` · on track for ${by}` : ` · behind: ${whole(need, sign)} a month for ${by}`;
+          }
+          const edit = el('button', 'btn btn--ghost btn--small', 'Change');
+          edit.type = 'button';
+          edit.addEventListener('click', () => openGoal(g));
+          const foot = el('span', 'bp-goal__foot');
+          foot.append(el('span', saved < g.target && note.includes('behind') ? 'bp__over' : 'muted', note), edit);
+          li.append(head, track, foot);
+          return li;
+        }),
+        ...(loose ? [el('li', 'bp-goal bp-goal--loose', `${whole(loose, sign)} saved with no goal`)] : []),
+      );
+      const suggest = $<HTMLButtonElement>('[data-bp-g-suggest]');
+      const needs = Math.max(p.needs, p.planned.needs);
+      suggest.hidden = goals.length > 0 || !needs;
+      suggest.textContent = `Start with an emergency fund: 3 months of needs, ${whole(needs * 3, sign)}`;
+      suggest.dataset.target = String(Math.round(needs * 3));
+      const select = $<HTMLSelectElement>('[data-bp-s-goal]');
+      const was = select.value;
+      select.replaceChildren(
+        ...goals.map((g) => new Option(g.name, g.id)),
+        new Option('Savings, no goal', ''),
+      );
+      select.value = [...select.options].some((o) => o.value === was) ? was : (goals[0]?.id ?? '');
+    }
+
+    function openGoal(goal: Goal | null, preset?: { name: string; target: number }): void {
+      editingGoal = goal;
+      gForm.hidden = false;
+      $('[data-bp-g-new]').hidden = true;
+      setText('[data-bp-g-form-title]', goal ? 'Change goal' : 'New goal');
+      $<HTMLInputElement>('[data-bp-g-name]').value = goal?.name ?? preset?.name ?? '';
+      $<HTMLInputElement>('[data-bp-g-target]').value = String(goal?.target ?? preset?.target ?? '');
+      $<HTMLInputElement>('[data-bp-g-monthly]').value = goal?.monthly ? String(goal.monthly) : '';
+      $<HTMLInputElement>('[data-bp-g-by]').value = goal?.by ?? '';
+      $('[data-bp-g-delete]').hidden = !goal;
+      $<HTMLInputElement>('[data-bp-g-name]').focus();
+    }
+
+    function closeGoal(): void {
+      editingGoal = null;
+      gForm.hidden = true;
+      $('[data-bp-g-new]').hidden = false;
+    }
+
+    c.add(
+      listen($('[data-sheet="goals"]'), 'sheet:open', () => {
+        closeGoal();
+        // Money put aside goes to the first goal unless you pick another.
+        const select = $<HTMLSelectElement>('[data-bp-s-goal]');
+        select.value = store().goals[0]?.id ?? '';
+      }),
+    );
+    c.add(listen($('[data-bp-g-new]'), 'click', () => openGoal(null)));
+    c.add(listen($('[data-bp-g-cancel]'), 'click', closeGoal));
+    c.add(
+      listen($('[data-bp-g-suggest]'), 'click', () => openGoal(null, { name: 'Emergency fund', target: Number($('[data-bp-g-suggest]').dataset.target) })),
+    );
+    c.add(
+      listen(gForm, 'submit', (e) => {
+        e.preventDefault();
+        const goal = saveGoal(
+          {
+            name: $<HTMLInputElement>('[data-bp-g-name]').value,
+            target: Number($<HTMLInputElement>('[data-bp-g-target]').value),
+            monthly: Number($<HTMLInputElement>('[data-bp-g-monthly]').value) || 0,
+            by: $<HTMLInputElement>('[data-bp-g-by]').value || null,
+          },
+          editingGoal?.id,
+        );
+        if (!goal) return;
+        announce(`Saved goal ${goal.name}`);
+        closeGoal();
+      }),
+    );
+    c.add(
+      listen($('[data-bp-g-delete]'), 'click', () => {
+        const goal = editingGoal;
+        closeGoal();
+        if (!goal) return;
+        removing.add(goal.id);
+        render();
+        offerUndo({
+          message: `Deleted goal “${goal.name}”. What it had stays in savings.`,
+          commit: () => {
+            removing.delete(goal.id);
+            removeGoal(goal.id);
+          },
+          undo: () => {
+            removing.delete(goal.id);
+            render();
+          },
+        });
+      }),
+    );
+    c.add(
+      listen($('[data-bp-s-form]'), 'submit', (e) => {
+        e.preventDefault();
+        const amount = $<HTMLInputElement>('[data-bp-s-amount]');
+        const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value));
+        if (!save) return;
+        amount.value = '';
+        announce(`Put ${formatMoney(save.amount, getBudget().currency)} aside`);
+      }),
+    );
+
+    // ---- The plan: split and tags, saved as you change them ----
+    function renderPlan(): void {
+      const s = store();
+      const p = monthPlan(s, month, today());
+      const split = s.plan.split.join('/');
+      for (const r of $$<HTMLInputElement>('input[name="bp-split"]')) r.checked = r.value === split;
+      for (const span of $$<HTMLElement>('[data-bp-split-amounts]')) {
+        const parts = span.dataset.bpSplitAmounts!.split('/').map(Number);
+        span.textContent = p.income ? parts.map((n) => whole((p.income * n) / 100, s.currency)).join(' · ') : '';
+      }
+      for (const r of $$<HTMLInputElement>('[data-bp-tag]')) r.checked = r.value === categoryTag(s.plan, r.dataset.bpTag as Category);
+    }
+
+    c.add(
+      listen($('[data-sheet="plan"]'), 'change', (e) => {
+        const t = e.target as HTMLInputElement;
+        const plan = getBudget().plan;
+        if (t.name === 'bp-split') setPlan({ ...plan, split: t.value.split('/').map(Number) as Split });
+        else if (t.dataset.bpTag) setPlan({ ...plan, tags: { ...plan.tags, [t.dataset.bpTag]: t.value as CategoryTag } });
+        announce('Plan saved');
+      }),
+    );
+
+    // ---- Calendar: each day against the day's share, no-spend days and bills ----
+    function renderCalendar(): void {
+      const s = store();
+      const sign = s.currency;
+      const p = monthPlan(s, month, today());
+      const days = daysInMonth(month);
+      const current = month === monthOf(today());
+      const upto = month < monthOf(today()) ? days : current ? Number(today().slice(8)) : 0;
+      // The day's share of the month: income less savings and all the bills, over the days.
+      const bills = p.billsByDay.reduce((a, b) => a + b, 0);
+      const share = p.income ? (p.income - Math.max(p.saved, p.planned.savings) - bills) / days : 0;
+      setText('[data-bp-cal-title]', monthLong.format(fromDayKey(`${month}-01`)));
+      const first = fromDayKey(`${month}-01`);
+      const lead = (first.getDay() + 6) % 7;
+      $('[data-bp-cal-week]').replaceChildren(
+        ...Array.from({ length: 7 }, (_, i) => el('span', '', weekday.format(new Date(2024, 0, 1 + i)))),
+      );
+      if (!picked || monthOf(picked) !== month) picked = current ? today() : `${month}-01`;
+      const cells: HTMLElement[] = Array.from({ length: lead }, () => el('span'));
+      for (let d = 1; d <= days; d++) {
+        const key = `${month}-${String(d).padStart(2, '0')}`;
+        const spent = p.byDay[d - 1] ?? 0;
+        const past = d <= upto;
+        const bill = p.billsByDay[d - 1] ?? 0;
+        const b = el('button', 'bp-cal__cell');
+        b.type = 'button';
+        if (past) b.classList.add(spent === 0 ? 'is-none' : share && spent > share ? 'is-over' : 'is-under');
+        else b.classList.add('is-later');
+        if (bill) b.classList.add('has-bill');
+        b.setAttribute('aria-pressed', String(key === picked));
+        const amount = past ? (spent ? whole(spent, sign) : '—') : bill ? 'bill' : '';
+        b.append(el('strong', '', String(d)), el('span', '', amount));
+        b.setAttribute('aria-label', `${formatDay(fromDayKey(key))}: ${past ? (spent ? formatMoney(spent, sign) : 'no spend') : bill ? 'bill due' : 'to come'}`);
+        b.addEventListener('click', () => {
+          picked = key;
+          renderCalendar();
+        });
+        cells.push(b);
+      }
+      $('[data-bp-cal-grid]').replaceChildren(...cells);
+      $('[data-bp-cal-key]').replaceChildren(
+        ...[
+          ['is-under', share ? `Under ${whole(share, sign)}` : 'Spent'],
+          ...(share ? [['is-over', 'Over']] : []),
+          ['is-none', 'No spend'],
+          ['has-bill', 'Bill due'],
+        ].map(([cls, text]) => {
+          const li = el('li');
+          li.append(el('i', `bp-cal__swatch ${cls}`), document.createTextNode(text!));
+          return li;
+        }),
+      );
+
+      // The picked day.
+      const day = $('[data-bp-cal-day]');
+      const entries = s.entries.filter((e) => e.deletedAt === undefined && e.day === picked);
+      const incomes = s.incomes.filter((i) => i.day === picked);
+      const dueBills = picked! > today() ? s.repeats.filter((r) => r.deletedAt === undefined && r.from <= month && repeatDay(r, month) === picked) : [];
+      const rows: [string, string][] = [
+        ...entries.map((e): [string, string] => {
+          const need = needOf(e, s.plan);
+          return [`${e.what} · ${CATEGORY_SHORT[e.category]}${need ? ` · ${need}` : ''}${e.repeatId ? ' · bill' : ''}`, formatMoney(e.amount, sign)];
+        }),
+        ...incomes.map((i): [string, string] => [`${i.what} · income`, `+${formatMoney(i.amount, sign)}`]),
+        ...dueBills.map((r): [string, string] => [`${r.what} · bill due`, formatMoney(r.amount, sign)]),
+      ];
+      const pickedDate = fromDayKey(picked!);
+      const titleText = `${formatDay(pickedDate)}${picked === today() ? ' · today' : ''}`;
+      day.replaceChildren(el('strong', '', titleText));
+      if (!rows.length) day.append(el('span', 'muted', picked! <= today() ? 'No spend.' : 'Nothing planned yet.'));
+      for (const [what, amount] of rows) {
+        const row = el('span', 'bp-cal__row');
+        row.append(el('span', '', what), el('strong', '', amount));
+        day.append(row);
+      }
+
+      const ns = noSpend(p.byDay, upto);
+      const over = share ? p.byDay.slice(0, upto).filter((v) => v > share).length : 0;
+      const stat = (label: string, value: string) => {
+        const d = el('div');
+        d.append(el('span', 'muted', label), el('strong', '', value));
+        return d;
+      };
+      $('[data-bp-cal-stats]').replaceChildren(
+        stat('No-spend days', `${ns.days}${ns.best > 1 ? ` · best run ${ns.best}` : ''}`),
+        ...(share ? [stat(`Over ${whole(share, sign)}`, plural(over, 'day'))] : []),
+        stat('Bills left', whole(p.billsLater, sign)),
+      );
+    }
+
+    c.add(
+      listen(card.querySelector('[data-bp-expense]')!, 'click', () => document.querySelector<HTMLButtonElement>('[data-bv-add]')?.click()),
+    );
+    c.add(
+      listen(document, 'budget:month', (e) => {
+        month = (e as CustomEvent<MonthKey>).detail;
+        render();
+      }),
+    );
+    c.add(subscribe('health', render));
+    render();
+    return c.run;
+  });
+</script>
+
+<!-- Global: most of what is styled here is built by the script, which scoped styles miss. Every class starts with bp. -->
+<style is:global>
+  /* Elements here set their own display, which would beat the hidden attribute. */
+  [data-bplan] [hidden],
+  [data-sheet] [hidden] {
+    display: none !important;
+  }
+
+  .bp {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bp__empty {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+
+  .bp__empty p {
+    margin: 0;
+  }
+
+  .bp__main {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bp__hero {
+    display: grid;
+    gap: 4px;
+  }
+
+  .bp__hero p {
+    margin: 0;
+  }
+
+  .bp__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+
+  .bp__big {
+    font-size: clamp(2.6rem, 9vw, 3.4rem);
+    font-weight: 750;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bp__big.is-over {
+    color: var(--color-danger);
+  }
+
+  .bp__line {
+    font-size: var(--text-sm);
+  }
+
+  .bp__saved {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--cat-structure);
+  }
+
+  .bp__bars {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bp__bar {
+    display: grid;
+    gap: 6px;
+  }
+
+  .bp__bar-head,
+  .bp-goal__head,
+  .bp-goal__foot {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .bp__over {
+    color: var(--color-danger);
+    font-weight: 600;
+  }
+
+  .bp__track {
+    display: block;
+    block-size: 10px;
+    border-radius: 5px;
+    background: var(--color-surface-2);
+    overflow: hidden;
+  }
+
+  .bp__track i {
+    display: block;
+    block-size: 100%;
+    border-radius: 5px;
+  }
+
+  .bp__unsorted {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bp__actions {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--space-2);
+  }
+
+  .bp__tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .bp__tile {
+    display: grid;
+    gap: 2px;
+    align-content: center;
+    min-height: 64px;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font: inherit;
+    color: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .bp__tile span {
+    font-size: var(--text-xs);
+  }
+
+  .bp__tile strong {
+    font-size: var(--text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---- Sheets ---- */
+  .bp-form {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .bp-amount {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    box-shadow: inset 0 0 0 1px var(--edge);
+  }
+
+  .bp-amount__sign {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+  }
+
+  .bp-amount input {
+    flex: 1;
+    min-width: 0;
+    min-height: 60px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 1.8rem;
+    font-weight: 750;
+    color: inherit;
+    outline: none;
+  }
+
+  .bp-amount:focus-within {
+    box-shadow: inset 0 0 0 2px var(--color-focus);
+  }
+
+  .bp-seg {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bp-seg--small {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .bp-seg__opt {
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    padding: 4px var(--space-2);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .bp-seg--small .bp-seg__opt {
+    min-height: 40px;
+    font-size: var(--text-xs);
+  }
+
+  .bp-seg__opt:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+
+  .bp-seg__opt:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .bp-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .bp-field {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bp-check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    font-size: var(--text-sm);
+  }
+
+  .bp-check input {
+    inline-size: 20px;
+    block-size: 20px;
+    accent-color: var(--color-accent);
+  }
+
+  .bp-form__save {
+    justify-self: stretch;
+  }
+
+  .bp-sub {
+    margin: var(--space-4) 0 var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .bp-intro {
+    margin: 0 0 var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .bp-list,
+  .bp-goals,
+  .bp-tags {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bp-list__row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--edge);
+  }
+
+  .bp-list__main {
+    flex: 1;
+    display: grid;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bp-list__main span {
+    font-size: var(--text-xs);
+  }
+
+  .bp-list__amount {
+    font-weight: 700;
+    color: var(--cat-structure);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bp-goal {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .bp-goal--loose {
+    font-size: var(--text-sm);
+  }
+
+  .bp-suggest {
+    justify-self: stretch;
+    margin-block: var(--space-2);
+    white-space: normal;
+  }
+
+  .bp-goal-form {
+    margin-top: var(--space-3);
+  }
+
+  .bp-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .bp-put {
+    margin-top: var(--space-2);
+  }
+
+  .bp-splits {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bp-splits legend {
+    margin-top: 0;
+  }
+
+  .bp-split {
+    align-content: center;
+    gap: 2px;
+    min-height: 64px;
+  }
+
+  .bp-split span {
+    font-size: var(--text-xs);
+    font-weight: 500;
+  }
+
+  .bp-tags__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .bp-tags__name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bp-tags__name i {
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 4px;
+    flex: none;
+  }
+
+  /* ---- Calendar ---- */
+  .bp-cal__title {
+    margin: 0 0 var(--space-3);
+  }
+
+  .bp-cal__week,
+  .bp-cal__grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .bp-cal__week {
+    margin-bottom: 4px;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    text-align: center;
+  }
+
+  .bp-cal__cell {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 1px;
+    min-height: 50px;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .bp-cal__cell strong {
+    font-size: var(--text-sm);
+  }
+
+  .bp-cal__cell span {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .bp-cal__cell.is-under,
+  .bp-cal__swatch.is-under {
+    background: color-mix(in srgb, var(--cat-structure) 16%, transparent);
+  }
+
+  .bp-cal__cell.is-over,
+  .bp-cal__swatch.is-over {
+    background: color-mix(in srgb, var(--cat-reward) 20%, transparent);
+  }
+
+  .bp-cal__cell.is-none,
+  .bp-cal__swatch.is-none {
+    border: 2px solid var(--cat-structure);
+  }
+
+  .bp-cal__cell.is-later {
+    color: var(--color-text-muted);
+  }
+
+  .bp-cal__cell.has-bill:not(.is-none),
+  .bp-cal__swatch.has-bill {
+    border: 1px dashed var(--color-text-muted);
+  }
+
+  .bp-cal__cell[aria-pressed='true'] {
+    border: 2px solid var(--color-text);
+  }
+
+  .bp-cal__key {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px var(--space-3);
+    margin: var(--space-3) 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-xs);
+  }
+
+  .bp-cal__key li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .bp-cal__swatch {
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 3px;
+    box-sizing: border-box;
+  }
+
+  .bp-cal__day {
+    display: grid;
+    gap: 6px;
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+  }
+
+  .bp-cal__row {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .bp-cal__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .bp-cal__stats div {
+    display: grid;
+    gap: 2px;
+    font-size: var(--text-sm);
+  }
+
+  .bp-cal__stats span {
+    font-size: var(--text-xs);
+  }
+</style>

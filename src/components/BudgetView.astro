@@ -40,6 +40,9 @@ const icon = (d: string, w = 2) =>
     </div>
   </div>
 
+  {/* The plan (BudgetPlan.astro), under the month it follows. */}
+  <slot />
+
   <section class="card bv__hero" aria-labelledby="bv-left-label">
     <p class="bv__label" id="bv-left-label" data-bv-left-label></p>
     <p class="bv__big"><strong data-bv-big></strong> <span class="muted" data-bv-of></span></p>
@@ -153,6 +156,13 @@ const icon = (d: string, w = 2) =>
           ))
         }
       </fieldset>
+      {/* Need or want: the category's tag is picked for you; a mixed one (food) asks. */}
+      <fieldset class="bv-need">
+        <legend>Counts as</legend>
+        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="need" class="visually-hidden" />Need</label>
+        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="want" class="visually-hidden" />Want</label>
+        <p class="muted bv-need__hint" data-bv-x-need-hint></p>
+      </fieldset>
       <label class="bv-dialog__field" data-bv-x-kind-field hidden>
         <span>Kind</span>
         <select class="input" data-bv-x-kind>
@@ -234,6 +244,7 @@ const icon = (d: string, w = 2) =>
     addSpend,
     billsAfter,
     catchUpRepeats,
+    categoryTag,
     CATEGORIES,
     CATEGORY_COLORS,
     CATEGORY_LABELS,
@@ -250,6 +261,8 @@ const icon = (d: string, w = 2) =>
     monthOf,
     monthSpend,
     monthTotals,
+    needOf,
+    NEED_LABELS,
     paceLine,
     removeRepeat,
     removeSpend,
@@ -258,6 +271,7 @@ const icon = (d: string, w = 2) =>
     shiftMonth,
     toCsv,
     type Category,
+    type Need,
     type SpendEntry,
     type WellbeingKind,
   } from '../lib/budget';
@@ -389,6 +403,15 @@ const icon = (d: string, w = 2) =>
         .filter(Boolean)
         .join(' · ');
       main.append(el('strong', '', entry.what), el('span', 'muted', sub));
+      // Need or want; a mixed category without one asks, and the tap opens the expense to choose.
+      const need = needOf(entry, getBudget().plan);
+      if (need) main.append(el('span', `bv__need bv__need--${need}`, NEED_LABELS[need]));
+      else {
+        const ask = el('button', 'bv__need bv__need--ask', 'Need or want?');
+        ask.type = 'button';
+        ask.addEventListener('click', () => openExpense(entry));
+        main.append(ask);
+      }
       const edit = el('button', 'icon-btn');
       edit.type = 'button';
       edit.setAttribute('aria-label', `Change ${entry.what}`);
@@ -415,6 +438,8 @@ const icon = (d: string, w = 2) =>
       $('[data-bv-month]').closest<HTMLElement>('[data-budget]')!.toggleAttribute('data-fresh', store.entries.length === 0 && !budget && store.repeats.length === 0);
 
       setText('[data-bv-month]', monthLong.format(fromDayKey(`${month}-01`)));
+      // The plan card above (BudgetPlan.astro) follows the month shown here.
+      document.dispatchEvent(new CustomEvent('budget:month', { detail: month }));
       $<HTMLButtonElement>('[data-bv-next]').disabled = current;
 
       // ---- What is left, and the pace ----
@@ -715,9 +740,34 @@ const icon = (d: string, w = 2) =>
     // ---- The expense dialog ----
     const chosenCategory = () => ($<HTMLInputElement>('input[name="bv-x-cat"]:checked')?.value ?? 'food') as Category;
 
+    const needRadios = () => $$<HTMLInputElement>('input[name="bv-x-need"]');
+    const chosenNeed = () => (needRadios().find((r) => r.checked)?.value ?? null) as Need | null;
+    /** The category the need was last set for, so changing category picks that category's tag. */
+    let needFor: Category | null = null;
+
+    function updateNeed(): void {
+      const cat = chosenCategory();
+      const tag = categoryTag(getBudget().plan, cat);
+      if (cat !== needFor) {
+        needFor = cat;
+        for (const r of needRadios()) r.checked = tag !== 'mixed' && r.value === tag;
+      }
+      for (const r of needRadios()) r.required = tag === 'mixed';
+      const need = chosenNeed();
+      setText(
+        '[data-bv-x-need-hint]',
+        tag === 'mixed'
+          ? `${CATEGORY_SHORT[cat]} is mixed: groceries are a need, eating out is a want.`
+          : need && need !== tag
+            ? `Only this expense. ${CATEGORY_SHORT[cat]} stays a ${tag}.`
+            : `${CATEGORY_SHORT[cat]} counts as a ${tag}. Change it for just this one if it is not.`,
+      );
+    }
+
     function updateDialog(): void {
       const cat = chosenCategory();
       $('[data-bv-x-kind-field]').hidden = cat !== 'wellbeing';
+      updateNeed();
       const store = getBudget();
       const own = store.budgets[cat];
       const hint = $('[data-bv-x-hint]');
@@ -749,6 +799,12 @@ const icon = (d: string, w = 2) =>
       xKind.value = entry?.kind ?? '';
       const cat = entry?.category ?? filter ?? 'food';
       for (const r of $$<HTMLInputElement>('input[name="bv-x-cat"]')) r.checked = r.value === cat;
+      needFor = cat;
+      const need = entry ? needOf(entry, store.plan) : (() => {
+        const tag = categoryTag(store.plan, cat);
+        return tag === 'mixed' ? null : tag;
+      })();
+      for (const r of needRadios()) r.checked = r.value === need;
       xRepeat.checked = repeat;
       $('[data-bv-x-repeat-field]').hidden = !!entry;
       $('[data-bv-x-delete]').hidden = !entry;
@@ -767,6 +823,8 @@ const icon = (d: string, w = 2) =>
         kind: (xKind.value || null) as WellbeingKind | null,
         amount: Number(xAmount.value),
         day: xDay.value,
+        // Kept on the expense only when it differs from its category, so changing the category's tag later still counts.
+        need: ((n) => (n && n !== categoryTag(getBudget().plan, chosenCategory()) ? n : null))(chosenNeed()),
       };
       const sign = getBudget().currency;
       if (editing) {
@@ -1681,6 +1739,91 @@ const icon = (d: string, w = 2) =>
   .bv-cat:has(input:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+  }
+
+  .bv-need {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bv-need legend {
+    margin-bottom: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bv-need__opt {
+    --c: var(--cat-visual);
+    display: grid;
+    place-items: center;
+    min-height: 44px;
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font-size: var(--text-sm);
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .bv-need__opt:has(input[value='want']) {
+    --c: var(--cat-reward);
+  }
+
+  .bv-need__opt:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--c);
+    color: var(--c);
+    background: var(--color-surface-2);
+  }
+
+  .bv-need__opt:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .bv-need__hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: var(--text-xs);
+  }
+
+  .bv :global(.bv__need) {
+    justify-self: start;
+    margin-top: 2px;
+    padding: 1px 8px;
+    border: 0;
+    border-radius: 999px;
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 650;
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 14%, transparent);
+  }
+
+  .bv :global(.bv__need--need) {
+    --c: var(--cat-visual);
+  }
+
+  .bv :global(.bv__need--want) {
+    --c: var(--cat-reward);
+  }
+
+  .bv :global(.bv__need--ask) {
+    --c: var(--color-text);
+    min-height: 28px;
+    box-shadow: inset 0 0 0 1px var(--edge);
+    background: none;
+    cursor: pointer;
+  }
+
+  /* With income in the month, the plan card above says what is left instead. */
+  .bv[data-planned] .bv__hero {
+    display: none;
   }
 
   .bv-dialog__field {

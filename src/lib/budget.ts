@@ -6,6 +6,11 @@
  * Kept in the `health` store, where wellbeing spend used to live (it is now the Wellbeing
  * category), so the account sync and its rules stay as they are. A store written before
  * Budget existed (no `v`) is read as wellbeing spend: see `normaliseBudget`.
+ *
+ * The plan (2026-11): income, a needs / wants / savings split (50/30/20 by default), a need or
+ * want tag on each category that one expense can change, and savings goals that are paid
+ * first when income comes in. These are extra keys and fields on the same `v: 2` store, so an
+ * older app still reads every expense; it only leaves the new parts out when it writes.
  */
 import { newId, read, write } from './storage';
 import { addDays, dayKey, fromDayKey, isDayKey, type DayKey } from './dates';
@@ -53,6 +58,33 @@ export const KIND_LABELS: Record<WellbeingKind, string> = {
   medical: 'Medical',
 };
 
+/** Whether money spent was needed or wanted. A category is one of these, or mixed (asked each time). */
+export type Need = 'need' | 'want';
+export type CategoryTag = Need | 'mixed';
+export const NEED_LABELS: Record<Need, string> = { need: 'Need', want: 'Want' };
+
+/** Groceries are needs and eating out is a want, so food asks. */
+export const DEFAULT_TAGS: Record<Category, CategoryTag> = {
+  food: 'mixed',
+  home: 'need',
+  wellbeing: 'need',
+  transport: 'need',
+  fun: 'want',
+  other: 'want',
+};
+
+export const INCOME_SOURCES = ['salary', 'freelance', 'gift', 'other'] as const;
+export type IncomeSource = (typeof INCOME_SOURCES)[number];
+export const SOURCE_LABELS: Record<IncomeSource, string> = { salary: 'Salary', freelance: 'Freelance', gift: 'Gift', other: 'Other' };
+
+/** Needs / wants / savings, in percent of income. */
+export type Split = [number, number, number];
+export const SPLITS: Split[] = [
+  [50, 30, 20],
+  [60, 20, 20],
+  [70, 20, 10],
+];
+
 export const WHAT_MAX = 80;
 export const AMOUNT_MAX = 1_000_000;
 export const CURRENCY_MAX = 4;
@@ -72,6 +104,8 @@ export interface SpendEntry {
   repeatId?: string;
   /** Set on entries read from a bank alert: the bank's name (src/lib/bank.ts). */
   from?: string;
+  /** Need or want for this one expense; without it the category's tag counts. */
+  need?: Need;
   /**
    * Set when the entry was removed: a marker (what and amount stripped) that stays in
    * the store so the removal reaches other devices instead of the entry coming back.
@@ -90,9 +124,68 @@ export interface Repeat {
   dayOfMonth: number;
   /** The first month it adds an entry for. */
   from: MonthKey;
+  need?: Need;
   createdAt: number;
   deletedAt?: number;
 }
+
+export interface IncomeEntry {
+  id: string;
+  day: DayKey;
+  what: string;
+  source: IncomeSource;
+  amount: number;
+  createdAt: number;
+  /** Set on income a repeat added. */
+  repeatId?: string;
+  deletedAt?: number;
+}
+
+/** Income that comes every month on the same day, like a salary. */
+export interface IncomeRepeat {
+  id: string;
+  what: string;
+  source: IncomeSource;
+  amount: number;
+  dayOfMonth: number;
+  from: MonthKey;
+  /** Each time it comes, the savings share goes to the goals first. */
+  saveFirst: boolean;
+  createdAt: number;
+  deletedAt?: number;
+}
+
+export interface Goal {
+  id: string;
+  name: string;
+  target: number;
+  /** How much of each month's savings goes here; the savings are shared out by these. */
+  monthly: number;
+  /** When you want it by. */
+  by?: MonthKey;
+  createdAt: number;
+  /** Goals are changed in place; the newer copy wins between devices. */
+  updatedAt: number;
+  deletedAt?: number;
+}
+
+/** Money put towards a goal ("" for savings with no goal). */
+export interface SaveEntry {
+  id: string;
+  goalId: string;
+  day: DayKey;
+  amount: number;
+  createdAt: number;
+  deletedAt?: number;
+}
+
+export interface Plan {
+  split: Split;
+  /** Only the categories changed from DEFAULT_TAGS. */
+  tags: Partial<Record<Category, CategoryTag>>;
+}
+
+export const DEFAULT_PLAN: Plan = { split: [50, 30, 20], tags: {} };
 
 export interface BudgetStore {
   v: 2;
@@ -107,9 +200,30 @@ export interface BudgetStore {
   /** Removal markers included; `getBudget` leaves them out. */
   entries: SpendEntry[];
   repeats: Repeat[];
+  incomes: IncomeEntry[];
+  incomeRepeats: IncomeRepeat[];
+  goals: Goal[];
+  saves: SaveEntry[];
+  plan: Plan;
+  /** When the plan was last set, so the newer one wins between devices. */
+  planAt: number;
 }
 
-export const EMPTY_BUDGET: BudgetStore = { v: 2, budget: null, budgets: {}, currency: '$', budgetAt: 0, entries: [], repeats: [] };
+export const EMPTY_BUDGET: BudgetStore = {
+  v: 2,
+  budget: null,
+  budgets: {},
+  currency: '$',
+  budgetAt: 0,
+  entries: [],
+  repeats: [],
+  incomes: [],
+  incomeRepeats: [],
+  goals: [],
+  saves: [],
+  plan: DEFAULT_PLAN,
+  planAt: 0,
+};
 
 /** Removal markers older than this are dropped; by then every device has long since synced. */
 const MARKER_MS = 180 * 86_400_000;
@@ -118,6 +232,10 @@ const isCategory = (v: unknown): v is Category => (CATEGORIES as readonly unknow
 const isKind = (v: unknown): v is WellbeingKind => (WELLBEING_KINDS as readonly unknown[]).includes(v);
 const isAmount = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= AMOUNT_MAX;
 const isMonthKey = (v: unknown): v is MonthKey => typeof v === 'string' && /^\d{4}-\d{2}$/.test(v);
+const isNeed = (v: unknown): v is Need => v === 'need' || v === 'want';
+const isTag = (v: unknown): v is CategoryTag => isNeed(v) || v === 'mixed';
+const isSource = (v: unknown): v is IncomeSource => (INCOME_SOURCES as readonly unknown[]).includes(v);
+const isDayOfMonth = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31;
 
 function readEntry(v: unknown, legacy: boolean): SpendEntry | null {
   if (typeof v !== 'object' || v === null) return null;
@@ -146,6 +264,7 @@ function readEntry(v: unknown, legacy: boolean): SpendEntry | null {
   if (kind) entry.kind = kind;
   if (typeof e.repeatId === 'string') entry.repeatId = e.repeatId;
   if (typeof e.from === 'string' && e.from) entry.from = e.from.slice(0, WHAT_MAX);
+  if (isNeed(e.need)) entry.need = e.need;
   if (removed) entry.deletedAt = e.deletedAt as number;
   return entry;
 }
@@ -169,13 +288,72 @@ function readRepeat(v: unknown): Repeat | null {
     return null;
   const repeat: Repeat = { id: r.id, what: r.what, category: r.category, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, createdAt: r.createdAt };
   if (r.category === 'wellbeing' && isKind(r.kind)) repeat.kind = r.kind;
+  if (isNeed(r.need)) repeat.need = r.need;
   if (removed) repeat.deletedAt = r.deletedAt as number;
   return repeat;
 }
 
+/** Shared by the newer lists: an object with an id, live or a removal marker. */
+function record(v: unknown): (Record<string, unknown> & { id: string; removed: boolean }) | null {
+  if (typeof v !== 'object' || v === null || typeof (v as { id?: unknown }).id !== 'string') return null;
+  const r = v as Record<string, unknown> & { id: string };
+  return { ...r, removed: typeof r.deletedAt === 'number' };
+}
+
+const amountOk = (amount: unknown, removed: boolean) => isAmount(amount) || (removed && amount === 0);
+
+function readIncome(v: unknown): IncomeEntry | null {
+  const r = record(v);
+  if (!r || !isDayKey(r.day) || typeof r.what !== 'string' || !isSource(r.source) || !amountOk(r.amount, r.removed) || typeof r.createdAt !== 'number') return null;
+  const income: IncomeEntry = { id: r.id, day: r.day, what: r.what, source: r.source, amount: r.amount as number, createdAt: r.createdAt };
+  if (typeof r.repeatId === 'string') income.repeatId = r.repeatId;
+  if (r.removed) income.deletedAt = r.deletedAt as number;
+  return income;
+}
+
+function readIncomeRepeat(v: unknown): IncomeRepeat | null {
+  const r = record(v);
+  if (!r || typeof r.what !== 'string' || !isSource(r.source) || !amountOk(r.amount, r.removed) || !isDayOfMonth(r.dayOfMonth) || !isMonthKey(r.from) || typeof r.createdAt !== 'number') return null;
+  const repeat: IncomeRepeat = { id: r.id, what: r.what, source: r.source, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, saveFirst: r.saveFirst === true, createdAt: r.createdAt };
+  if (r.removed) repeat.deletedAt = r.deletedAt as number;
+  return repeat;
+}
+
+function readGoal(v: unknown): Goal | null {
+  const r = record(v);
+  if (!r || typeof r.name !== 'string' || !amountOk(r.target, r.removed) || typeof r.monthly !== 'number' || r.monthly < 0 || typeof r.createdAt !== 'number') return null;
+  const goal: Goal = { id: r.id, name: r.name, target: r.target as number, monthly: r.monthly, createdAt: r.createdAt, updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : r.createdAt };
+  if (isMonthKey(r.by)) goal.by = r.by;
+  if (r.removed) goal.deletedAt = r.deletedAt as number;
+  return goal;
+}
+
+function readSave(v: unknown): SaveEntry | null {
+  const r = record(v);
+  if (!r || typeof r.goalId !== 'string' || !isDayKey(r.day) || !amountOk(r.amount, r.removed) || typeof r.createdAt !== 'number') return null;
+  const save: SaveEntry = { id: r.id, goalId: r.goalId, day: r.day, amount: r.amount as number, createdAt: r.createdAt };
+  if (r.removed) save.deletedAt = r.deletedAt as number;
+  return save;
+}
+
+function readPlan(v: unknown): Plan {
+  if (typeof v !== 'object' || v === null) return DEFAULT_PLAN;
+  const p = v as Record<string, unknown>;
+  const ok =
+    Array.isArray(p.split) &&
+    p.split.length === 3 &&
+    p.split.every((n) => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 100) &&
+    (p.split as number[]).reduce((a, b) => a + b, 0) === 100;
+  const tags: Partial<Record<Category, CategoryTag>> = {};
+  if (typeof p.tags === 'object' && p.tags !== null) for (const [key, value] of Object.entries(p.tags)) if (isCategory(key) && isTag(value)) tags[key] = value;
+  return { split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
+}
+
 /** Newest day first, and within a day the one added last. */
 const byDay = (a: SpendEntry, b: SpendEntry) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt;
-const byDayOfMonth = (a: Repeat, b: Repeat) => a.dayOfMonth - b.dayOfMonth || a.createdAt - b.createdAt;
+const byDayOfMonth = <T extends { dayOfMonth: number; createdAt: number }>(a: T, b: T) => a.dayOfMonth - b.dayOfMonth || a.createdAt - b.createdAt;
+const byNewest = <T extends { day: DayKey; createdAt: number }>(a: T, b: T) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt;
+const byCreated = (a: Goal, b: Goal) => a.createdAt - b.createdAt;
 
 const pick = <T>(list: unknown, fn: (v: unknown) => T | null): T[] =>
   Array.isArray(list) ? list.map(fn).filter((x): x is T => x !== null) : [];
@@ -200,6 +378,12 @@ export function normaliseBudget(raw: unknown): BudgetStore {
     budgetAt: typeof s.budgetAt === 'number' ? s.budgetAt : 0,
     entries: pick(s.entries, (e) => readEntry(e, legacy)).sort(byDay),
     repeats: pick(s.repeats, readRepeat).sort(byDayOfMonth),
+    incomes: pick(s.incomes, readIncome).sort(byNewest),
+    incomeRepeats: pick(s.incomeRepeats, readIncomeRepeat).sort(byDayOfMonth),
+    goals: pick(s.goals, readGoal).sort(byCreated),
+    saves: pick(s.saves, readSave).sort(byNewest),
+    plan: readPlan(s.plan),
+    planAt: typeof s.planAt === 'number' ? s.planAt : 0,
   };
 }
 
@@ -215,13 +399,25 @@ export function getBudget(): BudgetStore {
     ...store,
     entries: store.entries.filter((e) => e.deletedAt === undefined),
     repeats: store.repeats.filter((r) => r.deletedAt === undefined),
+    incomes: store.incomes.filter((e) => e.deletedAt === undefined),
+    incomeRepeats: store.incomeRepeats.filter((r) => r.deletedAt === undefined),
+    goals: store.goals.filter((g) => g.deletedAt === undefined),
+    saves: store.saves.filter((x) => x.deletedAt === undefined),
   };
 }
 
 function writeStore(store: BudgetStore): void {
   const cutoff = Date.now() - MARKER_MS;
   const keep = (x: { deletedAt?: number }) => x.deletedAt === undefined || x.deletedAt > cutoff;
-  write('health', { ...store, entries: store.entries.filter(keep).sort(byDay), repeats: store.repeats.filter(keep).sort(byDayOfMonth) });
+  write('health', {
+    ...store,
+    entries: store.entries.filter(keep).sort(byDay),
+    repeats: store.repeats.filter(keep).sort(byDayOfMonth),
+    incomes: store.incomes.filter(keep).sort(byNewest),
+    incomeRepeats: store.incomeRepeats.filter(keep).sort(byDayOfMonth),
+    goals: store.goals.filter(keep).sort(byCreated),
+    saves: store.saves.filter(keep).sort(byNewest),
+  });
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -232,6 +428,8 @@ export interface SpendInput {
   kind?: WellbeingKind | null;
   amount: number;
   day?: DayKey;
+  /** Need or want for this expense; left out, the category's tag counts. */
+  need?: Need | null;
 }
 
 function makeEntry(input: SpendInput, id = newId('h')): SpendEntry | null {
@@ -246,6 +444,7 @@ function makeEntry(input: SpendInput, id = newId('h')): SpendEntry | null {
     createdAt: Date.now(),
   };
   if (input.category === 'wellbeing' && input.kind && isKind(input.kind)) entry.kind = input.kind;
+  if (isNeed(input.need)) entry.need = input.need;
   return entry;
 }
 
@@ -348,6 +547,7 @@ export function addRepeat(input: SpendInput): Repeat | null {
     createdAt: Date.now(),
   };
   if (first.kind) repeat.kind = first.kind;
+  if (first.need) repeat.need = first.need;
   const store = getStore();
   writeStore({ ...store, repeats: [...store.repeats, repeat] });
   catchUpRepeats();
@@ -389,11 +589,12 @@ export function catchUpRepeats(today: DayKey = dayKey(new Date())): number {
       if (day > today || known.has(id)) continue;
       const entry: SpendEntry = { id, day, what: r.what, category: r.category, amount: r.amount, createdAt: Date.now(), repeatId: r.id };
       if (r.kind) entry.kind = r.kind;
+      if (r.need) entry.need = r.need;
       added.push(entry);
     }
   }
   if (added.length) writeStore({ ...store, entries: [...added, ...store.entries] });
-  return added.length;
+  return added.length + catchUpIncome(today);
 }
 
 /** Repeats whose next entry falls within `days` days after today, soonest first. */
@@ -411,6 +612,273 @@ export function dueSoon(repeats: Repeat[], days = 7, today: DayKey = dayKey(new 
     }
   }
   return out.sort((a, b) => a.day.localeCompare(b.day));
+}
+
+// ---------- Income, savings and the plan ----------
+
+export interface IncomeInput {
+  what: string;
+  source: IncomeSource;
+  amount: number;
+  day?: DayKey;
+}
+
+function makeIncome(input: IncomeInput, id = newId('i')): IncomeEntry | null {
+  const amount = round(input.amount);
+  if (!isAmount(amount) || !isSource(input.source)) return null;
+  return {
+    id,
+    day: input.day && isDayKey(input.day) ? input.day : dayKey(new Date()),
+    what: input.what.trim().slice(0, WHAT_MAX) || SOURCE_LABELS[input.source],
+    source: input.source,
+    amount,
+    createdAt: Date.now(),
+  };
+}
+
+export function savedFor(saves: SaveEntry[], goalId: string): number {
+  return round(saves.filter((x) => x.deletedAt === undefined && x.goalId === goalId).reduce((a, x) => a + x.amount, 0));
+}
+
+/**
+ * The savings share of an income, shared out over the unfinished goals by their monthly
+ * amounts (evenly when none has one). With no goals it is still put aside, under goal "".
+ * `idBase` makes the ids, so a repeat's savings are added once on every device.
+ */
+function savesFor(store: BudgetStore, amount: number, day: DayKey, idBase: string): SaveEntry[] {
+  const share = round((amount * store.plan.split[2]) / 100);
+  if (!isAmount(share)) return [];
+  const now = Date.now();
+  const goals = store.goals.filter((g) => g.deletedAt === undefined && savedFor(store.saves, g.id) < g.target);
+  if (!goals.length) return [{ id: `${idBase}-s`, goalId: '', day, amount: share, createdAt: now }];
+  const total = goals.reduce((a, g) => a + g.monthly, 0);
+  let left = share;
+  return goals.flatMap((g, i) => {
+    const part = i === goals.length - 1 ? round(left) : round(total ? (share * g.monthly) / total : share / goals.length);
+    left = round(left - part);
+    return part > 0 ? [{ id: `${idBase}-s-${g.id}`, goalId: g.id, day, amount: part, createdAt: now }] : [];
+  });
+}
+
+/** Adds income. With `repeat` it comes every month on this day; with `saveFirst` its savings share goes to the goals first. */
+export function addIncome(input: IncomeInput, { repeat = false, saveFirst = false } = {}): IncomeEntry | null {
+  const first = makeIncome(input);
+  if (!first) return null;
+  const store = getStore();
+  if (repeat) {
+    const r: IncomeRepeat = {
+      id: newId('ir'),
+      what: first.what,
+      source: first.source,
+      amount: first.amount,
+      dayOfMonth: fromDayKey(first.day).getDate(),
+      from: monthOf(first.day),
+      saveFirst,
+      createdAt: Date.now(),
+    };
+    writeStore({ ...store, incomeRepeats: [...store.incomeRepeats, r] });
+    catchUpIncome();
+    return getStore().incomes.find((i) => i.repeatId === r.id && i.deletedAt === undefined) ?? first;
+  }
+  const saves = saveFirst ? savesFor(store, first.amount, first.day, first.id) : [];
+  writeStore({ ...store, incomes: [first, ...store.incomes], saves: [...saves, ...store.saves] });
+  return first;
+}
+
+/** Removes income, and the savings it put aside. */
+export function removeIncome(id: string): void {
+  const store = getStore();
+  const now = Date.now();
+  const fromIt = (x: SaveEntry) => x.deletedAt === undefined && (x.id === `${id}-s` || x.id.startsWith(`${id}-s-`));
+  writeStore({
+    ...store,
+    incomes: store.incomes.map((i) => (i.id === id && i.deletedAt === undefined ? { ...i, what: '', amount: 0, deletedAt: now } : i)),
+    saves: store.saves.map((x) => (fromIt(x) ? { ...x, amount: 0, deletedAt: now } : x)),
+  });
+}
+
+/** Stops a repeating income. What it already added stays. */
+export function removeIncomeRepeat(id: string): void {
+  const store = getStore();
+  const now = Date.now();
+  writeStore({
+    ...store,
+    incomeRepeats: store.incomeRepeats.map((r) => (r.id === id && r.deletedAt === undefined ? { ...r, what: '', amount: 0, deletedAt: now } : r)),
+  });
+}
+
+/** Adds every income a repeat owes up to today, with its savings, under ids made from the repeat and the month. */
+function catchUpIncome(today: DayKey = dayKey(new Date())): number {
+  const store = getStore();
+  const known = new Set(store.incomes.map((e) => e.id));
+  const knownSaves = new Set(store.saves.map((x) => x.id));
+  const incomes: IncomeEntry[] = [];
+  let saves: SaveEntry[] = [];
+  const now = monthOf(today);
+  for (const r of store.incomeRepeats) {
+    if (r.deletedAt !== undefined) continue;
+    for (let month = r.from; month <= now; month = shiftMonth(month, 1)) {
+      const id = `${r.id}-${month}`;
+      const day = repeatDay(r, month);
+      if (day > today || known.has(id)) continue;
+      incomes.push({ id, day, what: r.what, source: r.source, amount: r.amount, createdAt: Date.now(), repeatId: r.id });
+      if (r.saveFirst) saves = [...saves, ...savesFor({ ...store, saves: [...saves, ...store.saves] }, r.amount, day, id).filter((x) => !knownSaves.has(x.id))];
+    }
+  }
+  if (incomes.length) writeStore({ ...store, incomes: [...incomes, ...store.incomes], saves: [...saves, ...store.saves] });
+  return incomes.length;
+}
+
+export interface GoalInput {
+  name: string;
+  target: number;
+  monthly: number;
+  by?: MonthKey | null;
+}
+
+/** Adds a goal, or changes the one with `id`. */
+export function saveGoal(input: GoalInput, id?: string): Goal | null {
+  const target = round(input.target);
+  const name = input.name.trim().slice(0, WHAT_MAX);
+  if (!isAmount(target) || !name) return null;
+  const store = getStore();
+  const old = id ? store.goals.find((g) => g.id === id && g.deletedAt === undefined) : undefined;
+  const now = Date.now();
+  const goal: Goal = { id: old?.id ?? newId('g'), name, target, monthly: Math.max(0, round(input.monthly) || 0), createdAt: old?.createdAt ?? now, updatedAt: now };
+  if (input.by && isMonthKey(input.by)) goal.by = input.by;
+  writeStore({ ...store, goals: [...store.goals.filter((g) => g.id !== goal.id), goal] });
+  return goal;
+}
+
+/** Removes a goal. The money put towards it stays in your savings, with no goal. */
+export function removeGoal(id: string): void {
+  const store = getStore();
+  const now = Date.now();
+  writeStore({
+    ...store,
+    goals: store.goals.map((g) => (g.id === id && g.deletedAt === undefined ? { ...g, name: '', target: 0, updatedAt: now, deletedAt: now } : g)),
+    saves: store.saves.map((x) => (x.goalId === id ? { ...x, goalId: '' } : x)),
+  });
+}
+
+/** Puts money towards a goal ("" for savings with no goal). */
+export function addSave(goalId: string, amount: number, day: DayKey = dayKey(new Date())): SaveEntry | null {
+  const value = round(amount);
+  if (!isAmount(value)) return null;
+  const save: SaveEntry = { id: newId('s'), goalId, day, amount: value, createdAt: Date.now() };
+  const store = getStore();
+  writeStore({ ...store, saves: [save, ...store.saves] });
+  return save;
+}
+
+export function setPlan(plan: Plan): void {
+  const tags: Partial<Record<Category, CategoryTag>> = {};
+  for (const c of CATEGORIES) if (plan.tags[c] && plan.tags[c] !== DEFAULT_TAGS[c]) tags[c] = plan.tags[c];
+  writeStore({ ...getStore(), plan: { split: [...plan.split] as Split, tags }, planAt: Date.now() });
+}
+
+export const categoryTag = (plan: Plan, c: Category): CategoryTag => plan.tags[c] ?? DEFAULT_TAGS[c];
+
+/** Need or want for this expense; null for a mixed category it was not given for. */
+export function needOf(entry: Pick<SpendEntry, 'need' | 'category'>, plan: Plan): Need | null {
+  if (entry.need) return entry.need;
+  const tag = categoryTag(plan, entry.category);
+  return tag === 'mixed' ? null : tag;
+}
+
+export interface MonthPlan {
+  /** Income in the month: what came in, plus repeating income still due (in the current month). */
+  income: number;
+  received: number;
+  expected: number;
+  /** The split of `income`. */
+  planned: { needs: number; wants: number; savings: number };
+  /** Put aside this month. Safe to spend keeps back the larger of this and the planned savings. */
+  saved: number;
+  spent: number;
+  needs: number;
+  wants: number;
+  /** Spent in a mixed category without need or want given. */
+  unsorted: number;
+  /** Repeating bills after today (current month only). */
+  billsLater: number;
+  daysLeft: number;
+  /** Free per day from today on, counting nothing spent today (bills paid today are already taken off). */
+  perDay: number;
+  spentToday: number;
+  /** Left to spend today; below 0 when today went over. */
+  leftToday: number;
+  /** Free after savings and the bills still to come, for the days left (today included). */
+  free: number;
+  /** Spent each day of the month, repeating bills left out. */
+  byDay: number[];
+  /** Repeating bills on each day of the month. */
+  billsByDay: number[];
+}
+
+/** The month against the plan. `today` decides whether it is the current month and how many days are left. */
+export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = dayKey(new Date())): MonthPlan {
+  const days = daysInMonth(month);
+  const current = monthOf(today) === month;
+  const dom = current ? Number(today.slice(8)) : days;
+  const live = <T extends { deletedAt?: number }>(x: T) => x.deletedAt === undefined;
+  const incomes = store.incomes.filter(live);
+  const received = round(incomes.filter((i) => monthOf(i.day) === month).reduce((a, i) => a + i.amount, 0));
+  const known = new Set(incomes.map((i) => i.id));
+  const expected = current
+    ? round(
+        store.incomeRepeats
+          .filter((r) => live(r) && r.from <= month && repeatDay(r, month) > today && !known.has(`${r.id}-${month}`))
+          .reduce((a, r) => a + r.amount, 0),
+      )
+    : 0;
+  const income = round(received + expected);
+  const [n, w, sv] = store.plan.split;
+  const planned = { needs: round((income * n) / 100), wants: round((income * w) / 100), savings: round((income * sv) / 100) };
+  const saved = round(store.saves.filter((x) => live(x) && monthOf(x.day) === month).reduce((a, x) => a + x.amount, 0));
+  const mine = store.entries.filter((e) => live(e) && monthOf(e.day) === month);
+  let needs = 0;
+  let wants = 0;
+  let unsorted = 0;
+  const byDay = new Array<number>(days).fill(0);
+  for (const e of mine) {
+    const tag = needOf(e, store.plan);
+    if (tag === 'need') needs += e.amount;
+    else if (tag === 'want') wants += e.amount;
+    else unsorted += e.amount;
+    if (!e.repeatId) byDay[Number(e.day.slice(8)) - 1]! += e.amount;
+  }
+  const spent = round(needs + wants + unsorted);
+  const billsByDay = new Array<number>(days).fill(0);
+  for (const r of store.repeats) {
+    if (!live(r) || r.from > month) continue;
+    billsByDay[Number(repeatDay(r, month).slice(8)) - 1]! += r.amount;
+  }
+  const billsLater = current ? billsAfter(billsByDay, dom) : 0;
+  // Bills are planned for apart from the day's money, so one paid today does not eat today's share.
+  const spentToday = current ? round(mine.filter((e) => e.day === today && !e.repeatId).reduce((a, e) => a + e.amount, 0)) : 0;
+  const daysLeft = current ? days - dom + 1 : 0;
+  const free = round(income - Math.max(saved, planned.savings) - (spent - spentToday) - billsLater);
+  const perDay = daysLeft ? free / daysLeft : 0;
+  return {
+    income,
+    received,
+    expected,
+    planned,
+    saved,
+    spent,
+    needs: round(needs),
+    wants: round(wants),
+    unsorted: round(unsorted),
+    billsLater,
+    daysLeft,
+    perDay,
+    spentToday,
+    leftToday: perDay - spentToday,
+    free,
+    byDay: byDay.map(round),
+    billsByDay,
+  };
 }
 
 /** `budget` null clears it; a category left out of `budgets` has none. */
@@ -453,6 +921,13 @@ function mergeById<T extends { id: string; deletedAt?: number }>(a: T[], b: T[])
  */
 export function mergeBudgetStores(a: BudgetStore, b: BudgetStore): BudgetStore {
   const newer = b.budgetAt > a.budgetAt ? b : a;
+  const newerPlan = b.planAt > a.planAt ? b : a;
+  // Goals change in place: a removal wins, else the copy changed last.
+  const goals = new Map(a.goals.map((g) => [g.id, g]));
+  for (const g of b.goals) {
+    const mine = goals.get(g.id);
+    if (!mine || (g.deletedAt !== undefined && mine.deletedAt === undefined) || (mine.deletedAt === undefined && g.updatedAt > mine.updatedAt)) goals.set(g.id, g);
+  }
   return {
     v: 2,
     budget: newer.budget,
@@ -461,6 +936,12 @@ export function mergeBudgetStores(a: BudgetStore, b: BudgetStore): BudgetStore {
     budgetAt: newer.budgetAt,
     entries: mergeById(a.entries, b.entries).sort(byDay),
     repeats: mergeById(a.repeats, b.repeats).sort(byDayOfMonth),
+    incomes: mergeById(a.incomes, b.incomes).sort(byNewest),
+    incomeRepeats: mergeById(a.incomeRepeats, b.incomeRepeats).sort(byDayOfMonth),
+    goals: [...goals.values()].sort(byCreated),
+    saves: mergeById(a.saves, b.saves).sort(byNewest),
+    plan: newerPlan.plan,
+    planAt: newerPlan.planAt,
   };
 }
 
