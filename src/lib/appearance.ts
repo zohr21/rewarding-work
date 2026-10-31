@@ -20,11 +20,22 @@ export function applyAppearance(a: Appearance): void {
 
 const CELEBRATE = 'rw:celebrate';
 
-/** Ask the ambient background for a short, gentle bloom. */
-export function celebrate(): void {
-  window.dispatchEvent(new CustomEvent(CELEBRATE));
+export interface CelebrateDetail {
+  /** Where the finished thing was on screen, when a spark should fly from it to the Grove. */
+  from?: DOMRect;
 }
 
-export function onCelebrate(callback: () => void): void {
-  window.addEventListener(CELEBRATE, callback);
+/**
+ * Ask the ambient background for a short, gentle bloom. Pass the element that was finished
+ * (e.g. the Done button) and a spark also flies from it to the Grove link (GroveSpark.astro).
+ * Call it before the element is re-rendered away: its position is read right here.
+ */
+export function celebrate(from?: Element | null): void {
+  const rect = from?.getBoundingClientRect();
+  const detail: CelebrateDetail = rect && rect.width ? { from: rect } : {};
+  window.dispatchEvent(new CustomEvent<CelebrateDetail>(CELEBRATE, { detail }));
+}
+
+export function onCelebrate(callback: (detail: CelebrateDetail) => void): void {
+  window.addEventListener(CELEBRATE, (e) => callback((e as CustomEvent<CelebrateDetail>).detail ?? {}));
 }
