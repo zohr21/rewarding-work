@@ -68,6 +68,15 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     </label>
   </div>
 
+  {/* On /timer a 3D tree grows out of the top of the dial as the session runs (focus-tree.ts). */}
+  {
+    standalone && (
+      <div class="timer__tree" data-focus-tree aria-hidden="true">
+        <canvas></canvas>
+      </div>
+    )
+  }
+
   <div class="timer__dial" data-dial>
     <svg class="timer__ring" viewBox="0 0 200 200" aria-hidden="true">
       <circle class="timer__track" cx="100" cy="100" r={RADIUS}></circle>
@@ -199,7 +208,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 <script>
   import { mountTimers } from '../scripts/timer-ui';
   import { onPage } from '../lib/page';
+  import { mountFocusTree } from '../scripts/focus-tree';
   onPage('timer', mountTimers);
+  onPage('focus-tree', mountFocusTree);
 </script>
 
 <style>
@@ -381,10 +392,43 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     stroke: var(--phase-color);
     stroke-width: 12;
     stroke-linecap: round;
-    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--phase-color) 55%, transparent));
     transition:
       stroke-dashoffset 300ms linear,
-      stroke var(--duration-base) var(--ease-out);
+      stroke var(--duration-base) var(--ease-out),
+      filter var(--duration-slow) var(--ease-out);
+  }
+
+  /* Glow only while time is running; a paused or idle ring goes flat. */
+  .timer[data-status='running'] .timer__progress {
+    filter: drop-shadow(0 0 calc(7px * var(--glow-strength)) color-mix(in srgb, var(--phase-color) 60%, transparent));
+  }
+
+  /* The tree stands behind the top of the dial, so its trunk disappears into it like a pot. */
+  .timer__tree {
+    /* Fraction of the height, from the bottom, where the trunk meets the dial; the camera frames the tree above it. */
+    --tree-base: 0.35;
+    position: relative;
+    z-index: 0;
+    width: min(100%, 360px);
+    height: 230px;
+    margin-bottom: -96px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--duration-slow) var(--ease-out);
+  }
+
+  .timer__tree.is-ready {
+    opacity: 1;
+  }
+
+  .timer__tree canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .timer__tree + .timer__dial {
+    z-index: 1;
   }
 
   /* Flowtime focus counts up: show a calm dashed ring instead of progress. */
@@ -724,6 +768,28 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   :global(html[data-app]) .timer .timer__dial {
     order: 3;
     width: min(100%, 256px);
+  }
+
+  :global(html[data-app]) .timer .timer__tree {
+    order: 3;
+    /* Reaches up into the empty space under the tabs, so it adds only ~80px above the dial. */
+    --tree-base: 0.42;
+    width: min(100%, 300px);
+    height: 180px;
+    margin-top: -36px;
+    margin-bottom: -80px;
+  }
+
+  /* With the tree above it, the dial gives back some height so Start and Pause stay above the bottom bar. */
+  :global(html[data-app]) .timer .timer__tree + .timer__dial {
+    width: min(100%, 232px);
+  }
+
+  /* Short phone screens keep the plain dial, so Start stays above the fold. */
+  @media (max-height: 740px) {
+    :global(html[data-app]) .timer .timer__tree {
+      display: none;
+    }
   }
 
   :global(html[data-app]) .timer .timer__time {

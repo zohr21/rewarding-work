@@ -128,6 +128,11 @@
   --accent-grad: linear-gradient(180deg, #377a58, #2f6b4f);
   --accent-edge: #1b4531;
   --accent-glow: rgb(47 107 79 / 0.35);
+  /* Glow: only for things that are live (a running session) or earned (a reward). Paused or stale things lose it. */
+  --glow: #2f9a68;
+  --glow-soft: rgb(47 154 104 / 0.28);
+  --firefly: #c98a1c;
+  --glow-strength: 0.5;
   --popover-bg: linear-gradient(180deg, #ffffff, #f8f5ef);
   --popover-shadow: inset 0 1px 0 #fff, 0 2px 0 rgb(60 50 30 / 0.06), 0 30px 60px -20px rgb(60 50 30 / 0.4);
 
@@ -233,6 +238,10 @@
     --accent-grad: linear-gradient(180deg, #9be8b9, #6fcb94);
     --accent-edge: #2e7a50;
     --accent-glow: rgb(111 203 148 / 0.5);
+    --glow: #8dffc8;
+    --glow-soft: rgb(141 255 200 / 0.4);
+    --firefly: #ffd27a;
+    --glow-strength: 1;
     --popover-bg: linear-gradient(180deg, #1e2b24, #161f1a);
     --popover-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 0 rgb(0 0 0 / 0.5), 0 40px 80px -20px rgb(0 0 0 / 0.9);
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
@@ -296,6 +305,10 @@
   --accent-grad: linear-gradient(180deg, #9be8b9, #6fcb94);
   --accent-edge: #2e7a50;
   --accent-glow: rgb(111 203 148 / 0.5);
+  --glow: #8dffc8;
+  --glow-soft: rgb(141 255 200 / 0.4);
+  --firefly: #ffd27a;
+  --glow-strength: 1;
   --popover-bg: linear-gradient(180deg, #1e2b24, #161f1a);
   --popover-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 0 rgb(0 0 0 / 0.5), 0 40px 80px -20px rgb(0 0 0 / 0.9);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
