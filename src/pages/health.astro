@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import HealthBody from '../components/HealthBody.astro';
+import HealthGarden from '../components/HealthGarden.astro';
 import HealthSpendSummary from '../components/HealthSpendSummary.astro';
 import { NATIVE_APP } from '../config/app';
 ---
@@ -13,6 +14,7 @@ import { NATIVE_APP } from '../config/app';
     </header>
 
     <div class="health">
+      <HealthGarden />
       {/* The Android app has body data to lead with; the site only has a line about it, which goes last. */}
       {NATIVE_APP && <HealthBody />}
       <HealthSpendSummary />
