@@ -1,0 +1,340 @@
+---
+/**
+ * The calendar sheet on /health: a month of workouts (a dot per workout, coloured by type) and
+ * focus, with the totals for the month. Tapping a day lists it; "Show this day" puts the page
+ * on that day (a `health:day` event HealthToday.astro listens for).
+ */
+import Sheet from './Sheet.astro';
+import { WORKOUT_TYPES } from '../lib/workouts';
+---
+
+<Sheet id="calendar" labelledby="hc-month">
+  <div class="hc" data-hc>
+    <div class="hc__nav">
+      <button type="button" class="hc__step" data-hc-step="-1" aria-label="Previous month">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+      <h2 id="hc-month" class="hc__month" data-hc-month aria-live="polite"></h2>
+      <button type="button" class="hc__step" data-hc-step="1" aria-label="Next month">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+    </div>
+
+    <div class="hc__weekdays muted" aria-hidden="true" data-hc-weekdays></div>
+    <div class="hc__grid" data-hc-grid></div>
+
+    <ul class="hc__legend muted" role="list">
+      {WORKOUT_TYPES.map((t) => (
+        <li><i style={`background: ${t.color}`}></i>{t.label}</li>
+      ))}
+      <li><i class="hc__focus-key"></i>Focus</li>
+    </ul>
+
+    <div class="hc__detail" aria-live="polite">
+      <strong data-hc-day></strong>
+      <ul class="hc__rows" role="list" data-hc-rows></ul>
+      <button type="button" class="btn btn--small" data-hc-show>Show this day</button>
+    </div>
+
+    <dl class="hc__totals">
+      <div><dt class="muted">Active days</dt><dd data-hc-active></dd></div>
+      <div><dt class="muted">Workouts</dt><dd data-hc-count></dd></div>
+      <div><dt class="muted">Time moving</dt><dd data-hc-time></dd></div>
+    </dl>
+  </div>
+</Sheet>
+
+<script>
+  import { getWorkouts, workoutsByDay, workoutType } from '../lib/workouts';
+  import { getSessions, subscribe } from '../lib/storage';
+  import { minutesByDay } from '../lib/stats';
+  import { formatFocus } from '../lib/tasks';
+  import { addDays, dayKey, fromDayKey, isDayKey, startOfWeek } from '../lib/dates';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
+  const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const wdFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
+  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+
+  onPage('health-calendar', () => {
+    const root = document.querySelector<HTMLElement>('[data-hc]');
+    const dialog = root?.closest<HTMLDialogElement>('dialog');
+    if (!root || !dialog) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+
+    let month = new Date();
+    month.setDate(1);
+    let picked = dayKey(new Date());
+
+    const monday = startOfWeek(new Date());
+    $('[data-hc-weekdays]').replaceChildren(...Array.from({ length: 7 }, (_, i) => el('span', '', wdFmt.format(addDays(monday, i)))));
+
+    function render(): void {
+      const today = dayKey(new Date());
+      const byDay = workoutsByDay(getWorkouts());
+      const focus = minutesByDay(getSessions());
+      const first = new Date(month.getFullYear(), month.getMonth(), 1);
+      const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+      $('[data-hc-month]').textContent = monthFmt.format(first);
+      $<HTMLButtonElement>('[data-hc-step="1"]').disabled = dayKey(addDays(first, days)) > today;
+
+      const cells: HTMLElement[] = Array.from({ length: (first.getDay() + 6) % 7 }, () => el('span'));
+      let active = 0;
+      let count = 0;
+      let minutes = 0;
+      for (let n = 1; n <= days; n++) {
+        const k = dayKey(new Date(month.getFullYear(), month.getMonth(), n));
+        const list = byDay.get(k) ?? [];
+        const f = focus.get(k) ?? 0;
+        if (list.length) active++;
+        count += list.length;
+        minutes += list.reduce((a, w) => a + w.minutes, 0);
+        const b = el('button', 'hc__day');
+        b.type = 'button';
+        b.dataset.day = k;
+        b.disabled = k > today;
+        b.setAttribute('aria-pressed', String(k === picked));
+        b.setAttribute('aria-label', `${dayFmt.format(fromDayKey(k))}: ${list.length ? `${list.length} workouts` : 'no workouts'}${f ? `, ${Math.round(f)} minutes of focus` : ''}`);
+        if (list.length) b.classList.add('has-workout');
+        if (k === today) b.classList.add('is-today');
+        const dots = el('span', 'hc__dots');
+        for (const w of list.slice(0, 3)) {
+          const dot = el('i');
+          dot.style.background = workoutType(w.type).color;
+          dots.append(dot);
+        }
+        b.append(el('span', '', String(n)), dots);
+        if (f) b.append(el('span', 'hc__focus'));
+        cells.push(b);
+      }
+      $('[data-hc-grid]').replaceChildren(...cells);
+      $('[data-hc-active]').textContent = `${active} of ${days}`;
+      $('[data-hc-count]').textContent = String(count);
+      $('[data-hc-time]').textContent = formatFocus(minutes * 60);
+
+      const list = byDay.get(picked) ?? [];
+      const f = focus.get(picked) ?? 0;
+      $('[data-hc-day]').textContent = picked === today ? `Today · ${dayFmt.format(fromDayKey(picked))}` : dayFmt.format(fromDayKey(picked));
+      const rows = list.map((w) => {
+        const li = el('li');
+        const dot = el('i');
+        dot.style.background = workoutType(w.type).color;
+        li.append(dot, `${workoutType(w.type).label} · ${timeFmt.format(w.start)} · ${w.minutes} min`);
+        return li;
+      });
+      if (f) {
+        const li = el('li');
+        li.append(el('i', 'hc__focus-key'), `Focus · ${formatFocus(f * 60)}`);
+        rows.push(li);
+      }
+      if (!rows.length) rows.push(el('li', 'muted', 'Nothing logged.'));
+      $('[data-hc-rows]').replaceChildren(...rows);
+    }
+
+    c.add(
+      listen(dialog, 'sheet:open', (e) => {
+        const k = (e as CustomEvent<Record<string, string>>).detail?.day;
+        picked = k && isDayKey(k) ? k : dayKey(new Date());
+        month = fromDayKey(picked);
+        month.setDate(1);
+        render();
+      }),
+    );
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      const step = t.closest<HTMLButtonElement>('[data-hc-step]');
+      const day = t.closest<HTMLButtonElement>('[data-day]');
+      if (step && !step.disabled) {
+        month = new Date(month.getFullYear(), month.getMonth() + Number(step.dataset.hcStep), 1);
+        render();
+      } else if (day && !day.disabled) {
+        picked = day.dataset.day!;
+        render();
+      } else if (t.closest('[data-hc-show]')) {
+        document.dispatchEvent(new CustomEvent('health:day', { detail: picked }));
+        dialog.close();
+      }
+    });
+
+    render();
+    c.add(subscribe('workouts', render));
+    c.add(subscribe('sessions', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .hc {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .hc__nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .hc__month {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .hc__step {
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .hc__step:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .hc__weekdays,
+  .hc__grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+
+  .hc__weekdays {
+    font-size: var(--text-xs);
+    text-align: center;
+  }
+
+  .hc__grid :global(.hc__day) {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 3px;
+    min-block-size: 48px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .hc__grid :global(.hc__day.has-workout) {
+    border-color: var(--color-border);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .hc__grid :global(.hc__day.is-today) {
+    color: var(--color-accent);
+  }
+
+  .hc__grid :global(.hc__day[aria-pressed='true']) {
+    border: 2px solid var(--color-accent);
+  }
+
+  .hc__grid :global(.hc__day:disabled) {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .hc__grid :global(.hc__dots) {
+    display: flex;
+    gap: 2px;
+    block-size: 6px;
+  }
+
+  .hc__grid :global(.hc__dots i) {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+  }
+
+  .hc__grid :global(.hc__focus) {
+    position: absolute;
+    inset: auto 30% 3px;
+    block-size: 2px;
+    border-radius: 1px;
+    background: var(--heat-3);
+  }
+
+  .hc__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-xs);
+  }
+
+  .hc__legend li,
+  .hc__rows :global(li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .hc__legend i,
+  .hc__rows :global(i) {
+    flex: none;
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+  }
+
+  .hc :global(.hc__focus-key) {
+    border-radius: 1px;
+    block-size: 3px;
+    inline-size: 10px;
+    background: var(--heat-3);
+  }
+
+  .hc__detail {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .hc__detail .btn {
+    justify-self: start;
+  }
+
+  .hc__rows {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--text-sm);
+  }
+
+  .hc__totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin: 0;
+  }
+
+  .hc__totals dt {
+    font-size: var(--text-xs);
+  }
+
+  .hc__totals dd {
+    margin: 0;
+    font-weight: 700;
+  }
+</style>

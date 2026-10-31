@@ -1,0 +1,247 @@
+---
+/**
+ * A sheet: a panel that opens over the page instead of going to another page. It slides up
+ * from the bottom on a phone and in from the right on a wide screen.
+ *
+ * - Opened by any button with [data-sheet-open="<id>"]; the dialog gets a `sheet:open` event
+ *   first, with that button's dataset as `detail`, so the content can fill itself in.
+ * - Closed by its close button, Esc, a tap on the dimmed page, or a swipe down on its top.
+ *   Those fire a cancelable `sheet:dismiss` first, so a form with changes can ask before
+ *   they are lost. [data-sheet-close] inside it closes it without asking.
+ * - `title` shows a heading; without one, pass `labelledby` with the id of the content's own.
+ */
+interface Props {
+  id: string;
+  title?: string;
+  labelledby?: string;
+}
+
+const { id, title, labelledby } = Astro.props;
+const headingId = `sheet-${id}-title`;
+---
+
+<dialog class="sheet" data-sheet={id} aria-labelledby={title ? headingId : labelledby}>
+  <div class="sheet__panel">
+    <div class="sheet__top" data-sheet-grab>
+      <span class="sheet__handle" aria-hidden="true"></span>
+      <div class="sheet__head">
+        {title ? <h2 id={headingId} class="sheet__title">{title}</h2> : <span />}
+        <button type="button" class="sheet__close" data-sheet-dismiss aria-label="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div class="sheet__body">
+      <slot />
+    </div>
+  </div>
+</dialog>
+
+<script>
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  /** Asks the content first (`sheet:dismiss`), then closes. */
+  function dismiss(dialog: HTMLDialogElement): void {
+    if (dialog.dispatchEvent(new CustomEvent('sheet:dismiss', { cancelable: true }))) dialog.close();
+  }
+
+  onPage('sheet', () => {
+    const c = cleanups();
+    c.add(
+      listen(document, 'click', (e) => {
+        const t = e.target as HTMLElement;
+        const opener = t.closest<HTMLElement>('[data-sheet-open]');
+        if (opener) {
+          const dialog = document.querySelector<HTMLDialogElement>(`[data-sheet="${opener.dataset.sheetOpen}"]`);
+          if (!dialog) return;
+          dialog.dispatchEvent(new CustomEvent('sheet:open', { detail: { ...opener.dataset } }));
+          // A sheet opened from another one takes its place.
+          opener.closest<HTMLDialogElement>('dialog.sheet')?.close();
+          if (!dialog.open) dialog.showModal();
+          return;
+        }
+        const dialog = t.closest<HTMLDialogElement>('dialog.sheet');
+        if (!dialog) return;
+        // The dialog itself is only hit outside the panel: on the dimmed page.
+        if (t === dialog || t.closest('[data-sheet-dismiss]')) dismiss(dialog);
+        else if (t.closest('[data-sheet-close]')) dialog.close();
+      }),
+    );
+
+    for (const dialog of document.querySelectorAll<HTMLDialogElement>('dialog.sheet')) {
+      c.add(
+        listen(dialog, 'cancel', (e) => {
+          e.preventDefault();
+          dismiss(dialog);
+        }),
+      );
+
+      // Swipe down on the top of the sheet to put it away.
+      const grab = dialog.querySelector<HTMLElement>('[data-sheet-grab]')!;
+      const panel = dialog.querySelector<HTMLElement>('.sheet__panel')!;
+      let from: number | null = null;
+      let pulled = 0;
+      c.add(
+        listen(grab, 'pointerdown', (e) => {
+          const p = e as PointerEvent;
+          if ((p.target as HTMLElement).closest('button')) return;
+          from = p.clientY;
+          pulled = 0;
+          grab.setPointerCapture(p.pointerId);
+          panel.style.transition = 'none';
+        }),
+      );
+      c.add(
+        listen(grab, 'pointermove', (e) => {
+          if (from === null) return;
+          pulled = Math.max(0, (e as PointerEvent).clientY - from);
+          panel.style.transform = `translateY(${pulled}px)`;
+        }),
+      );
+      const release = () => {
+        if (from === null) return;
+        from = null;
+        panel.style.transition = '';
+        panel.style.transform = '';
+        if (pulled > 90) dismiss(dialog);
+      };
+      c.add(listen(grab, 'pointerup', release));
+      c.add(listen(grab, 'pointercancel', release));
+    }
+    return c.run;
+  });
+</script>
+
+<style>
+  .sheet {
+    inset: auto 0 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: 92dvh;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-text);
+    overflow: visible;
+  }
+
+  .sheet::backdrop {
+    background: rgb(0 0 0 / 0.6);
+  }
+
+  .sheet__panel {
+    display: flex;
+    flex-direction: column;
+    max-block-size: 92dvh;
+    border: 1px solid var(--color-border-strong);
+    border-width: 1px 0 0;
+    border-radius: 28px 28px 0 0;
+    background-color: var(--color-surface-solid);
+    background-image: var(--popover-bg);
+    box-shadow: var(--popover-shadow);
+    transition: transform var(--duration-slow, 420ms) cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sheet[open] .sheet__panel {
+    animation: sheet-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @keyframes sheet-up {
+    from {
+      transform: translateY(40%);
+      opacity: 0;
+    }
+  }
+
+  .sheet__top {
+    flex: none;
+    padding: var(--space-2) var(--space-4) 0 var(--space-5);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .sheet__handle {
+    display: block;
+    inline-size: 40px;
+    block-size: 5px;
+    margin: 0 auto var(--space-1);
+    border-radius: var(--radius-pill);
+    background: var(--color-border-strong);
+  }
+
+  .sheet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .sheet__title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .sheet__close {
+    flex: none;
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    border: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .sheet__body {
+    min-block-size: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Wide screens: a panel on the right, the page still in view beside it. */
+  @media (min-width: 900px) {
+    .sheet {
+      inset: 0 0 0 auto;
+      inline-size: min(28rem, 100%);
+      block-size: 100dvh;
+      max-block-size: none;
+    }
+
+    .sheet__panel {
+      block-size: 100%;
+      max-block-size: none;
+      border-width: 0 0 0 1px;
+      border-radius: 0;
+    }
+
+    .sheet[open] .sheet__panel {
+      animation-name: sheet-in;
+    }
+
+    .sheet__top {
+      padding-top: var(--space-4);
+      cursor: default;
+    }
+
+    .sheet__handle {
+      display: none;
+    }
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateX(30%);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sheet[open] .sheet__panel {
+      animation: none;
+    }
+  }
+</style>
