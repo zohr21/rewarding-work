@@ -11,9 +11,13 @@ import Sprig from './Sprig.astro';
 <section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
   <h2 id="tiers-heading" class="visually-hidden">Your tiers</h2>
   <div class="tiers__sprig" data-tiers-sprig>
-    <Sprig mood="auto" size={96} bob />
+    <div class="tiers__sprig-art" data-tiers-sprig-art>
+      <Sprig mood="auto" size={96} bob />
+      <canvas aria-hidden="true"></canvas>
+    </div>
     <div class="tiers__sprig-text">
       <p class="tiers__sprig-name" data-tiers-sprig-name></p>
+      <p class="tiers__sprig-tree" data-tiers-sprig-tree></p>
       <p class="muted" data-tiers-sprig-next></p>
       <div class="tiers__sprig-bar" role="progressbar" aria-label="Sprig's growth to the next stage" aria-valuemin="0" aria-valuemax="100" data-tiers-sprig-bar>
         <span></span>
@@ -48,8 +52,37 @@ import Sprig from './Sprig.astro';
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
   import { allProgress, chainInput, tierLabel, TIER_NAMES, type TrackProgress } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
-  import { sprigGrowth, sprigStageName } from '../lib/sprig';
+  import { SPRIG_TREES, sprigGrowth, sprigStageName } from '../lib/sprig';
   import { cleanups, onPage } from '../lib/page';
+  import { url } from '../lib/paths';
+  import { webglAvailable } from '../lib/scene';
+  import type { Sprig3D } from '../lib/scene/sprig3d';
+
+  /**
+   * Swap the drawn Sprig for the 3D one at `stage` (three.js loads only now). The drawing stays
+   * until the model is ready, and is what shows without WebGL. Returns a cleanup.
+   */
+  function show3D(art: HTMLElement, stage: number): () => void {
+    const canvas = art.querySelector('canvas');
+    if (!canvas || !webglAvailable()) return () => {};
+    const root = document.documentElement;
+    const motion = root.dataset.motion !== 'off' && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let sprig: Sprig3D | null = null;
+    let gone = false;
+    art.dataset.stage = String(stage);
+    void import('../lib/scene/sprig3d')
+      .then(({ createSprig3D }) => createSprig3D(canvas, url(`/sprig/sprig-${stage}.glb`), motion))
+      .then((s) => {
+        if (gone) return s?.destroy();
+        sprig = s;
+        art.classList.toggle('is-3d', !!s);
+      });
+    return () => {
+      gone = true;
+      sprig?.destroy();
+      art.classList.remove('is-3d');
+    };
+  }
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -134,6 +167,10 @@ import Sprig from './Sprig.astro';
       const head = root.querySelector<HTMLElement>('[data-tiers-head]')!;
       const seed = root.querySelector<HTMLElement>('[data-tiers-seed]')!;
       const sprig = root.querySelector<HTMLElement>('[data-tiers-sprig]')!;
+      const art = root.querySelector<HTMLElement>('[data-tiers-sprig-art]')!;
+      let stage3D = -1;
+      let stop3D = () => {};
+      c.add(() => stop3D());
       const render = () => {
         const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
         // Nothing has counted yet: one seed and the first goal, not four ladders of "not yet".
@@ -164,6 +201,14 @@ import Sprig from './Sprig.astro';
         root.querySelector('[data-tiers-sprig-name]')!.textContent = focus.level
           ? `Sprig is a ${tierLabel(focus.level - 1)}`
           : 'Sprig is still a seed';
+        root.querySelector('[data-tiers-sprig-tree]')!.textContent = SPRIG_TREES[Math.min(5, focus.level)]!;
+        // A new canvas for each model: a WebGL context can't be handed on cleanly.
+        if (focus.level !== stage3D) {
+          stage3D = focus.level;
+          stop3D();
+          art.querySelector('canvas')!.replaceWith(Object.assign(document.createElement('canvas'), { ariaHidden: 'true' }));
+          stop3D = show3D(art, focus.level);
+        }
         root.querySelector('[data-tiers-sprig-next]')!.textContent =
           goal === undefined
             ? 'A whole grove. Sprig has grown as far as it can.'
@@ -194,6 +239,7 @@ import Sprig from './Sprig.astro';
   /* Sprig, on its own patch of ground, with what it is and how far to the next stage. */
   .tiers__sprig {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
     gap: var(--space-4);
     margin-top: var(--space-3);
@@ -203,12 +249,50 @@ import Sprig from './Sprig.astro';
     box-shadow: var(--well-shadow);
   }
 
+  /* The drawing until the 3D model is ready (and without WebGL); then the model, a bit bigger,
+     with room for the Grove's wide crown. Drag to turn it. */
+  .tiers__sprig-art {
+    position: relative;
+    display: grid;
+    flex: none;
+    /* Centred on its own row when the text has wrapped below it (narrow phones, wide Grove). */
+    margin-inline: auto;
+    align-items: end;
+  }
+
+  .tiers__sprig-art :global(canvas) {
+    display: none;
+    inline-size: 128px;
+    block-size: 152px;
+    touch-action: pan-y;
+    cursor: grab;
+  }
+
+  .tiers__sprig-art[data-stage='5'] :global(canvas) {
+    inline-size: 210px;
+    block-size: 168px;
+  }
+
+  .tiers__sprig-art.is-3d :global(canvas) {
+    display: block;
+  }
+
+  .tiers__sprig-art.is-3d :global(.sprig) {
+    display: none;
+  }
+
+  .tiers__sprig-tree {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
   .tiers__sprig-text {
     display: grid;
     flex: 1;
     gap: 2px;
     align-self: center;
-    min-width: 0;
+    min-width: 11rem;
+    padding-block-end: var(--space-3);
     font-size: var(--text-sm);
   }
 
