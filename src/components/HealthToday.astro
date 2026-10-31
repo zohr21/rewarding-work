@@ -1,0 +1,559 @@
+---
+/**
+ * The top of /health: one day at a glance, everything else in sheets (Sheet.astro).
+ *
+ * - A week strip picks the day; a dot for each workout logged on it.
+ * - Rings: sleep, steps and active minutes in the Android app (from the `body` store
+ *   HealthBody.astro keeps), active minutes and focus on the site. In the app they open the
+ *   body sheet with the full numbers.
+ * - "Your day": workouts (src/lib/workouts.ts) and focus sessions in time order. A workout
+ *   opens the log sheet to change it.
+ * - Garden and wellbeing spend are two small buttons that open their own sheets.
+ */
+import { NATIVE_APP } from '../config/app';
+---
+
+<section class="ht" data-ht data-app={NATIVE_APP ? 'true' : 'false'} aria-label="Your day">
+  <div class="ht__head">
+    <p class="ht__date" data-ht-date></p>
+    <button type="button" class="ht__icon" data-sheet-open="calendar" data-ht-cal aria-label="Open calendar">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect><path d="M3.5 10h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+    </button>
+  </div>
+
+  <nav class="ht__week" aria-label="Pick a day" data-ht-week></nav>
+
+  <div class="card ht__rings" data-ht-rings></div>
+  <p class="ht__connect" data-ht-connect hidden>
+    Sleep and steps come from Health Connect.
+    <button type="button" class="ht__link" data-sheet-open="body">Connect</button>
+  </p>
+
+  <button type="button" class="btn ht__log" data-sheet-open="log" data-ht-log>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    Log activity
+  </button>
+
+  <section class="ht__day" aria-labelledby="ht-day-heading">
+    <div class="ht__day-head">
+      <h2 id="ht-day-heading" class="panel-title">Your day</h2>
+      <span class="muted ht__small">Workouts and focus</span>
+    </div>
+    <ol class="ht__list" role="list" data-ht-list></ol>
+    <p class="muted ht__empty" data-ht-empty hidden></p>
+  </section>
+
+  <div class="ht__more">
+    <button type="button" class="ht__tile" data-sheet-open="garden" data-ht-garden hidden>
+      <span class="muted ht__small">Garden</span>
+      <strong data-ht-garden-sub>Your plants today</strong>
+    </button>
+    <button type="button" class="ht__tile" data-sheet-open="spend">
+      <span class="muted ht__small">Wellbeing spend</span>
+      <strong data-ht-spend-sub>This month</strong>
+    </button>
+  </div>
+</section>
+
+<script>
+  import { getSessions, read, subscribe, type FocusSession } from '../lib/storage';
+  import type { BodyDay } from '../lib/device';
+  import { getWorkouts, workoutsByDay, workoutType, EFFORT_WORDS, type Workout } from '../lib/workouts';
+  import { addDays, dayKey, fromDayKey, isDayKey, startOfWeek } from '../lib/dates';
+  import { formatFocus } from '../lib/tasks';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30, focusMin: 120 };
+  /** Focus sessions closer than this, on the same task, show as one block. */
+  const JOIN_GAP = 15 * 60_000;
+  const MILES = /^en-(US|LR)|^my/i.test(navigator.language);
+  const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const wdFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
+  const distance = (m: number) => (MILES ? `${(m / 1609.344).toFixed(1)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+
+  interface Ring {
+    label: string;
+    value: string;
+    goal: string;
+    share: number;
+    color: string;
+  }
+
+  interface Row {
+    start: number;
+    time: string;
+    color: string;
+    title: string;
+    sub: string;
+    workout?: string;
+  }
+
+  function ringSvg(share: number, color: string): SVGSVGElement {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 64 64');
+    svg.setAttribute('width', '64');
+    svg.setAttribute('height', '64');
+    svg.setAttribute('aria-hidden', 'true');
+    const circ = 2 * Math.PI * 26;
+    for (const [stroke, dash] of [
+      ['var(--color-surface-2)', `${circ} ${circ}`],
+      [color, `${circ * Math.min(1, Math.max(0, share))} ${circ}`],
+    ] as const) {
+      const c = document.createElementNS(SVG_NS, 'circle');
+      c.setAttribute('cx', '32');
+      c.setAttribute('cy', '32');
+      c.setAttribute('r', '26');
+      c.setAttribute('fill', 'none');
+      c.setAttribute('stroke-width', '7');
+      c.setAttribute('stroke-linecap', 'round');
+      c.setAttribute('transform', 'rotate(-90 32 32)');
+      c.style.stroke = stroke;
+      c.setAttribute('stroke-dasharray', dash);
+      svg.append(c);
+    }
+    return svg;
+  }
+
+  /** Focus sessions of one day as blocks: back-to-back sessions on the same task join up. */
+  function focusRows(sessions: FocusSession[]): Row[] {
+    const blocks: { start: number; end: number; seconds: number; count: number; label: string }[] = [];
+    for (const s of sessions) {
+      const last = blocks[blocks.length - 1];
+      if (last && last.label === s.label && s.start - last.end < JOIN_GAP) {
+        last.end = s.end;
+        last.seconds += s.focusSeconds;
+        last.count += 1;
+      } else blocks.push({ start: s.start, end: s.end, seconds: s.focusSeconds, count: 1, label: s.label });
+    }
+    return blocks.map((b) => ({
+      start: b.start,
+      time: timeFmt.format(b.start),
+      color: 'var(--heat-3)',
+      title: b.label ? `Focus · ${b.label}` : 'Focus',
+      sub: `${formatFocus(b.seconds)}${b.count > 1 ? ` · ${b.count} sessions` : ''}`,
+    }));
+  }
+
+  function workoutRow(w: Workout): Row {
+    const t = workoutType(w.type);
+    const parts = [`${w.minutes} min`];
+    if (w.distanceM) parts.push(distance(w.distanceM));
+    if (w.laps) parts.push(`${w.laps} laps · ${(w.laps * (w.poolM ?? 25)).toLocaleString()} m`);
+    parts.push(EFFORT_WORDS[w.effort]!.toLowerCase());
+    return { start: w.start, time: timeFmt.format(w.start), color: t.color, title: t.label, sub: parts.join(' · '), workout: w.id };
+  }
+
+  onPage('health-today', () => {
+    const root = document.querySelector<HTMLElement>('[data-ht]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const app = root.dataset.app === 'true';
+    let day = dayKey(new Date());
+
+    function rings(body: BodyDay | undefined, loggedMin: number, focusMin: number): Ring[] {
+      const active = Math.max(body?.activeMin ?? 0, loggedMin);
+      const activeRing: Ring = { label: 'Active', value: `${active} min`, goal: `Goal ${GOALS.activeMin} min`, share: active / GOALS.activeMin, color: 'var(--cat-reward)' };
+      if (!app) {
+        return [activeRing, { label: 'Focus', value: formatFocus(focusMin * 60), goal: `Goal ${hm(GOALS.focusMin)}`, share: focusMin / GOALS.focusMin, color: 'var(--heat-3)' }];
+      }
+      const sleep = body?.sleepMin;
+      const steps = body?.steps;
+      return [
+        { label: 'Sleep', value: sleep ? hm(sleep) : '–', goal: 'Goal 8h', share: (sleep ?? 0) / GOALS.sleepMin, color: 'var(--cat-visual)' },
+        { label: 'Steps', value: steps !== undefined ? steps.toLocaleString() : '–', goal: `Goal ${GOALS.steps.toLocaleString()}`, share: (steps ?? 0) / GOALS.steps, color: 'var(--cat-structure)' },
+        activeRing,
+      ];
+    }
+
+    function render(): void {
+      const today = dayKey(new Date());
+      if (day > today) day = today;
+      const workouts = workoutsByDay(getWorkouts());
+      const dayStart = fromDayKey(day).getTime();
+      const dayEnd = addDays(fromDayKey(day), 1).getTime();
+      const sessions = getSessions().filter((s) => s.start >= dayStart && s.start < dayEnd);
+      const bodyDays = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+      const body = bodyDays.find((d) => d.day === day);
+      const logged = workouts.get(day) ?? [];
+
+      $('[data-ht-date]').textContent = day === today ? `Today · ${dateFmt.format(fromDayKey(day))}` : dateFmt.format(fromDayKey(day));
+      $<HTMLElement>('[data-ht-log]').dataset.day = day;
+      $<HTMLElement>('[data-ht-cal]').dataset.day = day;
+
+      // The week the day is in, Monday first.
+      const monday = startOfWeek(fromDayKey(day));
+      $('[data-ht-week]').replaceChildren(
+        ...Array.from({ length: 7 }, (_, i) => {
+          const d = addDays(monday, i);
+          const k = dayKey(d);
+          const b = el('button', 'ht__wd');
+          b.type = 'button';
+          b.dataset.day = k;
+          b.setAttribute('aria-pressed', String(k === day));
+          b.setAttribute('aria-label', `${dateFmt.format(d)}${workouts.get(k)?.length ? `, ${workouts.get(k)!.length} workouts` : ''}`);
+          b.disabled = k > today;
+          if (k === today) b.classList.add('is-today');
+          const dots = el('span', 'ht__dots');
+          for (const w of (workouts.get(k) ?? []).slice(0, 3)) {
+            const dot = el('i');
+            dot.style.background = workoutType(w.type).color;
+            dots.append(dot);
+          }
+          b.append(el('span', 'ht__wd-name', wdFmt.format(d)), el('span', 'ht__wd-num', String(d.getDate())), dots);
+          return b;
+        }),
+      );
+
+      const focusMin = Math.round(sessions.reduce((a, s) => a + s.focusSeconds, 0) / 60);
+      const loggedMin = logged.reduce((a, w) => a + w.minutes, 0);
+      $('[data-ht-rings]').replaceChildren(
+        ...rings(body, loggedMin, focusMin).map((r) => {
+          const box = app ? el('button', 'ht__ring') : el('div', 'ht__ring');
+          if (box instanceof HTMLButtonElement) {
+            box.type = 'button';
+            box.dataset.sheetOpen = 'body';
+          }
+          box.append(ringSvg(r.share, r.color), el('strong', 'ht__ring-value', r.value), el('span', 'ht__ring-label', r.label), el('span', 'muted ht__small', r.goal));
+          return box;
+        }),
+      );
+      $<HTMLElement>('[data-ht-connect]').hidden = !app || bodyDays.length > 0;
+
+      const rows = [...logged.map(workoutRow), ...focusRows(sessions)].sort((a, b) => a.start - b.start);
+      $('[data-ht-list]').replaceChildren(
+        ...rows.map((r) => {
+          const li = el('li');
+          const inner = r.workout ? el('button', 'ht__row') : el('div', 'ht__row');
+          if (inner instanceof HTMLButtonElement) {
+            inner.type = 'button';
+            inner.dataset.sheetOpen = 'log';
+            inner.dataset.workout = r.workout;
+            inner.setAttribute('aria-label', `${r.title} at ${r.time}, ${r.sub}. Edit`);
+          }
+          const dot = el('i', 'ht__dot');
+          dot.style.background = r.color;
+          const text = el('span', 'ht__row-text');
+          text.append(el('strong', '', r.title), el('span', 'muted ht__small', r.sub));
+          inner.append(el('span', 'muted ht__time', r.time), dot, text);
+          if (r.workout) inner.append(el('span', 'muted ht__small', 'Edit'));
+          li.append(inner);
+          return li;
+        }),
+      );
+      const empty = $<HTMLElement>('[data-ht-empty]');
+      empty.hidden = rows.length > 0;
+      empty.textContent = day === today ? 'Nothing yet today. Log a workout, or start a focus session.' : 'Nothing logged on this day.';
+    }
+
+    $('[data-ht-week]').addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-day]');
+      if (!b || b.disabled) return;
+      day = b.dataset.day!;
+      render();
+    });
+    c.add(
+      listen(document, 'health:day', (e) => {
+        const k = (e as CustomEvent<string>).detail;
+        if (isDayKey(k)) {
+          day = k;
+          render();
+        }
+      }),
+    );
+
+    // The garden and spend sheets work out their own numbers; their buttons here show the gist.
+    const garden = document.querySelector<HTMLElement>('[data-garden]');
+    const total = document.querySelector<HTMLElement>('[data-ws-total]');
+    const mirror = () => {
+      const gardenButton = $<HTMLElement>('[data-ht-garden]');
+      gardenButton.hidden = !garden || garden.hidden;
+      const hint = garden?.querySelector('[data-garden-hint]')?.textContent;
+      if (hint) $('[data-ht-garden-sub]').textContent = hint;
+      if (total?.textContent) $('[data-ht-spend-sub]').textContent = `${total.textContent} this month`;
+    };
+    const watch = new MutationObserver(mirror);
+    if (garden) watch.observe(garden, { attributes: true, attributeFilter: ['hidden'], subtree: true, childList: true, characterData: true });
+    if (total) watch.observe(total, { childList: true, characterData: true, subtree: true });
+    c.add(() => watch.disconnect());
+    mirror();
+
+    render();
+    for (const store of ['workouts', 'sessions', 'body'] as const) c.add(subscribe(store, render));
+    c.add(
+      listen(document, 'visibilitychange', () => {
+        if (!document.hidden) render();
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .ht {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .ht [hidden] {
+    display: none;
+  }
+
+  .ht__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .ht__date {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .ht__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-btn);
+    background: var(--raised-grad);
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .ht__week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--space-1);
+  }
+
+  .ht__week :global(.ht__wd) {
+    display: grid;
+    justify-items: center;
+    gap: 2px;
+    min-block-size: 64px;
+    padding: var(--space-2) 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-btn);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .ht__week :global(.ht__wd:disabled) {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .ht__week :global(.ht__wd.is-today .ht__wd-name) {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .ht__week :global(.ht__wd[aria-pressed='true']) {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .ht__week :global(.ht__wd[aria-pressed='true'] .ht__wd-name) {
+    color: inherit;
+  }
+
+  .ht__week :global(.ht__wd-name) {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .ht__week :global(.ht__wd-num) {
+    font-size: var(--text-base);
+    font-weight: 650;
+  }
+
+  .ht__week :global(.ht__dots) {
+    display: flex;
+    gap: 3px;
+    block-size: 6px;
+  }
+
+  .ht__week :global(.ht__dots i) {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+  }
+
+  .ht__week :global(.ht__wd[aria-pressed='true'] .ht__dots i) {
+    box-shadow: 0 0 0 1.5px var(--color-on-accent);
+  }
+
+  .ht__rings {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-2);
+  }
+
+  .ht__rings :global(.ht__ring) {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    text-align: center;
+  }
+
+  .ht__rings :global(button.ht__ring) {
+    cursor: pointer;
+  }
+
+  .ht__rings :global(.ht__ring-value) {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+  }
+
+  .ht__rings :global(.ht__ring-label) {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .ht__small {
+    font-size: var(--text-xs);
+  }
+
+  .ht__connect {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .ht__link {
+    min-block-size: 44px;
+    padding: 0 var(--space-1);
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .ht__log {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-block-size: 52px;
+    text-decoration: none;
+  }
+
+  .ht__day {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .ht__day-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .ht__day-head .panel-title {
+    margin: 0;
+  }
+
+  .ht__list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ht__list :global(li) {
+    max-width: none;
+  }
+
+  .ht__list :global(.ht__row) {
+    display: grid;
+    grid-template-columns: auto 12px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
+    min-block-size: 56px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+  }
+
+  .ht__list :global(button.ht__row) {
+    cursor: pointer;
+  }
+
+  .ht__list :global(.ht__time) {
+    min-inline-size: 3rem;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ht__list :global(.ht__dot) {
+    inline-size: 12px;
+    block-size: 12px;
+    border-radius: 50%;
+  }
+
+  .ht__list :global(.ht__row-text) {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .ht__list :global(.ht__row-text strong) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ht__empty {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .ht__more {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: var(--space-2);
+  }
+
+  .ht__tile {
+    display: grid;
+    gap: 2px;
+    min-block-size: 56px;
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+</style>
