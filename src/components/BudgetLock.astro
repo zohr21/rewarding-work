@@ -1,0 +1,749 @@
+---
+/**
+ * The Budget lock (src/lib/lock.ts): the screen that covers Budget until you unlock it, the
+ * "Lock Budget" sheet, and the eye that hides amounts. The eye and the lock button sit in
+ * BudgetView's bar; this wires them. Goes first on the Budget page.
+ */
+import Sheet from './Sheet.astro';
+import { NATIVE_APP } from '../config/app';
+import { ACCOUNTS_ENABLED } from '../config/firebase';
+import { PIN_MAX, PIN_MIN } from '../lib/lock';
+
+const here = NATIVE_APP ? 'this phone' : 'this browser';
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
+---
+
+{/* Before the page paints: locked, or amounts hidden, so nothing shows first. Repeats lock.ts isOpen and amountsHidden. */}
+<script is:inline>
+  (function () {
+    var d = document.documentElement;
+    try {
+      var l = JSON.parse(localStorage.getItem('rw:v1:lock') || '{}') || {};
+      var mode = l.mode === 'device' || (l.mode === 'pin' && l.pin) ? l.mode : 'off';
+      var open = true;
+      if (mode !== 'off') {
+        var o = JSON.parse(sessionStorage.getItem('rw:lock:open') || 'null');
+        var after = typeof l.after === 'number' ? l.after : 300;
+        open = !!o && (o.awayAt === null || Date.now() - o.awayAt <= after * 1000);
+      }
+      d.toggleAttribute('data-budget-locked', !open);
+      var h = sessionStorage.getItem('rw:lock:hide');
+      d.toggleAttribute('data-money-hidden', h === null ? l.hideOnOpen === true : h === '1');
+    } catch (e) {
+      d.removeAttribute('data-budget-locked');
+    }
+  })();
+</script>
+
+<section class="card bl" aria-labelledby="bl-title" data-bl-screen>
+  <span class="bl__icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="30" height="30"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+  </span>
+  <h1 class="bl__title" id="bl-title">Budget is locked</h1>
+
+  <div class="bl__device" data-bl-device hidden>
+    <p class="muted">Unlock with your fingerprint, face or the phone’s PIN. Focus, Tasks and your grove stay open.</p>
+    <button type="button" class="btn" data-bl-device-unlock>Unlock</button>
+  </div>
+
+  <form class="bl__pin" data-bl-pin hidden>
+    <label class="bl__field">
+      <span class="muted">Your Budget PIN for {here}</span>
+      <input
+        class="input bl__input"
+        type="password"
+        inputmode="numeric"
+        autocomplete="off"
+        pattern="[0-9]*"
+        minlength={PIN_MIN}
+        maxlength={PIN_MAX}
+        required
+        data-bl-pin-input
+      />
+    </label>
+    <p class="bl__error" role="alert" data-bl-error></p>
+    <div class="bl__keys">
+      {
+        KEYS.map((k) =>
+          k === 'del' ? (
+            <button type="button" class="bl__key" data-bl-key="del" aria-label="Delete last digit">
+              ⌫
+            </button>
+          ) : k === 'ok' ? (
+            <button type="submit" class="bl__key bl__key--ok" aria-label="Unlock">
+              OK
+            </button>
+          ) : (
+            <button type="button" class="bl__key" data-bl-key={k}>
+              {k}
+            </button>
+          ),
+        )
+      }
+    </div>
+    <button type="button" class="btn btn--ghost btn--small" data-bl-forgot>Forgot PIN?</button>
+  </form>
+
+  <div class="bl__forgot" data-bl-forgot-panel hidden>
+    <div data-bl-forgot-account hidden>
+      <p>Sign in again to show it is you. The PIN is then removed and Budget opens.</p>
+      <form class="bl__confirm" data-bl-confirm-password hidden>
+        <label class="bl__field">
+          <span>Your account password</span>
+          <input class="input" type="password" autocomplete="current-password" required data-bl-password />
+        </label>
+        <button type="submit" class="btn">Confirm</button>
+      </form>
+      <button type="button" class="btn" data-bl-confirm-google hidden>Continue with Google</button>
+    </div>
+    <div data-bl-forgot-local hidden>
+      <p>
+        {ACCOUNTS_ENABLED ? 'Without an account to sign in to, the' : 'The'} only way back in is to remove Budget’s data from {here}: expenses, income, goals
+        and the plan. Nothing else is touched.
+      </p>
+      <button type="button" class="btn btn--danger" data-bl-wipe>Remove Budget data and the PIN</button>
+    </div>
+    <p class="bl__error" role="alert" data-bl-forgot-error></p>
+    <button type="button" class="btn btn--ghost btn--small" data-bl-forgot-back>Back to the PIN</button>
+  </div>
+
+  <p class="muted bl__foot">This keeps Budget from a glance at an open screen. Your account sign-in and your device’s own lock are what protect the data.</p>
+</section>
+
+<Sheet id="budget-lock" title="Lock Budget">
+  <div class="bl-set" data-bl-settings>
+    <p class="muted bl-set__intro">Ask before showing your money. Only Budget locks; the rest of Grovyn stays open.</p>
+
+    <fieldset class="bl-set__group">
+      <legend>Unlock with</legend>
+      <label class="bl-opt">
+        <input type="radio" name="bl-mode" value="off" class="visually-hidden" />
+        <span class="bl-opt__text"><strong>Off</strong><span class="muted">Budget opens straight away</span></span>
+      </label>
+      {
+        NATIVE_APP && (
+          <label class="bl-opt" data-bl-device-opt>
+            <input type="radio" name="bl-mode" value="device" class="visually-hidden" />
+            <span class="bl-opt__text">
+              <strong>Phone unlock</strong>
+              <span class="muted" data-bl-device-sub>
+                Fingerprint, face or the phone’s PIN
+              </span>
+            </span>
+          </label>
+        )
+      }
+      <label class="bl-opt">
+        <input type="radio" name="bl-mode" value="pin" class="visually-hidden" />
+        <span class="bl-opt__text">
+          <strong>{NATIVE_APP ? 'Grovyn PIN' : 'PIN'}</strong>
+          <span class="muted">{PIN_MIN}–{PIN_MAX} digits, for {here} only</span>
+        </span>
+      </label>
+    </fieldset>
+
+    <form class="bl-set__pin" data-bl-new-pin hidden>
+      <div class="bl-set__pair">
+        <label class="bl__field">
+          <span>New PIN</span>
+          <input class="input" type="password" inputmode="numeric" autocomplete="new-password" pattern="[0-9]*" minlength={PIN_MIN} maxlength={PIN_MAX} required data-bl-new />
+        </label>
+        <label class="bl__field">
+          <span>Again</span>
+          <input class="input" type="password" inputmode="numeric" autocomplete="new-password" pattern="[0-9]*" minlength={PIN_MIN} maxlength={PIN_MAX} required data-bl-again />
+        </label>
+      </div>
+      <p class="bl__error" role="alert" data-bl-new-error></p>
+      <div class="bl-set__row">
+        <button type="button" class="btn btn--ghost btn--small" data-bl-new-cancel>Cancel</button>
+        <button type="submit" class="btn btn--small">Save PIN</button>
+      </div>
+    </form>
+    <button type="button" class="btn btn--ghost btn--small bl-set__change" data-bl-change-pin hidden>Change PIN</button>
+
+    <fieldset class="bl-set__group" data-bl-after-group>
+      <legend>Lock again after</legend>
+      <div class="bl-set__afters">
+        {
+          [
+            [0, 'Right away'],
+            [60, '1 min'],
+            [300, '5 min'],
+            [900, '15 min'],
+          ].map(([value, label]) => (
+            <label class="bl-opt bl-opt--small">
+              <input type="radio" name="bl-after" value={value} class="visually-hidden" />
+              {label}
+            </label>
+          ))
+        }
+      </div>
+    </fieldset>
+
+    <label class="bl-switch">
+      <span class="bl-opt__text"><strong>Hide amounts on open</strong><span class="muted">Budget shows ₼••• until you tap the eye</span></span>
+      <input type="checkbox" role="switch" data-bl-hide-on-open />
+    </label>
+
+    <p class="bl-set__note" data-bl-note></p>
+    <button type="button" class="btn btn--ghost" data-bl-lock-now hidden>Lock now</button>
+    <p class="visually-hidden" aria-live="polite" data-bl-live></p>
+  </div>
+</Sheet>
+
+<script>
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { NATIVE_APP } from '../config/app';
+  import { deviceLockAvailable, deviceUnlock } from '../lib/device';
+  import { getAccount, loadAccount } from '../lib/account/state';
+  import { friendlyError } from '../lib/account/errors';
+  import { remove } from '../lib/storage';
+  import {
+    amountsHidden,
+    checkPin,
+    forgetPin,
+    getLock,
+    isOpen,
+    isPin,
+    lockNow,
+    markAway,
+    markOpen,
+    MAX_TRIES,
+    setAmountsHidden,
+    setLock,
+    setPin,
+    type LockMode,
+  } from '../lib/lock';
+
+  onPage('budget-lock', () => {
+    const found = document.querySelector<HTMLElement>('[data-bl-screen]');
+    if (!found) return;
+    const screen = found;
+    const c = cleanups();
+    const html = document.documentElement;
+    const $ = <E extends Element = HTMLElement>(s: string) => document.querySelector<E>(s)!;
+    const $$ = <E extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<E>(s)];
+    const pinInput = $<HTMLInputElement>('[data-bl-pin-input]');
+    /** null until asked; false when the phone has no screen lock (then Phone unlock cannot lock anything). */
+    let deviceReady: boolean | null = NATIVE_APP ? null : false;
+    let prompting = false;
+
+    const announce = (text: string) => {
+      const live = $('[data-bl-live]');
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    };
+
+    /** The lock that applies now: Phone unlock on a phone without a screen lock is no lock. */
+    const effective = () => {
+      const lock = getLock();
+      return lock.mode === 'device' && deviceReady === false ? { ...lock, mode: 'off' as LockMode } : lock;
+    };
+
+    // ---- Hide amounts ----
+    function applyHidden(hidden: boolean): void {
+      html.toggleAttribute('data-money-hidden', hidden);
+      for (const eye of $$<HTMLButtonElement>('[data-bl-eye]')) {
+        eye.setAttribute('aria-pressed', String(hidden));
+        eye.setAttribute('aria-label', hidden ? 'Show amounts' : 'Hide amounts');
+        eye.dataset.hidden = String(hidden);
+      }
+      document.dispatchEvent(new CustomEvent('budget:refresh'));
+    }
+
+    // ---- Locked or open ----
+    function showLock(): void {
+      const lock = effective();
+      const locked = !isOpen(lock);
+      html.toggleAttribute('data-budget-locked', locked);
+      if (!locked) return;
+      const device = lock.mode === 'device';
+      $('[data-bl-device]').hidden = !device;
+      $<HTMLFormElement>('[data-bl-pin]').hidden = device;
+      $('[data-bl-forgot-panel]').hidden = true;
+      setText('[data-bl-error]', lock.mode === 'pin' && lock.tries <= 0 ? 'Too many wrong PINs. Use “Forgot PIN?” to get back in.' : '');
+      pinInput.disabled = lock.mode === 'pin' && lock.tries <= 0;
+      if (device) void askDevice();
+      else if (!pinInput.disabled) window.setTimeout(() => pinInput.focus(), 50);
+    }
+
+    function setText(sel: string, text: string): void {
+      $(sel).textContent = text;
+    }
+
+    function opened(): void {
+      markOpen();
+      html.removeAttribute('data-budget-locked');
+      pinInput.value = '';
+      announce('Budget unlocked');
+    }
+
+    async function askDevice(): Promise<void> {
+      if (prompting) return;
+      prompting = true;
+      const result = await deviceUnlock('Unlock Budget', 'Grovyn');
+      prompting = false;
+      if (result === 'ok') opened();
+    }
+
+    c.add(listen($('[data-bl-device-unlock]'), 'click', () => void askDevice()));
+
+    c.add(
+      listen($('[data-bl-pin]'), 'submit', (e) => {
+        e.preventDefault();
+        const pin = pinInput.value;
+        if (!isPin(pin)) {
+          setText('[data-bl-error]', 'Enter all the digits of your PIN.');
+          return;
+        }
+        void checkPin(pin).then((ok) => {
+          if (ok) return opened();
+          pinInput.value = '';
+          const left = getLock().tries;
+          setText('[data-bl-error]', left > 0 ? `Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong PINs. Use “Forgot PIN?” to get back in.');
+          pinInput.disabled = left <= 0;
+          if (left > 0) pinInput.focus();
+        });
+      }),
+    );
+    for (const key of $$<HTMLButtonElement>('[data-bl-key]')) {
+      c.add(
+        listen(key, 'click', () => {
+          if (pinInput.disabled) return;
+          const k = key.dataset.blKey!;
+          pinInput.value = k === 'del' ? pinInput.value.slice(0, -1) : (pinInput.value + k).slice(0, pinInput.maxLength);
+        }),
+      );
+    }
+
+    // ---- Forgot PIN ----
+    c.add(
+      listen($('[data-bl-forgot]'), 'click', () => {
+        const user = getAccount().user;
+        const account = !!user && !user.isAnonymous;
+        $<HTMLFormElement>('[data-bl-pin]').hidden = true;
+        $('[data-bl-forgot-panel]').hidden = false;
+        $('[data-bl-forgot-account]').hidden = !account;
+        $('[data-bl-forgot-local]').hidden = account;
+        $<HTMLFormElement>('[data-bl-confirm-password]').hidden = !(account && user!.providers.includes('password'));
+        $('[data-bl-confirm-google]').hidden = !(account && user!.providers.includes('google.com'));
+        setText('[data-bl-forgot-error]', '');
+      }),
+    );
+    c.add(listen($('[data-bl-forgot-back]'), 'click', showLock));
+
+    async function confirmed(password?: string): Promise<void> {
+      setText('[data-bl-forgot-error]', '');
+      try {
+        await (await loadAccount()).confirmIdentity(password);
+        forgetPin();
+        opened();
+        announce('PIN removed. Budget is open.');
+        $<HTMLDialogElement>('[data-sheet="budget-lock"]').showModal();
+        fillSettings();
+      } catch (err) {
+        setText('[data-bl-forgot-error]', friendlyError(err));
+      }
+    }
+
+    c.add(
+      listen($('[data-bl-confirm-password]'), 'submit', (e) => {
+        e.preventDefault();
+        void confirmed($<HTMLInputElement>('[data-bl-password]').value);
+      }),
+    );
+    c.add(listen($('[data-bl-confirm-google]'), 'click', () => void confirmed()));
+    c.add(
+      listen($('[data-bl-wipe]'), 'click', () => {
+        if (!window.confirm('Remove all Budget data on this device, and the PIN? This cannot be undone.')) return;
+        remove('health');
+        forgetPin();
+        opened();
+      }),
+    );
+
+    // ---- The settings sheet ----
+    const sheet = $<HTMLDialogElement>('[data-sheet="budget-lock"]');
+    /** Picked "PIN" but no PIN saved yet: the radio shows it while the form is open. */
+    let choosingPin = false;
+
+    function fillSettings(): void {
+      const lock = getLock();
+      const mode = choosingPin ? 'pin' : lock.mode;
+      for (const r of $$<HTMLInputElement>('input[name="bl-mode"]')) r.checked = r.value === mode;
+      for (const r of $$<HTMLInputElement>('input[name="bl-after"]')) r.checked = Number(r.value) === lock.after;
+      $<HTMLInputElement>('[data-bl-hide-on-open]').checked = lock.hideOnOpen;
+      $('[data-bl-after-group]').hidden = mode === 'off';
+      $<HTMLFormElement>('[data-bl-new-pin]').hidden = !choosingPin;
+      $('[data-bl-change-pin]').hidden = choosingPin || lock.mode !== 'pin';
+      $('[data-bl-lock-now]').hidden = lock.mode === 'off';
+      const deviceOpt = document.querySelector<HTMLInputElement>('input[name="bl-mode"][value="device"]');
+      if (deviceOpt) {
+        deviceOpt.disabled = deviceReady === false;
+        setText('[data-bl-device-sub]', deviceReady === false ? 'Set a screen lock in the phone’s settings first' : 'Fingerprint, face or the phone’s PIN');
+      }
+      const notes: Record<LockMode, string> = {
+        off: `Anyone holding ${NATIVE_APP ? 'your unlocked phone' : 'this open browser'} can see Budget. The eye still hides the amounts.`,
+        device: 'Uses Android’s own prompt. Grovyn never sees your fingerprint or PIN, only whether it matched.',
+        pin: getAccount().user && !getAccount().user!.isAnonymous
+          ? 'Forgot it? Sign in to your account again to remove it. Your data stays in your account.'
+          : 'Forgot it? Without an account, the way back in is to remove Budget’s data from this device.',
+      };
+      setText('[data-bl-note]', notes[mode]);
+    }
+
+    function openNewPin(): void {
+      choosingPin = true;
+      $<HTMLInputElement>('[data-bl-new]').value = '';
+      $<HTMLInputElement>('[data-bl-again]').value = '';
+      setText('[data-bl-new-error]', '');
+      fillSettings();
+      $<HTMLInputElement>('[data-bl-new]').focus();
+    }
+
+    c.add(listen(sheet, 'sheet:open', () => {
+      choosingPin = false;
+      fillSettings();
+    }));
+    c.add(
+      listen(sheet, 'change', (e) => {
+        const t = e.target as HTMLInputElement;
+        if (t.name === 'bl-mode') {
+          const mode = t.value as LockMode;
+          if (mode === 'pin') {
+            if (getLock().mode !== 'pin') openNewPin();
+            return;
+          }
+          choosingPin = false;
+          if (mode === 'device') {
+            // Try it once first, so a lock that cannot be opened is never set.
+            void deviceUnlock('Turn on the Budget lock', 'Grovyn').then((result) => {
+              if (result === 'ok') {
+                setLock({ mode: 'device', pin: null });
+                markOpen();
+                announce('Budget locks with your phone’s unlock');
+              }
+              fillSettings();
+            });
+            return;
+          }
+          setLock({ mode: 'off', pin: null, tries: MAX_TRIES });
+          announce('Budget lock off');
+        } else if (t.name === 'bl-after') {
+          setLock({ after: Number(t.value) });
+        } else if (t.matches('[data-bl-hide-on-open]')) {
+          setLock({ hideOnOpen: t.checked });
+        }
+        fillSettings();
+      }),
+    );
+    c.add(listen($('[data-bl-change-pin]'), 'click', openNewPin));
+    c.add(
+      listen($('[data-bl-new-cancel]'), 'click', () => {
+        choosingPin = false;
+        fillSettings();
+      }),
+    );
+    c.add(
+      listen($('[data-bl-new-pin]'), 'submit', (e) => {
+        e.preventDefault();
+        const pin = $<HTMLInputElement>('[data-bl-new]').value;
+        if (!isPin(pin)) return setText('[data-bl-new-error]', 'Use 4 to 6 digits.');
+        if (pin !== $<HTMLInputElement>('[data-bl-again]').value) return setText('[data-bl-new-error]', 'The two PINs are not the same.');
+        void setPin(pin).then(() => {
+          choosingPin = false;
+          fillSettings();
+          announce('PIN saved. Budget is locked with it.');
+        });
+      }),
+    );
+    c.add(
+      listen($('[data-bl-lock-now]'), 'click', () => {
+        sheet.close();
+        lockNow();
+        showLock();
+      }),
+    );
+
+    // ---- The eye, and leaving and coming back ----
+    for (const eye of $$<HTMLButtonElement>('[data-bl-eye]')) {
+      c.add(
+        listen(eye, 'click', () => {
+          const hidden = !html.hasAttribute('data-money-hidden');
+          setAmountsHidden(hidden);
+          applyHidden(hidden);
+        }),
+      );
+    }
+    c.add(
+      listen(document, 'visibilitychange', () => {
+        if (document.visibilityState === 'hidden') markAway();
+        else if (!isOpen(effective())) showLock();
+        else if (!html.hasAttribute('data-budget-locked')) markOpen();
+      }),
+    );
+
+    // You › Privacy › Lock Budget comes here with ?lock=settings.
+    const params = new URLSearchParams(location.search);
+    const wantSettings = params.get('lock') === 'settings';
+
+    async function start(): Promise<void> {
+      if (NATIVE_APP) deviceReady = await deviceLockAvailable();
+      applyHidden(amountsHidden());
+      showLock();
+      if (!html.hasAttribute('data-budget-locked')) markOpen();
+      if (wantSettings && !html.hasAttribute('data-budget-locked')) {
+        fillSettings();
+        sheet.showModal();
+      }
+    }
+    void start();
+
+    return () => {
+      c.run();
+      markAway();
+      html.removeAttribute('data-budget-locked');
+      html.removeAttribute('data-money-hidden');
+    };
+  });
+</script>
+
+<style is:global>
+  /* Locked: only the lock screen shows on the Budget page. */
+  html[data-budget-locked] .budget-page > :not(.bl) {
+    display: none !important;
+  }
+
+  html:not([data-budget-locked]) .bl {
+    display: none;
+  }
+
+  .bl {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    max-width: 420px;
+    margin: var(--space-6) auto;
+    text-align: center;
+  }
+
+  .bl [hidden] {
+    display: none !important;
+  }
+
+  .bl p {
+    margin: 0;
+  }
+
+  .bl__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 64px;
+    block-size: 64px;
+    border-radius: 50%;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .bl__title {
+    margin: 0;
+    font-size: var(--text-xl);
+  }
+
+  .bl__device,
+  .bl__pin,
+  .bl__forgot,
+  .bl__forgot > div,
+  .bl__confirm {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .bl__field {
+    display: grid;
+    gap: var(--space-1);
+    width: 100%;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: start;
+  }
+
+  .bl__input {
+    font-size: 1.6rem;
+    letter-spacing: 0.4em;
+    text-align: center;
+  }
+
+  .bl__error {
+    min-height: 1.2em;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-danger);
+  }
+
+  .bl__keys {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .bl__key {
+    min-height: 56px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    font: inherit;
+    font-size: 1.3rem;
+    font-weight: 650;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .bl__key--ok {
+    background: var(--color-accent);
+    color: var(--color-on-accent, #fff);
+    font-size: var(--text-sm);
+  }
+
+  .bl__foot {
+    font-size: var(--text-xs);
+  }
+
+  /* ---- The settings sheet ---- */
+  .bl-set {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bl-set [hidden] {
+    display: none !important;
+  }
+
+  .bl-set p {
+    margin: 0;
+  }
+
+  .bl-set__intro {
+    font-size: var(--text-sm);
+  }
+
+  .bl-set__group {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bl-set__group legend {
+    margin-bottom: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .bl-opt {
+    display: flex;
+    align-items: center;
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    cursor: pointer;
+  }
+
+  .bl-opt:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+
+  .bl-opt:has(input:disabled) {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .bl-opt:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .bl-opt--small {
+    justify-content: center;
+    min-height: 44px;
+    padding: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .bl-opt__text {
+    display: grid;
+    gap: 2px;
+    font-size: var(--text-sm);
+  }
+
+  .bl-opt__text span {
+    font-size: var(--text-xs);
+  }
+
+  .bl-set__afters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .bl-set__pin {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bl-set__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .bl-set__row {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .bl-set__change {
+    justify-self: start;
+  }
+
+  .bl-switch {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    cursor: pointer;
+  }
+
+  .bl-switch input {
+    inline-size: 22px;
+    block-size: 22px;
+    flex: none;
+    accent-color: var(--color-accent);
+  }
+
+  .bl-set__note {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+  }
+</style>

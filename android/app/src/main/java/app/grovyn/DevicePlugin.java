@@ -10,6 +10,9 @@ import android.health.connect.HealthConnectManager;
 import android.os.Build;
 import android.provider.Settings;
 
+import androidx.annotation.NonNull;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.credentials.Credential;
@@ -20,6 +23,7 @@ import androidx.credentials.GetCredentialRequest;
 import androidx.credentials.GetCredentialResponse;
 import androidx.credentials.exceptions.GetCredentialCancellationException;
 import androidx.credentials.exceptions.GetCredentialException;
+import androidx.fragment.app.FragmentActivity;
 
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
@@ -43,7 +47,8 @@ import java.util.List;
  * What the pages ask of the phone (src/lib/device.ts): the timer's notifications,
  * the home-screen widgets' data, where a notification or widget wanted to go,
  * Google's account picker for signing in, reading from Health Connect, bank alerts
- * read from notifications (BankInbox.java), and phone time from usage events (UsageData.java). The pages own all the data; nothing here changes it.
+ * read from notifications (BankInbox.java), phone time from usage events (UsageData.java), and the
+ * phone's own unlock for the Budget lock. The pages own all the data; nothing here changes it.
  */
 @CapacitorPlugin(
     name = "RewardDevice",
@@ -462,5 +467,51 @@ public class DevicePlugin extends Plugin {
     public void bankAck(PluginCall call) {
         BankInbox.ack(getContext(), call.getArray("ids", new JSArray()));
         call.resolve();
+    }
+
+    /** Fingerprint or face, or the phone's PIN, pattern or password instead. */
+    private static final int UNLOCK_WITH = BiometricManager.Authenticators.BIOMETRIC_WEAK | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
+
+    /** Whether the phone has a screen lock to ask for. */
+    @PluginMethod
+    public void lockState(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("available", BiometricManager.from(getContext()).canAuthenticate(UNLOCK_WITH) == BiometricManager.BIOMETRIC_SUCCESS);
+        call.resolve(result);
+    }
+
+    /**
+     * Android's own unlock prompt. Resolves { result: "ok" | "cancelled" | "failed" }; the app never
+     * sees the fingerprint or the PIN, only whether it matched.
+     */
+    @PluginMethod
+    public void unlock(PluginCall call) {
+        String title = call.getString("title", "Unlock");
+        String subtitle = call.getString("subtitle", "");
+        getActivity().runOnUiThread(() -> {
+            BiometricPrompt prompt = new BiometricPrompt((FragmentActivity) getActivity(), ContextCompat.getMainExecutor(getContext()), new BiometricPrompt.AuthenticationCallback() {
+                @Override
+                public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                    JSObject out = new JSObject();
+                    out.put("result", "ok");
+                    call.resolve(out);
+                }
+
+                @Override
+                public void onAuthenticationError(int code, @NonNull CharSequence message) {
+                    boolean cancelled = code == BiometricPrompt.ERROR_USER_CANCELED || code == BiometricPrompt.ERROR_NEGATIVE_BUTTON || code == BiometricPrompt.ERROR_CANCELED;
+                    JSObject out = new JSObject();
+                    out.put("result", cancelled ? "cancelled" : "failed");
+                    out.put("message", message.toString());
+                    call.resolve(out);
+                }
+            });
+            BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle(title)
+                .setSubtitle(subtitle)
+                .setAllowedAuthenticators(UNLOCK_WITH)
+                .build();
+            prompt.authenticate(info);
+        });
     }
 }

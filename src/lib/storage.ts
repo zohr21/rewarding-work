@@ -35,10 +35,11 @@ export type StoreName =
   | 'screen' // phone time read in the Android app, per day and per focus session (src/lib/screen.ts); never synced
   | 'board' // the weekly board: whether you joined, your nickname, friend code and friends (src/lib/board.ts)
   | 'workouts' // Health: runs, swims and other workouts you log by hand (src/lib/workouts.ts); this device only for now
+  | 'lock' // The Budget lock and its PIN's hash (src/lib/lock.ts); each device keeps its own
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).

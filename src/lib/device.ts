@@ -120,7 +120,11 @@ interface DevicePlugin {
   setWidgets(data: WidgetData): Promise<void>;
   takeRoute(): Promise<{ route: string | null }>;
   googleSignIn(options: { clientId: string }): Promise<{ idToken: string }>;
+  lockState(): Promise<{ available: boolean }>;
+  unlock(options: { title: string; subtitle: string }): Promise<{ result: UnlockResult }>;
 }
+
+export type UnlockResult = 'ok' | 'cancelled' | 'failed';
 
 // Wrapped in an object: Capacitor's plugin is a proxy that answers to any name, `then` included,
 // so a promise of the bare plugin would try to call it as one and never settle.
@@ -159,6 +163,10 @@ export const openUsageSettings = () => void call((p) => p.usageSettings(), undef
 /** null without Usage access or a native side. */
 export const usageDays = (days: number) => call<UsageDay[] | null>(async (p) => (await p.usageDays({ days })).days, null);
 export const usageBetween = (start: number, end: number) => call<UsageSpan | null>((p) => p.usageBetween({ start, end }), null);
+/** Whether the phone has a screen lock (fingerprint, face, PIN…) to ask for; null where there is no native side. */
+export const deviceLockAvailable = () => call<boolean | null>(async (p) => (await p.lockState()).available, null);
+/** Android's own unlock prompt, for the Budget lock; null where there is no native side. */
+export const deviceUnlock = (title: string, subtitle: string) => call<UnlockResult | null>(async (p) => (await p.unlock({ title, subtitle })).result, null);
 export const takeRoute = () => call<string | null>(async (p) => (await p.takeRoute()).route, null);
 
 /**
