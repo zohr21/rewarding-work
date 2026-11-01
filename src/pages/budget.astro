@@ -3,11 +3,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import BudgetPlan from '../components/BudgetPlan.astro';
 import BudgetView from '../components/BudgetView.astro';
 import BankImport from '../components/BankImport.astro';
+import BudgetLock from '../components/BudgetLock.astro';
 import { NATIVE_APP } from '../config/app';
 ---
 
 <BaseLayout title="Budget" description="What you spend, against a monthly budget: what is left, your pace, and where it goes.">
-  <div class="container">
+  <div class="container budget-page">
+    <BudgetLock />
     {/* In the app the bottom bar already says Budget: the money comes first. */}
     <header class={NATIVE_APP ? 'visually-hidden' : 'page-header'}>
       <h1>Budget</h1>

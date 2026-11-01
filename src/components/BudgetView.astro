@@ -20,6 +20,12 @@ const icon = (d: string, w = 2) =>
       <button type="button" class="icon-btn" data-bv-next aria-label="Next month" set:html={icon('M9 6l6 6-6 6')} />
     </div>
     <div class="bv__actions">
+      {/* Hide amounts and the Budget lock (BudgetLock.astro wires both). */}
+      <button type="button" class="icon-btn bv__eye" data-bl-eye aria-pressed="false" aria-label="Hide amounts">
+        <Fragment set:html={icon('M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z')} />
+        <Fragment set:html={icon('M3 3l18 18M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3 3.6M6.4 7.6A16 16 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4.2-1')} />
+      </button>
+      <button type="button" class="icon-btn" data-sheet-open="budget-lock" aria-label="Lock Budget" set:html={icon('M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z')} />
       {
         !NATIVE_APP && (
           <button type="button" class="btn btn--ghost btn--small" data-bv-csv>
@@ -967,6 +973,7 @@ const icon = (d: string, w = 2) =>
       render();
     }, 60_000);
     c.add(() => window.clearInterval(tick));
+    c.add(listen(document, 'budget:refresh', render));
     return c.run;
   });
 </script>
@@ -1819,6 +1826,21 @@ const icon = (d: string, w = 2) =>
     box-shadow: inset 0 0 0 1px var(--edge);
     background: none;
     cursor: pointer;
+  }
+
+  /* The eye shows the slashed icon while amounts are hidden. */
+  .bv__eye :global(svg + svg),
+  .bv__eye[data-hidden='true'] :global(svg:first-child) {
+    display: none;
+  }
+
+  .bv__eye[data-hidden='true'] :global(svg + svg) {
+    display: block;
+  }
+
+  .bv__eye[data-hidden='true'] {
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
   }
 
   /* With income in the month, the plan card above says what is left instead. */

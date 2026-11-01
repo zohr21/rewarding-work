@@ -713,6 +713,7 @@ const TAGS = [
       }),
     );
     c.add(subscribe('health', render));
+    c.add(listen(document, 'budget:refresh', render));
     render();
     return c.run;
   });

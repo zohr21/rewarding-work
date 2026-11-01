@@ -1048,6 +1048,7 @@ const moneyFormats = new Map<string, Intl.NumberFormat>();
  * a typed sign goes in front. `compact` shortens big numbers for chart axes ("₼1.2K").
  */
 export function formatMoney(amount: number, currency: string, decimals: 'auto' | 0 = 'auto', compact = false): string {
+  if (moneyHidden()) return `${currencySign(currency)}•••`;
   const fraction = compact
     ? { maximumFractionDigits: 1 }
     : decimals === 0
@@ -1066,6 +1067,14 @@ export function formatMoney(amount: number, currency: string, decimals: 'auto' |
   }
   // A sign made of letters ("CHF") gets a space before the number; "$" does not.
   return code ? fmt.format(amount) : `${currency}${/\p{L}$/u.test(currency) ? ' ' : ''}${fmt.format(amount)}`;
+}
+
+/**
+ * Hide amounts (the eye on the Budget page, src/components/BudgetLock.astro): every amount
+ * then shows as "₼•••". Kept on the page, so it ends when you leave Budget.
+ */
+export function moneyHidden(): boolean {
+  return typeof document !== 'undefined' && document.documentElement.hasAttribute('data-money-hidden');
 }
 
 /** The month's entries as CSV, for a spreadsheet. */

@@ -433,6 +433,16 @@ async function reauthenticate(user: User, password?: string): Promise<void> {
   // Guests have nothing to confirm.
 }
 
+/**
+ * Sign in again, by password or Google, to show it is you: how a forgotten Budget PIN is
+ * removed (src/lib/lock.ts). Guests have nothing to confirm, so they are refused.
+ */
+export async function confirmIdentity(password?: string): Promise<void> {
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) throw Object.assign(new Error('No account to confirm.'), { code: 'auth/no-account' });
+  await reauthenticate(user, password);
+}
+
 export async function changePassword(current: string, next: string): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error('Not signed in.');

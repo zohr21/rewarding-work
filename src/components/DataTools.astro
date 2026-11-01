@@ -73,6 +73,12 @@ import { url } from '../lib/paths';
       <p class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
     </div>
 
+    <a class="row" href={url('/budget?lock=settings')}>
+      <RowIcon name="lock" />
+      <span class="row__main">Lock Budget<small>Ask before showing your money</small></span>
+      <RowIcon chevron />
+    </a>
+
     <a class="row" href={url('/privacy')}>
       <RowIcon name="shield" />
       <span class="row__main">Privacy</span>
