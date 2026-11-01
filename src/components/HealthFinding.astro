@@ -1,0 +1,378 @@
+---
+/**
+ * Your finding on /health (src/lib/findings.ts): one slim row under the rings, and a sheet with
+ * the detail when you tap it. The same sheet turns to a rough plan for tomorrow. Android app
+ * only, since the sleep comes from Health Connect.
+ */
+import Sheet from './Sheet.astro';
+import { NATIVE_APP } from '../config/app';
+---
+
+{
+  NATIVE_APP && (
+    <button type="button" class="hf" data-sheet-open="finding" data-hf>
+      <span class="hf__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+      </span>
+      <span class="hf__text">
+        <span class="muted hf__kicker" data-hf-kicker>Your finding</span>
+        <span class="hf__short" data-hf-short></span>
+      </span>
+      <svg class="hf__chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </button>
+  )
+}
+
+{
+  NATIVE_APP && (
+    <Sheet id="finding" title="Your finding">
+      <div class="hfs" data-hfs>
+        <button type="button" class="hfs__back" data-hfs-back hidden>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          Finding
+        </button>
+
+        <div class="hfs__view" data-hfs-finding>
+          <span class="hfs__badge" data-hfs-badge></span>
+          <p class="hfs__sentence" data-hfs-sentence></p>
+          <div class="hfs__progress" data-hfs-progress hidden><i data-hfs-progress-bar></i></div>
+          <div class="hfs__bars" data-hfs-bars hidden></div>
+          <p class="muted hfs__small" data-hfs-note></p>
+          <div class="hfs__votes" data-hfs-votes hidden>
+            <button type="button" class="btn btn--ghost" data-hfs-vote="yes">Helpful</button>
+            <button type="button" class="btn btn--ghost" data-hfs-vote="no">Not true for me</button>
+          </div>
+          <p class="muted hfs__small" data-hfs-voted hidden></p>
+          <button type="button" class="btn hfs__go" data-hfs-plan hidden>See tomorrow with this</button>
+        </div>
+
+        <div class="hfs__view" data-hfs-plan-view hidden>
+          <p class="muted hfs__small" data-hfs-plan-sub></p>
+          <ol class="hfs__plan" role="list" data-hfs-plan-list></ol>
+          <p class="muted hfs__small">A rough plan from your last four weeks. Nothing is added to your tasks.</p>
+          <button type="button" class="btn hfs__go" data-sheet-close>Done</button>
+        </div>
+      </div>
+    </Sheet>
+  )
+}
+
+<script>
+  import { getSessions, read, subscribe } from '../lib/storage';
+  import type { BodyDay } from '../lib/device';
+  import { getWorkouts } from '../lib/workouts';
+  import { NEED_ROWS, examIn, finding, hm, plan, rows, saveVote, sentence, setAside, short, voteFor, type Finding, type PlanItem } from '../lib/findings';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  const COLORS: Record<PlanItem['kind'], string> = { focus: 'var(--heat-3)', walk: 'var(--cat-structure)', workout: 'var(--cat-reward)', sleep: 'var(--cat-visual)' };
+  const hourFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const at = (hour: number) => {
+    const d = new Date();
+    d.setHours(hour, 0, 0, 0);
+    return hourFmt.format(d);
+  };
+
+  function badge(f: Finding): string {
+    switch (f.kind) {
+      case 'learning':
+        return `Learning · ${f.rows} of ${NEED_ROWS} nights`;
+      case 'one-sided':
+        return `Nothing to compare yet · ${f.rows} nights`;
+      case 'no-link':
+        return `No clear link · ${f.rows} nights`;
+      case 'link':
+        return `${f.sure ? 'Fairly sure' : 'Maybe'} · ${f.rows} nights`;
+    }
+  }
+
+  onPage('health-finding', () => {
+    const foundRow = document.querySelector<HTMLElement>('[data-hf]');
+    const root = document.querySelector<HTMLElement>('[data-hfs]');
+    const dialog = root?.closest<HTMLDialogElement>('dialog');
+    if (!foundRow || !root || !dialog) return;
+    const row = foundRow;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    let current: Finding = finding([]);
+    let view: 'finding' | 'plan' = 'finding';
+
+    function show(next: 'finding' | 'plan'): void {
+      view = next;
+      $<HTMLElement>('[data-hfs-finding]').hidden = view !== 'finding';
+      $<HTMLElement>('[data-hfs-plan-view]').hidden = view !== 'plan';
+      $<HTMLElement>('[data-hfs-back]').hidden = view !== 'plan';
+      dialog!.querySelector('.sheet__title')!.textContent = view === 'plan' ? 'Tomorrow' : 'Your finding';
+    }
+
+    function render(): void {
+      const sessions = getSessions();
+      const f = finding(rows(read<BodyDay[]>('body', []), sessions));
+      current = f;
+      const aside = setAside(f);
+      const vote = voteFor(f);
+
+      row.querySelector<HTMLElement>('[data-hf-kicker]')!.textContent = f.kind === 'learning' ? 'Finding · learning' : 'Your finding';
+      row.querySelector<HTMLElement>('[data-hf-short]')!.textContent = aside ? 'Set aside · checking with more nights' : short(f);
+      row.setAttribute('aria-label', `${f.kind === 'learning' ? 'Finding, still learning' : 'Your finding'}: ${aside ? 'set aside' : short(f)}. Open`);
+
+      $('[data-hfs-badge]').textContent = badge(f);
+      $('[data-hfs-badge]').setAttribute('data-kind', f.kind === 'link' ? (f.sure ? 'sure' : 'maybe') : f.kind);
+      $('[data-hfs-sentence]').textContent = sentence(f);
+
+      const progress = $<HTMLElement>('[data-hfs-progress]');
+      progress.hidden = f.kind !== 'learning';
+      if (f.kind === 'learning') $<HTMLElement>('[data-hfs-progress-bar]').style.inlineSize = `${Math.round((f.rows / NEED_ROWS) * 100)}%`;
+
+      const bars = $<HTMLElement>('[data-hfs-bars]');
+      const compared = f.kind === 'link' || f.kind === 'no-link';
+      bars.hidden = !compared;
+      if (compared) {
+        const top = Math.max(f.long.avgFocusMin, f.short.avgFocusMin, 1);
+        bars.replaceChildren(
+          ...[f.long, f.short].flatMap((g) => {
+            const bar = el('span', 'hfs__bar');
+            const fill = el('i');
+            fill.style.inlineSize = `${Math.round((g.avgFocusMin / top) * 100)}%`;
+            bar.append(fill);
+            return [el('span', '', `${g.label} · ${g.days}`), bar, el('strong', '', hm(g.avgFocusMin))];
+          }),
+        );
+      }
+
+      const note = $<HTMLElement>('[data-hfs-note]');
+      note.textContent =
+        f.kind === 'learning'
+          ? `Nights that also had some focus the next day. ${f.more} more and Grovyn can tell you something true about you, not a general tip.`
+          : f.kind === 'one-sided'
+            ? 'Grovyn needs at least 5 nights on each side, 7 hours or more and shorter, to compare them.'
+            : 'Average focus the next day, from the last 6 weeks. Exam days and days without any focus are left out.';
+
+      // Taps are asked only where there is a claim to agree or disagree with.
+      const votes = $<HTMLElement>('[data-hfs-votes]');
+      const voted = $<HTMLElement>('[data-hfs-voted]');
+      votes.hidden = !compared || !!vote;
+      voted.hidden = !vote;
+      voted.textContent = aside
+        ? 'You said this is not true for you. Grovyn will look again after 7 more nights.'
+        : vote === 'yes'
+          ? 'Thanks. Grovyn keeps this one in mind for your plan.'
+          : vote === 'no'
+            ? 'Grovyn checked again with more nights and still sees this.'
+            : '';
+
+      const items = plan(sessions, getWorkouts(), f);
+      $<HTMLElement>('[data-hfs-plan]').hidden = items.length < 2;
+      const exam = examIn();
+      $('[data-hfs-plan-sub]').textContent = exam ? `${exam.title} ${exam.days === 0 ? 'is today' : `in ${exam.days} ${exam.days === 1 ? 'day' : 'days'}`}` : 'Built from your own habits';
+      $('[data-hfs-plan-list]').replaceChildren(
+        ...items.map((i) => {
+          const li = el('li', 'hfs__item');
+          const dot = el('i', 'hfs__dot');
+          dot.style.background = i.color ?? COLORS[i.kind];
+          const text = el('span', 'hfs__item-text');
+          text.append(el('strong', '', i.title), el('span', 'muted hfs__small', i.why));
+          li.append(el('span', 'muted hfs__time', at(i.hour)), dot, text);
+          return li;
+        }),
+      );
+      if (view === 'plan' && items.length < 2) show('finding');
+    }
+
+    c.add(listen(dialog, 'sheet:open', () => show('finding')));
+    c.add(listen($('[data-hfs-plan]'), 'click', () => show('plan')));
+    c.add(listen($('[data-hfs-back]'), 'click', () => show('finding')));
+    c.add(
+      listen(root, 'click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-hfs-vote]');
+        if (b) saveVote(current, b.dataset.hfsVote === 'yes' ? 'yes' : 'no');
+      }),
+    );
+    for (const store of ['body', 'sessions', 'workouts', 'exam', 'findings'] as const) c.add(subscribe(store, render));
+    render();
+    return c.run;
+  });
+</script>
+
+<style>
+  .hf {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) 16px;
+    gap: var(--space-3);
+    align-items: center;
+    inline-size: 100%;
+    min-block-size: 52px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .hf:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .hf__icon {
+    display: grid;
+    place-items: center;
+    inline-size: 28px;
+    block-size: 28px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--cat-visual) 22%, transparent);
+    color: var(--cat-visual);
+  }
+
+  .hf__text {
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .hf__kicker {
+    font-size: var(--text-xs);
+  }
+
+  .hf__short {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .hf__chev {
+    color: var(--color-text-muted);
+  }
+
+  .hfs {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .hfs [hidden] {
+    display: none;
+  }
+
+  .hfs__back {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-block-size: 40px;
+    padding: 0 var(--space-2) 0 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .hfs__view {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .hfs__badge {
+    justify-self: start;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .hfs__badge[data-kind='sure'] {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .hfs__sentence {
+    margin: 0;
+    font-size: var(--text-lg);
+    line-height: 1.4;
+  }
+
+  .hfs :global(.hfs__small) {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .hfs__progress {
+    block-size: 8px;
+    border-radius: 99px;
+    background: var(--color-surface-2);
+    overflow: hidden;
+  }
+
+  .hfs__progress i {
+    display: block;
+    block-size: 100%;
+    border-radius: 99px;
+    background: var(--cat-visual);
+  }
+
+  .hfs__bars {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+    align-items: center;
+    font-size: var(--text-sm);
+  }
+
+  .hfs__bars :global(.hfs__bar) {
+    display: block;
+    block-size: 12px;
+  }
+
+  .hfs__bars :global(.hfs__bar i) {
+    display: block;
+    block-size: 100%;
+    border-radius: 4px;
+    background: var(--heat-3);
+  }
+
+  .hfs__votes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .hfs__votes .btn,
+  .hfs__go {
+    min-block-size: 48px;
+  }
+
+  .hfs__plan {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .hfs__plan :global(.hfs__item) {
+    display: grid;
+    grid-template-columns: 4.5em 8px minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-2) 0;
+    border-block-end: 1px solid var(--color-border);
+  }
+
+  .hfs__plan :global(.hfs__time) {
+    font-size: var(--text-sm);
+  }
+
+  .hfs__plan :global(.hfs__dot) {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+  }
+
+  .hfs__plan :global(.hfs__item-text) {
+    display: grid;
+  }
+</style>
