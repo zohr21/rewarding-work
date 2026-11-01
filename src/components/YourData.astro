@@ -1,0 +1,200 @@
+---
+/**
+ * Your data, a sheet opened from the You page in the Android app: what your finding and
+ * tomorrow's plan (src/lib/findings.ts) learn from, what they have learned, and a way to
+ * forget it or take it with you.
+ */
+import Sheet from './Sheet.astro';
+import { SOURCES } from '../lib/findings';
+---
+
+<Sheet id="mydata" title="Your data">
+  <div class="yd" data-yd>
+    <p class="muted yd__small">Your finding and tomorrow's plan are worked out on this phone. Health data never leaves it.</p>
+
+    <fieldset class="yd__group">
+      <legend class="yd__legend">Grovyn learns from</legend>
+      {
+        SOURCES.map((s) => (
+          <label class="yd__row">
+            <span class="yd__text">
+              <strong>{s.label}</strong>
+              <span class="muted yd__small">{s.where}</span>
+            </span>
+            <input type="checkbox" role="switch" data-yd-source={s.id} />
+          </label>
+        ))
+      }
+    </fieldset>
+    <p class="muted yd__small" data-yd-off-note hidden>With sleep or focus off, your finding is turned off too.</p>
+
+    <section class="yd__group" aria-labelledby="yd-learned">
+      <h3 id="yd-learned" class="yd__legend">What Grovyn has learned</h3>
+      <ul class="yd__facts" role="list" data-yd-facts></ul>
+      <p class="muted yd__small" data-yd-none hidden>Nothing yet. It needs a couple of weeks of your nights and sessions.</p>
+      <p class="muted yd__small">Forgetting keeps your sleep, sessions and workouts. Grovyn only starts learning again from today.</p>
+    </section>
+
+    <div class="yd__actions">
+      <button type="button" class="btn btn--ghost" data-yd-export>Export</button>
+      <button type="button" class="btn btn--ghost yd__danger" data-yd-forget-all>Forget everything</button>
+    </div>
+    <p class="muted yd__small" role="status" data-yd-msg></p>
+  </div>
+</Sheet>
+
+<script>
+  import { getSessions, read, subscribe } from '../lib/storage';
+  import type { BodyDay } from '../lib/device';
+  import { getWorkouts } from '../lib/workouts';
+  import { exportFile, finding, forget, forgetAll, learned, rows, setSourceOn, sourceOn, type FactId, type Source } from '../lib/findings';
+  import { dayKey } from '../lib/dates';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { el } from '../lib/dom';
+
+  onPage('your-data', () => {
+    const root = document.querySelector<HTMLElement>('[data-yd]');
+    if (!root) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const msg = $<HTMLElement>('[data-yd-msg]');
+
+    function render(): void {
+      for (const box of root!.querySelectorAll<HTMLInputElement>('[data-yd-source]')) box.checked = sourceOn(box.dataset.ydSource as Source);
+      $<HTMLElement>('[data-yd-off-note]').hidden = sourceOn('sleep') && sourceOn('focus');
+      const sessions = getSessions();
+      const workouts = getWorkouts();
+      const facts = learned(finding(rows(read<BodyDay[]>('body', []), sessions)), sessions, workouts);
+      $('[data-yd-facts]').replaceChildren(
+        ...facts.map((f) => {
+          const li = el('li', 'yd__fact');
+          const text = el('span', 'yd__text');
+          text.append(el('span', '', f.text), el('span', 'muted yd__small', f.from));
+          const b = el('button', 'btn btn--ghost btn--small', 'Forget');
+          b.type = 'button';
+          b.dataset.ydForget = f.id;
+          b.setAttribute('aria-label', `Forget: ${f.text}`);
+          li.append(text, b);
+          return li;
+        }),
+      );
+      $<HTMLElement>('[data-yd-none]').hidden = facts.length > 0;
+    }
+
+    c.add(
+      listen(root, 'change', (e) => {
+        const box = (e.target as HTMLElement).closest<HTMLInputElement>('[data-yd-source]');
+        if (box) setSourceOn(box.dataset.ydSource as Source, box.checked);
+      }),
+    );
+    c.add(
+      listen(root, 'click', (e) => {
+        const t = e.target as HTMLElement;
+        const one = t.closest<HTMLElement>('[data-yd-forget]');
+        if (one) {
+          forget(one.dataset.ydForget as FactId);
+          msg.textContent = 'Forgotten. Grovyn learns that again from today.';
+        } else if (t.closest('[data-yd-forget-all]')) {
+          if (!window.confirm('Forget everything Grovyn has learned? Your sleep, sessions and workouts stay.')) return;
+          forgetAll();
+          msg.textContent = 'Everything forgotten. Grovyn starts learning again from today.';
+        } else if (t.closest('[data-yd-export]')) {
+          const file = exportFile(read<BodyDay[]>('body', []), getSessions(), getWorkouts());
+          const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `grovyn-finding-${dayKey(new Date())}.json`;
+          document.body.append(a);
+          a.click();
+          a.remove();
+          window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+          msg.textContent = `Saved ${a.download}: ${file.rows.length} days, what was learned and tomorrow's plan.`;
+        }
+      }),
+    );
+    c.add(listen(root.closest('dialog')!, 'sheet:open', () => (msg.textContent = '')));
+    for (const store of ['findings', 'body', 'sessions', 'workouts'] as const) c.add(subscribe(store, render));
+    render();
+    return c.run;
+  });
+</script>
+
+<style>
+  .yd {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .yd [hidden] {
+    display: none;
+  }
+
+  .yd :global(.yd__small) {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .yd__group {
+    display: grid;
+    gap: var(--space-2);
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .yd__legend {
+    margin: 0 0 var(--space-1);
+    padding: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+
+  .yd__row,
+  .yd__facts :global(.yd__fact) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    align-items: center;
+    min-block-size: 52px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .yd__row {
+    cursor: pointer;
+  }
+
+  .yd__row input {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    accent-color: var(--color-accent);
+  }
+
+  .yd :global(.yd__text) {
+    display: grid;
+  }
+
+  .yd__facts {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .yd__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .yd__actions .btn {
+    min-block-size: 48px;
+  }
+
+  .yd__danger {
+    color: var(--color-danger);
+  }
+</style>

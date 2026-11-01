@@ -8,9 +8,11 @@
  *   body sheet with the full numbers.
  * - "Your day": workouts (src/lib/workouts.ts) and focus sessions in time order. A workout
  *   opens the log sheet to change it.
+ * - Your finding (HealthFinding.astro): one row under the rings, its detail in a sheet.
  * - Garden and wellbeing spend are two small buttons that open their own sheets.
  */
 import { NATIVE_APP } from '../config/app';
+import HealthFinding from './HealthFinding.astro';
 ---
 
 <section class="ht" data-ht data-app={NATIVE_APP ? 'true' : 'false'} aria-label="Your day">
@@ -24,6 +26,7 @@ import { NATIVE_APP } from '../config/app';
   <nav class="ht__week" aria-label="Pick a day" data-ht-week></nav>
 
   <div class="card ht__rings" data-ht-rings></div>
+  <HealthFinding />
   <p class="ht__connect" data-ht-connect hidden>
     Sleep and steps come from Health Connect.
     <button type="button" class="ht__link" data-sheet-open="body">Connect</button>

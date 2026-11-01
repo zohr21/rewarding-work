@@ -132,6 +132,8 @@ const CHECK = 'M5 12l5 5 9-10';
   type Range = 'today' | 'week' | 'month';
   const SPAN: Record<Range, number> = { today: 1, week: 7, month: 30 };
   const READ_DAYS = 30;
+  /** Older days stay in the store for your finding (src/lib/findings.ts), up to this many. */
+  const KEEP_DAYS = 90;
   /** What a full bar means on Today. */
   const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30 };
   const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
@@ -159,7 +161,8 @@ const CHECK = 'M5 12l5 5 9-10';
     let state: HealthState | null = null;
     let range: Range = 'today';
     // The last read is kept so the page has numbers before Health Connect answers.
-    let days = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+    const stored = () => read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+    let days = stored().slice(-READ_DAYS);
 
     /** `ask`: the kinds to ask for when the tile's Allow is tapped; without it there is no Allow. */
     function tile(kind: HealthKind, value: string, sub: string, share?: number, ask?: HealthKind[]): void {
@@ -313,7 +316,9 @@ const CHECK = 'M5 12l5 5 9-10';
         for (const field of lost) if (old?.[field] !== undefined) merged[field] = old[field];
         return merged;
       });
-      write('body', days);
+      const justRead = new Set(days.map((d) => d.day));
+      const older = stored().filter((d) => !justRead.has(d.day));
+      write('body', [...older, ...days].sort((a, b) => (a.day < b.day ? -1 : 1)).slice(-KEEP_DAYS));
       render();
     }
 

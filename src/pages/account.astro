@@ -7,6 +7,7 @@ import DataTools from '../components/DataTools.astro';
 import AppearanceMenu from '../components/AppearanceMenu.astro';
 import RowIcon from '../components/RowIcon.astro';
 import BoardJoin from '../components/BoardJoin.astro';
+import YourData from '../components/YourData.astro';
 import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
@@ -260,6 +261,17 @@ import pkg from '../../package.json';
               <span class="row__main">{NATIVE_APP ? 'Health Connect' : 'Health data'}<small>{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small></span>
               <a class="btn btn--ghost btn--small" href={url('/health')}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
             </div>
+            {
+              NATIVE_APP && (
+                <button type="button" class="row" data-sheet-open="mydata">
+                  <RowIcon name="shield" />
+                  <span class="row__main">
+                    Your data<small>What your finding learns from, and forgetting it</small>
+                  </span>
+                  <RowIcon chevron />
+                </button>
+              )
+            }
             <p class="account__msg row-note" role="status" data-connect-msg></p>
           </div>
         </section>
@@ -381,6 +393,7 @@ import pkg from '../../package.json';
     </div>
   </div>
   {ACCOUNTS_ENABLED && <BoardJoin />}
+  {NATIVE_APP && <YourData />}
 </BaseLayout>
 
 <script>
