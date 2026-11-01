@@ -50,10 +50,20 @@ const PRESETS = [15, 30, 45, 60];
       </label>
     </fieldset>
 
-    <label class="wl__field" data-wl-distance>
-      <span>Distance (<span data-wl-unit>km</span>)</span>
-      <input type="number" name="distance" min="0" step="0.1" inputmode="decimal" placeholder="Optional" />
-    </label>
+    <div class="wl__field" data-wl-distance>
+      <div class="wl__distance-head">
+        <label for="wl-distance">Distance</label>
+        <div class="wl__unit" role="radiogroup" aria-label="Distance unit">
+          <label><input type="radio" name="unit" value="km" />km</label>
+          <label><input type="radio" name="unit" value="mi" />mi</label>
+        </div>
+      </div>
+      <div class="wl__with-button">
+        <input id="wl-distance" type="number" name="distance" min="0" step="0.1" inputmode="decimal" placeholder="Optional" />
+        <button type="button" class="btn btn--ghost wl__estimate" data-wl-estimate>Estimate</button>
+      </div>
+      <p class="muted wl__small" data-wl-distance-hint hidden></p>
+    </div>
 
     <div class="wl__swim" data-wl-swim>
       <div class="wl__pair">
@@ -82,6 +92,15 @@ const PRESETS = [15, 30, 45, 60];
       <input type="text" name="note" maxlength="120" placeholder="Optional" autocomplete="off" />
     </label>
 
+    <div class="wl__kcal">
+      <p class="wl__kcal-line" aria-live="polite"><span class="muted">About</span> <strong data-wl-kcal></strong></p>
+      <p class="muted wl__small" data-wl-kcal-why></p>
+      <label class="wl__field wl__field--inline">
+        Your weight (kg)
+        <input type="number" name="weight" min="20" max="300" step="0.5" inputmode="decimal" />
+      </label>
+    </div>
+
     <p class="wl__fit" data-wl-fit aria-live="polite"></p>
     <p class="wl__error" data-wl-error role="alert" hidden></p>
 
@@ -93,13 +112,30 @@ const PRESETS = [15, 30, 45, 60];
 </Sheet>
 
 <script>
-  import { EFFORT_WORDS, getWorkouts, isWorkoutType, lastWorkoutType, overlappingSession, removeWorkout, saveWorkout, workoutType, type Workout, type WorkoutType } from '../lib/workouts';
+  import {
+    DEFAULT_KG,
+    EFFORT_WORDS,
+    getWorkouts,
+    isWorkoutType,
+    lastWorkoutType,
+    overlappingSession,
+    removeWorkout,
+    roughDistanceM,
+    roughKcal,
+    roughKmh,
+    saveWeightKg,
+    saveUsesMiles,
+    saveWorkout,
+    usesMiles,
+    weightKg,
+    workoutType,
+    type Workout,
+    type WorkoutType,
+  } from '../lib/workouts';
   import { getSessions } from '../lib/storage';
   import { dayKey, fromDayKey, isDayKey } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
 
-  const MILES = /^en-(US|LR)|^my/i.test(navigator.language);
-  const M_PER_UNIT = MILES ? 1609.344 : 1000;
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
   const pad = (n: number) => String(n).padStart(2, '0');
   const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -113,7 +149,10 @@ const PRESETS = [15, 30, 45, 60];
     const $ = <E extends Element>(s: string) => form.querySelector<E>(s)!;
     const field = <E extends HTMLInputElement>(name: string) => form.elements.namedItem(name) as E;
     const error = $<HTMLElement>('[data-wl-error]');
-    $('[data-wl-unit]').textContent = MILES ? 'mi' : 'km';
+    let miles = usesMiles();
+    const perUnit = () => (miles ? 1609.344 : 1000);
+    const unitName = () => (miles ? 'mi' : 'km');
+    (form.elements.namedItem('unit') as RadioNodeList).value = unitName();
 
     /** The workout being changed; null for a new one. */
     let editing: Workout | null = null;
@@ -132,17 +171,47 @@ const PRESETS = [15, 30, 45, 60];
       return d.getTime();
     };
     const minutes = () => Math.round(Number(field('minutes').value));
+    /** The weight typed in, or nothing when it is blank or out of range. */
+    const typedKg = (): number | undefined => {
+      const kg = Number(field('weight').value);
+      return field('weight').value && kg >= 20 && kg <= 300 ? kg : undefined;
+    };
+    /** True while the distance field holds Estimate's guess, so it follows time and effort. */
+    let estimated = false;
 
     function sync(): void {
       const t = workoutType(type());
       const min = minutes();
+      const effort = Number(field('effort').value);
       $<HTMLElement>('[data-wl-distance]').hidden = !t.distance;
+
+      const guess = t.distance && min > 0 ? roughDistanceM(t.id, min, effort) : undefined;
+      if (estimated && guess) field('distance').value = String(Math.round((guess / perUnit()) * 10) / 10);
+      const hint = $<HTMLElement>('[data-wl-distance-hint]');
+      hint.hidden = !(estimated && guess);
+      if (estimated && guess) {
+        const speed = roughKmh(t.id, effort)! / (perUnit() / 1000);
+        hint.textContent = `A guess: ${min} min at about ${Math.round(speed)} ${miles ? 'mph' : 'km/h'}, a ${EFFORT_WORDS[effort]!.toLowerCase()} pace. Change it if you know better.`;
+      }
+
+      // Calories: always a rough figure, and the line says what it was worked out from.
+      const kg = typedKg();
+      const distanceM = t.distance ? Math.round(Number(field('distance').value) * perUnit()) : 0;
+      const kcalOut = $('[data-wl-kcal]');
+      const why = $('[data-wl-kcal-why]');
+      if (min > 0) {
+        kcalOut.textContent = `${roughKcal({ type: t.id, minutes: min, effort, distanceM: distanceM > 0 ? distanceM : undefined }, kg ?? DEFAULT_KG).toLocaleString()} kcal`;
+        const from = distanceM > 0 ? `the distance` : `${min} min at ${EFFORT_WORDS[effort]!.toLowerCase()} effort`;
+        why.textContent = kg ? `From ${from} and your weight. A rough guess, not a measurement.` : `From ${from}, for someone of ${DEFAULT_KG} kg. Add your weight for a closer guess.`;
+      } else {
+        kcalOut.textContent = '–';
+        why.textContent = '';
+      }
       $<HTMLElement>('[data-wl-swim]').hidden = t.id !== 'swim';
       form.querySelectorAll<HTMLElement>('[data-wl-preset]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.wlPreset) === min)));
       const laps = Number(field('laps').value);
       const pool = Number((form.elements.namedItem('pool') as RadioNodeList).value);
-      $('[data-wl-swim-total]').textContent = laps > 0 ? `${(laps * pool).toLocaleString()} m in all` : '';
-      const effort = Number(field('effort').value);
+      $('[data-wl-swim-total]').textContent = laps > 0 ? `${(laps * pool).toLocaleString()} m in all · ${((laps * pool) / perUnit()).toFixed(2)} ${unitName()}` : '';
       $('[data-wl-effort-out]').textContent = `${effort} · ${EFFORT_WORDS[effort]}`;
       $('[data-wl-save]').textContent = `Save ${t.label.toLowerCase()}${min > 0 ? ` · ${min} min` : ''}`;
 
@@ -168,13 +237,14 @@ const PRESETS = [15, 30, 45, 60];
       dialog!.querySelector('.sheet__title')!.textContent = editing ? `Edit ${workoutType(editing.type).label.toLowerCase()}` : 'Log activity';
       const today = dayKey(new Date());
       field('day').max = today;
+      estimated = false;
       if (editing) {
         const s = new Date(editing.start);
         (form.elements.namedItem('type') as RadioNodeList).value = editing.type;
         field('day').value = dayKey(s);
         field('time').value = hhmm(s);
         field('minutes').value = String(editing.minutes);
-        field('distance').value = editing.distanceM ? String(Math.round((editing.distanceM / M_PER_UNIT) * 10) / 10) : '';
+        field('distance').value = editing.distanceM ? String(Math.round((editing.distanceM / perUnit()) * 10) / 10) : '';
         field('laps').value = editing.laps ? String(editing.laps) : '';
         (form.elements.namedItem('pool') as RadioNodeList).value = String(editing.poolM ?? 25);
         field('effort').value = String(editing.effort);
@@ -191,6 +261,9 @@ const PRESETS = [15, 30, 45, 60];
         field('minutes').value = '30';
         field('effort').value = '5';
       }
+      const kg = weightKg();
+      field('weight').value = kg ? String(kg) : '';
+      field('weight').placeholder = String(DEFAULT_KG);
       dirty = false;
       sync();
     }
@@ -202,13 +275,30 @@ const PRESETS = [15, 30, 45, 60];
       }),
     );
     c.add(
-      listen(form, 'input', () => {
+      listen(form, 'input', (e) => {
+        const target = e.target as HTMLInputElement;
+        if (target.name === 'distance') estimated = false;
+        if (target.name === 'unit') {
+          // The number in the field keeps its length in the new unit; the choice sticks for next time.
+          const metres = Number(field('distance').value) * perUnit();
+          miles = target.value === 'mi';
+          saveUsesMiles(miles);
+          if (metres > 0) field('distance').value = String(Math.round((metres / perUnit()) * 10) / 10);
+          sync();
+          return;
+        }
         dirty = true;
         sync();
       }),
     );
     c.add(
       listen(form, 'click', (e) => {
+        if ((e.target as HTMLElement).closest('[data-wl-estimate]')) {
+          estimated = true;
+          dirty = true;
+          sync();
+          return;
+        }
         const preset = (e.target as HTMLElement).closest<HTMLElement>('[data-wl-preset]');
         if (!preset) return;
         field('minutes').value = preset.dataset.wlPreset!;
@@ -239,13 +329,15 @@ const PRESETS = [15, 30, 45, 60];
         const distance = Number(field('distance').value);
         const laps = Math.round(Number(field('laps').value));
         const note = field('note').value.trim();
+        const kg = typedKg();
+        if (kg && kg !== weightKg()) saveWeightKg(kg);
         saveWorkout({
           id: editing?.id ?? `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
           type: t,
           start,
           minutes: min,
           effort: Number(field('effort').value),
-          ...(workoutType(t).distance && distance > 0 ? { distanceM: Math.round(distance * M_PER_UNIT) } : {}),
+          ...(workoutType(t).distance && distance > 0 ? { distanceM: Math.round(distance * perUnit()) } : {}),
           ...(t === 'swim' && laps > 0 ? { laps, poolM: Number((form.elements.namedItem('pool') as RadioNodeList).value) } : {}),
           ...(note ? { note } : {}),
         });
@@ -381,6 +473,79 @@ const PRESETS = [15, 30, 45, 60];
     inline-size: 100%;
     block-size: 28px;
     accent-color: var(--color-accent);
+  }
+
+  .wl__distance-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .wl__unit {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-btn);
+    overflow: hidden;
+  }
+
+  .wl__unit label {
+    position: relative;
+    padding: var(--space-1) var(--space-3);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .wl__unit input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .wl__unit label:has(input:checked) {
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+  }
+
+  .wl__unit label:has(input:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: -3px;
+  }
+
+  .wl__with-button {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2);
+  }
+
+  .wl__estimate {
+    min-block-size: 44px;
+  }
+
+  .wl__kcal {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .wl__kcal-line {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .wl__kcal-line strong {
+    font-size: var(--text-lg);
+  }
+
+  .wl__kcal .wl__field--inline input {
+    inline-size: 6em;
+    justify-self: end;
   }
 
   .wl__effort-label {

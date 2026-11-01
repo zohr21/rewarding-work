@@ -127,6 +127,7 @@ const CHECK = 'M5 12l5 5 9-10';
   import { dayKey, fromDayKey } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { usesMiles } from '../lib/workouts';
 
   type Range = 'today' | 'week' | 'month';
   const SPAN: Record<Range, number> = { today: 1, week: 7, month: 30 };
@@ -140,9 +141,8 @@ const CHECK = 'M5 12l5 5 9-10';
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   // Miles where people walk in miles, kilometres everywhere else.
-  const MILES = /^en-(US|LR)|^my/i.test(navigator.language);
   const distance = (m: number) =>
-    MILES ? `${(m / 1609.344).toFixed(m < 16_093 ? 1 : 0)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
+    usesMiles() ? `${(m / 1609.344).toFixed(m < 16_093 ? 1 : 0)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
   const kcal = (n: number) => `${Math.round(n).toLocaleString()} kcal`;
   const numbers = (days: BodyDay[], key: BodyField) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
 
