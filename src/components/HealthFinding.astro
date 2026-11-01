@@ -61,17 +61,11 @@ import { NATIVE_APP } from '../config/app';
   import { getSessions, read, subscribe } from '../lib/storage';
   import type { BodyDay } from '../lib/device';
   import { getWorkouts } from '../lib/workouts';
-  import { NEED_ROWS, examIn, finding, hm, plan, rows, saveVote, sentence, setAside, short, voteFor, type Finding, type PlanItem } from '../lib/findings';
+  import { NEED_ROWS, atHour, examIn, finding, hm, plan, rows, saveVote, sentence, setAside, short, sourceOn, voteFor, type Finding, type PlanItem } from '../lib/findings';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
 
   const COLORS: Record<PlanItem['kind'], string> = { focus: 'var(--heat-3)', walk: 'var(--cat-structure)', workout: 'var(--cat-reward)', sleep: 'var(--cat-visual)' };
-  const hourFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
-  const at = (hour: number) => {
-    const d = new Date();
-    d.setHours(hour, 0, 0, 0);
-    return hourFmt.format(d);
-  };
 
   function badge(f: Finding): string {
     switch (f.kind) {
@@ -106,6 +100,12 @@ import { NATIVE_APP } from '../config/app';
     }
 
     function render(): void {
+      // Without sleep or focus there is nothing to compare: the row goes (Your data on the You page).
+      row.hidden = !sourceOn('sleep') || !sourceOn('focus');
+      if (row.hidden) {
+        if (dialog!.open) dialog!.close();
+        return;
+      }
       const sessions = getSessions();
       const f = finding(rows(read<BodyDay[]>('body', []), sessions));
       current = f;
@@ -172,7 +172,7 @@ import { NATIVE_APP } from '../config/app';
           dot.style.background = i.color ?? COLORS[i.kind];
           const text = el('span', 'hfs__item-text');
           text.append(el('strong', '', i.title), el('span', 'muted hfs__small', i.why));
-          li.append(el('span', 'muted hfs__time', at(i.hour)), dot, text);
+          li.append(el('span', 'muted hfs__time', atHour(i.hour)), dot, text);
           return li;
         }),
       );
@@ -210,6 +210,10 @@ import { NATIVE_APP } from '../config/app';
     font: inherit;
     text-align: start;
     cursor: pointer;
+  }
+
+  .hf[hidden] {
+    display: none;
   }
 
   .hf:focus-visible {
