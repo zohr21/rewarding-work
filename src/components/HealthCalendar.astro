@@ -45,7 +45,7 @@ import { WORKOUT_TYPES } from '../lib/workouts';
 </Sheet>
 
 <script>
-  import { getWorkouts, workoutsByDay, workoutType } from '../lib/workouts';
+  import { DEFAULT_KG, getWorkouts, roughKcal, weightKg, workoutsByDay, workoutType } from '../lib/workouts';
   import { getSessions, subscribe } from '../lib/storage';
   import { minutesByDay } from '../lib/stats';
   import { formatFocus } from '../lib/tasks';
@@ -122,7 +122,7 @@ import { WORKOUT_TYPES } from '../lib/workouts';
         const li = el('li');
         const dot = el('i');
         dot.style.background = workoutType(w.type).color;
-        li.append(dot, `${workoutType(w.type).label} · ${timeFmt.format(w.start)} · ${w.minutes} min`);
+        li.append(dot, `${workoutType(w.type).label} · ${timeFmt.format(w.start)} · ${w.minutes} min · ~${roughKcal(w, weightKg() ?? DEFAULT_KG)} kcal`);
         return li;
       });
       if (f) {

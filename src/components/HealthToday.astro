@@ -37,7 +37,7 @@ import { NATIVE_APP } from '../config/app';
   <section class="ht__day" aria-labelledby="ht-day-heading">
     <div class="ht__day-head">
       <h2 id="ht-day-heading" class="panel-title">Your day</h2>
-      <span class="muted ht__small">Workouts and focus</span>
+      <span class="muted ht__small" data-ht-day-sub>Workouts and focus</span>
     </div>
     <ol class="ht__list" role="list" data-ht-list></ol>
     <p class="muted ht__empty" data-ht-empty hidden></p>
@@ -58,7 +58,7 @@ import { NATIVE_APP } from '../config/app';
 <script>
   import { getSessions, read, subscribe, type FocusSession } from '../lib/storage';
   import type { BodyDay } from '../lib/device';
-  import { getWorkouts, workoutsByDay, workoutType, EFFORT_WORDS, type Workout } from '../lib/workouts';
+  import { DEFAULT_KG, getWorkouts, roughKcal, usesMiles, weightKg, workoutsByDay, workoutType, EFFORT_WORDS, type Workout } from '../lib/workouts';
   import { addDays, dayKey, fromDayKey, isDayKey, startOfWeek } from '../lib/dates';
   import { formatFocus } from '../lib/tasks';
   import { cleanups, listen, onPage } from '../lib/page';
@@ -68,12 +68,11 @@ import { NATIVE_APP } from '../config/app';
   const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30, focusMin: 120 };
   /** Focus sessions closer than this, on the same task, show as one block. */
   const JOIN_GAP = 15 * 60_000;
-  const MILES = /^en-(US|LR)|^my/i.test(navigator.language);
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   const wdFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
   const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
   const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
-  const distance = (m: number) => (MILES ? `${(m / 1609.344).toFixed(1)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+  const distance = (m: number) => (usesMiles() ? `${(m / 1609.344).toFixed(1)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
 
   interface Ring {
     label: string;
@@ -145,7 +144,7 @@ import { NATIVE_APP } from '../config/app';
     const parts = [`${w.minutes} min`];
     if (w.distanceM) parts.push(distance(w.distanceM));
     if (w.laps) parts.push(`${w.laps} laps · ${(w.laps * (w.poolM ?? 25)).toLocaleString()} m`);
-    parts.push(EFFORT_WORDS[w.effort]!.toLowerCase());
+    parts.push(EFFORT_WORDS[w.effort]!.toLowerCase(), `~${roughKcal(w, weightKg() ?? DEFAULT_KG).toLocaleString()} kcal`);
     return { start: w.start, time: timeFmt.format(w.start), color: t.color, title: t.label, sub: parts.join(' · '), workout: w.id };
   }
 
@@ -247,6 +246,8 @@ import { NATIVE_APP } from '../config/app';
           return li;
         }),
       );
+      const kcal = logged.reduce((a, w) => a + roughKcal(w, weightKg() ?? DEFAULT_KG), 0);
+      $('[data-ht-day-sub]').textContent = kcal > 0 ? `Workouts ~${kcal.toLocaleString()} kcal` : 'Workouts and focus';
       const empty = $<HTMLElement>('[data-ht-empty]');
       empty.hidden = rows.length > 0;
       empty.textContent = day === today ? 'Nothing yet today. Log a workout, or start a focus session.' : 'Nothing logged on this day.';

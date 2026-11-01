@@ -39,6 +39,10 @@ interface WorkoutStore {
   items: Workout[];
   /** The type picked last, so the form opens on it. */
   lastType?: WorkoutType;
+  /** For the calorie estimate. */
+  weightKg?: number;
+  /** Distances in miles instead of km. */
+  miles?: boolean;
 }
 
 const KEEP = 2000;
@@ -56,7 +60,12 @@ function getStore(): WorkoutStore {
   const raw = read<unknown>('workouts', null);
   if (!raw || typeof raw !== 'object') return { items: [] };
   const s = raw as WorkoutStore;
-  return { items: Array.isArray(s.items) ? s.items.filter(isWorkout) : [], lastType: isWorkoutType(s.lastType) ? s.lastType : undefined };
+  return {
+    items: Array.isArray(s.items) ? s.items.filter(isWorkout) : [],
+    lastType: isWorkoutType(s.lastType) ? s.lastType : undefined,
+    weightKg: typeof s.weightKg === 'number' && s.weightKg >= 20 && s.weightKg <= 300 ? s.weightKg : undefined,
+    miles: s.miles === true || undefined,
+  };
 }
 
 /** All workouts, oldest first. */
@@ -70,10 +79,11 @@ export function lastWorkoutType(): WorkoutType {
 
 /** Adds the workout, or replaces the one with the same id. */
 export function saveWorkout(w: Workout): void {
-  const items = getStore().items.filter((x) => x.id !== w.id);
+  const s = getStore();
+  const items = s.items.filter((x) => x.id !== w.id);
   items.push(w);
   items.sort((a, b) => a.start - b.start);
-  write<WorkoutStore>('workouts', { items: items.slice(-KEEP), lastType: w.type });
+  write<WorkoutStore>('workouts', { ...s, items: items.slice(-KEEP), lastType: w.type });
 }
 
 export function removeWorkout(id: string): void {
@@ -98,6 +108,61 @@ export function workoutsByDay(items: Workout[]): Map<DayKey, Workout[]> {
 export function overlappingSession(start: number, minutes: number, sessions: FocusSession[]): FocusSession | undefined {
   const end = start + minutes * 60_000;
   return sessions.find((s) => s.start < end && s.end > start);
+}
+
+/**
+ * Rough numbers for the estimates: MET (energy per kg per hour, from the Compendium of Physical
+ * Activities) from very easy to all out, speed in km/h over the same range, and for the types
+ * that cover ground, kcal per kg per km, which holds better than MET once the distance is known.
+ */
+const ROUGH: Record<WorkoutType, { met: [number, number]; kmh?: [number, number]; kcalPerKgKm?: number }> = {
+  run: { met: [7, 12.5], kmh: [8, 14], kcalPerKgKm: 1 },
+  walk: { met: [2.8, 5], kmh: [3.5, 6.5], kcalPerKgKm: 0.5 },
+  cycle: { met: [4, 12], kmh: [12, 28], kcalPerKgKm: 0.28 },
+  swim: { met: [5, 10] },
+  gym: { met: [3.5, 6] },
+  yoga: { met: [2, 4] },
+};
+
+const along = ([lo, hi]: [number, number], effort: number) => lo + ((hi - lo) * (Math.min(10, Math.max(1, effort)) - 1)) / 9;
+
+/** Typical speed in km/h at this effort, for run, walk and cycle. */
+export function roughKmh(type: WorkoutType, effort: number): number | undefined {
+  const kmh = ROUGH[type].kmh;
+  return kmh && along(kmh, effort);
+}
+
+/** Metres covered at a typical speed for this effort, for run, walk and cycle. */
+export function roughDistanceM(type: WorkoutType, minutes: number, effort: number): number | undefined {
+  const kmh = roughKmh(type, effort);
+  return kmh && Math.round((kmh * minutes * 1000) / 60);
+}
+
+/** Calories burned, rounded to 5: from the distance when there is one, otherwise from time and effort. */
+export function roughKcal(w: Pick<Workout, 'type' | 'minutes' | 'effort' | 'distanceM'>, kg: number): number {
+  const r = ROUGH[w.type];
+  const kcal = r.kcalPerKgKm && w.distanceM ? r.kcalPerKgKm * kg * (w.distanceM / 1000) : (along(r.met, w.effort) * kg * w.minutes) / 60;
+  return Math.round(kcal / 5) * 5;
+}
+
+/** Body weight for the calorie estimate; the form asks once. */
+export const DEFAULT_KG = 70;
+
+export function weightKg(): number | undefined {
+  return getStore().weightKg;
+}
+
+export function saveWeightKg(kg: number): void {
+  write<WorkoutStore>('workouts', { ...getStore(), weightKg: kg });
+}
+
+/** Distances show in km unless miles were picked in the log form. */
+export function usesMiles(): boolean {
+  return getStore().miles === true;
+}
+
+export function saveUsesMiles(miles: boolean): void {
+  write<WorkoutStore>('workouts', { ...getStore(), miles: miles || undefined });
 }
 
 export const EFFORT_WORDS = ['', 'Very easy', 'Easy', 'Easy', 'Moderate', 'Moderate', 'Fairly hard', 'Hard', 'Very hard', 'Near max', 'All out'];
