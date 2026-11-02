@@ -18,12 +18,12 @@ node scripts/build-apk.mjs full   # Gradle assembleFullDebug → grovyn.apk (npm
   Studio's Java; don't fight those.
 - **OneDrive breaks Gradle** ("not a regular file"): it turns `android/app/src/main/assets/public`
   into cloud placeholders. Delete that folder, rerun `npm run build:app`, then the APK step.
-- **The phone shows up twice** in `adb devices` (`192.168.0.188:<port>` and an
+- **The phone shows up twice** in `adb devices` (an `<phone-ip>:<port>` entry and an
   `adb-…_adb-tls-connect._tcp` entry), so the script's own install is skipped. Install with:
   ```bash
-  adb -s 192.168.0.188:<port> install -r grovyn.apk
+  adb -s <phone-ip>:<port> install -r grovyn.apk
   ```
-  The port changes when wireless debugging restarts — read it from `adb devices`.
+  Read the IP and port from `adb devices`; the port changes when wireless debugging restarts.
 - Built on a branch that lacks another open PR's change? Say which changes the installed APK
   has and doesn't.
 - **Before installing over real data**, check the change is safe for stored data the phone
@@ -46,8 +46,7 @@ node .claude/skills/grovyn-phone/phone.mjs "location.assign('/health/index.html'
 - The phone must be **unlocked with Grovyn in front**, or Android freezes the app and the
   script says it isn't answering. Ask the user to open it.
 - Pages are at `https://localhost/<page>/index.html`.
-- **Read freely, write only with the user's OK**: the phone holds the user's real data (1000+
-  budget entries, months of sessions). Never seed test data into it, never grant permissions or
+- **Read freely, write only with the user's OK**: the phone holds the user's real data. Never seed test data into it, never grant permissions or
   turn on access settings for them.
 - To preview with the phone's data: copy the stores out with the script into a file under
   `node_modules/.phone-data.json`, load them in the dev preview, and delete the copy afterwards.
@@ -63,7 +62,7 @@ node .claude/skills/grovyn-phone/phone.mjs "location.assign('/health/index.html'
 ## Emulator (when the phone isn't there or must not be touched)
 
 AVD `Medium_Phone_API_36.1`, headless. Set both `ANDROID_SDK_ROOT` and `ANDROID_HOME` to
-`C:\Users\LOQ\AppData\Local\Android\Sdk` (a stray `ANDROID_HOME=C:\Android` breaks it), then
+the Android SDK, usually `%LOCALAPPDATA%\Android\Sdk` (a stray `ANDROID_HOME=C:\Android` breaks it), then
 install with `adb -s emulator-5554 install -r grovyn.apk`. The script works there with
 `--serial emulator-5554`.
 

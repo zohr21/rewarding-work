@@ -51,8 +51,8 @@ over CDP, and check Android's side with `adb shell dumpsys healthconnect`,
 `dumpsys usagestats`, `dumpsys notification`, `dumpsys window | grep mCurrentFocus`
 (biometric prompts are blank in screencaps).
 
-## Known facts about the user's phone
+## The user's phone
 
-Galaxy S24 Ultra, Android 16, en-US locale. Samsung Health doesn't share phone-estimated sleep
-to Health Connect; a Xiaomi band (Mi Fitness) is the planned sleep source. Bank alert formats
-seen so far are in the `bank-alerts-import` memory note.
+What the phone has, which apps share to Health Connect, and the bank alert formats seen so
+far are in the project memory notes (`health-tab-built`, `workout-estimates`,
+`bank-alerts-import`), not in this repo. Read those first.
