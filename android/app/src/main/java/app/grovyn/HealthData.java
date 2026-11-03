@@ -6,10 +6,13 @@ import android.health.connect.AggregateRecordsRequest;
 import android.health.connect.HealthConnectException;
 import android.health.connect.HealthConnectManager;
 import android.health.connect.LocalTimeRangeFilter;
+import android.health.connect.ReadRecordsRequestUsingFilters;
+import android.health.connect.ReadRecordsResponse;
 import android.health.connect.datatypes.ActiveCaloriesBurnedRecord;
 import android.health.connect.datatypes.AggregationType;
 import android.health.connect.datatypes.DistanceRecord;
 import android.health.connect.datatypes.ExerciseSessionRecord;
+import android.health.connect.datatypes.Record;
 import android.health.connect.datatypes.RestingHeartRateRecord;
 import android.health.connect.datatypes.SleepSessionRecord;
 import android.health.connect.datatypes.StepsRecord;
@@ -22,9 +25,12 @@ import androidx.annotation.RequiresApi;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -125,6 +131,108 @@ final class HealthData {
                 default:
                     finished.run();
             }
+        }
+    }
+
+    /**
+     * The records behind a day's number, for checking where it comes from (DevicePlugin.healthRecords).
+     * `records`, oldest first, each with `app` (the package that wrote it), `start`, `end` and
+     * `written` (local times); sleep adds `stages` (minutes per stage), steps add `count`.
+     * `more` is true when there were more than one page. Covers the same range as `read`.
+     */
+    static void records(Context context, String kind, int days, Consumer<JSObject> done) {
+        HealthConnectManager manager = context.getSystemService(HealthConnectManager.class);
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = kind.equals(SLEEP) ? today.minusDays(days).atTime(NIGHT_STARTS, 0) : today.minusDays(days - 1).atStartOfDay();
+
+        JSObject result = new JSObject();
+        result.put("kind", kind);
+        result.put("records", new JSArray());
+        if (manager == null || !(kind.equals(SLEEP) || kind.equals(STEPS))) {
+            done.accept(result);
+            return;
+        }
+        if (kind.equals(SLEEP)) readAll(context, manager, SleepSessionRecord.class, start, result, done);
+        else readAll(context, manager, StepsRecord.class, start, result, done);
+    }
+
+    private static <T extends Record> void readAll(
+        Context context,
+        HealthConnectManager manager,
+        Class<T> type,
+        LocalDateTime start,
+        JSObject result,
+        Consumer<JSObject> done
+    ) {
+        ReadRecordsRequestUsingFilters<T> request = new ReadRecordsRequestUsingFilters.Builder<>(type)
+            .setTimeRangeFilter(new LocalTimeRangeFilter.Builder().setStartTime(start).setEndTime(LocalDateTime.now()).build())
+            .setPageSize(5000)
+            .build();
+        try {
+            manager.readRecords(
+                request,
+                context.getMainExecutor(),
+                new OutcomeReceiver<ReadRecordsResponse<T>, HealthConnectException>() {
+                    @Override
+                    public void onResult(ReadRecordsResponse<T> response) {
+                        JSArray list = new JSArray();
+                        for (Record record : response.getRecords()) list.put(describe(record));
+                        result.put("records", list);
+                        result.put("more", response.getNextPageToken() != -1);
+                        done.accept(result);
+                    }
+
+                    @Override
+                    public void onError(@NonNull HealthConnectException e) {
+                        result.put("failed", e.getErrorCode() + ": " + e.getMessage());
+                        done.accept(result);
+                    }
+                }
+            );
+        } catch (RuntimeException e) {
+            result.put("failed", String.valueOf(e.getMessage()));
+            done.accept(result);
+        }
+    }
+
+    private static JSObject describe(Record record) {
+        JSObject out = new JSObject();
+        out.put("app", record.getMetadata().getDataOrigin().getPackageName());
+        out.put("written", local(record.getMetadata().getLastModifiedTime()));
+        if (record instanceof SleepSessionRecord) {
+            SleepSessionRecord sleep = (SleepSessionRecord) record;
+            out.put("start", local(sleep.getStartTime()));
+            out.put("end", local(sleep.getEndTime()));
+            JSObject stages = new JSObject();
+            for (SleepSessionRecord.Stage stage : sleep.getStages()) {
+                String name = stageName(stage.getType());
+                long min = Duration.between(stage.getStartTime(), stage.getEndTime()).toMinutes();
+                stages.put(name, stages.optLong(name, 0) + min);
+            }
+            out.put("stages", stages);
+        } else if (record instanceof StepsRecord) {
+            StepsRecord steps = (StepsRecord) record;
+            out.put("start", local(steps.getStartTime()));
+            out.put("end", local(steps.getEndTime()));
+            out.put("count", steps.getCount());
+        }
+        return out;
+    }
+
+    private static String local(Instant at) {
+        return LocalDateTime.ofInstant(at, ZoneId.systemDefault()).toString();
+    }
+
+    private static String stageName(int type) {
+        switch (type) {
+            case SleepSessionRecord.StageType.STAGE_TYPE_AWAKE: return "awake";
+            case SleepSessionRecord.StageType.STAGE_TYPE_AWAKE_IN_BED: return "awakeInBed";
+            case SleepSessionRecord.StageType.STAGE_TYPE_AWAKE_OUT_OF_BED: return "outOfBed";
+            case SleepSessionRecord.StageType.STAGE_TYPE_SLEEPING: return "asleep";
+            case SleepSessionRecord.StageType.STAGE_TYPE_SLEEPING_LIGHT: return "light";
+            case SleepSessionRecord.StageType.STAGE_TYPE_SLEEPING_DEEP: return "deep";
+            case SleepSessionRecord.StageType.STAGE_TYPE_SLEEPING_REM: return "rem";
+            default: return "unknown";
         }
     }
 
