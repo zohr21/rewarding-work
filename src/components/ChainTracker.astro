@@ -3,8 +3,13 @@
  * Don't-break-the-chain tracker. Each habit is a row: one tap marks today, its last
  * seven days show as dots, and opening the row shows its best chain and month calendar.
  * Best chain is the headline number; a gap is never framed as failure.
+ * A chain can also count an amount, parts of the day (the five prayers) or fill itself in
+ * from Focus or Health (src/lib/chainkinds.ts); its days then open in ChainDay's sheet.
  * Used on /progress and the technique page.
  */
+import ChainDay from './ChainDay.astro';
+import { KINDS, PRAYERS, TEMPLATES, WORKOUT_TYPES } from '../lib/chainkinds';
+
 interface Props {
   headingLevel?: 'h2' | 'h3';
 }
@@ -35,12 +40,60 @@ const Heading = headingLevel;
       <label for="chain-habit" data-chain-label>What small thing will you do every day?</label>
       <div class="chain__row">
         <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
+      </div>
+
+      <div class="chain__templates" data-chain-templates>
+        <p class="chain__small">Or start from one</p>
+        <div class="chain__chips">
+          {TEMPLATES.map((t, i) => <button type="button" class="chain__chip" data-chain-template={i}>{t.label}</button>)}
+        </div>
+      </div>
+
+      <fieldset class="chain__kinds">
+        <legend class="chain__small">How do you mark a day?</legend>
+        {
+          KINDS.map((k) => (
+            <label class="chain__kind">
+              <input type="radio" name="chain-kind" value={k.id} data-chain-kind />
+              <span class="chain__kind-text">
+                <strong>{k.title}</strong>
+                <span>{k.sub}</span>
+              </span>
+            </label>
+          ))
+        }
+      </fieldset>
+
+      <div class="chain__opts" data-chain-opt="amount" hidden>
+        <label class="chain__opt">Goal per day<input class="input" type="text" inputmode="decimal" placeholder="20" data-chain-goal /></label>
+        <label class="chain__opt">Counted in<input class="input" type="text" maxlength="20" placeholder="pages" data-chain-unit /></label>
+      </div>
+      <div class="chain__opts" data-chain-opt="parts" hidden>
+        <label class="chain__opt chain__opt--wide"
+          >Slots, separated by commas<input class="input" type="text" maxlength="200" value={PRAYERS.join(', ')} data-chain-parts /></label
+        >
+        <label class="chain__opt">The day counts at<select class="input" data-chain-count-at></select></label>
+      </div>
+      <div class="chain__opts" data-chain-opt="linked" hidden>
+        <label class="chain__opt"
+          >Fills from<select class="input" data-chain-source>
+            <option value="focus">Focus time</option>
+            {WORKOUT_TYPES.map((t) => <option value={t.id}>{t.label} on Health</option>)}
+          </select></label
+        >
+        <label class="chain__opt"
+          ><span data-chain-link-unit>Goal (minutes)</span><input class="input" type="text" inputmode="decimal" placeholder="0 = any" data-chain-link-goal /></label
+        >
+      </div>
+
+      <div class="chain__form-actions">
+        <div class="chain__edit-actions" data-chain-edit-actions hidden>
+          <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
+          <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
+        </div>
         <button type="submit" class="btn">Save</button>
       </div>
-      <div class="chain__edit-actions" data-chain-edit-actions hidden>
-        <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
-        <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
-      </div>
+      <p class="chain__small muted" data-chain-form-error hidden></p>
     </form>
   </div>
 
@@ -88,6 +141,8 @@ const Heading = headingLevel;
   <p class="visually-hidden" aria-live="polite" data-chain-live></p>
 </section>
 
+<ChainDay />
+
 <script>
   import {
     addChain,
@@ -100,6 +155,22 @@ const Heading = headingLevel;
     toggleChainDay,
     type ChainEntry,
   } from '../lib/storage';
+  import {
+    EDIT_DAYS,
+    TEMPLATES,
+    WORKOUT_TYPES,
+    chainDay,
+    getEntry,
+    getSetup,
+    linkData,
+    removeDetail,
+    saveSetup,
+    syncLinked,
+    togglePart,
+    type ChainKind,
+    type ChainSetup,
+    type LinkSource,
+  } from '../lib/chainkinds';
   import { offerUndo } from '../lib/undo';
   import { streakRecords } from '../lib/rewards';
   import { chainStats } from '../lib/stats';
@@ -107,8 +178,6 @@ const Heading = headingLevel;
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
 
-  /** Days you can still mark or unmark, counting today. Older days are read-only. */
-  const EDIT_DAYS = 7;
   const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
   const shortMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
 
@@ -128,7 +197,22 @@ const Heading = headingLevel;
     name: HTMLElement;
     sub: HTMLElement;
     dots: HTMLElement;
+    /** Today's slots, for a parts-of-the-day chain. */
+    parts: HTMLElement;
     slot: HTMLElement;
+  }
+
+  /** Buttons that open a day in ChainDay's sheet carry these. */
+  function opensDay(b: HTMLElement, id: string, key: string | null): void {
+    if (key) {
+      b.dataset.sheetOpen = 'chain-day';
+      b.dataset.chainId = id;
+      b.dataset.chainDay = key;
+    } else {
+      delete b.dataset.sheetOpen;
+      delete b.dataset.chainId;
+      delete b.dataset.chainDay;
+    }
   }
 
   onPage('chain', () => {
@@ -159,6 +243,17 @@ const Heading = headingLevel;
       const thisMonth = $<HTMLButtonElement>('[data-chain-this-month]');
       const hint = $<HTMLElement>('[data-chain-hint]');
       const live = $<HTMLElement>('[data-chain-live]');
+      const templates = $<HTMLElement>('[data-chain-templates]');
+      const kindInputs = [...root.querySelectorAll<HTMLInputElement>('[data-chain-kind]')];
+      const opts = [...root.querySelectorAll<HTMLElement>('[data-chain-opt]')];
+      const goalIn = $<HTMLInputElement>('[data-chain-goal]');
+      const unitIn = $<HTMLInputElement>('[data-chain-unit]');
+      const partsIn = $<HTMLInputElement>('[data-chain-parts]');
+      const countAtIn = $<HTMLSelectElement>('[data-chain-count-at]');
+      const sourceIn = $<HTMLSelectElement>('[data-chain-source]');
+      const linkGoalIn = $<HTMLInputElement>('[data-chain-link-goal]');
+      const linkUnit = $<HTMLElement>('[data-chain-link-unit]');
+      const formError = $<HTMLElement>('[data-chain-form-error]');
 
       const rows = new Map<string, Row>();
       /** The chain whose tracker is showing; undefined until the first render picks one. */
@@ -186,6 +281,80 @@ const Heading = headingLevel;
         return `${days(s.current)} and counting.`;
       }
 
+      // ---------- The kind fields of the form ----------
+
+      const pickedKind = (): ChainKind => (kindInputs.find((i) => i.checked)?.value as ChainKind) ?? 'tick';
+      const slotNames = () =>
+        partsIn.value
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .slice(0, 8);
+      const distanceSource = () => WORKOUT_TYPES.find((t) => t.id === sourceIn.value)?.distance ?? false;
+
+      function showKind(): void {
+        const kind = pickedKind();
+        opts.forEach((o) => (o.hidden = o.dataset.chainOpt !== kind));
+        const n = Math.max(1, slotNames().length);
+        const keep = Number(countAtIn.value) || n;
+        countAtIn.replaceChildren(
+          ...Array.from({ length: n }, (_, i) => {
+            const o = document.createElement('option');
+            o.value = String(i + 1);
+            o.textContent = `${i + 1} of ${n}`;
+            return o;
+          }),
+        );
+        countAtIn.value = String(Math.min(keep, n));
+        linkUnit.textContent = sourceIn.value === 'focus' ? 'Goal (minutes)' : distanceSource() ? 'Goal (km)' : 'Goal (minutes)';
+        formError.hidden = true;
+      }
+      kindInputs.forEach((i) => i.addEventListener('change', showKind));
+      partsIn.addEventListener('input', showKind);
+      sourceIn.addEventListener('change', showKind);
+
+      function fillKind(s: ChainSetup): void {
+        kindInputs.forEach((i) => (i.checked = i.value === s.kind));
+        goalIn.value = s.kind === 'amount' ? String(s.goal ?? '') : '';
+        unitIn.value = s.kind === 'amount' ? (s.unit ?? '') : '';
+        if (s.kind === 'parts') partsIn.value = (s.parts ?? []).join(', ');
+        sourceIn.value = s.kind === 'linked' ? (s.source ?? 'focus') : 'focus';
+        linkGoalIn.value = s.kind === 'linked' && s.goal ? String(s.goal) : '';
+        countAtIn.value = '';
+        showKind();
+        if (s.kind === 'parts') countAtIn.value = String(s.countAt ?? (s.parts ?? []).length);
+      }
+
+      /** The setup the form describes, or a sentence saying what is missing. */
+      function readKind(): ChainSetup | string {
+        const kind = pickedKind();
+        const n = (v: string) => Number(v.replace(',', '.'));
+        if (kind === 'amount') {
+          const goal = n(goalIn.value);
+          if (!(goal > 0)) return 'Give the goal per day as a number, like 20.';
+          return { kind, goal, unit: unitIn.value.trim() || undefined };
+        }
+        if (kind === 'parts') {
+          const parts = slotNames();
+          if (parts.length < 2) return 'Name two slots or more, separated by commas.';
+          return { kind, parts, countAt: Number(countAtIn.value) || parts.length };
+        }
+        if (kind === 'linked') {
+          const goal = linkGoalIn.value.trim() ? n(linkGoalIn.value) : 0;
+          if (!(goal >= 0)) return 'Give the goal as a number, or leave it empty for any.';
+          return { kind, source: sourceIn.value as LinkSource, goal };
+        }
+        return { kind: 'tick' };
+      }
+
+      templates.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLElement>('[data-chain-template]');
+        const t = b && TEMPLATES[Number(b.dataset.chainTemplate)];
+        if (!t) return;
+        input.value = t.habit;
+        fillKind(t.setup);
+      });
+
       function makeRow(id: string): Row {
         const el = document.createElement('li');
         el.className = 'chain__item';
@@ -196,7 +365,10 @@ const Heading = headingLevel;
         tick.type = 'button';
         tick.className = 'chain__tick';
         tick.innerHTML = TICK_SVG;
-        tick.addEventListener('click', () => toggle(id, dayKey(new Date()), new Date()));
+        // Other kinds open today in the sheet instead (opensDay).
+        tick.addEventListener('click', () => {
+          if (getSetup(id).kind === 'tick') toggle(id, dayKey(new Date()), new Date());
+        });
 
         const open = document.createElement('button');
         open.type = 'button';
@@ -221,28 +393,75 @@ const Heading = headingLevel;
           render();
         });
 
+        const parts = document.createElement('div');
+        parts.className = 'chain__parts';
+        parts.setAttribute('role', 'group');
+        parts.addEventListener('click', (e) => {
+          const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-part]');
+          if (!b) return;
+          const ch = shown().find((x) => x.id === id);
+          const key = dayKey(new Date());
+          const before = ch?.days.includes(key) ?? false;
+          const counted = togglePart(id, key, Number(b.dataset.part));
+          if (counted && !before) celebrate();
+          // The write has redrawn the row already, so the button shows the new state.
+          announce(`${b.textContent}: ${b.getAttribute('aria-pressed') === 'true' ? 'done' : 'not yet'}.`);
+        });
+
         const slot = document.createElement('div');
         slot.className = 'chain__slot';
         head.append(tick, open);
-        el.append(head, slot);
-        return { el, tick, open, name, sub, dots, slot };
+        el.append(head, parts, slot);
+        return { el, tick, open, name, sub, dots, parts, slot };
       }
 
-      function fillRow(r: Row, ch: ChainEntry, s: ReturnType<typeof chainStats>): void {
+      function fillRow(r: Row, ch: ChainEntry, s: ReturnType<typeof chainStats>, data: ReturnType<typeof linkData>): void {
         const isOpen = ch.id === openId;
-        const set = new Set(ch.days);
         const now = startOfDay(new Date());
+        const todayKey = dayKey(now);
+        const setup = getSetup(ch.id);
+        const today = chainDay(ch, todayKey, data);
         r.el.style.setProperty('--chain-color', CHAIN_COLORS[ch.color % CHAIN_COLORS.length]!);
         r.el.classList.toggle('is-open', isOpen);
         r.name.textContent = ch.habit;
-        r.sub.textContent =
-          s.total === 0 ? 'Not started yet' : `${s.current ? `${days(s.current)} running` : 'No chain right now'} · best ${s.best}`;
-        r.tick.setAttribute('aria-label', `Done today: ${ch.habit}`);
-        r.tick.setAttribute('aria-pressed', String(s.doneToday));
+        const run = s.total === 0 ? 'Not started yet' : `${s.current ? `${days(s.current)} running` : 'No chain right now'} · best ${s.best}`;
+        r.sub.textContent = setup.kind === 'tick' ? run : `${today.long} today · best ${s.best}`;
+        r.tick.setAttribute('aria-label', setup.kind === 'tick' ? `Done today: ${ch.habit}` : `Fill in today: ${ch.habit}, ${today.long}`);
+        r.tick.setAttribute('aria-pressed', String(today.counted));
+        // A chain with a number shows it until the day counts, then the tick.
+        const text = setup.kind !== 'tick' && !today.counted ? today.short : '';
+        r.tick.classList.toggle('has-text', !!text);
+        if (text) r.tick.textContent = text;
+        else if (!r.tick.querySelector('svg')) r.tick.innerHTML = TICK_SVG;
+        opensDay(r.tick, ch.id, setup.kind === 'tick' ? null : todayKey);
         r.open.setAttribute('aria-expanded', String(isOpen));
         [...r.dots.children].forEach((dot, i) => {
-          dot.classList.toggle('is-marked', set.has(dayKey(addDays(now, i - (EDIT_DAYS - 1)))));
+          const view = chainDay(ch, dayKey(addDays(now, i - (EDIT_DAYS - 1))), data);
+          dot.classList.toggle('is-marked', view.counted);
+          dot.classList.toggle('is-part', view.partial);
           dot.classList.toggle('is-today', i === EDIT_DAYS - 1);
+        });
+
+        // Parts of the day: one tap per slot, today.
+        const names = setup.kind === 'parts' ? (setup.parts ?? []) : [];
+        r.parts.hidden = !names.length;
+        r.parts.setAttribute('aria-label', `${ch.habit} today`);
+        const entry = names.length ? (getEntry(ch.id, todayKey).parts ?? []) : [];
+        // Kept and updated in place, so focus stays on the slot just tapped.
+        if (r.parts.children.length !== names.length)
+          r.parts.replaceChildren(
+            ...names.map((_, i) => {
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'chain__part';
+              b.dataset.part = String(i);
+              return b;
+            }),
+          );
+        [...r.parts.children].forEach((b, i) => {
+          b.textContent = names[i]!;
+          b.setAttribute('aria-pressed', String(!!entry[i]));
+          b.classList.toggle('is-later', entry[i] === 2);
         });
       }
 
@@ -254,6 +473,7 @@ const Heading = headingLevel;
         const openChain = list.find((ch) => ch.id === openId);
         if (mode === 'edit' && !openChain) mode = null;
         const stats = new Map(list.map((ch) => [ch.id, chainStats(ch.days)]));
+        const data = linkData();
 
         const doneToday = list.filter((ch) => stats.get(ch.id)!.doneToday).length;
         count.hidden = none;
@@ -272,7 +492,7 @@ const Heading = headingLevel;
           let r = rows.get(ch.id);
           if (!r) rows.set(ch.id, (r = makeRow(ch.id)));
           if (listEl.children[i] !== r.el) listEl.insertBefore(r.el, listEl.children[i] ?? null);
-          fillRow(r, ch, stats.get(ch.id)!);
+          fillRow(r, ch, stats.get(ch.id)!, data);
         });
 
         const openRow = openChain && rows.get(openChain.id);
@@ -283,6 +503,8 @@ const Heading = headingLevel;
         label.textContent = renaming ? 'Rename this habit' : none ? 'What small thing will you do every day?' : 'What else will you do every day?';
         editActions.hidden = none;
         del.hidden = !renaming;
+        templates.hidden = !!renaming;
+        if (!kindInputs.some((i) => i.checked)) fillKind({ kind: 'tick' });
 
         const tracking = openChain && openRow && !renaming;
         if (tracking) {
@@ -293,14 +515,15 @@ const Heading = headingLevel;
           current.textContent = days(s.current);
           total.textContent = String(s.total);
           message.textContent = encouragement(s);
-          renderCalendar(openChain);
+          renderCalendar(openChain, data);
         }
         body.hidden = !tracking;
         pulseKey = null;
       }
 
       /** Month grid, Monday first, with the neighbouring months' days dimmed. */
-      function renderCalendar(chain: ChainEntry): void {
+      function renderCalendar(chain: ChainEntry, data: ReturnType<typeof linkData>): void {
+        const plain = getSetup(chain.id).kind === 'tick';
         const marked = chain.days;
         const set = new Set(marked);
         const now = startOfDay(new Date());
@@ -336,8 +559,15 @@ const Heading = headingLevel;
           b.disabled = future;
           // Read-only past days stay focusable, so their state can still be read out.
           if (!future && !editable) b.setAttribute('aria-disabled', 'true');
-          b.setAttribute('aria-pressed', String(isMarked));
-          b.setAttribute('aria-label', `${formatDay(date)}${key === todayKey ? ' (today)' : ''}${!future && !editable ? ', read only' : ''}`);
+          const view = plain || future ? undefined : chainDay(chain, key, data);
+          // Other kinds open the day in the sheet, so the button is not a toggle there.
+          if (plain) b.setAttribute('aria-pressed', String(isMarked));
+          if (!plain && editable) opensDay(b, chain.id, key);
+          b.classList.toggle('is-part', !!view?.partial);
+          b.setAttribute(
+            'aria-label',
+            `${formatDay(date)}${key === todayKey ? ' (today)' : ''}${view ? `, ${view.long}` : ''}${!future && !editable ? ', read only' : ''}`,
+          );
           b.classList.toggle('is-outside', outside);
           b.classList.toggle('is-locked', !future && !editable);
           if (isMarked) {
@@ -356,13 +586,15 @@ const Heading = headingLevel;
               hint.classList.add('is-nudged');
               return;
             }
-            toggle(chain.id, key, day);
+            if (plain) toggle(chain.id, key, day);
           });
           buttons.push(b);
         }
         cal.replaceChildren(...buttons);
         if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
-        hint.textContent = `Tap a day in the last ${EDIT_DAYS} days to mark or unmark it. Older days are kept as they are.`;
+        hint.textContent = plain
+          ? `Tap a day in the last ${EDIT_DAYS} days to mark or unmark it. Older days are kept as they are.`
+          : `Tap a day in the last ${EDIT_DAYS} days to fill it in. Older days are kept as they are.`;
       }
 
       function show(month: Date): void {
@@ -397,9 +629,17 @@ const Heading = headingLevel;
           input.focus();
           return;
         }
+        const setup = readKind();
+        if (typeof setup === 'string') {
+          formError.textContent = setup;
+          formError.hidden = false;
+          announce(setup);
+          return;
+        }
         if (mode === 'edit' && openId) {
           mode = null;
           renameChain(openId, habit);
+          saveSetup(openId, setup);
           render();
           announce(`Habit saved: ${habit}`);
           edit.focus();
@@ -407,6 +647,7 @@ const Heading = headingLevel;
         }
         const id = addChain(habit);
         if (!id) return;
+        saveSetup(id, setup);
         mode = null;
         openId = id;
         viewMonth = monthStart(new Date());
@@ -419,6 +660,7 @@ const Heading = headingLevel;
       newBtn.addEventListener('click', () => {
         mode = 'new';
         input.value = '';
+        fillKind({ kind: 'tick' });
         render();
         input.focus();
       });
@@ -428,6 +670,7 @@ const Heading = headingLevel;
         if (!chain) return;
         mode = 'edit';
         input.value = chain.habit;
+        fillKind(getSetup(chain.id));
         render();
         input.focus();
         input.select();
@@ -456,6 +699,7 @@ const Heading = headingLevel;
           commit: () => {
             if (!removing.delete(old.id)) return;
             deleteChain(old.id, streakRecords(getChains().find((ch) => ch.id === old.id)?.days ?? []));
+            removeDetail(old.id);
           },
           undo: () => {
             if (!removing.delete(old.id)) return;
@@ -469,8 +713,16 @@ const Heading = headingLevel;
         announce(`Deleted your chain “${old.habit}”. Press Undo to bring it back.`);
       });
 
-      render();
+      // Linked chains follow Focus and Health; syncing writes `chain`, which redraws.
+      const follow = () => {
+        syncLinked();
+        render();
+      };
+      follow();
       c.add(subscribe('chain', render));
+      c.add(subscribe('chain-detail', render));
+      c.add(subscribe('sessions', follow));
+      c.add(subscribe('workouts', follow));
     });
     return c.run;
   });
@@ -669,6 +921,173 @@ const Heading = headingLevel;
 
   .chain__edit-actions[hidden] {
     display: none;
+  }
+
+  /* ---------- Kinds: the form ---------- */
+
+  .chain__setup .chain__small,
+  .chain__small {
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .chain__templates[hidden] {
+    display: none;
+  }
+
+  .chain__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .chain__chip {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--well-bg);
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .chain__kinds {
+    display: grid;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .chain__kinds legend {
+    margin-bottom: var(--space-2);
+    padding: 0;
+  }
+
+  .chain__setup .chain__kind {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    font-weight: 400;
+    cursor: pointer;
+  }
+
+  .chain__kind:has(input:checked) {
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+  }
+
+  .chain__kind input {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    accent-color: var(--color-accent);
+  }
+
+  .chain__kind-text {
+    display: grid;
+  }
+
+  .chain__kind-text span {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+  }
+
+  .chain__opts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .chain__opts[hidden] {
+    display: none;
+  }
+
+  .chain__setup .chain__opt {
+    display: grid;
+    gap: var(--space-1);
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
+  .chain__opt--wide {
+    grid-column: 1 / -1;
+  }
+
+  .chain__form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .chain__form-actions .btn[type='submit'] {
+    margin-left: auto;
+  }
+
+  /* ---------- Kinds: the rows ---------- */
+
+  /* A chain with a number shows it in the tick until the day counts. */
+  .chain :global(.chain__tick.has-text) {
+    color: var(--color-text);
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .chain :global(.chain__dots .is-part) {
+    border: 2px solid var(--chain-color);
+  }
+
+  .chain :global(.chain__parts) {
+    display: flex;
+    gap: var(--space-1);
+    padding: 0 var(--space-2) var(--space-2) var(--space-3);
+  }
+
+  .chain :global(.chain__parts[hidden]) {
+    display: none;
+  }
+
+  .chain :global(.chain__part) {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 2px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--well-bg);
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .chain :global(.chain__part[aria-pressed='true']) {
+    border-color: var(--chain-color);
+    background: var(--chain-color);
+    color: var(--color-on-accent);
+  }
+
+  /* Done later: still done, drawn as a ring. */
+  .chain :global(.chain__part.is-later[aria-pressed='true']) {
+    background: var(--well-bg);
+    color: var(--color-text);
+    box-shadow: inset 0 0 0 1px var(--chain-color);
+  }
+
+  .chain :global(.chain__day.is-part:not(.is-marked)) {
+    box-shadow: inset 0 0 0 2px var(--chain-color);
   }
 
   .chain__habit {
