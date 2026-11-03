@@ -34,6 +34,7 @@ const current = Astro.url.pathname;
 <script>
   import { onAccountChange, startAccount, type AccountState } from '../lib/account/state';
   import { startBoard } from '../lib/board';
+  import { BOARD_ENABLED } from '../config/firebase';
   import { onPage } from '../lib/page';
 
   const SYNC_TEXT: Record<AccountState['sync'], string> = {
@@ -46,7 +47,8 @@ const current = Astro.url.pathname;
 
   onPage('account-button', () => {
     startAccount();
-    startBoard();
+    // The Play version has no board, so a `board` store synced from another device sends nothing.
+    if (BOARD_ENABLED) startBoard();
     const btn = document.querySelector<HTMLAnchorElement>('[data-account-btn]');
     if (!btn) return;
     const label = btn.querySelector<HTMLElement>('[data-account-label]')!;

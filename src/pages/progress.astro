@@ -11,6 +11,7 @@ import ChainTracker from '../components/ChainTracker.astro';
 import ScreenStats from '../components/ScreenStats.astro';
 import BoardPanel from '../components/BoardPanel.astro';
 import { NATIVE_APP } from '../config/app';
+import { BOARD_ENABLED } from '../config/firebase';
 import { url } from '../lib/paths';
 
 /** The grove's tabs, in order. `hash` is what links use to open one (#stats); the first is the default. */
@@ -19,7 +20,7 @@ const TABS = [
   { id: 'stats', label: 'Stats' },
   { id: 'done', label: 'Done' },
   { id: 'chains', label: 'Chains' },
-  { id: 'board', label: 'Board' },
+  ...(BOARD_ENABLED ? [{ id: 'board', label: 'Board' }] : []),
 ];
 ---
 
@@ -75,9 +76,13 @@ const TABS = [
         <ChainTracker />
       </section>
 
-      <section class="grove-panel" role="tabpanel" id="grove-panel-board" aria-labelledby="grove-tab-board" data-grove-panel="board" hidden>
-        <BoardPanel />
-      </section>
+      {
+        BOARD_ENABLED && (
+          <section class="grove-panel" role="tabpanel" id="grove-panel-board" aria-labelledby="grove-tab-board" data-grove-panel="board" hidden>
+            <BoardPanel />
+          </section>
+        )
+      }
 
       <p class="muted progress__data">
         Kept on this {NATIVE_APP ? 'phone' : 'device'}, and in your account when you're signed in. Back up, move or delete it under

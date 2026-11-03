@@ -1,6 +1,7 @@
 package app.grovyn;
 
 import android.Manifest;
+import android.app.AlarmManager;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -131,7 +132,26 @@ public class DevicePlugin extends Plugin {
     private JSObject granted() {
         JSObject result = new JSObject();
         result.put("granted", NotificationManagerCompat.from(getContext()).areNotificationsEnabled());
+        result.put("exact", exactAlarms());
         return result;
+    }
+
+    /** Whether a phase-end alert can go off on time; without it TimerNotices sets it inexact. */
+    private boolean exactAlarms() {
+        return Build.VERSION.SDK_INT < 31 || getContext().getSystemService(AlarmManager.class).canScheduleExactAlarms();
+    }
+
+    /** Android's "Alarms & reminders" screen for this app (Android 12 and later), where the user allows alerts on time. */
+    @PluginMethod
+    public void alarmSettings(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 31 && getActivity() != null) {
+            try {
+                getActivity().startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getContext().getPackageName())));
+            } catch (RuntimeException ignored) {
+                /* No such screen on this phone. */
+            }
+        }
+        call.resolve();
     }
 
     /** What the widgets show: the first-up task and the chain (Widgets.java reads it back). */
