@@ -2,8 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- No Android backup or phone-to-phone copy: health numbers, screen time and bank alerts stay on this phone
+         (privacy page). Your own backup file and the account sync are how data moves. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -104,8 +107,8 @@
     <!-- READ_SMS is only in the full version: src/full/AndroidManifest.xml. -->
     <!-- The timer's notifications, and telling you on time that a session ended. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <!-- Asked for, not assumed: without it the alert is set inexact and can come a few minutes late (TimerNotices.java). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Health Connect, read only: the Health page's sleep, steps, exercise, resting heart rate, calories burned and distance. -->
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_STEPS" />

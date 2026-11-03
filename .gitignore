@@ -7,6 +7,11 @@ dist/
 firebase-debug.log
 firestore-debug.log
 *.apk
+*.aab
+# The Play upload key never goes in the repo (docs/release.md)
+*.jks
+*.keystore
+keystore.properties
 
 # Claude Code: skills are shared, the rest is per machine
 .claude/*

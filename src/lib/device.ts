@@ -124,8 +124,10 @@ interface DevicePlugin {
   usageBetween(options: { start: number; end: number }): Promise<UsageSpan>;
   showTimer(options: { ongoing: TimerOngoing | null; alerts: TimerAlert[] }): Promise<void>;
   clearTimer(): Promise<void>;
-  notificationState(): Promise<{ granted: boolean }>;
-  requestNotifications(): Promise<{ granted: boolean }>;
+  /** `exact`: a phase-end alert can go off on time (Android's "Alarms & reminders"); without it, it may be a few minutes late. */
+  notificationState(): Promise<{ granted: boolean; exact: boolean }>;
+  requestNotifications(): Promise<{ granted: boolean; exact: boolean }>;
+  alarmSettings(): Promise<void>;
   setWidgets(data: WidgetData): Promise<void>;
   takeRoute(): Promise<{ route: string | null }>;
   googleSignIn(options: { clientId: string }): Promise<{ idToken: string }>;
@@ -156,6 +158,9 @@ export const clearTimerNotice = () => void call((p) => p.clearTimer(), undefined
 /** null where there is no native side to ask. */
 export const notificationsGranted = () => call<boolean | null>(async (p) => (await p.notificationState()).granted, null);
 export const requestNotifications = () => call<boolean | null>(async (p) => (await p.requestNotifications()).granted, null);
+/** null where there is no native side to ask. */
+export const exactAlarmsAllowed = () => call<boolean | null>(async (p) => (await p.notificationState()).exact ?? true, null);
+export const openAlarmSettings = () => void call((p) => p.alarmSettings(), undefined);
 export const setWidgets = (data: WidgetData) => void call((p) => p.setWidgets(data), undefined);
 /** null where there is no native side to ask. */
 export const healthState = () => call<HealthState | null>((p) => p.healthState(), null);

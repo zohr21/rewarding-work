@@ -9,7 +9,7 @@
  * (Settings → Secrets and variables → Actions → Variables). Without them the site
  * builds and works as before, with no accounts.
  */
-import { NATIVE_APP } from './app';
+import { NATIVE_APP, PLAY_STORE } from './app';
 
 export const FIREBASE_CONFIG = {
   apiKey: String(import.meta.env.PUBLIC_FIREBASE_API_KEY ?? ''),
@@ -22,6 +22,8 @@ export const FIREBASE_CONFIG = {
 export const USE_EMULATOR = String(import.meta.env.PUBLIC_FIREBASE_EMULATOR) === 'true';
 
 export const ACCOUNTS_ENABLED = Object.values(FIREBASE_CONFIG).every((v) => v.length > 0);
+/** The weekly board needs accounts, and is left out of the Play version (PLAY_STORE in app.ts). */
+export const BOARD_ENABLED = ACCOUNTS_ENABLED && !PLAY_STORE;
 
 /**
  * The Android app can't open Google's sign-in window, so it asks the phone's own account

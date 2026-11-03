@@ -8,7 +8,7 @@ import AppearanceMenu from '../components/AppearanceMenu.astro';
 import RowIcon from '../components/RowIcon.astro';
 import BoardJoin from '../components/BoardJoin.astro';
 import YourData from '../components/YourData.astro';
-import { ACCOUNTS_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
+import { ACCOUNTS_ENABLED, BOARD_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { APP_ONLY_MODULES, MODULES } from '../config/site';
@@ -96,7 +96,7 @@ import pkg from '../../package.json';
         <ul>
           <li data-view="signed-out" hidden><a href="#acc-signin">Sign in</a></li>
           <li data-view="signed-in" data-member-only hidden><a href="#acc-security">Sign-in and security</a></li>
-          {ACCOUNTS_ENABLED && <li><a href="#acc-board">Weekly board</a></li>}
+          {BOARD_ENABLED && <li><a href="#acc-board">Weekly board</a></li>}
           <li><a href="#acc-data">Data and sync</a></li>
           <li><a href="#acc-connections">Connections</a></li>
           <li><a href="#acc-prefs">Preferences</a></li>
@@ -184,7 +184,7 @@ import pkg from '../../package.json';
         </section>
 
         {
-          ACCOUNTS_ENABLED && (
+          BOARD_ENABLED && (
             <section class="group o-board" id="acc-board" aria-labelledby="acc-board-h" data-board-card>
               <h2 id="acc-board-h" class="group__title">Weekly board</h2>
               <div class="rows">
@@ -325,7 +325,7 @@ import pkg from '../../package.json';
                 <button type="button" class="row" data-notify>
                   <RowIcon name="bell" />
                   <span class="row__main">
-                    Notifications and widgets<small>Timer alerts. Widgets are added from your home screen.</small>
+                    Notifications and widgets<small data-notify-note>Timer alerts. Widgets are added from your home screen.</small>
                   </span>
                   <span class="row__value" data-pref-notify />
                 </button>
@@ -392,7 +392,7 @@ import pkg from '../../package.json';
       </div>
     </div>
   </div>
-  {ACCOUNTS_ENABLED && <BoardJoin />}
+  {BOARD_ENABLED && <BoardJoin />}
   {NATIVE_APP && <YourData />}
 </BaseLayout>
 
@@ -408,7 +408,7 @@ import pkg from '../../package.json';
   import { tierIcon } from '../lib/tier-icons';
   import { FIFTY_TWO, POMODORO } from '../lib/timer/engine';
   import { onPlayerChange } from '../lib/sound/player';
-  import { notificationsGranted, requestNotifications } from '../lib/device';
+  import { exactAlarmsAllowed, notificationsGranted, openAlarmSettings, requestNotifications } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
 
   // The profile's tier row: the highest tier reached on any track.
@@ -502,9 +502,21 @@ import pkg from '../../package.json';
     const notify = q<HTMLButtonElement>('[data-notify]');
     if (notify) {
       const value = q('[data-pref-notify]')!;
-      const show = (granted: boolean | null) => (value.textContent = granted === null ? '' : granted ? 'On' : 'Off');
+      const note = q('[data-notify-note]')!;
+      const plain = note.textContent;
+      // Notifications on but alarms not allowed on time: say so, and the row opens Android's screen for it.
+      let late = false;
+      const show = async (granted: boolean | null) => {
+        late = granted === true && (await exactAlarmsAllowed()) === false;
+        value.textContent = granted === null ? '' : granted ? 'On' : 'Off';
+        note.textContent = late ? 'Timer alerts can come a few minutes late. Tap to allow them on time.' : plain;
+      };
       void notificationsGranted().then(show);
-      notify.addEventListener('click', () => void requestNotifications().then(show));
+      notify.addEventListener('click', () => (late ? openAlarmSettings() : void requestNotifications().then(show)));
+      // Back from Android's settings.
+      const recheck = () => document.visibilityState === 'visible' && void notificationsGranted().then(show);
+      document.addEventListener('visibilitychange', recheck);
+      c.add(() => document.removeEventListener('visibilitychange', recheck));
     }
 
     const useEmail = q<HTMLButtonElement>('[data-use-email]')!;
