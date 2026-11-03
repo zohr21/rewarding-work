@@ -34,13 +34,14 @@ import { url } from '../lib/paths';
 
 <script>
   import { getChain, getDone, getSessions, onWrite, subscribe, type StoreName } from '../lib/storage';
+  import { bodyInput } from '../lib/bodytiers';
   import { chainInput, earnedTierIds, tierInfo, tierLabel, TIER_MATERIALS, TIER_NAMES, type TierInfo } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
   import { armAudioUnlock, cueVolume, playAchievement } from '../lib/timer/cues';
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
 
-  const WATCHED: StoreName[] = ['sessions', 'done', 'chain'];
+  const WATCHED: StoreName[] = ['sessions', 'done', 'chain', 'body', 'body-manual', 'workouts'];
   const SHOW_MS = 6500;
   /** Toasts after the first wait a moment each, so a burst reads as a sequence. */
   const STAGGER_MS = 700;
@@ -52,7 +53,7 @@ import { url } from '../lib/paths';
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
   const earnedNow = () => {
-    return earnedTierIds({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
+    return earnedTierIds({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()), body: bodyInput() });
   };
   const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -280,6 +281,8 @@ import { url } from '../lib/paths';
       stack.removeEventListener('keydown', onKey);
     });
     c.add(onWrite((name) => WATCHED.includes(name) && queue(true)));
+    // Turning Health on brings its body markers in quietly, not as a burst of old tiers.
+    c.add(onWrite((name) => name === 'profile' && (known = earnedNow())));
     WATCHED.forEach((name) => c.add(subscribe(name, () => queue(false))));
     return c.run;
   });

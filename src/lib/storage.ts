@@ -39,10 +39,11 @@ export type StoreName =
   | 'workouts' // Health: runs, swims and other workouts you log by hand (src/lib/workouts.ts); this device only for now
   | 'lock' // The Budget lock and its PIN's hash (src/lib/lock.ts); each device keeps its own
   | 'findings' // Health: your Helpful / Not true tap on your finding (src/lib/findings.ts); this device only
+  | 'body-tiers' // Grove: body-marker days old enough to keep, so a tier stays when Health data ages out (src/lib/bodytiers.ts); this device only
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'body-manual', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'body-manual', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings', 'body-tiers'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
