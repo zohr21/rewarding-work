@@ -17,11 +17,15 @@ export const TIER_MATERIALS = ['Green', 'Bronze', 'Silver', 'Gold', 'Diamond'] a
 /** "Silver Sapling" — the tier at `index` with its material. */
 export const tierLabel = (index: number) => `${TIER_MATERIALS[index]} ${TIER_NAMES[index]}`;
 
-export type TrackId = 'focus' | 'sessions' | 'streak' | 'done';
+export type TrackId = 'focus' | 'sessions' | 'streak' | 'done' | 'rest' | 'move' | 'active' | 'workouts';
 
 export interface Track {
   id: TrackId;
+  /** Focus tracks always count; body ones only with Health on (src/lib/bodytiers.ts). */
+  group: 'focus' | 'body';
   title: string;
+  /** What counts, in a sentence, for the marker sheet. */
+  how: string;
   /** One threshold per tier, ascending. */
   thresholds: readonly number[];
   /** "5 hours of focus" — describes reaching `n`. */
@@ -35,6 +39,8 @@ const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : ma
 export const TRACKS: readonly Track[] = [
   {
     id: 'focus',
+    group: 'focus',
+    how: 'All your focus minutes, finished sessions or not. Sprig grows with this one.',
     title: 'Focus time',
     thresholds: [1, 5, 15, 40, 100],
     describe: (n) => `${n} ${plural(n, 'hour')} of focus`,
@@ -42,6 +48,8 @@ export const TRACKS: readonly Track[] = [
   },
   {
     id: 'sessions',
+    group: 'focus',
+    how: 'Timer sessions you ran to the end.',
     title: 'Sessions completed',
     thresholds: [1, 10, 30, 75, 150],
     describe: (n) => `${n} completed ${plural(n, 'session')}`,
@@ -49,6 +57,8 @@ export const TRACKS: readonly Track[] = [
   },
   {
     id: 'streak',
+    group: 'focus',
+    how: 'Your longest run of chain days. A missed day never takes a tier away.',
     title: 'Best chain',
     thresholds: [3, 7, 14, 30, 66],
     describe: (n) => `a ${n}-day chain`,
@@ -56,6 +66,8 @@ export const TRACKS: readonly Track[] = [
   },
   {
     id: 'done',
+    group: 'focus',
+    how: 'Every task you finished, counted once.',
     title: 'Things done',
     thresholds: [1, 10, 30, 75, 150],
     describe: (n) => `${n} ${plural(n, 'thing')} done`,
@@ -63,12 +75,70 @@ export const TRACKS: readonly Track[] = [
   },
 ];
 
+/**
+ * Body markers count days you looked after yourself, never how hard you pushed: a night of
+ * enough sleep, a day of enough steps, a week of enough activity. Thresholds and goals are in
+ * src/lib/bodytiers.ts, which also gathers the days.
+ */
+export const BODY_TRACKS: readonly Track[] = [
+  {
+    id: 'rest',
+    group: 'body',
+    title: 'Rested nights',
+    how: 'Nights with 7 hours of sleep or more, from Health Connect or added by hand.',
+    thresholds: [3, 10, 30, 75, 150],
+    describe: (n) => `${n} rested ${plural(n, 'night')}`,
+    unit: (n) => plural(n, 'night'),
+  },
+  {
+    id: 'move',
+    group: 'body',
+    title: 'Moving days',
+    how: 'Days with 7,000 steps or more.',
+    thresholds: [3, 10, 30, 75, 150],
+    describe: (n) => `${n} moving ${plural(n, 'day')}`,
+    unit: (n) => plural(n, 'day'),
+  },
+  {
+    id: 'active',
+    group: 'body',
+    title: 'Active weeks',
+    how: 'Weeks (Monday to Sunday) with 150 active minutes, workouts and brisk walks together.',
+    thresholds: [1, 4, 12, 26, 52],
+    describe: (n) => `${n} active ${plural(n, 'week')}`,
+    unit: (n) => plural(n, 'week'),
+  },
+  {
+    id: 'workouts',
+    group: 'body',
+    title: 'Workouts logged',
+    how: 'Every workout you log on Health.',
+    thresholds: [1, 10, 30, 75, 150],
+    describe: (n) => `${n} ${plural(n, 'workout')} logged`,
+    unit: (n) => plural(n, 'workout'),
+  },
+];
+
+const ALL_TRACKS = [...TRACKS, ...BODY_TRACKS];
+
+/** The days behind the body markers (src/lib/bodytiers.ts). */
+export interface BodyInput {
+  rest: DayKey[];
+  move: DayKey[];
+  /** The Monday of each active week. */
+  active: DayKey[];
+  /** When each workout started, epoch ms. */
+  workouts: number[];
+}
+
 export interface RewardInput {
   sessions: FocusSession[];
   done: DoneItem[];
   chainDays: DayKey[];
   /** Best-run records of deleted chains (Chain.pastBests). */
   pastBests?: [DayKey, number][];
+  /** Left out when Health is off: then there are no body markers. */
+  body?: BodyInput;
 }
 
 export interface TrackProgress {
@@ -79,7 +149,12 @@ export interface TrackProgress {
   level: number;
   /** When each tier was first reached (epoch ms), or null. Same length as thresholds. */
   reachedAt: (number | null)[];
+  /** How much the value grew in the last PACE_DAYS days, for "at your pace". */
+  recent: number;
 }
+
+/** "At your pace" looks back this far. */
+export const PACE_DAYS = 14;
 
 interface Point {
   t: number;
@@ -115,6 +190,18 @@ function series(input: RewardInput, id: TrackId): Point[] {
       for (const p of records) if (p.v > (points.at(-1)?.v ?? 0)) points.push(p);
       return points;
     }
+    case 'rest':
+    case 'move':
+    case 'active': {
+      let n = 0;
+      return [...new Set(input.body?.[id] ?? [])]
+        .sort()
+        .map((key) => ({ t: fromDayKey(key).getTime(), v: ++n }));
+    }
+    case 'workouts': {
+      let n = 0;
+      return [...(input.body?.workouts ?? [])].sort((a, b) => a - b).map((t) => ({ t, v: ++n }));
+    }
   }
 }
 
@@ -147,16 +234,56 @@ export function trackProgress(input: RewardInput, track: Track): TrackProgress {
   const points = series(input, track.id);
   // Small epsilon so 59.99… minutes of float sums still count as the hour it is.
   const reachedAt = track.thresholds.map((n) => points.find((p) => p.v >= n - 1e-9)?.t ?? null);
+  const value = points.at(-1)?.v ?? 0;
+  const since = Date.now() - PACE_DAYS * 86_400_000;
+  const before = points.filter((p) => p.t < since).at(-1)?.v ?? 0;
   return {
     track,
-    value: points.at(-1)?.v ?? 0,
+    value,
     level: reachedAt.filter((t) => t !== null).length,
     reachedAt,
+    recent: value - before,
   };
 }
 
+/** Every track, the body ones only when `input.body` is there. */
 export function allProgress(input: RewardInput): TrackProgress[] {
-  return TRACKS.map((t) => trackProgress(input, t));
+  return (input.body ? ALL_TRACKS : TRACKS).map((t) => trackProgress(input, t));
+}
+
+export interface NextTier {
+  p: TrackProgress;
+  /** The next tier's threshold. */
+  next: number;
+  /** How far from the last tier to the next one, 0–1. */
+  share: number;
+  /** What is left, rounded the way the track counts. */
+  left: number;
+}
+
+/** The tiers closest to being reached, closest first; tracks with every tier reached drop out. */
+export function closestTiers(progress: TrackProgress[], count = 3): NextTier[] {
+  return progress
+    .flatMap((p) => {
+      const next = p.track.thresholds[p.level];
+      if (next === undefined) return [];
+      const prev = p.level ? p.track.thresholds[p.level - 1]! : 0;
+      const share = Math.min(1, Math.max(0, (p.value - prev) / (next - prev)));
+      const left = p.track.id === 'focus' ? Math.ceil((next - p.value) * 10) / 10 : Math.ceil(next - p.value);
+      return [{ p, next, share, left }];
+    })
+    .sort((a, b) => b.share - a.share)
+    .slice(0, count);
+}
+
+/**
+ * Days to the next tier at the pace of the last PACE_DAYS days, or null when nothing grew.
+ * The chain has no pace: it is as many days as are left, in a row.
+ */
+export function daysToNext({ p, left }: NextTier): number | null {
+  if (p.track.id === 'streak') return left;
+  if (p.recent <= 0) return null;
+  return Math.max(1, Math.round(left / (p.recent / PACE_DAYS)));
 }
 
 /** Stable id of one tier, e.g. "focus:2" (the third tier of focus time). */
@@ -181,7 +308,7 @@ export interface TierInfo {
 
 export function tierInfo(id: string): TierInfo | null {
   const [trackId, indexText] = id.split(':');
-  const track = TRACKS.find((t) => t.id === trackId);
+  const track = ALL_TRACKS.find((t) => t.id === trackId);
   const index = Number(indexText);
   const name = TIER_NAMES[index];
   const threshold = track?.thresholds[index];

@@ -67,7 +67,8 @@ import ChainToday from './ChainToday.astro';
 <script>
   import { getChain, getChains, getDone, getSessions, getTasks, subscribe } from '../lib/storage';
   import { getProfile } from '../lib/profile';
-  import { allProgress, chainInput, tierLabel } from '../lib/rewards';
+  import { allProgress, chainInput, closestTiers, tierLabel } from '../lib/rewards';
+  import { bodyInput } from '../lib/bodytiers';
   import { chainStats, dailyMinutes, totals } from '../lib/stats';
   import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
   import { miniBars, ring } from '../lib/charts';
@@ -226,19 +227,11 @@ import ChainToday from './ChainToday.astro';
     /** The one tier that is closest, so the home screen points at a single next thing. */
     function renderNudge(): void {
       const nudge = $<HTMLAnchorElement>('[data-td-nudge]');
-      const closest = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) })
-        .flatMap((p) => {
-          const next = p.track.thresholds[p.level];
-          if (next === undefined) return [];
-          const prev = p.level ? p.track.thresholds[p.level - 1]! : 0;
-          return [{ p, next, share: (p.value - prev) / (next - prev) }];
-        })
-        .sort((a, b) => b.share - a.share)[0];
+      const closest = closestTiers(allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()), body: bodyInput() }), 1)[0];
       // Tiers mean nothing yet on the first day; the seed card says what grows them.
       nudge.hidden = !closest || isFirstDay();
       if (nudge.hidden || !closest) return;
-      const { p, next, share } = closest;
-      const left = p.track.id === 'focus' ? Math.ceil((next - p.value) * 10) / 10 : Math.ceil(next - p.value);
+      const { p, share, left } = closest;
       const bar = $('[data-td-nudge-bar]');
       bar.style.setProperty('--share', `${Math.round(Math.min(1, Math.max(0, share)) * 100)}%`);
       bar.style.setProperty('--next', `var(--tier-${p.level})`);

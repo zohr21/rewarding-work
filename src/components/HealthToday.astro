@@ -61,6 +61,10 @@ import HealthFinding from './HealthFinding.astro';
       <span class="muted ht__small">Garden</span>
       <strong data-ht-garden-sub>Your plants today</strong>
     </button>
+    <button type="button" class="ht__tile" data-sheet-open="markers" data-ht-markers hidden>
+      <span class="muted ht__small">Body markers</span>
+      <strong data-ht-markers-sub>Your tiers</strong>
+    </button>
     <button type="button" class="ht__tile" data-sheet-open="spend">
       <span class="muted ht__small">Wellbeing spend</span>
       <strong data-ht-spend-sub>This month</strong>
@@ -289,8 +293,9 @@ import HealthFinding from './HealthFinding.astro';
       }),
     );
 
-    // The garden and spend sheets work out their own numbers; their buttons here show the gist.
+    // The garden, markers and spend sheets work out their own numbers; their buttons here show the gist.
     const garden = document.querySelector<HTMLElement>('[data-garden]');
+    const markers = document.querySelector<HTMLElement>('[data-health-markers]');
     const total = document.querySelector<HTMLElement>('[data-ws-total]');
     const mirror = () => {
       const gardenButton = $<HTMLElement>('[data-ht-garden]');
@@ -298,10 +303,14 @@ import HealthFinding from './HealthFinding.astro';
       const hint = garden?.querySelector('[data-garden-hint]')?.textContent;
       if (hint) $('[data-ht-garden-sub]').textContent = hint;
       if (total?.textContent) $('[data-ht-spend-sub]').textContent = `${total.textContent} this month`;
+      $<HTMLElement>('[data-ht-markers]').hidden = !markers || markers.hidden;
+      const next = markers?.querySelector('[data-hm-hint]')?.textContent;
+      if (next) $('[data-ht-markers-sub]').textContent = next;
     };
     const watch = new MutationObserver(mirror);
     if (garden) watch.observe(garden, { attributes: true, attributeFilter: ['hidden'], subtree: true, childList: true, characterData: true });
     if (total) watch.observe(total, { childList: true, characterData: true, subtree: true });
+    if (markers) watch.observe(markers, { attributes: true, attributeFilter: ['hidden'], childList: true, characterData: true, subtree: true });
     c.add(() => watch.disconnect());
     mirror();
 

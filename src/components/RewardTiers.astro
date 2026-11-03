@@ -1,11 +1,15 @@
 ---
 /**
- * Reward tiers on the grove's first tab: one compact row per track, each a ladder of five
- * tiers (src/lib/rewards.ts) with how far it is to the next one.
+ * Reward tiers on the grove's first tab: the three tiers closest to being reached ("Next up"),
+ * then one compact row per track, each a ladder of five tiers (src/lib/rewards.ts). Any row
+ * opens a sheet with that track's ladder, when each tier was reached and the pace to the next.
+ * With Health on, body markers (src/lib/bodytiers.ts) join in, behind a Focus / Body switch.
  * Before anything has counted towards a tier it is one seed instead, with the first goal.
  * Sprig stands at the top, grown as far as the focus-time tier.
  */
 import Sprig from './Sprig.astro';
+import Sheet from './Sheet.astro';
+import { url } from '../lib/paths';
 ---
 
 <section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
@@ -24,8 +28,16 @@ import Sprig from './Sprig.astro';
       </div>
     </div>
   </div>
+  <section class="tiers__soon" data-tiers-soon aria-labelledby="tiers-soon-heading">
+    <h3 id="tiers-soon-heading" class="tiers__markers">Next up</h3>
+    <ul class="tiers__soon-list" data-tiers-soon-list></ul>
+  </section>
   <div class="tiers__head" data-tiers-head>
-    <h3 class="tiers__markers">Markers</h3>
+    <h3 class="tiers__markers">All markers</h3>
+    <div class="tiers__groups" role="group" aria-label="Which markers" data-tiers-groups hidden>
+      <button type="button" class="tiers__group" aria-pressed="true" data-tiers-group="focus">Focus</button>
+      <button type="button" class="tiers__group" aria-pressed="false" data-tiers-group="body">Body</button>
+    </div>
     <details class="tiers__about">
       <summary>What are these?</summary>
       <p class="muted">
@@ -33,9 +45,16 @@ import Sprig from './Sprig.astro';
         and gold, with diamond for the hardest runs. The chain counts your best run, so a missed day never takes a tier
         away.
       </p>
+      <p class="muted">
+        Body markers count days you reached a sensible goal, never calories, weight or how hard you pushed. They stay on
+        this device.
+      </p>
     </details>
   </div>
   <ul class="tiers__grid" data-tiers-list></ul>
+  <p class="muted tiers__body-empty" data-tiers-body-empty hidden>
+    Sleep, steps and workouts start to count here once they're on <a href={url('/health')}>Health</a>.
+  </p>
 
   <div class="seed" data-tiers-seed hidden>
     <Sprig stage={0} size={100} bob />
@@ -48,12 +67,23 @@ import Sprig from './Sprig.astro';
   </div>
 </section>
 
+<Sheet id="tier" labelledby="tier-sheet-title">
+  <div class="tier-sheet" data-tier-sheet>
+    <h2 id="tier-sheet-title" class="tier-sheet__title" data-ts-title></h2>
+    <p class="muted" data-ts-how></p>
+    <ol class="tier-sheet__ladder" data-ts-ladder></ol>
+    <p class="tier-sheet__pace" data-ts-pace></p>
+  </div>
+</Sheet>
+
 <script>
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
-  import { allProgress, chainInput, tierLabel, TIER_NAMES, type TrackProgress } from '../lib/rewards';
+  import { allProgress, chainInput, closestTiers, daysToNext, tierLabel, TIER_NAMES, type NextTier, type TrackId, type TrackProgress } from '../lib/rewards';
+  import { bodyInput } from '../lib/bodytiers';
+  import { el } from '../lib/dom';
   import { tierIcon } from '../lib/tier-icons';
   import { SPRIG_TREES, sprigGrowth, sprigStageName } from '../lib/sprig';
-  import { cleanups, onPage } from '../lib/page';
+  import { cleanups, listen, onPage } from '../lib/page';
   import { url } from '../lib/paths';
   import { webglAvailable } from '../lib/scene';
   import type { Sprig3D } from '../lib/scene/sprig3d';
@@ -96,6 +126,68 @@ import Sprig from './Sprig.astro';
     return v.toLocaleString();
   }
 
+  /** The row's name, as a button that covers the whole row and opens the track's sheet. */
+  function opener(track: TrackId, text: string): HTMLButtonElement {
+    const b = el('button', 'tier__open', text);
+    b.type = 'button';
+    b.dataset.sheetOpen = 'tier';
+    b.dataset.track = track;
+    return b;
+  }
+
+  const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  /** "2 more nights", "1.5 more hours". */
+  const more = ({ p, left }: NextTier) => `${left.toLocaleString()} more ${p.track.unit(left)}`;
+
+  /** One of the closest tiers: the coin it will be, how much is left, and a bar to it. */
+  function renderSoon(n: NextTier): HTMLLIElement {
+    const { p, next, share } = n;
+    const li = el('li', 'soon');
+    const coin = el('span', `tier-coin tier-coin--t${p.level}`);
+    coin.innerHTML = tierIcon(p.level, 18);
+    const head = el('p', 'soon__head');
+    head.append(opener(p.track.id, p.track.title), el('span', 'soon__left', more(n)));
+    const bar = el('span', 'soon__bar');
+    bar.setAttribute('aria-hidden', 'true');
+    bar.style.setProperty('--share', `${Math.round(share * 100)}%`);
+    bar.style.setProperty('--next', `var(--tier-${p.level})`);
+    bar.append(el('span'));
+    const line = el('p', 'soon__line muted', `${amount(p)} of ${next} ${p.track.unit(next)} to ${tierLabel(p.level)}`);
+    li.append(coin, head, bar, line);
+    return li;
+  }
+
+  /** "At your pace", and honest when there is no pace yet. */
+  function paceLine(n: NextTier | undefined): string {
+    if (!n) return 'Every tier reached. Nothing left to chase here.';
+    const days = daysToNext(n);
+    const goal = `${capital(more(n))} for ${tierLabel(n.p.level)}.`;
+    if (n.p.track.id === 'streak') return `Keep your chain ${days} more ${days === 1 ? 'day' : 'days'} in a row for ${tierLabel(n.p.level)}.`;
+    if (days === null) return `${goal} Nothing counted in the last two weeks, so no guess at when.`;
+    const when = days <= 1 ? 'about a day' : days < 14 ? `about ${days} days` : days < 60 ? `about ${Math.round(days / 7)} weeks` : 'a few months. No rush';
+    return `${goal} At your last two weeks' pace, ${when}.`;
+  }
+
+  function renderSheet(root: HTMLElement, p: TrackProgress): void {
+    const { track, level, reachedAt } = p;
+    root.querySelector('[data-ts-title]')!.textContent = track.title;
+    root.querySelector('[data-ts-how]')!.textContent = track.how;
+    root.querySelector('[data-ts-ladder]')!.replaceChildren(
+      ...track.thresholds.map((n, i) => {
+        const at = reachedAt[i];
+        const li = el('li', `tier-sheet__step${i === level ? ' is-next' : ''}`);
+        const coin = el('span', `tier-coin ${at !== null ? `tier-coin--t${i}` : 'tier-coin--blank'}`);
+        coin.innerHTML = tierIcon(i, 16);
+        const name = el('span', 'tier-sheet__name', tierLabel(i));
+        name.append(el('span', 'muted', ` · ${track.describe(n)}`));
+        const when = el('span', 'tier-sheet__when', at !== null ? dateFmt.format(at) : i === level ? 'Next' : '');
+        li.append(coin, name, when);
+        return li;
+      }),
+    );
+    root.querySelector('[data-ts-pace]')!.textContent = paceLine(closestTiers([p], 1)[0]);
+  }
+
   function renderTrack(p: TrackProgress): HTMLLIElement {
     const { track, level, reachedAt } = p;
     const li = document.createElement('li');
@@ -105,7 +197,7 @@ import Sprig from './Sprig.astro';
     head.className = 'tier__head';
     const title = document.createElement('h3');
     title.className = 'tier__title';
-    title.textContent = track.title;
+    title.append(opener(track.id, track.title));
     const current = document.createElement('p');
     current.className = `tier__current${level ? '' : ' muted'}`;
     current.innerHTML = level ? LEAF_SVG : '';
@@ -168,15 +260,42 @@ import Sprig from './Sprig.astro';
       const seed = root.querySelector<HTMLElement>('[data-tiers-seed]')!;
       const sprig = root.querySelector<HTMLElement>('[data-tiers-sprig]')!;
       const art = root.querySelector<HTMLElement>('[data-tiers-sprig-art]')!;
+      const soon = root.querySelector<HTMLElement>('[data-tiers-soon]')!;
+      const groups = root.querySelector<HTMLElement>('[data-tiers-groups]')!;
+      const bodyEmpty = root.querySelector<HTMLElement>('[data-tiers-body-empty]')!;
+      const sheet = document.querySelector<HTMLElement>('[data-sheet="tier"]');
+      let group: 'focus' | 'body' = 'focus';
+      let progress: TrackProgress[] = [];
+      c.add(
+        listen(groups, 'click', (e) => {
+          const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tiers-group]');
+          if (!b) return;
+          group = b.dataset.tiersGroup === 'body' ? 'body' : 'focus';
+          render();
+        }),
+      );
+      if (sheet) {
+        c.add(
+          listen(sheet, 'sheet:open', (e) => {
+            const id = (e as CustomEvent<{ track?: string }>).detail.track;
+            const p = progress.find((x) => x.track.id === id);
+            if (p) renderSheet(sheet, p);
+          }),
+        );
+      }
       let stage3D = -1;
       let stop3D = () => {};
       c.add(() => stop3D());
       const render = () => {
-        const progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()) });
+        const body = bodyInput();
+        progress = allProgress({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()), body });
         // Nothing has counted yet: one seed and the first goal, not four ladders of "not yet".
         const bare = progress.every((p) => p.value === 0);
         seed.hidden = !bare;
-        head.hidden = list.hidden = sprig.hidden = bare;
+        head.hidden = list.hidden = sprig.hidden = soon.hidden = bare;
+        if (!body) group = 'focus';
+        groups.hidden = bare || !body;
+        bodyEmpty.hidden = true;
         if (bare) {
           const focus = progress.find((p) => p.track.id === 'focus') ?? progress[0]!;
           const goal = focus.track.thresholds[0]!;
@@ -220,12 +339,19 @@ import Sprig from './Sprig.astro';
         bar.setAttribute('aria-valuenow', String(Math.round(share * 100)));
         bar.style.setProperty('--share', `${share * 100}%`);
         bar.style.setProperty('--next', `var(--tier-${Math.min(4, focus.level)})`);
-        list.replaceChildren(...progress.map(renderTrack));
+        const next = closestTiers(progress.filter((p) => p.value > 0));
+        soon.hidden = !next.length;
+        root.querySelector('[data-tiers-soon-list]')!.replaceChildren(...next.map(renderSoon));
+        groups.querySelectorAll<HTMLElement>('[data-tiers-group]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tiersGroup === group)));
+        const shown = progress.filter((p) => p.track.group === group);
+        bodyEmpty.hidden = group !== 'body' || shown.some((p) => p.value > 0);
+        list.replaceChildren(...(bodyEmpty.hidden ? shown.map(renderTrack) : []));
       };
       render();
       c.add(subscribe('sessions', render));
       c.add(subscribe('done', render));
       c.add(subscribe('chain', render));
+      for (const name of ['body', 'body-manual', 'workouts', 'profile'] as const) c.add(subscribe(name, render));
     });
     return c.run;
   });
@@ -499,5 +625,201 @@ import Sprig from './Sprig.astro';
 
   .tiers__grid :global(.tier__next) {
     font-size: var(--text-xs);
+  }
+
+  /* The row's name is its button; it stretches over the whole row so any tap opens the sheet. */
+  .tiers :global(.tier),
+  .tiers :global(.soon) {
+    position: relative;
+  }
+
+  .tiers :global(.tier__open) {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .tiers :global(.tier__open)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-md);
+  }
+
+  .tiers :global(.tier__open:focus-visible) {
+    outline: none;
+  }
+
+  .tiers :global(.tier__open:focus-visible)::after {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) {
+    .tiers :global(.tier:hover),
+    .tiers :global(.soon:hover) {
+      background: var(--hl);
+    }
+  }
+
+  /* Next up: the three tiers closest to being reached, closest first. */
+  .tiers__soon {
+    margin-top: var(--space-5);
+  }
+
+  .tiers__soon-list {
+    display: grid;
+    margin-top: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
+  .tiers__soon-list :global(.soon) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-3);
+    row-gap: 6px;
+    align-items: center;
+    min-block-size: 44px;
+    padding: var(--space-3) var(--space-2);
+    border-radius: var(--radius-md);
+  }
+
+  .tiers__soon-list :global(.soon + .soon) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .tiers__soon-list :global(.soon .tier-coin) {
+    --coin-size: 40px;
+    grid-row: 1 / span 3;
+    margin: 0;
+  }
+
+  .tiers__soon-list :global(.soon__head) {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0 var(--space-3);
+    font-weight: 600;
+  }
+
+  .tiers__soon-list :global(.soon__left) {
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-accent);
+  }
+
+  .tiers__soon-list :global(.soon__bar) {
+    display: block;
+    block-size: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--heat-0);
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35);
+    overflow: hidden;
+  }
+
+  .tiers__soon-list :global(.soon__bar > span) {
+    display: block;
+    inline-size: var(--share, 0%);
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--next);
+  }
+
+  .tiers__soon-list :global(.soon__line) {
+    font-size: var(--text-xs);
+  }
+
+  /* Focus / Body: only with Health on. */
+  .tiers__groups {
+    display: flex;
+    gap: var(--space-1);
+  }
+
+  .tiers__group {
+    min-block-size: 36px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .tiers__group[aria-pressed='true'] {
+    border-color: transparent;
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+    font-weight: 600;
+  }
+
+  .tiers__body-empty {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  /* The marker sheet: the whole ladder, when each tier came, and the pace to the next. */
+  .tier-sheet {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .tier-sheet__title {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+  }
+
+  .tier-sheet__ladder {
+    display: grid;
+    gap: 2px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tier-sheet__ladder :global(.tier-sheet__step) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-block-size: 46px;
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+  }
+
+  .tier-sheet__ladder :global(.tier-sheet__step .tier-coin) {
+    --coin-size: 30px;
+    margin: 0;
+  }
+
+  .tier-sheet__ladder :global(.tier-sheet__name) {
+    flex: 1;
+  }
+
+  .tier-sheet__ladder :global(.tier-sheet__when) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  .tier-sheet__ladder :global(.is-next) {
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+
+  .tier-sheet__ladder :global(.is-next .tier-sheet__when) {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .tier-sheet__pace {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
   }
 </style>

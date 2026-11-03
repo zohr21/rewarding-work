@@ -4,6 +4,7 @@ import BodyEntry from '../components/BodyEntry.astro';
 import HealthBody from '../components/HealthBody.astro';
 import HealthCalendar from '../components/HealthCalendar.astro';
 import HealthGarden from '../components/HealthGarden.astro';
+import HealthMarkers from '../components/HealthMarkers.astro';
 import HealthSpendSummary from '../components/HealthSpendSummary.astro';
 import HealthToday from '../components/HealthToday.astro';
 import Sheet from '../components/Sheet.astro';
@@ -35,6 +36,9 @@ import { NATIVE_APP } from '../config/app';
     {NATIVE_APP && <BodyEntry />}
     <Sheet id="garden" labelledby="garden-heading">
       <HealthGarden />
+    </Sheet>
+    <Sheet id="markers" labelledby="markers-heading">
+      <HealthMarkers />
     </Sheet>
     <Sheet id="spend" labelledby="ws-heading">
       <HealthSpendSummary />
