@@ -35,6 +35,14 @@ export type HealthKind = (typeof HEALTH_KINDS)[number];
 /** `available` is false before Android 14, which has no Health Connect of its own; each kind is true once allowed. */
 export type HealthState = { available: boolean } & Record<HealthKind, boolean>;
 
+/** Raw records from Health Connect (healthRecords). Times are local, like "2026-11-03T07:40". */
+export interface HealthRecords {
+  kind: 'sleep' | 'steps';
+  records: { app: string; start: string; end: string; written: string; stages?: Record<string, number>; count?: number }[];
+  more?: boolean;
+  failed?: string;
+}
+
 /** One day from Health Connect. A field is missing when nothing was recorded or that kind isn't allowed. */
 export interface BodyDay {
   day: string;
@@ -108,6 +116,7 @@ interface DevicePlugin {
   healthState(): Promise<HealthState>;
   healthConnect(options: { kinds: HealthKind[] }): Promise<HealthState>;
   healthRead(options: { days: number }): Promise<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> }>;
+  healthRecords(options: { kind: 'sleep' | 'steps'; days: number }): Promise<HealthRecords>;
   healthSettings(): Promise<void>;
   usageState(): Promise<{ access: boolean }>;
   usageSettings(): Promise<void>;
@@ -156,6 +165,8 @@ export const healthConnect = (kinds: HealthKind[]) => call<HealthState | null>((
  * answers while the app is on screen). null where there is no native side, or the call failed.
  */
 export const healthRead = (days: number) => call<{ days: BodyDay[]; failed: Partial<Record<BodyField, string>> } | null>((p) => p.healthRead({ days }), null);
+/** The raw records behind sleep or steps, with the app that wrote each: for checking where a number comes from. */
+export const healthRecords = (kind: 'sleep' | 'steps', days = 3) => call<HealthRecords | null>((p) => p.healthRecords({ kind, days }), null);
 export const openHealthSettings = () => void call((p) => p.healthSettings(), undefined);
 /** null where there is no native side to ask. */
 export const usageAccess = () => call<boolean | null>(async (p) => (await p.usageState()).access, null);
