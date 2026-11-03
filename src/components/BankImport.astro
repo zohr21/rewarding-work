@@ -102,6 +102,31 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     </form>
   </dialog>
 
+  <!-- Said before Android's Notification access screen, every time it is opened to switch access on (Play's prominent disclosure). -->
+  <dialog class="bk-dialog" data-bk-c-dialog aria-labelledby="bk-c-title">
+    <form method="dialog" data-bk-c-form>
+      <h2 id="bk-c-title">Let Grovyn read bank alerts?</h2>
+      <p>
+        To add your payments to Budget, Grovyn reads new notifications from the bank apps and SMS senders you picked: the
+        amount, the shop and the time.
+      </p>
+      <ul class="bk-c-list">
+        <li>Notifications from every other app are ignored and never kept.</li>
+        <li>The alerts stay on this phone. Only the expenses you keep go to Budget, and to your account if you're signed in.</li>
+        <li>One-time codes are skipped, and card numbers are masked.</li>
+        <li>Turn it off here, or in Android's settings, at any time.</li>
+      </ul>
+      <p class="muted bk__note">
+        Next, Android opens Notification access. Its warning says an app with access can read all notifications; Grovyn
+        reads only the ones above.
+      </p>
+      <div class="bk-dialog__actions">
+        <button type="button" class="btn btn--ghost" data-bk-cancel>Not now</button>
+        <button type="submit" class="btn">Agree</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="bk-dialog" data-bk-h-dialog aria-labelledby="bk-h-title">
     <form method="dialog" data-bk-h-form>
       <h2 id="bk-h-title">Past bank SMS</h2>
@@ -362,7 +387,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     $<HTMLFormElement>('[data-bk-s-form]').addEventListener('submit', () => {
       setBankSettings({ on: true, apps: checked('[data-bk-apps]'), senders: checked('[data-bk-senders]'), auto: $<HTMLInputElement>('[data-bk-auto]').checked });
       // Reading needs Android's say-so; ask right after the first save.
-      if (!state?.access) openBankSettings();
+      if (!state?.access) askAccess();
     });
     $('[data-bk-off]').addEventListener('click', () => {
       setBankSettings({ on: false });
@@ -370,7 +395,14 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       // The app stops keeping alerts at once; this is where you also take the access back.
       if (state?.access) openBankSettings();
     });
-    for (const btn of [$('[data-bk-open-access]'), $('[data-bk-s-open-access]')]) btn.addEventListener('click', () => openBankSettings());
+    // Switching access on always goes through what Grovyn will read first; Android's screen only on Agree.
+    const cDialog = $<HTMLDialogElement>('[data-bk-c-dialog]');
+    function askAccess() {
+      if (sDialog.open) sDialog.close();
+      cDialog.showModal();
+    }
+    $<HTMLFormElement>('[data-bk-c-form]').addEventListener('submit', () => openBankSettings());
+    for (const btn of [$('[data-bk-open-access]'), $('[data-bk-s-open-access]')]) btn.addEventListener('click', askAccess);
 
     // ---- Past SMS ----
 
@@ -734,6 +766,14 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 
   .bk-dialog p {
     margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bk-c-list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding-left: 1.2em;
     font-size: var(--text-sm);
   }
 

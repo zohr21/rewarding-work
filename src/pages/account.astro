@@ -11,8 +11,11 @@ import YourData from '../components/YourData.astro';
 import { ACCOUNTS_ENABLED, BOARD_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
-import { APP_ONLY_MODULES, MODULES } from '../config/site';
+import { APP_ONLY_MODULES, MODULES, SITE } from '../config/site';
 import pkg from '../../package.json';
+
+/** The help row's email: says which version, so a report can be matched to the build. */
+const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${SITE.name} ${NATIVE_APP ? `app ${pkg.version}` : 'website'}`)}`;
 ---
 
 <BaseLayout title={NATIVE_APP ? 'You' : 'Account'} description="Your account, your data and how the site looks. Signing in is optional.">
@@ -101,6 +104,7 @@ import pkg from '../../package.json';
           <li><a href="#acc-connections">Connections</a></li>
           <li><a href="#acc-prefs">Preferences</a></li>
           <li data-view="signed-in" hidden><a href="#acc-device">This device</a></li>
+          <li><a href="#acc-help">Help</a></li>
         </ul>
       </nav>
 
@@ -385,6 +389,26 @@ import pkg from '../../package.json';
                 <p class="account__msg" role="status" data-delete-msg></p>
               </div>
             </details>
+          </div>
+        </section>
+
+        <section class="group o-help" id="acc-help" aria-labelledby="acc-help-h">
+          <h2 id="acc-help-h" class="group__title">Help</h2>
+          <div class="rows">
+            <a class="row" href={HELP_MAIL}>
+              <RowIcon name="mail" />
+              <span class="row__main">
+                Write to us<small>Questions, problems or ideas: {SITE.supportEmail}</small>
+              </span>
+              <RowIcon chevron />
+            </a>
+            <a class="row" href={url('/delete-account')}>
+              <RowIcon name="link" />
+              <span class="row__main">
+                Deleting your account<small>How, and what goes with it</small>
+              </span>
+              <RowIcon chevron />
+            </a>
           </div>
         </section>
 
@@ -1042,8 +1066,12 @@ import pkg from '../../package.json';
       order: 5;
     }
 
-    .o-ver {
+    .o-help {
       order: 6;
+    }
+
+    .o-ver {
+      order: 7;
     }
 
     /* Signing out is a plain button under the lists, deleting a quiet link under that. */

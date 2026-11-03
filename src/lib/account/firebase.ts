@@ -292,10 +292,11 @@ async function flush(ms = 6000): Promise<boolean> {
 async function deleteCloudData(uid: string): Promise<void> {
   const snap = await getDocs(collection(db, 'users', uid, 'stores'));
   await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
-  // The board: this week's and last week's rows, and the friend code (a new account claims it again).
-  const now = Date.now();
+  // The board: your row in every week since it started, and the friend code (a new account claims it again).
+  const weeks = new Set<string>();
+  for (let at = Date.now(); weekKey(at) >= BOARD_FIRST_WEEK; at -= 7 * 86_400_000) weeks.add(weekKey(at));
   await Promise.all([
-    ...[weekKey(now), weekKey(now - 7 * 86_400_000)].map((week) => deleteDoc(entryRef(week, uid)).catch(() => {})),
+    ...[...weeks].map((week) => deleteDoc(entryRef(week, uid)).catch(() => {})),
     releaseFriendCode(getBoard().code, uid),
   ]);
 }
@@ -493,6 +494,8 @@ export async function deleteAccount(password?: string): Promise<void> {
 
 // ---------- Weekly board (src/lib/board.ts) ----------
 
+/** The week the board started (it went live on 1 November 2026): no row is older. */
+const BOARD_FIRST_WEEK = '2026-10-26';
 const entryRef = (week: string, uid: string) => doc(db, 'boards', week, 'entries', uid);
 const codeRef = (code: string) => doc(db, 'codes', code);
 

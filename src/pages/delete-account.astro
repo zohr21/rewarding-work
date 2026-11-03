@@ -1,0 +1,70 @@
+---
+/**
+ * How to delete a Grovyn account and its data. Google Play wants a web address that leads with
+ * this, which works without the app installed; it goes into the Data safety form.
+ * Keep it true to deleteAccount() in src/lib/account/firebase.ts.
+ */
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { SITE } from '../config/site';
+import { url } from '../lib/paths';
+import { NATIVE_APP } from '../config/app';
+
+const CONTACT = SITE.supportEmail;
+const SUBJECT = encodeURIComponent(`Delete my ${SITE.name} account`);
+---
+
+<BaseLayout title="Delete your account" description={`How to delete your ${SITE.name} account and everything stored in it.`}>
+  <div class="container">
+    <header class="page-header">
+      <h1>Delete your {SITE.name} account</h1>
+      <p>Your account, and everything stored in it, can be deleted at any time. It takes a minute and can't be undone.</p>
+    </header>
+
+    <div class="prose delete">
+      <h2>In the app</h2>
+      <ol>
+        <li>Open {SITE.name} and go to <strong>You</strong>.</li>
+        <li>At the bottom, under <strong>Sign out</strong>, press <strong>Delete account…</strong>.</li>
+        <li>Confirm. If you signed in with a password, you're asked for it once more.</li>
+      </ol>
+
+      <h2>{NATIVE_APP ? 'On the website' : 'Here, without the app'}</h2>
+      <ol>
+        <li>Open <a href={`${url('/account')}#acc-device`}>Account</a> and sign in the same way you did in the app (Google, or email and password).</li>
+        <li>Under <strong>This device</strong>, press <strong>Delete account…</strong> and confirm.</li>
+      </ol>
+
+      <h2>If you can't sign in</h2>
+      <p>
+        Write to <a href={`mailto:${CONTACT}?subject=${SUBJECT}`}>{CONTACT}</a> from the address you signed up with, and we
+        delete the account within 30 days and write back when it's done.
+      </p>
+      <p>
+        A <strong>guest</strong> account lives only on the phone it was made on. Delete it there under You, or uninstall the
+        app, which removes the guest's data from the phone. To have its copy in the cloud deleted as well, write to us with
+        the date you started using {SITE.name}.
+      </p>
+
+      <h2>What is deleted</h2>
+      <ul>
+        <li>your sign-in: email address, name and password (or the link to your Google account);</li>
+        <li>everything synced to the account: tasks, focus sessions, done list, chains, exam plan, Budget, and settings;</li>
+        <li>your rows on the weekly board and your friend code;</li>
+        <li>the account's copy on the phone you delete it from.</li>
+      </ul>
+      <p>
+        Nothing is kept afterwards; {SITE.name} has no other copy. Health numbers, screen time, bank alerts and workouts were
+        never in the account. They stay on your phone until you use <strong>Delete all data</strong> under You, or uninstall
+        the app. A backup file you saved yourself stays wherever you saved it.
+      </p>
+
+      <p class="muted">More about what {SITE.name} stores is in the <a href={url('/privacy')}>privacy policy</a>.</p>
+    </div>
+  </div>
+</BaseLayout>
+
+<style>
+  .delete {
+    padding-bottom: var(--space-7);
+  }
+</style>

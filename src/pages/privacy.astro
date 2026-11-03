@@ -9,7 +9,7 @@ import { url } from '../lib/paths';
 import { NATIVE_APP } from '../config/app';
 
 const CONTACT = SITE.supportEmail;
-const UPDATED = '25 October 2026';
+const UPDATED = '4 November 2026';
 ---
 
 <BaseLayout title="Privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
@@ -25,6 +25,7 @@ const UPDATED = '25 October 2026';
         <li>Your tasks, focus sessions, done list, chain and settings are stored in your own browser.</li>
         <li>They leave your browser only if you choose to: by signing in to an account, or by sending an export to Google.</li>
         <li>There is no advertising and no analytics or tracking on this site.</li>
+        <li>In the Android app, what it reads from your phone (health numbers, phone time, bank alerts) stays on your phone.</li>
       </ul>
 
       <h2>What is stored in your browser</h2>
@@ -46,11 +47,22 @@ const UPDATED = '25 October 2026';
       <ul>
         <li>your sign-in details: your email address if you gave one (your password is stored by Firebase in hashed form and is never visible to us), or your Google account's name and email if you signed in with Google;</li>
         <li>the same data listed above: tasks, sessions, done list, chain and settings;</li>
-        <li>what you enter on the Budget page: each expense with its category, your budgets, and the bills you set to repeat.</li>
+        <li>what you enter on the Budget page: each expense with its category, your budgets, and the bills you set to repeat;</li>
+        <li>if you join the weekly board: the nickname you chose, your focus minutes for the week, your tier, and who your friends on the board are.</li>
       </ul>
       <p>
         Each account can read and write only its own data. You can delete your account, and everything stored in it, at
-        any time on the <a href={url('/account')}>Account</a> page.
+        any time on the <a href={url('/account')}>{NATIVE_APP ? 'You' : 'Account'}</a> page, or by following
+        <a href={url('/delete-account')}>Delete your account</a>, which also works without the app. Your data stays in the
+        account until you delete it, and is gone from Firebase when you do.
+      </p>
+
+      <h2>The weekly board</h2>
+      <p>
+        The weekly board is off until you join it. When you join, other people can see your nickname, your focus minutes
+        for this week and your tier: everyone, or only your friends on the board, as you choose. Nothing else about you is
+        shown, and your tasks and sessions are never on it. Each week starts fresh on Monday. Leaving the board removes
+        your entry. The board is not in the Google Play version of the app yet.
       </p>
 
       <h2>If you use Send to Google</h2>
@@ -80,20 +92,71 @@ const UPDATED = '25 October 2026';
         <li>they are not used for ads and are not shared with anyone;</li>
         <li>you can take the permission back at any time in Health Connect, under App permissions. Deleting all data in the app also clears the last numbers it read.</li>
       </ul>
+      <p>
+        The app keeps the last 90 days of those numbers, and older ones fall away. Workouts and health numbers you type in
+        yourself, and your Helpful / Not true answers on a finding, are also kept only on this phone.
+      </p>
       <p>What you type in on the Budget page, wellbeing spend included, is kept in your browser or on your phone, and in your account if you are signed in.</p>
+
+      <h2>Screen time in the Android app</h2>
+      <p>
+        If you turn on Screen time and allow Usage access in Android's settings, the app reads how long you used each app,
+        per day and during your focus sessions, to show it next to your plan.
+      </p>
+      <ul>
+        <li>it stays on your phone. It is not sent to us, not copied to your account, and not part of backups;</li>
+        <li>Android itself keeps the detail for about a week; the app keeps its own daily totals and its last 300 focus sessions;</li>
+        <li>you can turn it off at any time in Android's settings, under Usage access.</li>
+      </ul>
+
+      <h2>Bank alerts in the Android app</h2>
+      <p>
+        If you turn on bank alerts on the Budget page and allow Notification access in Android's settings, the app looks at
+        new notifications from the bank apps you picked, and only those. It reads the amount, the shop and the time from
+        each one so it can add the expense for you, or keep it for you to check first.
+      </p>
+      <ul>
+        <li>notifications from every other app are ignored and never stored;</li>
+        <li>the alert's text stays on your phone: the app keeps up to 400 alerts waiting for you to check, and the last 20 it read. Only the expense you keep goes into your Budget, and into your account if you are signed in;</li>
+        <li>one-time codes are skipped, and long card numbers are masked;</li>
+        <li>you can turn it off on the Budget page, or take Notification access back in Android's settings, at any time.</li>
+      </ul>
+      {
+        !NATIVE_APP && (
+          <p>
+            A version of the app that is installed by hand, not from Google Play, can also read past bank SMS once, when you
+            ask it to, from the senders you picked. It works the same way and keeps the same on the phone. The Google Play
+            version can't read SMS.
+          </p>
+        )
+      }
+
+      <h2>Backups</h2>
+      <p>
+        The Android app is not part of Android's own backup, and is not copied to a new phone. To move your data, sign in
+        to an account, or save a backup file under {NATIVE_APP ? 'You' : 'Account'} → Your data. The backup file holds your
+        tasks, sessions, done list, chain, exam plan and settings. It leaves out Budget, health numbers, workouts and screen
+        time on purpose; Budget moves with your account.
+      </p>
 
       <h2>Other services the site talks to</h2>
       <ul>
         <li><strong>GitHub Pages</strong> hosts the site. Like any web host, GitHub receives your IP address when your browser loads the pages.</li>
         <li><strong>YouTube</strong>, only if you choose a YouTube link as background sound. The player is loaded from YouTube's privacy-enhanced address (youtube-nocookie.com), and YouTube then receives the usual information a video player does.</li>
-        <li><strong>Google</strong>, only if you sign in to an account or use Send to Google, as described above.</li>
+        <li><strong>Google</strong>, only if you sign in to an account, join the weekly board or use Send to Google, as described above.</li>
       </ul>
 
       <h2>What we don't do</h2>
       <p>We don't sell or share your data, show ads, or use it for anything other than showing it back to you.</p>
 
+      <h2>Children</h2>
+      <p>{SITE.name} is not made for children under 13, and doesn't knowingly collect their data.</p>
+
+      <h2>Changes to this policy</h2>
+      <p>If what {SITE.name} stores or sends changes, this page changes with it, and the date at the top moves.</p>
+
       <h2>Questions</h2>
-      <p>Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>.</p>
+      <p>Write to <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. That address also takes requests to delete an account you can't sign in to.</p>
 
       <h2>Who makes {SITE.name}</h2>
       <p>{SITE.name} is made by {SITE.owner}. © {new Date().getFullYear()} {SITE.owner}. All rights reserved.</p>
