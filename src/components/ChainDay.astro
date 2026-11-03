@@ -1,0 +1,475 @@
+---
+/**
+ * The sheet a chain's day opens in, for the kinds that hold more than a tick
+ * (src/lib/chainkinds.ts): how much for an amount, each slot for parts of the day (the
+ * five prayers), and for a linked chain what Focus or Health found, with a workout you
+ * can add by hand. Opened by any [data-sheet-open="chain-day"] with data-chain-id and
+ * data-chain-day. Used by ChainTracker and ChainToday.
+ */
+import Sheet from './Sheet.astro';
+import { NATIVE_APP } from '../config/app';
+import { url } from '../lib/paths';
+---
+
+<Sheet id="chain-day" labelledby="chain-day-title">
+  <form class="cd" data-cd-form data-timer-url={url('/timer')}>
+    <div class="cd__head">
+      <div>
+        <p class="muted cd__date" data-cd-date></p>
+        <h2 id="chain-day-title" class="cd__title" data-cd-title></h2>
+      </div>
+      <p class="cd__total" data-cd-total></p>
+    </div>
+
+    <div class="cd__body" data-cd-body></div>
+
+    <label class="cd__field">
+      <span>Note (optional)</span>
+      <input class="input" type="text" maxlength="200" autocomplete="off" data-cd-note />
+    </label>
+
+    <p class="muted cd__private">
+      What you fill in here stays on this {NATIVE_APP ? 'phone' : 'device'}. Only whether the day counts goes to your chain, and none of it is
+      on the leaderboard.
+    </p>
+
+    <div class="cd__actions">
+      <button type="button" class="btn btn--ghost" data-sheet-close>Cancel</button>
+      <button type="submit" class="btn">Save day</button>
+    </div>
+  </form>
+</Sheet>
+
+<script>
+  import { getChains } from '../lib/storage';
+  import {
+    WORKOUT_TYPES,
+    dayOf,
+    getEntry,
+    getSetup,
+    linkData,
+    linkedWorkouts,
+    saveEntry,
+    type ChainSetup,
+    type DayEntry,
+    type PartState,
+  } from '../lib/chainkinds';
+  import { saveWorkout, EFFORT_WORDS } from '../lib/workouts';
+  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { el } from '../lib/dom';
+  import { celebrate } from '../lib/appearance';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  const STATES: { v: PartState; label: string }[] = [
+    { v: 1, label: 'On time' },
+    { v: 2, label: 'Later' },
+    { v: 0, label: 'Not yet' },
+  ];
+  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
+  onPage('chain-day', () => {
+    const dialog = document.querySelector<HTMLDialogElement>('[data-sheet="chain-day"]');
+    const form = dialog?.querySelector<HTMLFormElement>('[data-cd-form]');
+    if (!dialog || !form) return;
+    const $ = <E extends Element>(s: string) => form.querySelector<E>(s)!;
+    const body = $<HTMLElement>('[data-cd-body]');
+    const total = $<HTMLElement>('[data-cd-total]');
+    const note = $<HTMLInputElement>('[data-cd-note]');
+    const c = cleanups();
+
+    let id = '';
+    let key = '';
+    let setup: ChainSetup = { kind: 'tick' };
+    /** What the form holds: read on save. */
+    let parts: PartState[] = [];
+    let amount: HTMLInputElement | null = null;
+    let byHand: { minutes: HTMLInputElement; km: HTMLInputElement | null; effort: HTMLInputElement } | null = null;
+
+    function showTotal(): void {
+      const view = dayOf(setup, entryNow(), key);
+      total.textContent = setup.kind === 'linked' ? view.long : setup.kind === 'parts' ? view.short : view.long;
+      total.classList.toggle('is-counted', view.counted);
+    }
+
+    /** The entry as the form has it now (linked chains have only a note). */
+    function entryNow(): DayEntry {
+      const n = amount ? Number(amount.value.replace(',', '.')) : undefined;
+      return {
+        ...(setup.kind === 'amount' && n && n > 0 ? { n } : {}),
+        ...(setup.kind === 'parts' ? { parts } : {}),
+        ...(note.value.trim() ? { note: note.value.trim() } : {}),
+      };
+    }
+
+    function amountBody(entry: DayEntry): HTMLElement {
+      const wrap = el('div', 'cd__amount');
+      const minus = el('button', 'tool-btn cd__step', '−');
+      const plus = el('button', 'tool-btn cd__step', '+');
+      minus.type = plus.type = 'button';
+      minus.setAttribute('aria-label', 'One less');
+      plus.setAttribute('aria-label', 'One more');
+      const label = el('label', 'cd__field cd__grow');
+      const input = el('input', 'input cd__number');
+      input.type = 'text';
+      input.inputMode = 'decimal';
+      input.value = entry.n ? fmt(entry.n) : '';
+      input.placeholder = '0';
+      label.append(el('span', '', `How much${setup.unit ? ` (${setup.unit})` : ''} · goal ${fmt(setup.goal ?? 1)}`), input);
+      const step = (d: number) => {
+        const v = Math.max(0, (Number(input.value.replace(',', '.')) || 0) + d);
+        input.value = fmt(v);
+        showTotal();
+      };
+      minus.addEventListener('click', () => step(-1));
+      plus.addEventListener('click', () => step(1));
+      input.addEventListener('input', showTotal);
+      amount = input;
+      const row = el('div', 'cd__amount-row');
+      row.append(minus, label, plus);
+      wrap.append(row);
+      return wrap;
+    }
+
+    function partsBody(entry: DayEntry): HTMLElement {
+      const names = setup.parts ?? [];
+      parts = names.map((_, i) => entry.parts?.[i] ?? 0);
+      const list = el('div', 'cd__parts');
+      names.forEach((name, i) => {
+        const row = el('div', 'cd__part');
+        row.append(el('span', 'cd__part-name', name));
+        const group = el('div', 'cd__seg');
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-label', name);
+        const buttons = STATES.map((s) => {
+          const b = el('button', 'cd__seg-btn', s.label);
+          b.type = 'button';
+          b.dataset.state = String(s.v);
+          b.addEventListener('click', () => {
+            parts[i] = s.v;
+            buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+            showTotal();
+          });
+          b.setAttribute('aria-pressed', String(parts[i] === s.v));
+          return b;
+        });
+        group.append(...buttons);
+        row.append(group);
+        list.append(row);
+      });
+      const need = setup.countAt ?? names.length;
+      list.append(el('p', 'muted cd__hint', `The day counts at ${need} of ${names.length}. “Later” counts too.`));
+      return list;
+    }
+
+    function linkedBody(): HTMLElement {
+      const wrap = el('div', 'cd__linked');
+      const data = linkData();
+      const view = dayOf(setup, {}, key, data);
+      const bar = el('div', 'cd__bar');
+      bar.setAttribute('aria-hidden', 'true');
+      const fill = el('span');
+      fill.style.width = `${Math.round(view.share * 100)}%`;
+      bar.append(fill);
+      if (setup.source === 'focus') {
+        wrap.append(el('p', '', `Fills from your focus sessions on this day: ${view.long}.`), bar);
+        if (key === dayKey(new Date())) {
+          const go = el('a', 'btn btn--ghost btn--small', 'Start focus');
+          go.href = form!.dataset.timerUrl!;
+          wrap.append(go);
+        }
+        return wrap;
+      }
+      const type = WORKOUT_TYPES.find((t) => t.id === setup.source)!;
+      const found = linkedWorkouts(setup, key, data);
+      wrap.append(el('p', 'muted', found.length ? `${type.label} workouts on Health this day` : `No ${type.label.toLowerCase()} on Health this day yet.`));
+      if (found.length) {
+        const ul = el('ul', 'cd__found');
+        for (const w of found) {
+          const what = [timeFmt.format(w.start), `${w.minutes} min`, w.distanceM ? `${fmt(Math.round(w.distanceM / 100) / 10)} km` : ''].filter(Boolean).join(' · ');
+          ul.append(el('li', '', `${type.label} · ${what}`));
+        }
+        wrap.append(ul);
+      }
+      wrap.append(bar);
+
+      // Add one by hand: it goes to Health › Workouts, so it is entered once and shows in both.
+      const fold = el('details', 'cd__fold');
+      fold.append(el('summary', '', `Add a ${type.label.toLowerCase()} by hand`));
+      const grid = el('div', 'cd__grid');
+      const field = (labelText: string, mode: 'decimal' | 'numeric') => {
+        const l = el('label', 'cd__field');
+        const i = el('input', 'input');
+        i.type = 'text';
+        i.inputMode = mode;
+        l.append(el('span', '', labelText), i);
+        grid.append(l);
+        return i;
+      };
+      const km = type.distance ? field('Distance (km)', 'decimal') : null;
+      const minutes = field('Minutes', 'numeric');
+      const effortLabel = el('label', 'cd__field cd__wide');
+      const effortText = el('strong', '', `6 · ${EFFORT_WORDS[6]}`);
+      const effort = el('input', 'cd__range');
+      effort.type = 'range';
+      effort.min = '1';
+      effort.max = '10';
+      effort.value = '6';
+      effort.addEventListener('input', () => (effortText.textContent = `${effort.value} · ${EFFORT_WORDS[Number(effort.value)]}`));
+      const eHead = el('span', '', 'How hard was it? ');
+      eHead.append(effortText);
+      effortLabel.append(eHead, effort);
+      grid.append(effortLabel);
+      fold.append(grid, el('p', 'muted cd__hint', 'Saved to Health › Workouts too, so it shows in both places.'));
+      wrap.append(fold);
+      byHand = { minutes, km, effort };
+      return wrap;
+    }
+
+    c.add(
+      listen(dialog, 'sheet:open', (e) => {
+        const d = (e as CustomEvent<Record<string, string>>).detail;
+        const ch = getChains().find((x) => x.id === d.chainId);
+        if (!ch || !d.chainDay) return;
+        id = ch.id;
+        key = d.chainDay;
+        setup = getSetup(id);
+        amount = null;
+        byHand = null;
+        parts = [];
+        const entry = getEntry(id, key);
+        const isToday = key === dayKey(new Date());
+        $('[data-cd-date]').textContent = `${formatDay(fromDayKey(key))}${isToday ? ' · today' : ''}`;
+        $('[data-cd-title]').textContent = ch.habit;
+        note.value = entry.note ?? '';
+        body.replaceChildren(setup.kind === 'amount' ? amountBody(entry) : setup.kind === 'parts' ? partsBody(entry) : linkedBody());
+        showTotal();
+      }),
+    );
+
+    c.add(
+      listen(form, 'submit', (e) => {
+        e.preventDefault();
+        if (!id) return;
+        if (byHand) {
+          const min = Math.round(Number(byHand.minutes.value));
+          const km = byHand.km ? Number(byHand.km.value.replace(',', '.')) : 0;
+          if (min > 0 && min <= 600) {
+            // On today, the workout ends now; on an earlier day, at noon.
+            const day = fromDayKey(key);
+            const isToday = key === dayKey(new Date());
+            const start = isToday ? Date.now() - min * 60_000 : day.setHours(12, 0, 0, 0);
+            saveWorkout({
+              id: `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+              type: setup.source as (typeof WORKOUT_TYPES)[number]['id'],
+              start,
+              minutes: min,
+              effort: Number(byHand.effort.value),
+              ...(km > 0 ? { distanceM: Math.round(km * 1000) } : {}),
+            });
+          }
+        }
+        const before = getChains().find((x) => x.id === id)?.days.includes(key) ?? false;
+        const counted = saveEntry(id, key, entryNow());
+        dialog.close();
+        if (counted && !before) celebrate();
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .cd {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .cd__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .cd__date {
+    font-size: var(--text-sm);
+  }
+
+  .cd__title {
+    font-size: var(--text-xl);
+    overflow-wrap: anywhere;
+  }
+
+  .cd__total {
+    flex-shrink: 0;
+    font-family: var(--font-display, inherit);
+    font-size: var(--text-lg);
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-align: right;
+  }
+
+  .cd__total.is-counted {
+    color: var(--color-accent);
+  }
+
+  .cd :global(.cd__field) {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+  }
+
+  .cd :global(.cd__amount-row) {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-2);
+  }
+
+  .cd :global(.cd__grow) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .cd :global(.cd__number) {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .cd :global(.cd__step) {
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    font-size: var(--text-xl);
+  }
+
+  .cd :global(.cd__parts) {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .cd :global(.cd__part) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+  }
+
+  .cd :global(.cd__part-name) {
+    width: 5.5em;
+    flex-shrink: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .cd :global(.cd__seg) {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .cd :global(.cd__seg-btn) {
+    min-height: 44px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .cd :global(.cd__seg-btn[aria-pressed='true'][data-state='1']) {
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+  }
+
+  .cd :global(.cd__seg-btn[aria-pressed='true'][data-state='2']) {
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+  }
+
+  .cd :global(.cd__seg-btn[aria-pressed='true'][data-state='0']) {
+    background: var(--raised-grad, var(--surface-grad));
+    color: var(--color-text);
+  }
+
+  .cd :global(.cd__hint) {
+    font-size: var(--text-xs);
+  }
+
+  .cd :global(.cd__linked) {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+
+  .cd :global(.cd__found) {
+    display: grid;
+    gap: var(--space-1);
+    padding: 0;
+    list-style: none;
+    font-weight: 600;
+  }
+
+  .cd :global(.cd__bar) {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--well-bg);
+    overflow: hidden;
+  }
+
+  .cd :global(.cd__bar span) {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--accent-grad);
+  }
+
+  .cd :global(.cd__fold) {
+    width: 100%;
+  }
+
+  .cd :global(.cd__fold summary) {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    color: var(--color-accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .cd :global(.cd__grid) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+
+  .cd :global(.cd__wide) {
+    grid-column: 1 / -1;
+  }
+
+  .cd :global(.cd__range) {
+    accent-color: var(--color-accent);
+    min-height: 32px;
+  }
+
+  .cd__private {
+    font-size: var(--text-xs);
+  }
+
+  .cd__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+</style>

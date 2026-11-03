@@ -23,6 +23,7 @@ export type StoreName =
   | 'timer-prefs'
   | 'done'
   | 'chain'
+  | 'chain-detail' // each chain's kind (amount, parts of the day, linked) and what you filled in per day (src/lib/chainkinds.ts); this device only
   | 'tasks'
   | 'exam'
   | 'breakdown' // legacy: moved into `tasks` on first load (see migrateBreakdown)
@@ -40,7 +41,7 @@ export type StoreName =
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).
@@ -759,6 +760,12 @@ export function toggleChainDay(key: string, id: string = MAIN_CHAIN): boolean {
   if (id === MAIN_CHAIN) setChain({ ...c, days: flip(c.days) });
   else setChain({ ...c, more: (c.more ?? []).map((m) => (m.id === id ? { ...m, days: flip(m.days) } : m)) });
   return !days.includes(key);
+}
+
+/** Mark (`on`) or unmark a day on one chain; nothing is written when it is already so. */
+export function setChainDay(key: string, id: string, on: boolean): void {
+  const ch = getChains().find((x) => x.id === id);
+  if (ch && ch.days.includes(key) !== on) toggleChainDay(key, id);
 }
 
 // ---------- Tasks ----------
