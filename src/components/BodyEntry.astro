@@ -1,0 +1,291 @@
+---
+/**
+ * The Add by hand sheet on /health, in the Android app: sleep, steps and the rest for a day
+ * Health Connect missed or got wrong (src/lib/body.ts). Opened by [data-sheet-open="body-entry"];
+ * with data-day="<YYYY-MM-DD>" it starts on that day. Each box shows the synced number as its
+ * placeholder; a box left empty keeps it.
+ */
+import Sheet from './Sheet.astro';
+---
+
+<Sheet id="body-entry" title="Add by hand">
+  <form class="be" data-be novalidate>
+    <label class="be__field">
+      Day
+      <input type="date" name="day" required />
+    </label>
+
+    <fieldset class="be__group">
+      <legend class="be__legend">Sleep, the night before this day</legend>
+      <div class="be__pair">
+        <label class="be__field be__field--unit">
+          <input type="number" name="sleepH" min="0" max="24" inputmode="numeric" aria-label="Sleep hours" />
+          <span>h</span>
+        </label>
+        <label class="be__field be__field--unit">
+          <input type="number" name="sleepM" min="0" max="59" inputmode="numeric" aria-label="Sleep minutes" />
+          <span>min</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="be__pair">
+      <label class="be__field">
+        Steps
+        <input type="number" name="steps" min="0" inputmode="numeric" />
+      </label>
+      <label class="be__field">
+        Active minutes
+        <input type="number" name="activeMin" min="0" inputmode="numeric" />
+      </label>
+    </div>
+
+    <div class="be__pair">
+      <label class="be__field">
+        <span>Distance (<span data-be-unit>km</span>)</span>
+        <input type="number" name="distance" min="0" step="0.1" inputmode="decimal" />
+      </label>
+      <label class="be__field">
+        Resting heart (bpm)
+        <input type="number" name="restingHr" min="0" inputmode="numeric" />
+      </label>
+    </div>
+
+    <div class="be__pair">
+      <label class="be__field">
+        Calories burned
+        <input type="number" name="totalKcal" min="0" inputmode="numeric" />
+      </label>
+      <label class="be__field">
+        Active calories
+        <input type="number" name="activeKcal" min="0" inputmode="numeric" />
+      </label>
+    </div>
+
+    <p class="muted be__small" data-be-note></p>
+    <p class="be__error" data-be-error role="alert" hidden></p>
+
+    <div class="be__actions">
+      <button type="button" class="btn btn--ghost" data-be-clear hidden>Clear day</button>
+      <button type="submit" class="btn be__save">Save</button>
+    </div>
+  </form>
+</Sheet>
+
+<script>
+  import { MANUAL_MAX, manualFor, setManual, syncedDays, type BodyValues } from '../lib/body';
+  import type { BodyField } from '../lib/device';
+  import { dayKey, isDayKey } from '../lib/dates';
+  import { usesMiles } from '../lib/workouts';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  /** The plain number boxes, each one field; sleep and distance have their own. */
+  const PLAIN = ['steps', 'activeMin', 'restingHr', 'totalKcal', 'activeKcal'] as const;
+  const NAMES: Record<BodyField, string> = {
+    sleepMin: 'Sleep',
+    steps: 'Steps',
+    activeMin: 'Active minutes',
+    restingHr: 'Resting heart',
+    totalKcal: 'Calories burned',
+    activeKcal: 'Active calories',
+    distanceM: 'Distance',
+  };
+
+  onPage('body-entry', () => {
+    const found = document.querySelector<HTMLFormElement>('[data-be]');
+    const dialog = found?.closest<HTMLDialogElement>('dialog');
+    if (!found || !dialog) return;
+    const form = found;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => form.querySelector<E>(s)!;
+    const field = (name: string) => form.elements.namedItem(name) as HTMLInputElement;
+    const error = $<HTMLElement>('[data-be-error]');
+    const perUnit = () => (usesMiles() ? 1609.344 : 1000);
+    let dirty = false;
+
+    /** The boxes for `day`: what you typed in them, what synced as placeholders. */
+    function load(day: string): void {
+      const typed = manualFor(day);
+      const synced: BodyValues = syncedDays().find((d) => d.day === day) ?? {};
+      const shown = (n: number | undefined) => (n === undefined ? '' : String(n));
+      const sleep = (min: number | undefined, part: 'h' | 'm') => (min === undefined ? '' : String(part === 'h' ? Math.floor(min / 60) : Math.round(min % 60)));
+      const km = (m: number | undefined) => (m === undefined ? '' : String(Math.round((m / perUnit()) * 10) / 10));
+
+      field('sleepH').value = sleep(typed.sleepMin, 'h');
+      field('sleepM').value = sleep(typed.sleepMin, 'm');
+      field('sleepH').placeholder = sleep(synced.sleepMin, 'h') || '–';
+      field('sleepM').placeholder = sleep(synced.sleepMin, 'm') || '–';
+      for (const name of PLAIN) {
+        field(name).value = shown(typed[name]);
+        field(name).placeholder = synced[name] !== undefined ? synced[name]!.toLocaleString() : '–';
+      }
+      field('distance').value = km(typed.distanceM);
+      field('distance').placeholder = km(synced.distanceM) || '–';
+      $('[data-be-unit]').textContent = usesMiles() ? 'mi' : 'km';
+
+      const any = Object.keys(typed).length > 0;
+      $<HTMLElement>('[data-be-clear]').hidden = !any;
+      $('[data-be-note]').textContent = Object.keys(synced).some((k) => k !== 'day')
+        ? 'Grey numbers came from Health Connect. What you type replaces them for this day; leave a box empty to keep them.'
+        : 'Nothing synced for this day. What you type shows on your rings and counts toward your finding.';
+      error.hidden = true;
+      dirty = false;
+    }
+
+    /** The numbers in the boxes, or the name of the first one that makes no sense. */
+    function values(): BodyValues | string {
+      const num = (name: string): number | undefined | null => {
+        const raw = field(name).value.trim();
+        if (!raw) return undefined;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      };
+      const out: BodyValues = {};
+      const h = num('sleepH');
+      const m = num('sleepM');
+      if (h === null || m === null || (m ?? 0) >= 60) return NAMES.sleepMin;
+      if (h !== undefined || m !== undefined) out.sleepMin = Math.round((h ?? 0) * 60 + (m ?? 0));
+      for (const name of PLAIN) {
+        const n = num(name);
+        if (n === null) return NAMES[name];
+        if (n !== undefined) out[name] = Math.round(n);
+      }
+      const d = num('distance');
+      if (d === null) return NAMES.distanceM;
+      if (d !== undefined) out.distanceM = Math.round(d * perUnit());
+      for (const [k, v] of Object.entries(out) as [BodyField, number][]) if (v > MANUAL_MAX[k]) return NAMES[k];
+      return out;
+    }
+
+    c.add(
+      listen(dialog, 'sheet:open', (e) => {
+        const detail = (e as CustomEvent<Record<string, string | undefined>>).detail ?? {};
+        const today = dayKey(new Date());
+        const day = detail.day && isDayKey(detail.day) && detail.day <= today ? detail.day : today;
+        field('day').max = today;
+        field('day').value = day;
+        load(day);
+      }),
+    );
+    c.add(
+      listen(dialog, 'sheet:dismiss', (e) => {
+        if (dirty && !window.confirm('Leave without saving these numbers?')) e.preventDefault();
+      }),
+    );
+    c.add(
+      listen(form, 'input', (e) => {
+        if ((e.target as HTMLInputElement).name !== 'day') dirty = true;
+      }),
+    );
+    c.add(
+      listen(form, 'change', (e) => {
+        const day = field('day').value;
+        if ((e.target as HTMLInputElement).name !== 'day' || !isDayKey(day) || day > dayKey(new Date())) return;
+        if (dirty && !window.confirm('Switch day without saving these numbers?')) return;
+        load(day);
+      }),
+    );
+    c.add(
+      listen(form, 'submit', (e) => {
+        e.preventDefault();
+        const day = field('day').value;
+        const v = values();
+        const problem = !isDayKey(day) || day > dayKey(new Date()) ? 'Pick a day up to today.' : typeof v === 'string' ? `${v}: that number doesn't look right.` : '';
+        error.textContent = problem;
+        error.hidden = !problem;
+        if (problem || typeof v === 'string') return;
+        setManual(day, v);
+        dirty = false;
+        dialog.close();
+      }),
+    );
+    c.add(
+      listen($('[data-be-clear]'), 'click', () => {
+        const day = field('day').value;
+        if (!isDayKey(day) || !window.confirm('Remove what you typed for this day? Synced numbers stay.')) return;
+        setManual(day, {});
+        dirty = false;
+        dialog.close();
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .be {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .be [hidden] {
+    display: none;
+  }
+
+  .be__group {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .be__legend {
+    padding: 0;
+    margin-bottom: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .be__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    align-items: end;
+  }
+
+  .be__field {
+    display: grid;
+    gap: var(--space-2);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .be__field--unit {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .be__field input {
+    min-block-size: 44px;
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-inline-size: 0;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--well-bg, var(--color-bg));
+    color: var(--color-text);
+    font: inherit;
+  }
+
+  .be__small {
+    font-size: var(--text-sm);
+  }
+
+  .be__error {
+    color: var(--color-danger);
+  }
+
+  .be__actions {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  .be__actions .btn {
+    min-block-size: 52px;
+  }
+
+  .be__save {
+    flex: 1;
+  }
+</style>

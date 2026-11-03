@@ -44,8 +44,8 @@ import { SOURCES } from '../lib/findings';
 </Sheet>
 
 <script>
-  import { getSessions, read, subscribe } from '../lib/storage';
-  import type { BodyDay } from '../lib/device';
+  import { getSessions, subscribe } from '../lib/storage';
+  import { bodyDays } from '../lib/body';
   import { getWorkouts } from '../lib/workouts';
   import { exportFile, finding, forget, forgetAll, learned, rows, setSourceOn, sourceOn, type FactId, type Source } from '../lib/findings';
   import { dayKey } from '../lib/dates';
@@ -64,7 +64,7 @@ import { SOURCES } from '../lib/findings';
       $<HTMLElement>('[data-yd-off-note]').hidden = sourceOn('sleep') && sourceOn('focus');
       const sessions = getSessions();
       const workouts = getWorkouts();
-      const facts = learned(finding(rows(read<BodyDay[]>('body', []), sessions)), sessions, workouts);
+      const facts = learned(finding(rows(bodyDays(), sessions)), sessions, workouts);
       $('[data-yd-facts]').replaceChildren(
         ...facts.map((f) => {
           const li = el('li', 'yd__fact');
@@ -99,7 +99,7 @@ import { SOURCES } from '../lib/findings';
           forgetAll();
           msg.textContent = 'Everything forgotten. Grovyn starts learning again from today.';
         } else if (t.closest('[data-yd-export]')) {
-          const file = exportFile(read<BodyDay[]>('body', []), getSessions(), getWorkouts());
+          const file = exportFile(bodyDays(), getSessions(), getWorkouts());
           const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -113,7 +113,7 @@ import { SOURCES } from '../lib/findings';
       }),
     );
     c.add(listen(root.closest('dialog')!, 'sheet:open', () => (msg.textContent = '')));
-    for (const store of ['findings', 'body', 'sessions', 'workouts'] as const) c.add(subscribe(store, render));
+    for (const store of ['findings', 'body', 'body-manual', 'sessions', 'workouts'] as const) c.add(subscribe(store, render));
     render();
     return c.run;
   });

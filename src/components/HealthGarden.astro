@@ -25,10 +25,11 @@
 <script>
   import { getBudget, monthBudget, monthOf, monthSpend, paceLine, formatMoney } from '../lib/budget';
   import { getScreen } from '../lib/screen';
-  import { getSessions, read, subscribe } from '../lib/storage';
+  import { getSessions, subscribe } from '../lib/storage';
   import { minutesByDay } from '../lib/stats';
   import { formatFocus } from '../lib/tasks';
   import { dayKey, fromDayKey } from '../lib/dates';
+  import { bodyDays } from '../lib/body';
   import type { BodyDay } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
   import { el } from '../lib/dom';
@@ -57,7 +58,7 @@
   const ageInDays = (day: string, today: string) => Math.round((fromDayKey(today).getTime() - fromDayKey(day).getTime()) / DAY);
 
   function bodyPlants(today: string): Plant[] {
-    const days = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+    const days = bodyDays();
     if (!days.length) return [];
     const plants: Plant[] = [];
     const latest = (field: keyof BodyDay) => [...days].reverse().find((d) => typeof d[field] === 'number');
@@ -206,7 +207,7 @@
     }
 
     render();
-    for (const name of ['body', 'sessions', 'health', 'screen'] as const) c.add(subscribe(name, render));
+    for (const name of ['body', 'body-manual', 'sessions', 'health', 'screen'] as const) c.add(subscribe(name, render));
     // Day rollover and "how long ago" both move with the clock.
     const tick = window.setInterval(render, 5 * 60_000);
     c.add(() => window.clearInterval(tick));

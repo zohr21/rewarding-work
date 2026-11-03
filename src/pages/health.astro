@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import BodyEntry from '../components/BodyEntry.astro';
 import HealthBody from '../components/HealthBody.astro';
 import HealthCalendar from '../components/HealthCalendar.astro';
 import HealthGarden from '../components/HealthGarden.astro';
@@ -31,6 +32,7 @@ import { NATIVE_APP } from '../config/app';
         </Sheet>
       )
     }
+    {NATIVE_APP && <BodyEntry />}
     <Sheet id="garden" labelledby="garden-heading">
       <HealthGarden />
     </Sheet>

@@ -4,8 +4,9 @@
  *
  * - A week strip picks the day; a dot for each workout logged on it.
  * - Rings: sleep, steps and active minutes in the Android app (from the `body` store
- *   HealthBody.astro keeps), active minutes and focus on the site. In the app they open the
- *   body sheet with the full numbers.
+ *   HealthBody.astro keeps, with what you typed in by hand on top: src/lib/body.ts), active
+ *   minutes and focus on the site. In the app they open the body sheet with the full numbers,
+ *   and Add by hand opens BodyEntry.astro on the picked day.
  * - "Your day": workouts (src/lib/workouts.ts) and focus sessions in time order. A workout
  *   opens the log sheet to change it.
  * - Your finding (HealthFinding.astro): one row under the rings, its detail in a sheet.
@@ -27,10 +28,19 @@ import HealthFinding from './HealthFinding.astro';
 
   <div class="card ht__rings" data-ht-rings></div>
   <HealthFinding />
-  <p class="ht__connect" data-ht-connect hidden>
-    Sleep and steps come from Health Connect.
-    <button type="button" class="ht__link" data-sheet-open="body">Connect</button>
-  </p>
+  {
+    NATIVE_APP && (
+      <p class="ht__connect" data-ht-connect>
+        <span data-ht-connect-none>
+          Sleep and steps come from Health Connect.
+          <button type="button" class="ht__link" data-sheet-open="body">Connect</button>
+          or
+        </span>
+        <span data-ht-connect-some>Missing a number?</span>
+        <button type="button" class="ht__link" data-sheet-open="body-entry" data-ht-entry>add them by hand</button>
+      </p>
+    )
+  }
 
   <button type="button" class="btn ht__log" data-sheet-open="log" data-ht-log>
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
@@ -59,8 +69,9 @@ import HealthFinding from './HealthFinding.astro';
 </section>
 
 <script>
-  import { getSessions, read, subscribe, type FocusSession } from '../lib/storage';
+  import { getSessions, subscribe, type FocusSession } from '../lib/storage';
   import type { BodyDay } from '../lib/device';
+  import { bodyDays as allBodyDays } from '../lib/body';
   import { DEFAULT_KG, getWorkouts, roughKcal, usesMiles, weightKg, workoutsByDay, workoutType, EFFORT_WORDS, type Workout } from '../lib/workouts';
   import { addDays, dayKey, fromDayKey, isDayKey, startOfWeek } from '../lib/dates';
   import { formatFocus } from '../lib/tasks';
@@ -181,7 +192,7 @@ import HealthFinding from './HealthFinding.astro';
       const dayStart = fromDayKey(day).getTime();
       const dayEnd = addDays(fromDayKey(day), 1).getTime();
       const sessions = getSessions().filter((s) => s.start >= dayStart && s.start < dayEnd);
-      const bodyDays = read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
+      const bodyDays = allBodyDays();
       const body = bodyDays.find((d) => d.day === day);
       const logged = workouts.get(day) ?? [];
 
@@ -226,7 +237,13 @@ import HealthFinding from './HealthFinding.astro';
           return box;
         }),
       );
-      $<HTMLElement>('[data-ht-connect]').hidden = !app || bodyDays.length > 0;
+      if (app) {
+        $<HTMLElement>('[data-ht-connect-none]').hidden = bodyDays.length > 0;
+        $<HTMLElement>('[data-ht-connect-some]').hidden = !bodyDays.length;
+        const entry = $<HTMLElement>('[data-ht-entry]');
+        entry.dataset.day = day;
+        entry.textContent = bodyDays.length ? 'Add it by hand' : 'add them by hand';
+      }
 
       const rows = [...logged.map(workoutRow), ...focusRows(sessions)].sort((a, b) => a.start - b.start);
       $('[data-ht-list]').replaceChildren(
@@ -289,7 +306,7 @@ import HealthFinding from './HealthFinding.astro';
     mirror();
 
     render();
-    for (const store of ['workouts', 'sessions', 'body'] as const) c.add(subscribe(store, render));
+    for (const store of ['workouts', 'sessions', 'body', 'body-manual'] as const) c.add(subscribe(store, render));
     c.add(
       listen(document, 'visibilitychange', () => {
         if (!document.hidden) render();
