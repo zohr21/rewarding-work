@@ -236,6 +236,21 @@ public class DevicePlugin extends Plugin {
         HealthData.read(getContext(), days, allowed, call::resolve);
     }
 
+    /** The raw sleep or steps records of the last `days` days, with the app that wrote each (HealthData.records). */
+    @PluginMethod
+    public void healthRecords(PluginCall call) {
+        String kind = call.getString("kind", HealthData.SLEEP);
+        if (!HEALTH || getPermissionState(kind) != PermissionState.GRANTED) {
+            JSObject result = new JSObject();
+            result.put("kind", kind);
+            result.put("records", new JSArray());
+            call.resolve(result);
+            return;
+        }
+        int days = Math.max(1, Math.min(HEALTH_DAYS_MAX, call.getInt("days", 3)));
+        HealthData.records(getContext(), kind, days, call::resolve);
+    }
+
     /** Health Connect's own screen for what this app may read. */
     @PluginMethod
     public void healthSettings(PluginCall call) {
