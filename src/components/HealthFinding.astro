@@ -58,8 +58,8 @@ import { NATIVE_APP } from '../config/app';
 }
 
 <script>
-  import { getSessions, read, subscribe } from '../lib/storage';
-  import type { BodyDay } from '../lib/device';
+  import { getSessions, subscribe } from '../lib/storage';
+  import { bodyDays } from '../lib/body';
   import { getWorkouts } from '../lib/workouts';
   import { NEED_ROWS, atHour, examIn, finding, hm, plan, rows, saveVote, sentence, setAside, short, sourceOn, voteFor, type Finding, type PlanItem } from '../lib/findings';
   import { cleanups, listen, onPage } from '../lib/page';
@@ -107,7 +107,7 @@ import { NATIVE_APP } from '../config/app';
         return;
       }
       const sessions = getSessions();
-      const f = finding(rows(read<BodyDay[]>('body', []), sessions));
+      const f = finding(rows(bodyDays(), sessions));
       current = f;
       const aside = setAside(f);
       const vote = voteFor(f);
@@ -188,7 +188,7 @@ import { NATIVE_APP } from '../config/app';
         if (b) saveVote(current, b.dataset.hfsVote === 'yes' ? 'yes' : 'no');
       }),
     );
-    for (const store of ['body', 'sessions', 'workouts', 'exam', 'findings'] as const) c.add(subscribe(store, render));
+    for (const store of ['body', 'body-manual', 'sessions', 'workouts', 'exam', 'findings'] as const) c.add(subscribe(store, render));
     render();
     return c.run;
   });

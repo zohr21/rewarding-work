@@ -1,8 +1,10 @@
 ---
 /**
  * Body data on /health: sleep, steps, exercise, resting heart rate, calories and distance, read from Health
- * Connect by the Android app (src/lib/device.ts) and set next to focus time. The site
- * has nothing to read from, so it says where the numbers come from instead.
+ * Connect by the Android app (src/lib/device.ts) and set next to focus time. Numbers typed in
+ * by hand (BodyEntry.astro, src/lib/body.ts) are shown over the synced ones, and a tile with a
+ * typed number shows even when that kind isn't allowed. The site has nothing to read from, so
+ * it says where the numbers come from instead.
  */
 import { NATIVE_APP } from '../config/app';
 import { HEALTH_KINDS } from '../lib/device';
@@ -52,6 +54,10 @@ const CHECK = 'M5 12l5 5 9-10';
         <p class="body__refused" data-hb-refused hidden>
           Nothing was allowed. If Android no longer asks, allow it in Health Connect:
           <button type="button" class="body__link" data-hb-manage>open its settings</button>.
+        </p>
+        <p class="muted body__sub">
+          No watch or app sharing with Health Connect?
+          <button type="button" class="body__link" data-sheet-open="body-entry">Add numbers by hand</button>
         </p>
         <ul class="body__promises muted" role="list">
           {['Read only. The app never writes to your health record.', 'Stays on this phone. It is not part of account sync.', 'Never used for ads or shared with anyone.'].map((text) => (
@@ -105,7 +111,8 @@ const CHECK = 'M5 12l5 5 9-10';
 
         <p class="muted body__note">
           Body data comes from Health Connect and stays on this phone.
-          <button type="button" class="body__link" data-hb-manage>Manage</button>
+          <button type="button" class="body__link" data-hb-manage>Manage</button> ·
+          <button type="button" class="body__link" data-sheet-open="body-entry" data-hb-entry>Add by hand</button>
         </p>
       </div>
 
@@ -124,7 +131,8 @@ const CHECK = 'M5 12l5 5 9-10';
   import { HEALTH_KINDS, healthConnect, healthRead, healthState, openHealthSettings, type BodyDay, type BodyField, type HealthKind, type HealthState } from '../lib/device';
   import { minutesByDay } from '../lib/stats';
   import { formatFocus } from '../lib/tasks';
-  import { dayKey, fromDayKey } from '../lib/dates';
+  import { addDays, dayKey, fromDayKey } from '../lib/dates';
+  import { getManual, withManual } from '../lib/body';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
   import { usesMiles } from '../lib/workouts';
@@ -146,6 +154,17 @@ const CHECK = 'M5 12l5 5 9-10';
   const distance = (m: number) =>
     usesMiles() ? `${(m / 1609.344).toFixed(m < 16_093 ? 1 : 0)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
   const kcal = (n: number) => `${Math.round(n).toLocaleString()} kcal`;
+  /** Which kind each field belongs to, for the tiles. */
+  const KIND_OF: Record<BodyField, HealthKind> = {
+    sleepMin: 'sleep',
+    steps: 'steps',
+    activeMin: 'exercise',
+    restingHr: 'heart',
+    totalKcal: 'calories',
+    activeKcal: 'activeCalories',
+    distanceM: 'distance',
+  };
+  const TILE_OF: Partial<Record<HealthKind, HealthKind>> = { activeCalories: 'calories' };
   const numbers = (days: BodyDay[], key: BodyField) => days.flatMap((d) => (typeof d[key] === 'number' ? [d[key] as number] : []));
 
   onPage('health-body', () => {
@@ -163,6 +182,11 @@ const CHECK = 'M5 12l5 5 9-10';
     // The last read is kept so the page has numbers before Health Connect answers.
     const stored = () => read<BodyDay[]>('body', []).filter((d) => d && typeof d.day === 'string');
     let days = stored().slice(-READ_DAYS);
+    /** `days` with the typed numbers over them: what the page shows. `days` itself stays as synced. */
+    let view: BodyDay[] = days;
+    /** Kinds with a number typed in for some day. */
+    let typed = new Set<HealthKind>();
+    const dayBack = (n: number) => dayKey(addDays(new Date(), -n));
 
     /** `ask`: the kinds to ask for when the tile's Allow is tapped; without it there is no Allow. */
     function tile(kind: HealthKind, value: string, sub: string, share?: number, ask?: HealthKind[]): void {
@@ -179,17 +203,20 @@ const CHECK = 'M5 12l5 5 9-10';
 
     function renderTiles(): void {
       const today = range === 'today';
-      const shown = days.slice(-SPAN[range]);
+      const since = dayBack(SPAN[range] - 1);
+      const shown = view.filter((d) => d.day >= since);
       // Today is only part of a day, so daily averages leave it out (unless it is all there is).
       const todayKey = dayKey(new Date());
       const finished = shown.filter((d) => d.day !== todayKey);
       const whole = today || !finished.length ? shown : finished;
       const span = range === 'week' ? 'this week' : 'this month';
-      const allowed = (kind: HealthKind) => !!state?.[kind];
-      const off = (kind: HealthKind, ask: HealthKind[] = [kind]) => tile(kind, 'Off', 'Not allowed in Health Connect', undefined, ask);
+      const allowed = (kind: HealthKind) => !!state?.[kind] || typed.has(kind);
+      // Without Health Connect on the phone there is nothing to allow: only typing it in.
+      const off = (kind: HealthKind, ask: HealthKind[] = [kind]) =>
+        state?.available ? tile(kind, 'Off', 'Not allowed in Health Connect', undefined, ask) : tile(kind, '–', 'Not recorded · add it by hand');
 
       const sleep = numbers(shown, 'sleepMin');
-      const before = days[days.length - 2];
+      const before = view.find((d) => d.day === dayBack(1));
       if (!allowed('sleep')) off('sleep');
       else if (!sleep.length && today && before?.sleepMin) {
         // Not slept yet since the evening: the night before is the latest there is.
@@ -213,7 +240,7 @@ const CHECK = 'M5 12l5 5 9-10';
       else tile('exercise', formatFocus(total * 60), `${span[0]!.toUpperCase()}${span.slice(1)} · ${active.length} of ${shown.length} days`);
 
       const heart = numbers(shown, 'restingHr');
-      const month = numbers(days, 'restingHr');
+      const month = numbers(view, 'restingHr');
       if (!allowed('heart')) off('heart');
       else if (!heart.length) tile('heart', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
       else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
@@ -251,7 +278,7 @@ const CHECK = 'M5 12l5 5 9-10';
         ['activeCalories', 'activeKcal', 'active calories'],
         ['distance', 'distanceM', 'distance'],
       ];
-      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(days, field).length).map(([, , name]) => name);
+      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(view, field).length).map(([, , name]) => name);
       const hint = $<HTMLElement>('[data-hb-hint]');
       hint.hidden = !missing.length || !days.length;
       $('[data-hb-hint-text]').textContent = `No ${missing.join(' or ')} in the last ${days.length} days.`;
@@ -259,9 +286,9 @@ const CHECK = 'M5 12l5 5 9-10';
 
     function renderChart(): void {
       const chart = $<HTMLElement>('[data-hb-chart]');
-      const week = days.slice(-7);
+      const week = Array.from({ length: 7 }, (_, i) => dayBack(6 - i)).map((k) => view.find((d) => d.day === k) ?? { day: k });
       const sleep = week.map((d) => d.sleepMin ?? 0);
-      chart.hidden = !state?.sleep || !sleep.some(Boolean);
+      chart.hidden = !(state?.sleep || typed.has('sleep')) || !sleep.some(Boolean);
       if (chart.hidden) return;
       const focusByDay = minutesByDay(getSessions());
       const focus = week.map((d) => Math.round(focusByDay.get(d.day) ?? 0));
@@ -289,13 +316,24 @@ const CHECK = 'M5 12l5 5 9-10';
     }
 
     function render(): void {
+      const manual = getManual();
+      view = withManual(days, manual);
+      typed = new Set(Object.values(manual).flatMap((v) => (Object.keys(v) as BodyField[]).map((f) => KIND_OF[f])));
       const any = !!state && HEALTH_KINDS.some((k) => state![k]);
       none.hidden = !!state?.available;
       connect.hidden = !state?.available || any;
-      data.hidden = !any;
-      if (!any) return;
+      data.hidden = !any && !typed.size;
+      if (data.hidden) return;
       data.querySelectorAll<HTMLElement>('[data-hb-range]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.hbRange === range)));
       renderTiles();
+      // Today's numbers you typed say so, so a typo is easy to find again.
+      const todayTyped = range === 'today' ? manual[dayKey(new Date())] : undefined;
+      const marked = new Set(Object.keys(todayTyped ?? {}).map((f) => KIND_OF[f as BodyField]).map((k) => TILE_OF[k] ?? k));
+      for (const kind of marked) {
+        const sub = root!.querySelector(`[data-hb-tile="${kind}"] [data-hb-sub]`);
+        if (sub) sub.textContent = `${sub.textContent} · added by you`;
+      }
+      $<HTMLElement>('[data-hb-entry]').dataset.day = dayKey(new Date());
       renderHint();
       renderChart();
     }
@@ -352,6 +390,7 @@ const CHECK = 'M5 12l5 5 9-10';
 
     void refresh();
     c.add(subscribe('sessions', render));
+    c.add(subscribe('body-manual', render));
     c.add(
       listen(document, 'visibilitychange', () => {
         if (!document.hidden) void refresh();
