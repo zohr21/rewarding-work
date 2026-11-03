@@ -11,6 +11,7 @@ import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import Sprig from './Sprig.astro';
 import ScreenToday from './ScreenToday.astro';
+import ChainToday from './ChainToday.astro';
 ---
 
 <section
@@ -42,12 +43,14 @@ import ScreenToday from './ScreenToday.astro';
       <strong class="today__value" data-td-focus>0 min</strong>
       <span class="today__chart" data-td-bars></span>
     </a>
-    <a class="card today__stat" href={`${url('/progress')}#chains`}>
+    <a class="card today__stat" href={`${url('/progress')}#chains`} data-td-chain-card>
       <span class="today__label" data-td-chain-label>Chain</span>
       <strong class="today__value" data-td-chain>None yet</strong>
       <span class="today__dots" data-td-dots></span>
     </a>
   </div>
+
+  <ChainToday />
 
   {NATIVE_APP && <ScreenToday />}
 
@@ -192,6 +195,9 @@ import ScreenToday from './ScreenToday.astro';
 
     function renderChain(): void {
       const chain = getChains()[0];
+      // With a chain, Today's chains (ChainToday) shows them all; the card is only the way in.
+      $('[data-td-chain-card]').hidden = !!chain;
+      $('[data-td-pair]').classList.toggle('is-single', !!chain);
       const label = $('[data-td-chain-label]');
       const value = $('[data-td-chain]');
       const dots = $('[data-td-dots]');
@@ -442,6 +448,14 @@ import ScreenToday from './ScreenToday.astro';
     gap: var(--space-3);
   }
 
+  .today__pair.is-single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .today__stat[hidden] {
+    display: none;
+  }
+
   .today__stat {
     display: grid;
     align-content: start;
@@ -549,11 +563,11 @@ import ScreenToday from './ScreenToday.astro';
   @media (min-width: 56rem) {
     .today {
       grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto auto 1fr;
       grid-template-areas:
         'head head'
         'first pair'
-        'first nudge';
+        'chains nudge';
       gap: var(--space-4) var(--space-5);
     }
 
@@ -592,6 +606,12 @@ import ScreenToday from './ScreenToday.astro';
 
     .today__nudge {
       grid-area: nudge;
+      align-self: start;
+    }
+
+    .today > :global(.ct) {
+      grid-area: chains;
+      align-self: start;
     }
   }
 </style>
