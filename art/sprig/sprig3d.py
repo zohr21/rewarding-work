@@ -18,6 +18,9 @@ Metres, ground at z = 0, the face looks along -Y. Run headless:
   blender --background --factory-startup --python art/sprig/sprig3d.py -- --stage 1 --out <dir> [--preview]
 
 Writes <dir>/sprig-<stage>.glb and, with --preview, <dir>/sprig-<stage>.png.
+With --frame wide|tall it also renders <dir>/sprig-<stage>-<shape>.png, Sprig alone at
+1920x1080 or 1080x1920 on a see-through background; art/sprig/night_frame.py then puts it on
+a plain night background, as a first frame for video tools (Veo).
 """
 
 import argparse
@@ -435,12 +438,66 @@ def render_preview(path):
     bpy.ops.render.render(write_still=True)
 
 
+def render_frame(path, shape):
+    """A video first frame: Sprig lit warm from the front with a mint rim light behind, framed
+    with room around it to move. Transparent, so the night backdrop can be painted under it."""
+    scene = bpy.context.scene
+    engines = [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
+    scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else "BLENDER_EEVEE"
+    scene.render.film_transparent = True
+    scene.render.resolution_x, scene.render.resolution_y = (1920, 1080) if shape == "wide" else (1080, 1920)
+    scene.render.resolution_percentage = 100
+    scene.view_settings.view_transform = "AgX" if "AgX" in [t.identifier for t in scene.view_settings.bl_rna.properties["view_transform"].enum_items] else "Standard"
+    world = bpy.data.worlds.new("Night")
+    scene.world = world
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs["Color"].default_value = lin("#0a1511")
+    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
+
+    def light(name, loc, energy, size, colour="#fff1dc"):
+        data = bpy.data.lights.new(name, "AREA")
+        data.energy, data.size = energy, size
+        data.color = lin(colour)[:3]
+        obj = bpy.data.objects.new(name, data)
+        obj.location = loc
+        obj.rotation_euler = (-Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+        scene.collection.objects.link(obj)
+
+    light("Key", (-3, -4, 6), 700, 5)
+    light("Fill", (4, -3, 2), 140, 4, "#cfe8ff")
+    light("Rim", (2.5, 4, 3.5), 900, 3, "#8dffc8")
+    light("Rim 2", (-3, 3.5, 2.5), 500, 3, "#8dffc8")
+
+    cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
+    scene.collection.objects.link(cam)
+    scene.camera = cam
+    cam.data.lens = 70
+    cam.data.sensor_fit = "AUTO"
+    bpy.context.view_layer.update()
+    corners = [o.matrix_world @ Vector(c) for o in scene.objects if o.type in {"MESH", "CURVE"} for c in o.bound_box]
+    lo = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
+    hi = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
+    target = (lo + hi) / 2
+    w, h = hi.x - lo.x, hi.z - lo.z
+    aspect = scene.render.resolution_x / scene.render.resolution_y
+    # Sprig fills about 60% of the frame's height (wide) or up to 80% of its width (tall).
+    half_fov_v = math.atan(math.tan(cam.data.angle / 2) / max(aspect, 1)) if aspect >= 1 else cam.data.angle / 2
+    half_fov_h = cam.data.angle / 2 if aspect >= 1 else math.atan(math.tan(cam.data.angle / 2) * aspect)
+    need = max((h / 2) / math.tan(half_fov_v) / (0.6 if aspect >= 1 else 0.5), (w / 2) / math.tan(half_fov_h) / (0.8 if aspect < 1 else 0.6))
+    cam.location = target + Vector((0.18, -1, 0.16)).normalized() * need
+    look = target + Vector((0, 0, h * 0.08))  # Sprig a little below the middle, sky above
+    cam.rotation_euler = (look - cam.location).to_track_quat("-Z", "Y").to_euler()
+    scene.render.filepath = path
+    bpy.ops.render.render(write_still=True)
+
+
 def main():
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", type=int, default=1)
     ap.add_argument("--out", default=".")
     ap.add_argument("--preview", action="store_true")
+    ap.add_argument("--frame", choices=["wide", "tall"])
     a = ap.parse_args(argv)
     os.makedirs(a.out, exist_ok=True)
 
@@ -453,6 +510,10 @@ def main():
     if a.preview:
         png = os.path.join(a.out, f"sprig-{a.stage}.png")
         render_preview(png)
+        print(f"[sprig] wrote {png}")
+    if a.frame:
+        png = os.path.join(a.out, f"sprig-{a.stage}-{a.frame}.png")
+        render_frame(png, a.frame)
         print(f"[sprig] wrote {png}")
 
 
