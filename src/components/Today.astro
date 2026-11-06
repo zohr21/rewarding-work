@@ -31,11 +31,16 @@ import ChainToday from './ChainToday.astro';
 
   <div class="card today__start-list" data-td-steps hidden>
     <div class="today__steps-head">
-      <h2>Get started</h2>
+      <h2>Sprig's first quests</h2>
       <span class="muted" data-td-steps-count></span>
     </div>
+    <span class="today__quest-bar" aria-hidden="true"><span data-td-steps-bar></span></span>
     <ul data-td-steps-list></ul>
+    <button type="button" class="today__quest-hide" data-td-steps-hide>Put away (it stays under You › Help)</button>
   </div>
+
+  {/* "Did you know?": one tip a day at most, filled in by Guide.astro. */}
+  <div data-help-nudge hidden></div>
 
   <div class="today__pair" data-td-pair hidden>
     <a class="card today__stat" href={`${url('/progress')}#stats`}>
@@ -66,7 +71,8 @@ import ChainToday from './ChainToday.astro';
 
 <script>
   import { getChain, getChains, getDone, getSessions, getTasks, subscribe } from '../lib/storage';
-  import { getProfile } from '../lib/profile';
+  import { getProfile, getTours, setTours } from '../lib/profile';
+  import { url } from '../lib/paths';
   import { allProgress, chainInput, closestTiers, tierLabel } from '../lib/rewards';
   import { bodyInput } from '../lib/bodytiers';
   import { chainStats, dailyMinutes, totals } from '../lib/stats';
@@ -74,7 +80,7 @@ import ChainToday from './ChainToday.astro';
   import { miniBars, ring } from '../lib/charts';
   import { sprigMood, sprigSvg } from '../lib/sprig';
   import { addDays, dayKey, startOfWeek } from '../lib/dates';
-  import { cleanups, onPage } from '../lib/page';
+  import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
 
   const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -160,24 +166,38 @@ import ChainToday from './ChainToday.astro';
       box.replaceChildren(...parts);
     }
 
-    /** Three first steps; the list goes away once they are all done. */
+    /**
+     * Sprig's first quests: first things to try, each with a "Show me" that opens the page
+     * and starts its tour (src/lib/tours.ts). Gone once all are done, or when put away.
+     */
     function renderSteps(): void {
-      const steps: [string, boolean][] = [
-        ['Pick what to grow', getProfile().welcomed],
-        ['Finish one focus session', !isFirstDay()],
-        ['Add one task', getTasks().length > 0],
+      const tasks = getTasks();
+      const tours = getTours();
+      const steps: [string, boolean, string][] = [
+        ['Pick what to grow', getProfile().welcomed, url('/welcome')],
+        ['Finish one focus session', !isFirstDay(), url('/timer?tour=timer')],
+        ['Add one task', tasks.length > 0, url('/tasks?tour=tasks')],
+        ['Split a task into small steps', tasks.some((t) => t.steps.length > 0), url('/tasks?tour=tasks')],
+        ['Visit your grove', tours.seen.includes('grove'), url('/progress?tour=grove')],
       ];
       const done = steps.filter(([, ok]) => ok).length;
       const box = $('[data-td-steps]');
-      box.hidden = done === steps.length;
+      box.hidden = done === steps.length || !!tours.questsHidden;
       $('[data-td-steps-count]').textContent = `${done} of ${steps.length}`;
+      $('[data-td-steps-bar]').style.inlineSize = `${(done / steps.length) * 100}%`;
       $('[data-td-steps-list]').replaceChildren(
-        ...steps.map(([label, ok]) => {
+        ...steps.map(([label, ok, href]) => {
           const li = el('li', ok ? 'is-done' : '');
           const mark = el('span', 'today__check');
           if (ok) mark.innerHTML = CHECK_SVG;
-          li.append(mark, label);
+          li.append(mark, el('span', 'today__quest', label));
           if (ok) li.append(el('span', 'visually-hidden', ' (done)'));
+          else {
+            const show = el('a', 'today__show', 'Show me');
+            show.href = href;
+            show.setAttribute('aria-label', `Show me: ${label}`);
+            li.append(show);
+          }
           return li;
         }),
       );
@@ -254,7 +274,8 @@ import ChainToday from './ChainToday.astro';
       root.removeAttribute('aria-busy');
     };
     render();
-    (['tasks', 'sessions', 'chain', 'done'] as const).forEach((name) => c.add(subscribe(name, render)));
+    (['tasks', 'sessions', 'chain', 'done', 'profile'] as const).forEach((name) => c.add(subscribe(name, render)));
+    c.add(listen($('[data-td-steps-hide]'), 'click', () => setTours({ questsHidden: true })));
     return c.run;
   });
 </script>
@@ -414,9 +435,56 @@ import ChainToday from './ChainToday.astro';
     min-height: 36px;
   }
 
+  .today__start-list :global(li) {
+    min-height: 44px;
+  }
+
+  .today__start-list :global(.today__quest) {
+    flex: 1;
+  }
+
   .today__start-list :global(li.is-done) {
     color: var(--color-text-muted);
     text-decoration: line-through;
+  }
+
+  .today__start-list :global(.today__show) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .today__quest-bar {
+    display: block;
+    block-size: 6px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .today__quest-bar span {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+    transition: inline-size var(--duration-fast, 0.2s) var(--ease-out);
+  }
+
+  .today__quest-hide {
+    justify-self: start;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
   }
 
   .today__start-list :global(.today__check) {

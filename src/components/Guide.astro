@@ -1,0 +1,1214 @@
+---
+/**
+ * Help, on every page (BaseLayout, not on bare pages like Welcome). Four layers, each optional:
+ *
+ * - Tours (src/lib/tours.ts): a spotlight on one real thing at a time. In the app a tour starts
+ *   by itself the first time a screen, or one of its tabs, is opened; tabs not seen yet get a
+ *   dot. Never while the timer runs. `?tour=<id>` starts one.
+ * - Tips & tricks (src/lib/help.ts): `?tip=<id>` opens the page with a spotlight on the thing.
+ * - Playbooks: one goal in a few steps across screens, with progress from your own data.
+ * - "Did you know?": one tip a day at most, picked from what you do, shown on Today
+ *   ([data-help-nudge]) and when a session ends ([data-done-tip] in TimerWidget).
+ *
+ * The ? in the header opens help for this screen; the guides sheet (also under You › Help)
+ * holds everything, with search.
+ */
+import Sheet from './Sheet.astro';
+import { NATIVE_APP } from '../config/app';
+import { url } from '../lib/paths';
+---
+
+<Sheet id="help" labelledby="help-title">
+  <div class="guide" data-help>
+    <h2 id="help-title" class="guide__title" data-help-title>Help</h2>
+    <button type="button" class="guide__tour" data-help-tour hidden>
+      <span class="guide__play" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5l11 7-11 7z" fill="currentColor"></path></svg>
+      </span>
+      <span class="guide__tour-text">
+        <strong>Show me around</strong>
+        <small data-help-tour-sub></small>
+      </span>
+    </button>
+    <div class="guide__block" data-help-tabs-wrap hidden>
+      <h3 class="guide__label">Each tab</h3>
+      <ul class="guide__list" data-help-tabs></ul>
+    </div>
+    <div class="guide__block" data-help-tips-wrap hidden>
+      <h3 class="guide__label">Tips for this screen</h3>
+      <div class="guide__cards" data-help-tips></div>
+    </div>
+    <div class="guide__block guide__faq" data-help-faq-wrap hidden>
+      <h3 class="guide__label">Quick answers</h3>
+      <div data-help-faq></div>
+    </div>
+    <button type="button" class="btn btn--ghost guide__all" data-sheet-open="guides">All tours, tips and playbooks</button>
+  </div>
+</Sheet>
+
+<Sheet id="guides" title="Help & guides">
+  <div class="guide" data-guides>
+    <label class="guide__search">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
+      <span class="visually-hidden">Search help</span>
+      <input type="search" placeholder="Search help, e.g. exam or bank" autocomplete="off" data-guides-q />
+    </label>
+
+    <div class="guide__kinds" role="group" aria-label="Kind of help" data-guides-kinds>
+      <button type="button" aria-pressed="true" data-guides-kind="tours">Tours</button>
+      <button type="button" aria-pressed="false" data-guides-kind="playbooks">Playbooks</button>
+      <button type="button" aria-pressed="false" data-guides-kind="tips">Tips</button>
+    </div>
+
+    <div class="guide__block" data-guides-results hidden></div>
+
+    <section class="guide__block" data-guides-panel="tours">
+      <div class="guide__block" data-guides-tours></div>
+      <h3 class="guide__label">Settings</h3>
+      <div class="guide__list">
+        {
+          NATIVE_APP && (
+            <a class="guide__row" href={url('/welcome')}>
+              <span class="guide__row-main">
+                See Welcome again<small>Pick your sections</small>
+              </span>
+            </a>
+          )
+        }
+        {
+          NATIVE_APP && (
+            <label class="guide__row">
+              <span class="guide__row-main">
+                Tours on new screens<small>A short tour the first time you open a screen or tab</small>
+              </span>
+              <input type="checkbox" role="switch" data-guides-auto />
+            </label>
+          )
+        }
+        <label class="guide__row">
+          <span class="guide__row-main">
+            Did you know?<small>One tip at a time, picked from what you do</small>
+          </span>
+          <input type="checkbox" role="switch" data-guides-nudges />
+        </label>
+      </div>
+      <button type="button" class="btn btn--ghost guide__all" data-guides-reset>Show every tour and tip again</button>
+      <p class="guide__note muted">What you have seen is kept on this device.</p>
+    </section>
+
+    <section class="guide__block" data-guides-panel="playbooks" hidden>
+      <div class="guide__block" data-guides-books>
+        <p class="muted guide__intro">Pick a goal. Each playbook walks you through the screens that help with it.</p>
+        <ul class="guide__list" data-guides-book-list></ul>
+      </div>
+      <div class="guide__block" data-guides-book hidden></div>
+    </section>
+
+    <section class="guide__block" data-guides-panel="tips" hidden>
+      <div class="guide__chips" role="group" aria-label="Area" data-guides-areas></div>
+      <div class="guide__cards" data-guides-tips></div>
+    </section>
+  </div>
+</Sheet>
+
+<script>
+  import { NATIVE_APP } from '../config/app';
+  import { getProfile, getTours, setTours } from '../lib/profile';
+  import { AREAS, TOURS, pathOf, tabToursFor, tourById, tourFor, type Area, type Tour } from '../lib/tours';
+  import { PLAYBOOKS, TIPS, areaOn, helpContext, pickNudge, playbookById, stepDone, tipById, type Playbook, type Tip } from '../lib/help';
+  import { runSpotlight, stopSpotlight, visible } from '../scripts/tour-engine';
+  import { readJson } from '../lib/storage';
+  import { dayKey } from '../lib/dates';
+  import { url } from '../lib/paths';
+  import { el } from '../lib/dom';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { navigate } from 'astro:transitions/client';
+
+  const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  function timerRunning(): boolean {
+    try {
+      const t = JSON.parse(readJson('timer') ?? 'null') as { status?: string; phase?: string } | null;
+      return t?.status === 'running';
+    } catch {
+      return false;
+    }
+  }
+
+  const modules = () => getProfile().modules;
+  const tourOn = (t: Tour) => !t.module || modules()[t.module];
+  const tipOn = (t: Tip) => areaOn(t.area, modules()) && (!t.appOnly || NATIVE_APP);
+  const bookOn = (p: Playbook) => !p.module || modules()[p.module];
+
+  function markSeen(id: string): void {
+    const t = getTours();
+    if (!t.seen.includes(id)) setTours({ seen: [...t.seen, id] });
+  }
+
+  /** Open a tab first when the thing lives on one. */
+  async function openTab(selector?: string): Promise<void> {
+    if (!selector) return;
+    const tab = document.querySelector<HTMLElement>(selector);
+    if (tab && tab.getAttribute('aria-selected') !== 'true') {
+      tab.click();
+      await wait(300);
+    }
+  }
+
+  async function runTour(tour: Tour): Promise<void> {
+    markSeen(tour.id);
+    await openTab(tour.tab);
+    runSpotlight({ name: `${tour.name} tour`, steps: tour.steps, sayWhere: true });
+  }
+
+  async function runTip(tip: Tip): Promise<void> {
+    if (!tip.show) return;
+    await openTab(tip.show.tab);
+    const step = { title: tip.title, text: tip.text };
+    // When the thing isn't on screen right now (locked, no data yet), still say the tip.
+    if (!tip.show.target || !runSpotlight({ name: 'Tip', steps: [{ ...step, target: tip.show.target }] }))
+      runSpotlight({ name: 'Tip', steps: [{ ...step, target: '[data-guide-help]' }] });
+  }
+
+  const tourHref = (t: Tour) => url(`${t.path}?tour=${t.id}`);
+  const tipHref = (t: Tip) => (t.show ? url(`${t.show.path}?tip=${t.id}`) : null);
+
+  /** A tip as a card: area, title, text, Show me. */
+  function tipCard(t: Tip): HTMLElement {
+    const card = el('article', 'guide-card');
+    card.append(el('span', 'guide-card__area', t.area), el('h4', 'guide-card__title', t.title), el('p', 'guide-card__text', t.text));
+    const href = tipHref(t);
+    if (href) {
+      const a = el('a', 'guide-card__go', 'Show me');
+      a.href = href;
+      a.setAttribute('aria-label', `Show me: ${t.title}`);
+      card.append(a);
+    }
+    return card;
+  }
+
+  function row(href: string | null, title: string, sub: string, go: string, isNew = false): HTMLElement {
+    const r = href ? el('a', 'guide__row') : el('div', 'guide__row');
+    if (r instanceof HTMLAnchorElement && href) r.href = href;
+    const dot = el('span', `guide__dot${isNew ? ' is-new' : ''}`);
+    dot.setAttribute('aria-hidden', 'true');
+    const main = el('span', 'guide__row-main', title);
+    main.append(el('small', '', sub));
+    r.append(dot, main, el('span', `guide__go${isNew ? ' is-new' : ''}`, go));
+    return r;
+  }
+
+  function tourRow(t: Tour): HTMLElement {
+    const seen = getTours().seen.includes(t.id);
+    const li = el('li');
+    li.append(row(tourHref(t), t.name, `${seen ? 'Seen' : 'New'} · ${t.steps.length} tips`, seen ? 'Replay' : 'Start', !seen));
+    return li;
+  }
+
+  /* ---------- Starting tours and tips ---------- */
+
+  onPage('guide-tour', () => {
+    const c = cleanups();
+    const params = new URLSearchParams(location.search);
+    const askedTour = params.get('tour');
+    const askedTip = params.get('tip');
+    if (askedTour || askedTip) {
+      params.delete('tour');
+      params.delete('tip');
+      const q = params.toString();
+      history.replaceState(history.state, '', `${location.pathname}${q ? `?${q}` : ''}${location.hash}`);
+    }
+
+    const prefs = getTours();
+    const auto = NATIVE_APP && getProfile().welcomed && !prefs.off;
+    const page = tourFor(location.pathname);
+    const tabs = tabToursFor(location.pathname).filter(tourOn);
+    const isNew = (t: Tour) => auto && !getTours().seen.includes(t.id);
+
+    // Tabs whose tour hasn't been seen get a small dot.
+    const dots = () => {
+      for (const t of tabs) document.querySelector<HTMLElement>(t.tab!)?.toggleAttribute('data-tour-new', isNew(t));
+    };
+    dots();
+    c.add(() => tabs.forEach((t) => document.querySelector(t.tab!)?.removeAttribute('data-tour-new')));
+
+    const later = (fn: () => void, ms = 700) => {
+      const id = setTimeout(() => {
+        if (!document.querySelector('dialog[open]')) fn();
+      }, ms);
+      c.add(() => clearTimeout(id));
+    };
+
+    if (askedTip) {
+      const tip = tipById(askedTip);
+      if (tip) later(() => void runTip(tip));
+    } else if (askedTour) {
+      const tour = tourById(askedTour);
+      if (tour && tourOn(tour)) later(() => void runTour(tour).then(dots));
+    } else if (!timerRunning()) {
+      const selected = tabs.find((t) => document.querySelector(t.tab!)?.getAttribute('aria-selected') === 'true');
+      const first = page && tourOn(page) && isNew(page) ? page : selected && isNew(selected) ? selected : null;
+      if (first) later(() => void runTour(first).then(dots));
+    }
+
+    // Opening a tab for the first time starts its tour.
+    for (const t of tabs) {
+      const tab = document.querySelector<HTMLElement>(t.tab!);
+      if (!tab) continue;
+      c.add(
+        listen(tab, 'click', () => {
+          if (!isNew(t) || timerRunning()) return;
+          later(() => void runTour(t).then(dots), 350);
+        }),
+      );
+    }
+    // Show me / Replay links in the sheets and the nudge. Capture phase, before the router:
+    // save first (a store write while the router is navigating cancels it), close the sheet,
+    // then run it right here when it's this page, or go there.
+    c.add(
+      listen(
+        document,
+        'click',
+        (e) => {
+          const a = (e.target as HTMLElement).closest?.<HTMLAnchorElement>('a[href]');
+          if (!a || !a.closest('[data-sheet="help"], [data-sheet="guides"], [data-help-nudge], [data-done-tip]')) return;
+          const to = new URL(a.href, location.href);
+          const tip = to.searchParams.get('tip');
+          const tour = to.searchParams.get('tour');
+          if (!tip && !tour) return;
+          e.preventDefault();
+          const step = a.dataset.guidesTried;
+          const prefs = getTours();
+          if (step && !prefs.tried?.includes(step)) setTours({ tried: [...(prefs.tried ?? []), step] });
+          const away = a.dataset.guidesAway;
+          if (away && !prefs.tips?.includes(away)) setTours({ tips: [...(getTours().tips ?? []), away] });
+          a.closest('dialog')?.close();
+          if (pathOf(to.pathname) !== pathOf(location.pathname)) return void navigate(to.href);
+          const t = tip ? tipById(tip) : null;
+          const r = tour ? tourById(tour) : null;
+          if (t) later(() => void runTip(t), 250);
+          else if (r && tourOn(r)) later(() => void runTour(r).then(dots), 250);
+        },
+        { capture: true },
+      ),
+    );
+    c.add(stopSpotlight);
+    return c.run;
+  });
+
+  /* ---------- The ? sheet: this screen ---------- */
+
+  onPage('guide-help', () => {
+    const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="help"]');
+    if (!sheet) return;
+    const $ = <E extends HTMLElement = HTMLElement>(s: string) => sheet.querySelector<E>(s)!;
+    const page = tourFor(location.pathname);
+    const pageOn = !!page && tourOn(page);
+    const tabs = tabToursFor(location.pathname).filter(tourOn);
+
+    const render = () => {
+      $('[data-help-title]').textContent = pageOn ? `Help with ${page.name}` : 'Help';
+      $('[data-help-tour]').hidden = !pageOn;
+      if (pageOn) $('[data-help-tour-sub]').textContent = `${page.steps.length} tips on this screen`;
+
+      $('[data-help-tabs-wrap]').hidden = !tabs.length;
+      $('[data-help-tabs]').replaceChildren(...tabs.map(tourRow));
+
+      const areas = new Set<Area>([page, ...tabs].filter((t): t is Tour => !!t).map((t) => t.area));
+      const tips = TIPS.filter((t) => areas.has(t.area) && tipOn(t)).slice(0, 4);
+      $('[data-help-tips-wrap]').hidden = !tips.length;
+      $('[data-help-tips]').replaceChildren(...tips.map(tipCard));
+
+      const faq = [page, ...tabs].filter((t): t is Tour => !!t && tourOn(t)).flatMap((t) => t.faq);
+      $('[data-help-faq-wrap]').hidden = !faq.length;
+      $('[data-help-faq]').replaceChildren(
+        ...faq.map(([q, a]) => {
+          const d = el('details', 'guide__q');
+          d.append(el('summary', '', q), el('p', 'muted', a));
+          return d;
+        }),
+      );
+    };
+
+    const c = cleanups();
+    c.add(listen(sheet, 'sheet:open', render));
+    c.add(
+      listen($('[data-help-tour]'), 'click', () => {
+        sheet.close();
+        if (page) void runTour(page);
+      }),
+    );
+    render();
+    return c.run;
+  });
+
+  /* ---------- The guides sheet: everything ---------- */
+
+  onPage('guide-list', () => {
+    const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="guides"]');
+    if (!sheet) return;
+    const $ = <E extends HTMLElement = HTMLElement>(s: string) => sheet.querySelector<E>(s)!;
+    const q = $<HTMLInputElement>('[data-guides-q]');
+    const kinds = [...sheet.querySelectorAll<HTMLButtonElement>('[data-guides-kind]')];
+    const panels = [...sheet.querySelectorAll<HTMLElement>('[data-guides-panel]')];
+    const auto = sheet.querySelector<HTMLInputElement>('[data-guides-auto]');
+    const nudges = $<HTMLInputElement>('[data-guides-nudges]');
+    let kind = 'tours';
+    let area: Area | 'All' = 'All';
+    let book: string | null = null;
+
+    const renderTours = () => {
+      const groups = AREAS.map((a) => [a, TOURS.filter((t) => t.area === a && tourOn(t))] as const).filter(([, ts]) => ts.length);
+      $('[data-guides-tours]').replaceChildren(
+        ...groups.map(([a, ts]) => {
+          const wrap = el('div', 'guide__block');
+          const ul = el('ul', 'guide__list');
+          ul.append(...ts.map(tourRow));
+          wrap.append(el('h3', 'guide__label', a), ul);
+          return wrap;
+        }),
+      );
+      const prefs = getTours();
+      if (auto) auto.checked = !prefs.off;
+      nudges.checked = !prefs.nudgesOff;
+    };
+
+    const renderBooks = () => {
+      const ctx = helpContext();
+      const tried = getTours().tried ?? [];
+      const list = PLAYBOOKS.filter(bookOn);
+      $('[data-guides-book-list]').replaceChildren(
+        ...list.map((p) => {
+          const n = p.steps.filter((s) => stepDone(s, ctx, tried)).length;
+          const li = el('li');
+          const b = el('button', 'guide__row');
+          b.type = 'button';
+          b.dataset.guidesOpen = p.id;
+          const badge = el('span', `guide__badge${n ? ' is-going' : ''}`, n === p.steps.length ? '✓' : `${n}/${p.steps.length}`);
+          badge.setAttribute('aria-hidden', 'true');
+          const main = el('span', 'guide__row-main', p.name);
+          main.append(el('small', '', `${p.sub} · ${n} of ${p.steps.length} done`));
+          b.append(badge, main);
+          li.append(b);
+          return li;
+        }),
+      );
+      const open = book ? playbookById(book) : undefined;
+      $('[data-guides-books]').hidden = !!open;
+      $('[data-guides-book]').hidden = !open;
+      if (open) renderBook(open, ctx, tried);
+    };
+
+    const renderBook = (p: Playbook, ctx: ReturnType<typeof helpContext>, tried: string[]) => {
+      const box = $('[data-guides-book]');
+      const back = el('button', 'guide__back', '‹ All playbooks');
+      back.type = 'button';
+      back.dataset.guidesBack = '';
+      const n = p.steps.filter((s) => stepDone(s, ctx, tried)).length;
+      const bar = el('span', 'guide__bar');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', `${n} of ${p.steps.length} steps done`);
+      const fill = el('span');
+      fill.style.inlineSize = `${(n / p.steps.length) * 100}%`;
+      bar.append(fill);
+      const ol = el('ol', 'guide__steps');
+      p.steps.forEach((s, i) => {
+        const ok = stepDone(s, ctx, tried);
+        const li = el('li', ok ? 'is-done' : '');
+        const mark = el('span', 'guide__step-n', ok ? '✓' : String(i + 1));
+        mark.setAttribute('aria-hidden', 'true');
+        const main = el('span', 'guide__row-main', s.title);
+        main.append(el('small', '', s.how));
+        if (ok) main.append(el('span', 'visually-hidden', ' (done)'));
+        li.append(mark, main);
+        if (!ok) {
+          const a = el('a', 'guide-card__go', 'Show me');
+          const qs = s.go.tour ? `?tour=${s.go.tour}` : s.go.tip ? `?tip=${s.go.tip}` : '';
+          a.href = url(`${s.go.path}${qs}`);
+          a.dataset.guidesTried = s.id;
+          a.setAttribute('aria-label', `Show me: ${s.title}`);
+          li.append(a);
+        }
+        ol.append(li);
+      });
+      const why = el('details', 'guide__q guide__why');
+      const whyText = el('p', 'muted', p.why);
+      why.append(el('summary', '', 'Why this works'), whyText);
+      if (p.techniques.length) {
+        const more = el('p', 'guide__techs');
+        more.append('Read more: ');
+        p.techniques.forEach((t, i) => {
+          const a = el('a', '', t.name);
+          a.href = url(`/techniques/${t.slug}`);
+          more.append(...(i ? [', ', a] : [a]));
+        });
+        why.append(more);
+      }
+      const coach = el('a', 'guide__all guide__coach', 'Still stuck? Ask Coach what is in the way');
+      coach.href = url('/techniques');
+      box.replaceChildren(back, el('h3', 'guide__book-title', p.name), bar, el('p', 'muted guide__count', `${n} of ${p.steps.length} done`), ol, why, coach);
+    };
+
+    const renderTips = () => {
+      const areas = (['All', ...AREAS] as const).filter((a) => a === 'All' || TIPS.some((t) => t.area === a && tipOn(t)));
+      $('[data-guides-areas]').replaceChildren(
+        ...areas.map((a) => {
+          const b = el('button', 'guide__chip', a);
+          b.type = 'button';
+          b.dataset.guidesArea = a;
+          b.setAttribute('aria-pressed', String(a === area));
+          return b;
+        }),
+      );
+      $('[data-guides-tips]').replaceChildren(...TIPS.filter((t) => tipOn(t) && (area === 'All' || t.area === area)).map(tipCard));
+    };
+
+    /** Search across tours, playbooks and tips; every word must match. */
+    const renderSearch = (text: string) => {
+      const words = text.toLowerCase().split(/\s+/).filter(Boolean);
+      const hit = (...parts: string[]) => {
+        const hay = parts.join(' ').toLowerCase();
+        return words.every((w) => hay.includes(w));
+      };
+      const tours = TOURS.filter((t) => tourOn(t) && hit(t.name, t.area, ...t.steps.flatMap((s) => [s.title, s.text]), ...t.faq.flat()));
+      const books = PLAYBOOKS.filter((p) => bookOn(p) && hit(p.name, p.sub, p.why, ...p.steps.flatMap((s) => [s.title, s.how])));
+      const tips = TIPS.filter((t) => tipOn(t) && hit(t.title, t.text, t.area));
+      const box = $('[data-guides-results]');
+      const parts: HTMLElement[] = [];
+      if (tours.length) {
+        const ul = el('ul', 'guide__list');
+        ul.append(...tours.map(tourRow));
+        parts.push(el('h3', 'guide__label', 'Tours'), ul);
+      }
+      if (books.length) {
+        const ul = el('ul', 'guide__list');
+        ul.append(
+          ...books.map((p) => {
+            const li = el('li');
+            const b = el('button', 'guide__row');
+            b.type = 'button';
+            b.dataset.guidesOpen = p.id;
+            const main = el('span', 'guide__row-main', p.name);
+            main.append(el('small', '', p.sub));
+            b.append(main);
+            li.append(b);
+            return li;
+          }),
+        );
+        parts.push(el('h3', 'guide__label', 'Playbooks'), ul);
+      }
+      if (tips.length) {
+        const cards = el('div', 'guide__cards');
+        cards.append(...tips.map(tipCard));
+        parts.push(el('h3', 'guide__label', 'Tips'), cards);
+      }
+      if (!parts.length) parts.push(el('p', 'muted guide__intro', 'Nothing found. Try another word, or write to us under You › Help.'));
+      box.replaceChildren(...parts);
+    };
+
+    const render = () => {
+      const searching = q.value.trim().length > 0;
+      $('[data-guides-kinds]').hidden = searching;
+      $('[data-guides-results]').hidden = !searching;
+      for (const b of kinds) b.setAttribute('aria-pressed', String(b.dataset.guidesKind === kind));
+      for (const p of panels) p.hidden = searching || p.dataset.guidesPanel !== kind;
+      if (searching) return renderSearch(q.value);
+      if (kind === 'tours') renderTours();
+      else if (kind === 'playbooks') renderBooks();
+      else renderTips();
+    };
+
+    const c = cleanups();
+    c.add(
+      listen(sheet, 'sheet:open', (e) => {
+        const d = (e as CustomEvent<Record<string, string | undefined>>).detail ?? {};
+        if (d.guidesKind) kind = d.guidesKind;
+        book = d.guidesBook ?? null;
+        if (book) kind = 'playbooks';
+        render();
+      }),
+    );
+    c.add(listen(q, 'input', render));
+    c.add(
+      listen(sheet, 'click', (e) => {
+        const t = e.target as HTMLElement;
+        const k = t.closest<HTMLElement>('[data-guides-kind]');
+        const open = t.closest<HTMLElement>('[data-guides-open]');
+        const a = t.closest<HTMLElement>('[data-guides-area]');
+        if (k) {
+          kind = k.dataset.guidesKind!;
+          book = null;
+        } else if (open) {
+          q.value = '';
+          kind = 'playbooks';
+          book = open.dataset.guidesOpen!;
+        } else if (t.closest('[data-guides-back]')) book = null;
+        else if (a) area = a.dataset.guidesArea as Area | 'All';
+        else return;
+        render();
+      }),
+    );
+    if (auto) c.add(listen(auto, 'change', () => setTours({ off: !auto.checked })));
+    c.add(listen(nudges, 'change', () => setTours({ nudgesOff: !nudges.checked })));
+    c.add(
+      listen($('[data-guides-reset]'), 'click', () => {
+        setTours({ seen: [], questsHidden: false, tips: [], nudge: undefined });
+        render();
+      }),
+    );
+    render();
+    return c.run;
+  });
+
+  /* ---------- "Did you know?" ---------- */
+
+  function nudgeCard(tip: Tip, onAway: () => void): HTMLElement {
+    const card = el('section', 'help-nudge');
+    card.setAttribute('aria-label', 'Did you know?');
+    const actions = el('div', 'help-nudge__actions');
+    const putAway = () => {
+      const prefs = getTours();
+      if (!prefs.tips?.includes(tip.id)) setTours({ tips: [...(prefs.tips ?? []), tip.id] });
+    };
+    const away = () => {
+      putAway();
+      onAway();
+    };
+    const href = tipHref(tip);
+    if (href) {
+      const go = el('a', 'btn btn--small', 'Show me');
+      go.href = href;
+      // The shared link handler in 'guide-tour' puts it away, then goes.
+      go.dataset.guidesAway = tip.id;
+      actions.append(go);
+    }
+    const no = el('button', 'help-nudge__no', href ? 'Not now' : 'Got it');
+    no.type = 'button';
+    no.addEventListener('click', away);
+    actions.append(no);
+    card.append(
+      el('span', 'help-nudge__label', 'Did you know?'),
+      el('strong', 'help-nudge__title', tip.title),
+      el('p', 'help-nudge__text', tip.text),
+      actions,
+      el('p', 'help-nudge__why', `${tip.because ?? ''} Turn these off under You › Help.`.trim()),
+    );
+    return card;
+  }
+
+  /** Today's tip, picked once a day; null when there is none to show. */
+  function todaysNudge(): Tip | null {
+    const today = dayKey(new Date());
+    const prefs = getTours();
+    const tip = pickNudge(helpContext(), prefs, modules(), today, NATIVE_APP);
+    if (tip && prefs.nudge?.day !== today) setTours({ nudge: { day: today, id: tip.id } });
+    return tip;
+  }
+
+  onPage('guide-nudge', () => {
+    const c = cleanups();
+    // On Today, at a calm moment.
+    const slot = document.querySelector<HTMLElement>('[data-help-nudge]');
+    if (slot && getProfile().welcomed && !timerRunning()) {
+      const tip = todaysNudge();
+      slot.hidden = !tip;
+      slot.replaceChildren(...(tip ? [nudgeCard(tip, () => (slot.hidden = true))] : []));
+    }
+    // When a session ends.
+    const done = document.querySelector<HTMLDialogElement>('dialog[data-done]');
+    const doneSlot = done?.querySelector<HTMLElement>('[data-done-tip]');
+    if (done && doneSlot) {
+      const fill = () => {
+        if (!done.open) return;
+        const tip = todaysNudge();
+        doneSlot.hidden = !tip;
+        doneSlot.replaceChildren(...(tip ? [nudgeCard(tip, () => (doneSlot.hidden = true))] : []));
+      };
+      const watch = new MutationObserver(fill);
+      watch.observe(done, { attributes: true, attributeFilter: ['open'] });
+      c.add(() => watch.disconnect());
+    }
+    return c.run;
+  });
+</script>
+
+<style>
+  .guide {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .guide__block {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .guide__block[hidden] {
+    display: none;
+  }
+
+  .guide__title {
+    font-size: var(--text-xl);
+  }
+
+  .guide :global(.guide__label) {
+    margin-bottom: calc(-1 * var(--space-1));
+    color: var(--color-text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .guide :global(.guide__intro) {
+    font-size: var(--text-sm);
+  }
+
+  .guide__tour {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 64px;
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-md);
+    background: var(--color-accent-soft);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .guide__tour[hidden] {
+    display: none;
+  }
+
+  .guide__play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 40px;
+    block-size: 40px;
+    border-radius: 50%;
+    background: var(--accent-grad);
+    color: var(--color-on-accent);
+  }
+
+  .guide__tour-text {
+    display: grid;
+    gap: 2px;
+  }
+
+  .guide__tour-text small {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+
+  .guide :global(.guide__q) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .guide__faq :global(.guide__q:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .guide :global(.guide__q summary) {
+    display: flex;
+    align-items: center;
+    min-height: 48px;
+    cursor: pointer;
+  }
+
+  .guide :global(.guide__q p) {
+    padding-bottom: var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .guide :global(.guide__all) {
+    justify-self: center;
+  }
+
+  .guide :global(.guide__coach) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: var(--text-sm);
+  }
+
+  /* Search */
+  .guide__search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 48px;
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: var(--color-text-muted);
+  }
+
+  .guide__search input {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    outline: none;
+  }
+
+  .guide__search:focus-within {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Tours · Playbooks · Tips */
+  .guide__kinds {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding: 4px;
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .guide__kinds[hidden] {
+    display: none;
+  }
+
+  .guide__kinds button {
+    min-height: 40px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .guide__kinds button[aria-pressed='true'] {
+    background: var(--raised-grad);
+    box-shadow: inset 0 1px 0 var(--raised-hl), 0 2px 0 var(--edge);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  /* Lists */
+  .guide :global(.guide__list) {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+    list-style: none;
+  }
+
+  .guide :global(.guide__list > li + li),
+  .guide :global(.guide__list > .guide__row + .guide__row) {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .guide :global(.guide__row) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
+    min-height: 60px;
+    padding: var(--space-2) var(--space-4);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .guide :global(.guide__row-main) {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .guide :global(.guide__row-main small) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+  }
+
+  .guide :global(.guide__row input) {
+    flex: none;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    accent-color: var(--color-accent);
+  }
+
+  .guide :global(.guide__dot) {
+    flex: none;
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 50%;
+    background: var(--color-border-strong);
+  }
+
+  .guide :global(.guide__dot.is-new) {
+    background: var(--color-accent);
+  }
+
+  .guide :global(.guide__go) {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .guide :global(.guide__go.is-new) {
+    color: var(--color-accent);
+  }
+
+  .guide :global(.guide__badge) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 44px;
+    block-size: 40px;
+    border-radius: 12px;
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .guide :global(.guide__badge.is-going) {
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  /* A playbook */
+  .guide :global(.guide__back) {
+    justify-self: start;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-accent);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .guide :global(.guide__book-title) {
+    font-size: var(--text-xl);
+  }
+
+  .guide :global(.guide__bar) {
+    display: block;
+    block-size: 8px;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+  }
+
+  .guide :global(.guide__bar span) {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--color-accent);
+  }
+
+  .guide :global(.guide__count) {
+    margin-top: calc(-1 * var(--space-2));
+    font-size: var(--text-xs);
+  }
+
+  .guide :global(.guide__steps) {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .guide :global(.guide__steps li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .guide :global(.guide__step-n) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    inline-size: 28px;
+    block-size: 28px;
+    border: 2px solid var(--color-border-strong);
+    border-radius: 50%;
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+    font-weight: 700;
+  }
+
+  .guide :global(.guide__steps li.is-done .guide__step-n) {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .guide :global(.guide__steps li.is-done .guide__row-main) {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+  }
+
+  .guide :global(.guide__techs) {
+    font-size: var(--text-sm);
+  }
+
+  /* Tips */
+  .guide :global(.guide__chips) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .guide :global(.guide__chip) {
+    min-height: 40px;
+    padding-inline: var(--space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .guide :global(.guide__chip[aria-pressed='true']) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .guide :global(.guide__cards) {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .guide :global(.guide-card) {
+    display: grid;
+    gap: var(--space-1);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    box-shadow:
+      inset 0 1px 0 var(--hl),
+      0 3px 0 var(--edge);
+  }
+
+  .guide :global(.guide-card__area) {
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .guide :global(.guide-card__title) {
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+
+  .guide :global(.guide-card__text) {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
+  .guide :global(.guide-card__go) {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    flex: none;
+    min-height: 44px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .guide__note {
+    font-size: var(--text-xs);
+    text-align: center;
+  }
+
+  /* ---------- "Did you know?" (on Today and in the session-complete dialog) ---------- */
+  :global(.help-nudge) {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-accent);
+    border-radius: var(--radius-lg);
+    background: var(--color-accent-soft);
+    text-align: start;
+  }
+
+  :global(.help-nudge__label) {
+    color: var(--color-accent);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  :global(.help-nudge__title) {
+    font-size: var(--text-base);
+  }
+
+  :global(.help-nudge__text) {
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
+  :global(.help-nudge__actions) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  :global(.help-nudge__actions .btn) {
+    min-height: 44px;
+  }
+
+  :global(.help-nudge__no) {
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  :global(.help-nudge__why) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  /* A tab whose tour hasn't been seen yet. */
+  :global([data-tour-new]) {
+    position: relative;
+  }
+
+  :global([data-tour-new])::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 6px;
+    inset-inline-end: 6px;
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--color-accent);
+  }
+
+  /* ---------- The tour ---------- */
+  :global(.tour-spot) {
+    position: fixed;
+    z-index: 60;
+    border-radius: 16px;
+    box-shadow:
+      0 0 0 2px var(--color-accent),
+      0 0 0 9999px rgb(4 8 6 / 0.66);
+    pointer-events: none;
+    transition: all 0.25s var(--ease-out, ease);
+  }
+
+  :global(.tour-tip) {
+    position: fixed;
+    z-index: 61;
+    inset-inline: var(--space-4);
+    max-inline-size: 26rem;
+    margin-inline: auto;
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: 18px;
+    background: var(--popover-bg);
+    box-shadow:
+      var(--popover-shadow),
+      0 3px 0 var(--edge);
+    color: var(--color-text);
+    transition: top 0.25s var(--ease-out, ease);
+  }
+
+  :global(.tour-tip.is-still),
+  :global(html[data-motion='off'] .tour-spot) {
+    transition: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.tour-spot),
+    :global(.tour-tip) {
+      transition: none;
+    }
+  }
+
+  :global(.tour-tip__title) {
+    display: block;
+    font-size: var(--text-base);
+  }
+
+  :global(.tour-tip__text) {
+    margin-top: var(--space-1);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+  }
+
+  :global(.tour-tip__foot) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  :global(.tour-tip__count) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
+  :global(.tour-tip__actions) {
+    display: flex;
+    gap: var(--space-2);
+    margin-inline-start: auto;
+  }
+
+  :global(.tour-tip__skip) {
+    min-height: 44px;
+    padding-inline: var(--space-3);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  :global(.tour-tip__next) {
+    min-height: 44px;
+  }
+</style>

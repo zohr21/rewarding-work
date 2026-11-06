@@ -395,6 +395,13 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         <section class="group o-help" id="acc-help" aria-labelledby="acc-help-h">
           <h2 id="acc-help-h" class="group__title">Help</h2>
           <div class="rows">
+            <button type="button" class="row" data-sheet-open="guides">
+              <RowIcon name="help" />
+              <span class="row__main">
+                Help &amp; guides<small>Tours, tips and tricks, and playbooks for your goals</small>
+              </span>
+              <RowIcon chevron />
+            </button>
             <a class="row" href={HELP_MAIL}>
               <RowIcon name="mail" />
               <span class="row__main">

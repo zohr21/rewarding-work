@@ -65,7 +65,7 @@ import { url } from '../lib/paths';
       link.addEventListener('click', () => {
         const modules = { ...getProfile().modules };
         for (const b of picks) modules[b.dataset.modulePick as ModuleId] = b.getAttribute('aria-pressed') === 'true';
-        setProfile({ welcomed: true, modules });
+        setProfile({ ...getProfile(), welcomed: true, modules });
       });
     }
   });
