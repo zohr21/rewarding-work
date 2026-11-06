@@ -15,7 +15,7 @@ import { clearTimerNotice, notificationsGranted, requestNotifications, showTimer
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
-import { jot, listOf, logSession, taskName, todayTasks, type SessionLog } from '../lib/tasks';
+import { focusLabel, jot, listOf, logSession, taskMatchingLabel, taskName, todayTasks, type SessionLog } from '../lib/tasks';
 import { checkSession, formatShort, type SessionPhone } from '../lib/screen';
 import { getProfile } from '../lib/profile';
 
@@ -749,8 +749,10 @@ function mountTimer(root: HTMLElement): () => void {
 
   /** The open task whose title is exactly this label (ignoring case and spaces). */
   function taskForLabel(label: string): Task | undefined {
-    const key = label.trim().toLowerCase();
-    return key ? getTasks().find((t) => t.status === 'active' && listOf(t) !== 'inbox' && t.title.toLowerCase() === key) : undefined;
+    return taskMatchingLabel(
+      getTasks().filter((t) => t.status === 'active' && listOf(t) !== 'inbox'),
+      label,
+    );
   }
 
   /** Exam chapters link the same way (src/lib/exam.ts): the session's taskId is the chapter's id. */
@@ -882,12 +884,14 @@ function mountTimer(root: HTMLElement): () => void {
     history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&]mode=[^&]*/, '').replace(/^&/, '?'));
   }
 
-  // Arriving from "Focus on this" on the tasks page: /timer?task=<id>
+  // Arriving from Focus on the tasks page: /timer?task=<id>, with &step=<id> for the step you're on.
   const wantedTask = standalone ? new URLSearchParams(location.search).get('task') : null;
   if (wantedTask) {
     const task = getTask(wantedTask);
+    const stepId = new URLSearchParams(location.search).get('step');
+    const step = task?.steps.find((s) => s.id === stepId && !s.done);
     if (task && state.status === 'idle' && state.phase === 'work') {
-      state = T.setLabel(state, task.title, task.id);
+      state = T.setLabel(state, focusLabel(task, step), task.id);
       write('timer', state);
     }
     history.replaceState(history.state, '', location.pathname);

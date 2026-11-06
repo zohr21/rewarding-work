@@ -36,7 +36,16 @@ const {
     </div>
   </form>
 
-  <p class="bd__progress" data-bd-progress hidden></p>
+  <div class="bd__progress" data-bd-progress hidden>
+    <div class="bd__progress-head">
+      <p class="bd__count" data-bd-count></p>
+      <button type="button" class="btn btn--ghost btn--small bd__edit" data-bd-edit aria-pressed="false">Edit steps</button>
+    </div>
+    <div class="bd__meter" aria-hidden="true"><span class="bd__meter-fill" data-bd-fill></span></div>
+    <p class="bd__now" data-bd-now></p>
+  </div>
+  <p class="muted bd__edit-hint" data-bd-edit-hint hidden>Remove a step you don't need. You can bring it back with Undo.</p>
+  <p class="muted bd__how" data-bd-how hidden>Tap a step to work on it. Tap its circle when it's done.</p>
   <ol class="bd__steps" data-bd-steps></ol>
 
   <div class="bd__finish" data-bd-finish hidden>
@@ -74,14 +83,17 @@ const {
 </section>
 
 <script>
-  import { createTask, getCurrentTask, setCurrentTask, subscribe, updateTask } from '../lib/storage';
-  import { addStep, ensureCurrentTask, finishTask, formatFocus, removeStep, reopenTask, setStepDone, setTaskNotes } from '../lib/tasks';
+  import { createTask, getCurrentTask, setCurrentTask, subscribe, updateTask, type Task, type TaskStep } from '../lib/storage';
+  import { addStep, doStepNext, ensureCurrentTask, finishTask, formatFocus, removeStep, reopenTask, setStepDone, setTaskNotes } from '../lib/tasks';
+  import { currentStep, liveTaskId, STATE_WORDS, stepIcon, stepStates } from '../lib/parts';
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
 
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  /** Edit mode shows the remove buttons; kept for the visit. */
+  let editing = false;
 
   const logFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   const NOTES_SAVE_MS = 500;
@@ -94,6 +106,14 @@ const {
       const form = $<HTMLFormElement>('[data-bd-form]');
       const stepInput = $<HTMLInputElement>('[data-bd-step]');
       const progress = $<HTMLElement>('[data-bd-progress]');
+      const count = $<HTMLElement>('[data-bd-count]');
+      const fill = $<HTMLElement>('[data-bd-fill]');
+      const nowLine = $<HTMLElement>('[data-bd-now]');
+      const edit = $<HTMLButtonElement>('[data-bd-edit]');
+      const editHint = $<HTMLElement>('[data-bd-edit-hint]');
+      const how = $<HTMLElement>('[data-bd-how]');
+      /** After a re-render, put keyboard focus back on the control that was used. */
+      let refocus: string | null = null;
       const list = $<HTMLOListElement>('[data-bd-steps]');
       const finish = $<HTMLElement>('[data-bd-finish]');
       const finished = $<HTMLElement>('[data-bd-finished]');
@@ -128,14 +148,43 @@ const {
         window.setTimeout(() => (live.textContent = t), 50);
       };
 
+      /**
+       * The steps sheet's focus button (tasks.astro), when this breakdown is in it: it starts
+       * the timer on the step you're on and says which one.
+       */
+      function updateFocusLink(task: Task | null, now: TaskStep | undefined): void {
+        const go = root.closest('dialog')?.querySelector<HTMLAnchorElement>('[data-task-steps-focus]');
+        if (!go || !task) return;
+        const u = new URL(go.href);
+        u.search = '';
+        u.searchParams.set('task', task.id);
+        if (now) u.searchParams.set('step', now.id);
+        go.href = u.pathname + u.search;
+        go.textContent = now ? `Focus on “${now.text}”` : 'Start focusing';
+      }
+
       function render(): void {
         const task = getCurrentTask();
         const steps = (task?.steps ?? []).filter((s) => !removing.has(s.id));
         if (document.activeElement !== title) title.value = task?.title ?? '';
         const done = steps.filter((s) => s.done).length;
         const isDone = task?.status === 'done';
+        const live = !!task && !isDone && task.id === liveTaskId();
+        const pct = steps.length ? Math.round((done / steps.length) * 100) : 0;
         progress.hidden = steps.length === 0;
-        progress.textContent = `${done} of ${steps.length} step${steps.length === 1 ? '' : 's'} done${done === steps.length && done > 0 ? ' — the whole thing. Well done.' : ''}`;
+        progress.classList.toggle('is-live', live);
+        count.textContent = `${done} of ${steps.length} step${steps.length === 1 ? '' : 's'} done · ${pct}%`;
+        fill.style.inlineSize = `${Math.max(pct, 3)}%`;
+        const now = isDone ? undefined : currentStep(steps);
+        nowLine.textContent = now ? `${live ? 'Focusing now' : 'Up now'}: ${now.text}` : done > 0 ? 'Every step done — the whole thing. Well done.' : '';
+        if (!steps.length) editing = false;
+        edit.setAttribute('aria-pressed', String(editing));
+        edit.textContent = editing ? 'Done editing' : 'Edit steps';
+        editHint.hidden = !editing || !steps.length;
+        // How the two taps work, while there's an open step to pick.
+        how.hidden = editing || isDone || !steps.some((st) => !st.done);
+        updateFocusLink(task, now);
+        list.classList.toggle('is-editing', editing);
         // Offer to finish the task once every step is ticked.
         finish.hidden = !task || isDone || steps.length === 0 || done < steps.length;
         finished.hidden = !isDone;
@@ -174,32 +223,62 @@ const {
           }),
         );
 
+        // States from the visible steps, so a step waiting on Undo doesn't count as the one you're on.
+        const states = task ? stepStates({ ...task, steps }, live) : new Map();
         list.replaceChildren(
           ...steps.map((step) => {
+            const state = states.get(step.id) ?? (step.done ? 'done' : 'waiting');
             const li = document.createElement('li');
-            li.className = `bd__step${step.done ? ' is-done' : ''}`;
-            const id = `bd-${step.id}`;
+            li.className = `bd__step is-${state}${step.done ? ' is-done' : ''}`;
 
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.id = id;
-            cb.checked = step.done;
-            cb.addEventListener('change', () => {
+            // Two targets: the circle ticks the step done (or back), the name picks it as the one you're on.
+            const tick = document.createElement('button');
+            tick.type = 'button';
+            tick.className = 'bd__tick';
+            tick.dataset.bdTick = step.id;
+            tick.setAttribute('aria-pressed', String(step.done));
+            tick.setAttribute('aria-label', `${step.done ? 'Mark not done' : 'Mark done'}: ${step.text}`);
+            tick.title = step.done ? 'Mark not done' : 'Mark done';
+            tick.append(stepIcon(state, 26));
+            tick.addEventListener('click', () => {
               if (!task) return;
-              setStepDone(task.id, step.id, cb.checked);
-              if (cb.checked) celebrate();
-              announce(`${step.text}: ${cb.checked ? 'done' : 'not done'}`);
-              root.querySelector<HTMLInputElement>(`#${CSS.escape(id)}`)?.focus();
+              if (!step.done) celebrate(tick);
+              refocus = `[data-bd-tick="${step.id}"]`;
+              setStepDone(task.id, step.id, !step.done);
+              announce(`${step.text}: ${step.done ? 'not done' : 'done'}`);
             });
 
-            const label = document.createElement('label');
-            label.htmlFor = id;
-            label.textContent = step.text;
+            let name: HTMLElement;
+            if (step.done) {
+              name = document.createElement('span');
+            } else {
+              const pick = document.createElement('button');
+              pick.type = 'button';
+              pick.dataset.bdPick = step.id;
+              const isNow = state === 'now' || state === 'live';
+              if (isNow) pick.setAttribute('aria-current', 'step');
+              pick.setAttribute('aria-label', isNow ? `${step.text}, ${STATE_WORDS[state as keyof typeof STATE_WORDS]}` : `Work on “${step.text}” now`);
+              pick.addEventListener('click', () => {
+                if (!task || isNow) return;
+                refocus = `[data-bd-pick="${step.id}"]`;
+                doStepNext(task.id, step.id);
+                announce(`Up now: ${step.text}`);
+              });
+              name = pick;
+            }
+            name.classList.add('bd__step-text');
+            name.textContent = step.text;
+            li.append(tick, name);
+            if (!editing) return li;
+
+            const tools = document.createElement('div');
+            tools.className = 'bd__step-tools';
 
             const del = document.createElement('button');
             del.type = 'button';
-            del.className = 'icon-btn';
+            del.className = 'icon-btn bd__remove';
             del.setAttribute('aria-label', `Remove step “${step.text}”`);
+            del.title = 'Remove';
             del.innerHTML = X_SVG;
             del.addEventListener('click', () => {
               if (!task) return;
@@ -220,12 +299,24 @@ const {
               });
               announce(`Removed step: ${step.text}. Press Undo to bring it back.`);
             });
-
-            li.append(cb, label, del);
+            tools.append(del);
+            li.append(tools);
             return li;
           }),
         );
+
+        if (refocus) {
+          root.querySelector<HTMLElement>(refocus)?.focus();
+          refocus = null;
+        }
       }
+
+      edit.addEventListener('click', () => {
+        editing = !editing;
+        render();
+        edit.focus();
+        announce(editing ? 'Editing steps: remove the ones you don’t need.' : 'Done editing.');
+      });
 
       notes.addEventListener('input', () => {
         const task = getCurrentTask();
@@ -279,6 +370,7 @@ const {
 
       render();
       c.add(subscribe('tasks', render));
+      c.add(subscribe('timer', render)); // the step you're on turns while a session runs on this task
     });
     return c.run;
   });
@@ -311,48 +403,212 @@ const {
     min-width: 0;
   }
 
+  /* Installer-style progress: a sunken track that fills, with a sheen running along it while you focus. */
   .bd__progress {
-    margin-top: var(--space-4);
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-5);
+  }
+
+  .bd__progress[hidden],
+  .bd__edit-hint[hidden] {
+    display: none;
+  }
+
+  .bd__progress-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .bd__count {
     font-size: var(--text-sm);
     font-weight: 600;
+  }
+
+  .bd__edit {
+    min-height: 44px;
+  }
+
+  .bd__edit[aria-pressed='true'] {
+    background: var(--color-accent-soft);
     color: var(--color-accent);
   }
 
-  .bd__steps {
+  .bd__meter {
+    position: relative;
+    block-size: 12px;
+    border-radius: var(--radius-pill);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    overflow: hidden;
+  }
+
+  .bd__meter-fill {
+    display: block;
+    block-size: 100%;
+    inline-size: 3%;
+    border-radius: inherit;
+    background: var(--accent-grad);
+    transition: inline-size var(--duration-slow) var(--ease-out);
+  }
+
+  .bd__progress.is-live .bd__meter-fill {
+    background:
+      linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent) 0 0 / 120px 100% no-repeat,
+      var(--accent-grad);
+    box-shadow: 0 0 calc(10px * var(--glow-strength)) var(--glow-soft);
+    animation: bd-sheen 1.5s linear infinite;
+  }
+
+  @keyframes bd-sheen {
+    from {
+      background-position: -120px 0, 0 0;
+    }
+    to {
+      background-position: 400px 0, 0 0;
+    }
+  }
+
+  .bd__now {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .bd__progress.is-live .bd__now {
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+
+  .bd__now:empty {
+    display: none;
+  }
+
+  .bd__edit-hint {
     margin-top: var(--space-2);
-    padding-left: 0;
+    font-size: var(--text-xs);
+  }
+
+  .bd__steps {
+    display: grid;
+    gap: 2px;
+    margin-top: var(--space-3);
+    padding: var(--space-1);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
     list-style: none;
+  }
+
+  .bd__steps:empty {
+    display: none;
   }
 
   .breakdown :global(.bd__step) {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
-    border-bottom: 1px solid var(--color-border);
+    gap: var(--space-1);
+    border-radius: var(--radius-sm);
     max-width: none;
   }
 
-  .breakdown :global(.bd__step input) {
-    width: 1.25rem;
-    height: 1.25rem;
-    flex-shrink: 0;
-    accent-color: var(--color-accent);
+  /* The step you're on stands out; it glows while a session runs on this task. */
+  .breakdown :global(.bd__step.is-now),
+  .breakdown :global(.bd__step.is-live) {
+    background: color-mix(in srgb, var(--color-accent-soft) 85%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  .breakdown :global(.bd__step.is-live) {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--glow) 45%, transparent),
+      0 0 calc(16px * var(--glow-strength)) -6px var(--glow-soft);
+  }
+
+  /* The circle: a 48px target of its own, so ticking a step is a deliberate tap. */
+  .breakdown :global(.bd__tick) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    inline-size: 48px;
+    block-size: 52px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text);
     cursor: pointer;
   }
 
-  .breakdown :global(.bd__step label) {
+  .breakdown :global(.bd__tick:hover) {
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  }
+
+  /* The name: picks the step as the one you're on. */
+  .breakdown :global(.bd__step-text) {
     flex: 1;
     min-width: 0;
-    padding-block: var(--space-3);
+    min-height: 52px;
+    display: flex;
+    align-items: center;
+    padding: var(--space-2) var(--space-2) var(--space-2) 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
     overflow-wrap: anywhere;
-    cursor: pointer;
     transition: color var(--duration-base) var(--ease-out);
   }
 
-  .breakdown :global(.bd__step.is-done label) {
+  .breakdown :global(button.bd__step-text) {
+    cursor: pointer;
+  }
+
+  .breakdown :global(button.bd__step-text[aria-current]) {
+    cursor: default;
+    font-weight: 600;
+  }
+
+  .breakdown :global(button.bd__step-text:not([aria-current]):hover) {
+    color: var(--color-accent);
+  }
+
+  .bd__how {
+    margin-top: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .bd__how[hidden] {
+    display: none;
+  }
+
+  .breakdown :global(.bd__step.is-done .bd__step-text) {
     color: var(--color-text-muted);
     text-decoration: line-through;
     text-decoration-thickness: 1.5px;
+  }
+
+  .breakdown :global(.bd__step-tools) {
+    display: flex;
+    flex: none;
+    padding-inline-end: var(--space-1);
+  }
+
+  .breakdown :global(.bd__remove) {
+    color: var(--color-danger);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bd__progress.is-live .bd__meter-fill {
+      animation: none;
+    }
+  }
+
+  :global(html[data-motion='off']) .bd__progress.is-live .bd__meter-fill {
+    animation: none;
   }
 
   .bd__finish,

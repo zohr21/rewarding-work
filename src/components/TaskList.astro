@@ -113,8 +113,9 @@ const TABS = [
     todayTasks,
     TODAY_SOFT_MAX,
   } from '../lib/tasks';
+  import { currentStep, liveTaskId, stepBar } from '../lib/parts';
   import { celebrate } from '../lib/appearance';
-  import { ring, segments } from '../lib/charts';
+  import { ring } from '../lib/charts';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
 
@@ -163,8 +164,8 @@ const TABS = [
       const tabs = root.querySelector<HTMLElement>('[data-tl-tabs]');
       const viewEmpty = $<HTMLElement>('[data-tl-view-empty]');
       const examples = $<HTMLElement>('[data-tl-examples]');
-      // Only in the Android app: the steps sheet (tasks.astro).
-      const sheet = document.querySelector<HTMLDialogElement>('[data-task-sheet]');
+      // The steps sheet (tasks.astro): a bottom sheet on a phone, a side panel on a wide screen.
+      const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-steps"]');
 
       function showView(view: string): void {
         if (!tabs) return;
@@ -177,13 +178,14 @@ const TABS = [
         if ((MOVABLE as string[]).includes(view)) newList.value = view;
       }
 
-      /** Open the steps sheet on a task, with a way straight into a focus session. */
-      function openSheet(task: Task): void {
-        if (!sheet) return;
+      /**
+       * Get the steps sheet (tasks.astro) ready for a task: the Sheet component opens it from
+       * the button's [data-sheet-open], right after this runs.
+       */
+      function prepareSheet(task: Task): void {
         setCurrentTask(task.id);
-        const go = sheet.querySelector<HTMLAnchorElement>('[data-task-sheet-focus]');
+        const go = sheet?.querySelector<HTMLAnchorElement>('[data-task-steps-focus]');
         if (go) go.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
-        sheet.showModal();
       }
 
       /** Deleted tasks still offered for Undo (src/lib/undo.ts). */
@@ -337,9 +339,10 @@ const TABS = [
         return li;
       }
 
-      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, maxFocus: number, firstUp = false): HTMLLIElement {
+      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, maxFocus: number, liveId: string | null, firstUp = false): HTMLLIElement {
+        const live = task.id === liveId && task.status === 'active';
         const li = document.createElement('li');
-        li.className = `task${firstUp ? ' task--first' : ''}${task.id === currentId ? ' is-current' : ''}${task.status === 'done' ? ' is-done' : ''}`;
+        li.className = `task${firstUp ? ' task--first' : ''}${task.id === currentId ? ' is-current' : ''}${task.status === 'done' ? ' is-done' : ''}${live ? ' is-live' : ''}`;
         const name = taskName(task);
 
         const body = document.createElement('div');
@@ -363,23 +366,30 @@ const TABS = [
         parts.push(task.status === 'done' && task.doneAt ? `finished ${dayFmt.format(task.doneAt)}` : `added ${dayFmt.format(task.createdAt)}`);
         meta.textContent = parts.join(' · ');
         body.append(title, meta);
+        // The step you're on, under the title: green and turning while a session runs on it.
+        const nowStep = active ? currentStep(task.steps) : undefined;
+        if (nowStep) {
+          const now = document.createElement('p');
+          now.className = `task__now${live ? ' is-live' : ''}`;
+          now.textContent = `${live ? 'Now' : 'Next'}: ${nowStep.text}`;
+          body.append(now);
+        }
 
         const actions = document.createElement('div');
         actions.className = 'task__actions';
+        if (active && sheet) {
+          // One small button; the steps open in the sheet over the list, which keeps its room.
+          const steps = button(n ? `Steps ${stepsDone}/${n}` : 'Add steps', () => {
+            prepareSheet(task);
+            // A task with no steps yet goes straight to typing the first one.
+            if (!n) window.setTimeout(() => sheet.querySelector<HTMLInputElement>('[data-bd-step]')?.focus(), 60);
+          });
+          steps.dataset.sheetOpen = 'task-steps';
+          steps.setAttribute('aria-haspopup', 'dialog');
+          steps.setAttribute('aria-label', n ? `Steps of “${name}”: ${stepsDone} of ${n} done` : `Add steps to “${name}”`);
+          actions.append(steps);
+        }
         if (active) {
-          if (sheet) {
-            const steps = button('Steps', () => openSheet(task));
-            steps.setAttribute('aria-label', `Steps and notes for “${name}”`);
-            actions.append(steps);
-          } else if (task.id !== currentId) {
-            actions.append(
-              button('Break down', () => {
-                setCurrentTask(task.id);
-                announce(`Showing “${name}” in the breakdown below.`);
-                document.querySelector<HTMLInputElement>('[data-bd-step]')?.focus();
-              }),
-            );
-          }
           if (listOf(task) === 'today' && !firstUp) {
             actions.append(
               button('Do first', () => {
@@ -390,7 +400,7 @@ const TABS = [
           }
           const focusLink = document.createElement('a');
           focusLink.className = 'btn btn--ghost btn--small task__go';
-          focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
+          focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}${nowStep ? `&step=${encodeURIComponent(nowStep.id)}` : ''}`;
           focusLink.textContent = 'Focus';
           focusLink.setAttribute('aria-label', `Start a focus session on “${name}”`);
           const done = button('Done', () => {
@@ -422,7 +432,7 @@ const TABS = [
         // The same numbers as the meta line, drawn: a ring, a segment per step, a focus bar.
         const graphs = document.createElement('div');
         graphs.className = 'task__graphs';
-        if (active && n) graphs.append(segments(task.steps));
+        if (active && n) graphs.append(stepBar(task, live));
         if (active && seconds >= 60) graphs.append(focusBar(seconds, maxFocus));
 
         li.append(active ? ring(stepsDone, n, listOf(task) === 'today' ? 56 : 44) : ring(1, 1, 32), head(body, ...side));
@@ -440,6 +450,8 @@ const TABS = [
         const on = (list: TaskList) => open.filter((t) => listOf(t) === list);
         const finished = tasks.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
         const maxFocus = Math.max(1, ...open.map((t) => focus.get(t.id) ?? 0));
+        const liveId = liveTaskId();
+        const row = (t: Task, firstUp = false) => renderTask(t, currentId, focus, maxFocus, liveId, firstUp);
 
         const inbox = on('inbox').sort((a, b) => a.createdAt - b.createdAt);
         inboxWrap.hidden = inbox.length === 0;
@@ -448,7 +460,7 @@ const TABS = [
 
         const today = todayTasks(open);
         setHead(todayHead, 'Today', today.length ? plural(today.length, 'task') : '');
-        todayList.replaceChildren(...today.map((t, i) => renderTask(t, currentId, focus, maxFocus, i === 0)));
+        todayList.replaceChildren(...today.map((t, i) => row(t, i === 0)));
         todayHint.hidden = today.length > 0 && today.length <= TODAY_SOFT_MAX;
         todayHint.textContent = today.length
           ? `That's ${today.length} for today. A short list is easier to finish — consider moving some to Next.`
@@ -462,18 +474,18 @@ const TABS = [
 
         const next = on('next');
         setHead(nextHead, 'Next', next.length ? plural(next.length, 'task') : '');
-        nextList.replaceChildren(...next.map((t) => renderTask(t, currentId, focus, maxFocus)));
+        nextList.replaceChildren(...next.map((t) => row(t)));
         nextEmpty.hidden = next.length > 0;
 
         const someday = on('someday');
         somedayWrap.hidden = someday.length === 0;
         setHead(somedayHead, 'Someday', plural(someday.length, 'task'));
-        somedayList.replaceChildren(...someday.map((t) => renderTask(t, currentId, focus, maxFocus)));
+        somedayList.replaceChildren(...someday.map((t) => row(t)));
 
         finishedWrap.hidden = finished.length === 0;
         const finishedFocus = finished.reduce((sum, t) => sum + (focus.get(t.id) ?? 0), 0);
         setHead(finishedSummary, 'Finished', plural(finished.length, 'task') + (finishedFocus >= 60 ? `, ${formatFocus(finishedFocus)} of focus` : ''));
-        finishedList.replaceChildren(...finished.map((t) => renderTask(t, currentId, focus, maxFocus)));
+        finishedList.replaceChildren(...finished.map((t) => row(t)));
 
         if (tabs) {
           const counts: Record<string, number> = { inbox: inbox.length, today: today.length, next: next.length, someday: someday.length, finished: finished.length };
@@ -533,15 +545,6 @@ const TABS = [
         tabs.addEventListener('click', onTab);
         showView(appView);
       }
-      if (sheet) {
-        // Close from its button, or by tapping the dimmed page behind it.
-        const onSheetClick = (e: Event) => {
-          const el = e.target as HTMLElement;
-          if (el === sheet || el.closest('[data-task-sheet-close], [data-task-sheet-focus]')) sheet.close();
-        };
-        sheet.addEventListener('click', onSheetClick);
-        c.add(() => sheet.removeEventListener('click', onSheetClick));
-      }
 
       // Rings fill once on arrival (global.css); later re-renders show the new state at once.
       root.classList.add('is-entering');
@@ -551,6 +554,7 @@ const TABS = [
       render();
       c.add(subscribe('tasks', render));
       c.add(subscribe('sessions', render));
+      c.add(subscribe('timer', render)); // the step you're on turns while a session runs on its task
     });
     return c.run;
   });
@@ -702,6 +706,27 @@ const TABS = [
   .tasks :global(.task.is-done) {
     background: none;
     box-shadow: none;
+  }
+
+  /* A focus session is running on this task right now. */
+  .tasks :global(.task.is-live) {
+    border-color: color-mix(in srgb, var(--glow) 55%, transparent);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 0 calc(18px * var(--glow-strength)) -6px var(--glow-soft),
+      0 2px 0 var(--edge);
+  }
+
+  .tasks :global(.task__now) {
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .tasks :global(.task__now.is-live) {
+    color: var(--color-accent);
+    font-weight: 600;
   }
 
   .tasks :global(.task--jot .task__head),

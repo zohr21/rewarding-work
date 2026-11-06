@@ -26,6 +26,27 @@ export const UNTITLED = 'Untitled task';
 
 export const taskName = (task: Pick<Task, 'title'>) => task.title || UNTITLED;
 
+/** Between a task and the step being focused on, in a timer label: "Thesis · Write the intro". */
+export const STEP_SEP = ' · ';
+
+/** The timer label for focusing on a task, or on one of its steps. */
+export function focusLabel(task: Pick<Task, 'title'>, step?: { text: string }): string {
+  return (step ? `${taskName(task)}${STEP_SEP}${step.text}` : task.title).slice(0, 120);
+}
+
+/** The open task a timer label belongs to: its title, or its title then a step ("Thesis · Write the intro"). */
+export function taskMatchingLabel<T extends Pick<Task, 'title'>>(tasks: T[], label: string): T | undefined {
+  const key = label.trim().toLowerCase();
+  if (!key) return undefined;
+  return (
+    tasks.find((t) => t.title.toLowerCase() === key) ??
+    // The longest title wins, so "Thesis" doesn't take a label meant for "Thesis · chapter 2".
+    tasks
+      .filter((t) => t.title && key.startsWith(`${t.title.toLowerCase()}${STEP_SEP}`))
+      .sort((a, b) => b.title.length - a.title.length)[0]
+  );
+}
+
 /** Done-list source for a whole task (steps use their own id). */
 const taskSource = (id: string) => `task:${id}`;
 
@@ -42,6 +63,18 @@ export function addStep(taskId: string, text: string): void {
 
 export function removeStep(taskId: string, stepId: string): void {
   updateTask(taskId, (t) => ({ steps: t.steps.filter((s) => s.id !== stepId) }));
+}
+
+/** Make an open step the one you're on now: it moves to just before the first open step. */
+export function doStepNext(taskId: string, stepId: string): void {
+  updateTask(taskId, (t) => {
+    const step = t.steps.find((s) => s.id === stepId);
+    if (!step || step.done) return {};
+    const rest = t.steps.filter((s) => s.id !== stepId);
+    const at = rest.findIndex((s) => !s.done);
+    rest.splice(at === -1 ? rest.length : at, 0, step);
+    return { steps: rest };
+  });
 }
 
 export function setStepDone(taskId: string, stepId: string, done: boolean): void {
