@@ -1,5 +1,5 @@
 /**
- * Small inline graphics for the tasks page: the progress ring and the step segments.
+ * Small inline graphics for the tasks page: the progress ring (step segments: src/lib/parts.ts).
  * Styled by .ring / .segs in src/styles/global.css, so they follow the theme.
  *
  * A graphic without a label is decorative (aria-hidden): use that when the same
@@ -41,19 +41,6 @@ export function ring(done: number, total: number, size: number, label?: string):
     svg.setAttribute('aria-hidden', 'true');
   }
   return svg;
-}
-
-/** One segment per step, in order; done ones are filled. */
-export function segments(steps: { done: boolean }[]): HTMLDivElement {
-  const row = document.createElement('div');
-  row.className = 'segs';
-  row.setAttribute('aria-hidden', 'true');
-  for (const s of steps) {
-    const seg = document.createElement('span');
-    if (s.done) seg.className = 'is-done';
-    row.append(seg);
-  }
-  return row;
 }
 
 // ---------- Charts as SVG markup (progress page) ----------

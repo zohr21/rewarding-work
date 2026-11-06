@@ -740,6 +740,90 @@ summary.row::-webkit-details-marker {
   background: var(--color-accent);
 }
 
+/* The step you're on (src/lib/parts.ts): marked, and pulsing with the glow while a session runs on it. */
+.segs > .is-now {
+  background: color-mix(in srgb, var(--color-accent) 40%, var(--heat-0));
+}
+
+.segs > .is-live {
+  background: var(--glow);
+  box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--glow-soft);
+  animation: seg-pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes seg-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Step state icons: a check when done, a turning arc while focusing, a still arc for the one you're on, a dashed ring waiting. */
+.pi {
+  flex: none;
+  overflow: visible;
+}
+
+.pi__disc {
+  fill: var(--color-accent);
+}
+
+.pi__tick {
+  fill: none;
+  stroke: var(--color-on-accent);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pi__track {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 2.6;
+}
+
+.pi__arc {
+  fill: none;
+  stroke: var(--glow);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.pi__arc--still {
+  stroke: var(--color-accent);
+}
+
+.pi__wait {
+  fill: none;
+  stroke: var(--color-border-strong);
+  stroke-width: 1.8;
+  stroke-dasharray: 2.6 3.1;
+}
+
+.pi--live {
+  transform-origin: 50% 50%;
+  animation: pi-spin 0.9s linear infinite;
+  filter: drop-shadow(0 0 calc(5px * var(--glow-strength)) var(--glow-soft));
+}
+
+@keyframes pi-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* No turning or pulsing with reduced motion: the arc stays put, still glowing. */
+html[data-motion='off'] .pi--live,
+html[data-motion='off'] .segs > .is-live {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pi--live,
+  .segs > .is-live {
+    animation: none;
+  }
+}
+
 /* Rings fill once when the page opens; later updates just show the new state. */
 .is-entering .ring__value {
   animation: ring-fill 600ms var(--ease-out) backwards;
