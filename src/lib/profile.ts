@@ -13,6 +13,25 @@ export interface Profile {
   /** Welcome was seen (or skipped by someone who already had data). */
   welcomed: boolean;
   modules: Record<ModuleId, boolean>;
+  /** The short tours (src/lib/tours.ts). Missing on profiles saved before tours existed. */
+  tours?: TourPrefs;
+}
+
+export interface TourPrefs {
+  /** Tours already shown here (started, finished or skipped): they don't start by themselves again. */
+  seen: string[];
+  /** The person turned off tours starting by themselves on new screens. */
+  off?: boolean;
+  /** "Sprig's first quests" on Today was put away. */
+  questsHidden?: boolean;
+  /** "Did you know?" tips already shown and put away (src/lib/help.ts): never shown again. */
+  tips?: string[];
+  /** Today's "Did you know?" tip: one a day at most. */
+  nudge?: { day: string; id: string };
+  /** The person turned "Did you know?" tips off. */
+  nudgesOff?: boolean;
+  /** Playbook steps opened with "Show me", which count as done when nothing else can tell. */
+  tried?: string[];
 }
 
 const ALL_ON = Object.fromEntries(MODULES.map((m) => [m.id, true])) as Record<ModuleId, boolean>;
@@ -46,8 +65,35 @@ export function hasOwnData(): boolean {
 
 export function getProfile(): Profile {
   const stored = read<Profile | null>('profile', null, (v): v is Profile | null => v === null || isProfile(v));
-  if (stored) return { welcomed: stored.welcomed, modules: { ...ALL_OFF, ...stored.modules } };
+  if (stored) return { welcomed: stored.welcomed, modules: { ...ALL_OFF, ...stored.modules }, tours: toursOf(stored.tours) };
   return hasOwnData() ? { welcomed: true, modules: { ...ALL_ON } } : { welcomed: false, modules: { ...ALL_OFF } };
+}
+
+function strings(v: unknown, max: number): string[] {
+  return Array.isArray(v) ? v.filter((id): id is string => typeof id === 'string').slice(-max) : [];
+}
+
+/** Hand-edited or old data reads as "nothing seen yet". */
+function toursOf(v: unknown): TourPrefs {
+  const t = (v && typeof v === 'object' ? v : {}) as Partial<TourPrefs>;
+  return {
+    seen: strings(t.seen, 100),
+    off: t.off === true,
+    questsHidden: t.questsHidden === true,
+    tips: strings(t.tips, 200),
+    nudge: t.nudge && typeof t.nudge.day === 'string' && typeof t.nudge.id === 'string' ? { day: t.nudge.day, id: t.nudge.id } : undefined,
+    nudgesOff: t.nudgesOff === true,
+    tried: strings(t.tried, 200),
+  };
+}
+
+export function getTours(): TourPrefs {
+  return toursOf(getProfile().tours);
+}
+
+export function setTours(change: Partial<TourPrefs>): void {
+  const p = getProfile();
+  setProfile({ ...p, tours: { ...toursOf(p.tours), ...change } });
 }
 
 export function setProfile(profile: Profile): void {

@@ -36,6 +36,13 @@ const current = Astro.url.pathname;
 
     {/* In the app, Appearance and the account live under You in the bottom bar; Sound stays, since it holds the player. */}
     <div class="site-header__tools">
+      <button type="button" class="tool-btn" data-sheet-open="help" data-guide-help aria-label="Help for this screen">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+          <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+          <circle cx="12" cy="17" r="1.1" fill="currentColor"></circle>
+        </svg>
+      </button>
       <SoundMenu />
       {!NATIVE_APP && <AppearanceMenu />}
       {!NATIVE_APP && <AccountButton />}

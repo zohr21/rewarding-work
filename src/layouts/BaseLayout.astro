@@ -7,6 +7,7 @@ import GroveSpark from '../components/GroveSpark.astro';
 import Ambient from '../components/Ambient.astro';
 import RewardNotice from '../components/RewardNotice.astro';
 import UndoToast from '../components/UndoToast.astro';
+import Guide from '../components/Guide.astro';
 import { ClientRouter } from 'astro:transitions';
 import { NATIVE_APP } from '../config/app';
 import { MODULES, SITE } from '../config/site';
@@ -114,6 +115,7 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
     {!bare && (NATIVE_APP ? <AppNav /> : <SiteFooter />)}
     <RewardNotice />
     <UndoToast />
+    {!bare && <Guide />}
     <GroveSpark />
 
     {
