@@ -77,7 +77,7 @@ Say this in the review notes so the reviewer can find each one:
   *Agree and open Usage access* opens Android's screen.
 - **Notification access** (bank alerts): Budget → Bank alerts → *Allow* (or Save in its settings) opens *Let Grovyn
   read bank alerts?*; *Agree* opens Android's screen.
-- **Health Connect**: Health → each tile's *Connect* opens Android's own Health Connect dialog. The rationale link
+- **Health Connect**: Health → *Connect* (under the rings) opens Android's own Health Connect dialog. The rationale link
   in Health Connect opens the privacy page in the app.
 
 ## Before production

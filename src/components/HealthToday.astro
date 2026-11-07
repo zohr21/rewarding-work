@@ -438,6 +438,8 @@ import HealthFinding from './HealthFinding.astro';
   .ht__rings :global(.ht__ring) {
     display: grid;
     justify-items: center;
+    /* Top-aligned, so the three rings and their numbers stay in a row when one label is longer. */
+    align-content: start;
     gap: var(--space-1);
     padding: var(--space-1);
     border: 0;
@@ -464,6 +466,11 @@ import HealthFinding from './HealthFinding.astro';
 
   .ht__small {
     font-size: var(--text-xs);
+  }
+
+  /* "Goal 10,000" on one line on 360 px phones. */
+  .ht__rings :global(.ht__small) {
+    white-space: nowrap;
   }
 
   .ht__connect {

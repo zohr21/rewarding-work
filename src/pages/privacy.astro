@@ -9,7 +9,7 @@ import { url } from '../lib/paths';
 import { NATIVE_APP } from '../config/app';
 
 const CONTACT = SITE.supportEmail;
-const UPDATED = '4 November 2026';
+const UPDATED = '7 November 2026';
 ---
 
 <BaseLayout title="Privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
@@ -22,21 +22,21 @@ const UPDATED = '4 November 2026';
     <div class="prose privacy">
       <h2>The short version</h2>
       <ul>
-        <li>Your tasks, focus sessions, done list, chain and settings are stored in your own browser.</li>
-        <li>They leave your browser only if you choose to: by signing in to an account, or by sending an export to Google.</li>
-        <li>There is no advertising and no analytics or tracking on this site.</li>
+        <li>Your tasks, focus sessions, done list, chain and settings are stored on your own device: in the Android app, or in your browser on the website.</li>
+        <li>They leave your device only if you choose to: by signing in to an account, or by sending an export to Google.</li>
+        <li>There is no advertising and no analytics or tracking, in the app or on the website.</li>
         <li>In the Android app, what it reads from your phone (health numbers, phone time, bank alerts) stays on your phone.</li>
       </ul>
 
-      <h2>What is stored in your browser</h2>
+      <h2>What is stored on your device</h2>
       <p>
         Everything you enter (tasks and their steps and notes, focus sessions, the done list, your chain, and your look,
-        sound and timer settings) is kept in your browser's local storage on this device. The site also keeps a copy of
-        its own pages on the device so it works offline. None of this is sent to us.
+        sound and timer settings) is kept in the app's private storage on your phone, or in your browser's local storage when you use the website.
+        The website also keeps a copy of its own pages on the device so it works offline. None of this is sent to us.
       </p>
       <p>
         You can save a backup file, or delete everything, under <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
-        Clearing this site's data in your browser removes it too.
+        Uninstalling the app, or clearing the app's data (or this site's data in your browser), removes it too.
       </p>
 
       <h2>If you create an account</h2>
@@ -52,7 +52,7 @@ const UPDATED = '4 November 2026';
       </ul>
       <p>
         Each account can read and write only its own data. You can delete your account, and everything stored in it, at
-        any time on the <a href={url('/account')}>{NATIVE_APP ? 'You' : 'Account'}</a> page, or by following
+        any time on the <a href={url('/account')}>{NATIVE_APP ? 'You' : 'Account'}</a> page, or by following{' '}
         <a href={url('/delete-account')}>Delete your account</a>, which also works without the app. Your data stays in the
         account until you delete it, and is gone from Firebase when you do.
       </p>
@@ -72,12 +72,12 @@ const UPDATED = '4 November 2026';
       </p>
       <ul>
         <li>you sign in in Google's own window, and are asked for one permission: to create files, and to open the files this site created. The site cannot see, change or delete any other file in your Drive;</li>
-        <li>the file is built in your browser and sent directly to Google. It does not pass through any server of ours;</li>
+        <li>the file is built on your device and sent directly to Google. It does not pass through any server of ours;</li>
         <li>the access Google gives is used for that one export and is not stored. We keep no copy of the file and cannot open it;</li>
         <li>the file belongs to you. Delete it in Google Drive whenever you like, and remove the site's access at any time in your Google Account under Security → Third-party access.</li>
       </ul>
       <p>
-        {SITE.name}'s use of information received from Google APIs adheres to the
+        {SITE.name}'s use of information received from Google APIs adheres to the{' '}
         <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>,
         including the Limited Use requirements.
       </p>

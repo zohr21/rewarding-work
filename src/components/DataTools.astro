@@ -37,8 +37,7 @@ import { url } from '../lib/paths';
       )
     }
     <p class="data__warn row-note" data-data-warn hidden>
-      This browser isn't saving data (private browsing or blocked storage?). It will be lost when you close the tab —
-      export it if you want to keep it.
+      {NATIVE_APP ? 'Grovyn can\x27t save data on this phone right now. Export it if you want to keep it.' : 'This browser isn\x27t saving data (private browsing or blocked storage?). It will be lost when you close the tab — export it if you want to keep it.'}
     </p>
     <button type="button" class="row" data-export>
       <RowIcon name="download" />
@@ -122,6 +121,7 @@ import { url } from '../lib/paths';
   import { applyAppearance, applyTheme } from '../lib/appearance';
   import { backupSummary, downloadBackup } from '../lib/export/backup';
   import { onPage } from '../lib/page';
+  import { NATIVE_APP } from '../config/app';
 
   onPage('data-tools', () => {
     document.querySelectorAll<HTMLElement>('[data-data-tools]').forEach((root) => {
@@ -147,7 +147,7 @@ import { url } from '../lib/paths';
         try {
           say(`Exported ${backupSummary(downloadBackup())}.`);
         } catch {
-          say('Export failed in this browser.');
+          say(NATIVE_APP ? 'Export failed. Try again.' : 'Export failed in this browser.');
         }
       });
 
@@ -218,7 +218,7 @@ import { url } from '../lib/paths';
         clearBtn.textContent = 'Delete everything';
         clearAll();
         applyThemeNow();
-        say('All data deleted from this browser.');
+        say(`All data deleted from this ${NATIVE_APP ? 'phone' : 'browser'}.`);
       });
     });
   });
