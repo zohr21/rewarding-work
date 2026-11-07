@@ -86,6 +86,7 @@ import { NATIVE_APP } from '../config/app';
 </dialog>
 
 <script>
+  import { NATIVE_APP } from '../config/app';
   import { getChain, getChains, getDoneStore, getSessions, getTasks } from '../lib/storage';
   import { collect, RANGE_LABELS, type ExportData, type ExportOptions, type ExportRange } from '../lib/export/collect';
   import { buildSheet } from '../lib/export/sheets';
@@ -226,7 +227,7 @@ import { NATIVE_APP } from '../config/app';
         try {
           say(`Saved ${backupSummary(downloadBackup())}.`);
         } catch {
-          say('The download failed in this browser.');
+          say(NATIVE_APP ? 'The download failed. Try again.' : 'The download failed in this browser.');
         }
         return;
       }

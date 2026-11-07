@@ -1032,6 +1032,27 @@ const icon = (d: string, w = 2) =>
     text-align: center;
   }
 
+  /* The app has only the eye and the lock beside the month: keep them on one row, even at 360 px. */
+  :global(html[data-app]) .bv__bar {
+    flex-wrap: nowrap;
+    gap: var(--space-1);
+  }
+
+  :global(html[data-app]) .bv__month {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  :global(html[data-app]) .bv__month span {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  :global(html[data-app]) .bv__actions {
+    flex-wrap: nowrap;
+    gap: 0;
+  }
+
   .bv__month .icon-btn:disabled {
     opacity: 0.35;
     cursor: default;

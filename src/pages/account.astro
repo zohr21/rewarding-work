@@ -110,7 +110,8 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
 
       <div class="you__body">
         {
-          !ACCOUNTS_ENABLED && (
+          /* Set-up note for whoever runs a copy of the site. The Play build refuses to build without accounts. */
+          !ACCOUNTS_ENABLED && !NATIVE_APP && (
             <section class="card">
               <h2 class="panel-title">Accounts aren't set up on this copy of the site</h2>
               <p class="muted">
