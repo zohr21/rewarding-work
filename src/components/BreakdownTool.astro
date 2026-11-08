@@ -7,61 +7,67 @@
  */
 import { url } from '../lib/paths';
 import { NOTES_MAX } from '../lib/storage';
+import type { Key } from '../lib/i18n';
 
 interface Props {
   heading?: string;
+  /** The heading's key in src/lib/i18n, when it is not the default one. */
+  headingT?: Key;
   intro?: string;
+  introT?: Key;
   /** Off on the tasks page itself. */
   linkToTasks?: boolean;
 }
 const {
   heading = 'Try it: break it down',
+  headingT = 'tasks.bdHeading',
+  introT = 'tasks.bdIntro',
   linkToTasks = true,
   intro = 'Make each step small enough that you could start it in two minutes.',
 } = Astro.props;
 ---
 
 <section class="card breakdown" data-breakdown aria-labelledby="bd-heading">
-  <h2 id="bd-heading" class="panel-title">{heading}</h2>
-  <p class="muted bd__intro">{intro}</p>
+  <h2 id="bd-heading" class="panel-title" data-t={headingT}>{heading}</h2>
+  <p class="muted bd__intro" data-t={introT}>{intro}</p>
 
-  <label class="bd__label" for="bd-task">The big task</label>
-  <input id="bd-task" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Write the project report" data-bd-task />
+  <label data-t="tasks.theBigTask" class="bd__label" for="bd-task">The big task</label>
+  <input data-t-placeholder="tasks.eGWriteTheProject" id="bd-task" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Write the project report" data-bd-task />
 
   <form class="bd__add" data-bd-form>
-    <label class="bd__label" for="bd-step">Add a step</label>
+    <label data-t="tasks.addAStep" class="bd__label" for="bd-step">Add a step</label>
     <div class="bd__row">
-      <input id="bd-step" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Open the doc and write the headings" data-bd-step />
-      <button type="submit" class="btn">Add</button>
+      <input data-t-placeholder="tasks.eGOpenTheDoc" id="bd-step" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Open the doc and write the headings" data-bd-step />
+      <button data-t="tasks.add" type="submit" class="btn">Add</button>
     </div>
   </form>
 
   <div class="bd__progress" data-bd-progress hidden>
     <div class="bd__progress-head">
       <p class="bd__count" data-bd-count></p>
-      <button type="button" class="btn btn--ghost btn--small bd__edit" data-bd-edit aria-pressed="false">Edit steps</button>
+      <button data-t="tasks.editSteps" type="button" class="btn btn--ghost btn--small bd__edit" data-bd-edit aria-pressed="false">Edit steps</button>
     </div>
     <div class="bd__meter" aria-hidden="true"><span class="bd__meter-fill" data-bd-fill></span></div>
     <p class="bd__now" data-bd-now></p>
   </div>
-  <p class="muted bd__edit-hint" data-bd-edit-hint hidden>Remove a step you don't need. You can bring it back with Undo.</p>
-  <p class="muted bd__how" data-bd-how hidden>Tap a step to work on it. Tap its circle when it's done.</p>
+  <p data-t="tasks.removeAStepYouDon" class="muted bd__edit-hint" data-bd-edit-hint hidden>Remove a step you don't need. You can bring it back with Undo.</p>
+  <p data-t="tasks.tapAStepToWork" class="muted bd__how" data-bd-how hidden>Tap a step to work on it. Tap its circle when it's done.</p>
   <ol class="bd__steps" data-bd-steps></ol>
 
   <div class="bd__finish" data-bd-finish hidden>
-    <button type="button" class="btn" data-bd-done>Mark the whole task done</button>
+    <button data-t="tasks.markTheWholeTaskDone" type="button" class="btn" data-bd-done>Mark the whole task done</button>
   </div>
   <div class="bd__finish" data-bd-finished hidden>
-    <p class="bd__finished-text">Finished — it's in your Done list.</p>
-    <button type="button" class="btn btn--ghost btn--small" data-bd-reopen>Reopen</button>
+    <p data-t="tasks.finishedItSInYour" class="bd__finished-text">Finished — it's in your Done list.</p>
+    <button data-t="tasks.reopen" type="button" class="btn btn--ghost btn--small" data-bd-reopen>Reopen</button>
   </div>
 
   <div class="bd__notes" data-bd-notes-wrap hidden>
     <div class="bd__notes-head">
-      <label class="bd__label" for="bd-notes">Notes</label>
+      <label data-t="tasks.notes" class="bd__label" for="bd-notes">Notes</label>
       <span class="muted bd__saved" data-bd-saved></span>
     </div>
-    <textarea
+    <textarea data-t-placeholder="tasks.linksIdeasWhereYouLeft"
       id="bd-notes"
       class="input bd__notes-input"
       rows="4"
@@ -71,13 +77,13 @@ const {
   </div>
 
   <details class="disclosure bd__log" data-bd-log-wrap hidden>
-    <summary data-bd-log-summary>Session log</summary>
+    <summary data-t="tasks.sessionLog" data-bd-log-summary>Session log</summary>
     <ol class="bd__log-list" data-bd-log></ol>
   </details>
 
   <div class="bd__footer" data-bd-footer hidden>
-    <button type="button" class="btn btn--ghost btn--small" data-bd-clear>Start a new task</button>
-    <span class="muted bd__note">Ticked steps also appear in your Done list. {linkToTasks && <a href={url('/tasks')}>All your tasks</a>}</span>
+    <button data-t="tasks.startANewTask" type="button" class="btn btn--ghost btn--small" data-bd-clear>Start a new task</button>
+    <span class="muted bd__note"><span data-t="tasks.tickedSteps">Ticked steps also appear in your Done list.</span> {linkToTasks && <a data-t="tasks.allYourTasks" href={url('/tasks')}>All your tasks</a>}</span>
   </div>
   <p class="visually-hidden" aria-live="polite" data-bd-live></p>
 </section>
@@ -85,7 +91,8 @@ const {
 <script>
   import { createTask, getCurrentTask, setCurrentTask, subscribe, updateTask, type Task, type TaskStep } from '../lib/storage';
   import { addStep, doStepNext, ensureCurrentTask, finishTask, formatFocus, removeStep, reopenTask, setStepDone, setTaskNotes } from '../lib/tasks';
-  import { currentStep, liveTaskId, STATE_WORDS, stepIcon, stepStates } from '../lib/parts';
+  import { currentStep, liveTaskId, stateWords, stepIcon, stepStates } from '../lib/parts';
+  import { dateFormat, t } from '../lib/i18n';
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
@@ -95,7 +102,7 @@ const {
   /** Edit mode shows the remove buttons; kept for the visit. */
   let editing = false;
 
-  const logFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  const logFmt = dateFormat({ weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   const NOTES_SAVE_MS = 500;
 
   onPage('breakdown', () => {
@@ -137,15 +144,15 @@ const {
         const id = notesFor;
         notesFor = null;
         setTaskNotes(id, notes.value);
-        saved.textContent = 'Saved';
+        saved.textContent = t('tasks.saved');
       }
 
       /** Removed steps still offered for Undo (src/lib/undo.ts). */
       const removing = new Set<string>();
 
-      const announce = (t: string) => {
+      const announce = (text: string) => {
         live.textContent = '';
-        window.setTimeout(() => (live.textContent = t), 50);
+        window.setTimeout(() => (live.textContent = text), 50);
       };
 
       /**
@@ -160,7 +167,7 @@ const {
         u.searchParams.set('task', task.id);
         if (now) u.searchParams.set('step', now.id);
         go.href = u.pathname + u.search;
-        go.textContent = now ? `Focus on “${now.text}”` : 'Start focusing';
+        go.textContent = now ? t('tasks.focusOnStep', { step: now.text }) : t('tasks.startFocusing');
       }
 
       function render(): void {
@@ -176,10 +183,10 @@ const {
         count.textContent = `${done} of ${steps.length} step${steps.length === 1 ? '' : 's'} done · ${pct}%`;
         fill.style.inlineSize = `${Math.max(pct, 3)}%`;
         const now = isDone ? undefined : currentStep(steps);
-        nowLine.textContent = now ? `${live ? 'Focusing now' : 'Up now'}: ${now.text}` : done > 0 ? 'Every step done — the whole thing. Well done.' : '';
+        nowLine.textContent = now ? t(live ? 'tasks.focusingNow' : 'tasks.upNow', { step: now.text }) : done > 0 ? t('tasks.allStepsDone') : '';
         if (!steps.length) editing = false;
         edit.setAttribute('aria-pressed', String(editing));
-        edit.textContent = editing ? 'Done editing' : 'Edit steps';
+        edit.textContent = editing ? t('tasks.doneEditing') : t('tasks.editSteps');
         editHint.hidden = !editing || !steps.length;
         // How the two taps work, while there's an open step to pick.
         how.hidden = editing || isDone || !steps.some((st) => !st.done);
@@ -199,7 +206,7 @@ const {
 
         const log = [...(task?.log ?? [])].reverse();
         logWrap.hidden = log.length === 0;
-        logSummary.textContent = `Session log · ${log.length}`;
+        logSummary.textContent = t('tasks.sessionLogCount', { n: log.length });
         logList.replaceChildren(
           ...log.map((entry) => {
             const li = document.createElement('li');
@@ -209,9 +216,9 @@ const {
             const time = document.createElement('time');
             time.dateTime = new Date(entry.at).toISOString();
             time.textContent = logFmt.format(entry.at);
-            when.append(time, entry.focusSeconds >= 60 ? ` · ${formatFocus(entry.focusSeconds)} focus` : '');
+            when.append(time, entry.focusSeconds >= 60 ? ` · ${t('tasks.logFocus', { time: formatFocus(entry.focusSeconds) })}` : '');
             li.append(when);
-            for (const [label, text] of [['Did', entry.did], ['Next', entry.next]] as const) {
+            for (const [label, text] of [[t('tasks.logDid'), entry.did], [t('tasks.logNext'), entry.next]] as const) {
               if (!text) continue;
               const p = document.createElement('p');
               const b = document.createElement('strong');
@@ -237,15 +244,15 @@ const {
             tick.className = 'bd__tick';
             tick.dataset.bdTick = step.id;
             tick.setAttribute('aria-pressed', String(step.done));
-            tick.setAttribute('aria-label', `${step.done ? 'Mark not done' : 'Mark done'}: ${step.text}`);
-            tick.title = step.done ? 'Mark not done' : 'Mark done';
+            tick.setAttribute('aria-label', t(step.done ? 'tasks.markNotDoneStep' : 'tasks.markDoneStep', { step: step.text }));
+            tick.title = t(step.done ? 'tasks.markNotDone' : 'tasks.markDone');
             tick.append(stepIcon(state, 26));
             tick.addEventListener('click', () => {
               if (!task) return;
               if (!step.done) celebrate(tick);
               refocus = `[data-bd-tick="${step.id}"]`;
               setStepDone(task.id, step.id, !step.done);
-              announce(`${step.text}: ${step.done ? 'not done' : 'done'}`);
+              announce(t(step.done ? 'tasks.stepNotDoneSaid' : 'tasks.stepDoneSaid', { step: step.text }));
             });
 
             let name: HTMLElement;
@@ -257,12 +264,12 @@ const {
               pick.dataset.bdPick = step.id;
               const isNow = state === 'now' || state === 'live';
               if (isNow) pick.setAttribute('aria-current', 'step');
-              pick.setAttribute('aria-label', isNow ? `${step.text}, ${STATE_WORDS[state as keyof typeof STATE_WORDS]}` : `Work on “${step.text}” now`);
+              pick.setAttribute('aria-label', isNow ? `${step.text}, ${stateWords(state)}` : t('tasks.workOnNow', { step: step.text }));
               pick.addEventListener('click', () => {
                 if (!task || isNow) return;
                 refocus = `[data-bd-pick="${step.id}"]`;
                 doStepNext(task.id, step.id);
-                announce(`Up now: ${step.text}`);
+                announce(t('tasks.upNowSaid', { step: step.text }));
               });
               name = pick;
             }
@@ -277,8 +284,8 @@ const {
             const del = document.createElement('button');
             del.type = 'button';
             del.className = 'icon-btn bd__remove';
-            del.setAttribute('aria-label', `Remove step “${step.text}”`);
-            del.title = 'Remove';
+            del.setAttribute('aria-label', t('tasks.removeStep', { step: step.text }));
+            del.title = t('tasks.remove');
             del.innerHTML = X_SVG;
             del.addEventListener('click', () => {
               if (!task) return;
@@ -286,7 +293,7 @@ const {
               removing.add(step.id);
               render();
               offerUndo({
-                message: `Removed step “${step.text}”`,
+                message: t('tasks.removedStep', { step: step.text }),
                 commit: () => {
                   removeStep(task.id, step.id);
                   removing.delete(step.id);
@@ -294,10 +301,10 @@ const {
                 undo: () => {
                   removing.delete(step.id);
                   render();
-                  announce(`Restored step: ${step.text}`);
+                  announce(t('tasks.restoredStep', { step: step.text }));
                 },
               });
-              announce(`Removed step: ${step.text}. Press Undo to bring it back.`);
+              announce(t('tasks.removedStepSaid', { step: step.text }));
             });
             tools.append(del);
             li.append(tools);
@@ -315,7 +322,7 @@ const {
         editing = !editing;
         render();
         edit.focus();
-        announce(editing ? 'Editing steps: remove the ones you don’t need.' : 'Done editing.');
+        announce(editing ? t('tasks.editingSaid') : t('tasks.doneEditingSaid'));
       });
 
       notes.addEventListener('input', () => {
@@ -342,7 +349,7 @@ const {
         addStep(ensureCurrentTask().id, text);
         stepInput.value = '';
         stepInput.focus();
-        announce(`Step added: ${text}`);
+        announce(t('tasks.stepAdded', { step: text }));
       });
 
       $<HTMLButtonElement>('[data-bd-done]').addEventListener('click', (e) => {
@@ -350,7 +357,7 @@ const {
         if (!task) return;
         celebrate(e.currentTarget as HTMLElement);
         finishTask(task.id);
-        announce('Task finished and logged in your Done list.');
+        announce(t('tasks.finishedLogged'));
         reopen.focus();
       });
 
@@ -358,14 +365,14 @@ const {
         const task = getCurrentTask();
         if (!task) return;
         reopenTask(task.id);
-        announce('Task reopened.');
+        announce(t('tasks.reopenedTask'));
         stepInput.focus();
       });
 
       $<HTMLButtonElement>('[data-bd-clear]').addEventListener('click', () => {
         setCurrentTask(null);
         title.focus();
-        announce('Ready for a new task. The last one is kept with your other tasks.');
+        announce(t('tasks.readyNew'));
       });
 
       render();

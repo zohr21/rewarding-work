@@ -7,7 +7,7 @@ interface Props {
 const { category } = Astro.props;
 ---
 
-<span class={`badge cat cat--${category}`}>{CATEGORIES[category].label}</span>
+<span class={`badge cat cat--${category}`} data-t={`cat.${category}`}>{CATEGORIES[category].label}</span>
 
 <style>
   .cat--reward { color: var(--cat-reward); background: var(--cat-reward-bg); }

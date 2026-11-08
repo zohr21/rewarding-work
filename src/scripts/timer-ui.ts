@@ -4,12 +4,15 @@
  */
 import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
-import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
+import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
+import { modeLabel } from '../lib/i18n/labels';
 import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { paintSprig, sprigMood, sprigStage, sprigStageName, type SprigMood } from '../lib/sprig';
 import { el } from '../lib/dom';
+import { locale, t, tn } from '../lib/i18n';
+import { minutesWords, spokenDuration } from '../lib/i18n/units';
 import { NATIVE_APP } from '../config/app';
 import { clearTimerNotice, notificationsGranted, requestNotifications, showTimerNotice, type TimerAlert, type TimerOngoing } from '../lib/device';
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
@@ -37,9 +40,9 @@ function isPrefs(v: unknown): v is TimerPrefs {
 }
 
 const PHASE_LABEL: Record<TimerState['phase'], string> = {
-  work: 'Focus',
-  'short-break': 'Short break',
-  'long-break': 'Long break',
+  work: t('timer.phaseFocus'),
+  'short-break': t('timer.phaseShort'),
+  'long-break': t('timer.phaseLong'),
 };
 
 // ---------- Formatting ----------
@@ -54,30 +57,20 @@ function formatClock(ms: number, roundUp: boolean): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-function minutesText(ms: number): string {
-  const min = Math.round(ms / 60_000);
-  return `${min} minute${min === 1 ? '' : 's'}`;
-}
+const minutesText = minutesWords;
 
 /** "Still focusing?" in words, for the page and the notification. */
 function checkInText(checkMs: number): string {
-  return `Tap Keep going, or in ${minutesText(T.FLOW_ANSWER_MS)} Flowtime stops and saves ${minutesText(checkMs)}.`;
+  return t('timer.checkIn', { wait: minutesText(T.FLOW_ANSWER_MS), saved: minutesText(checkMs) });
 }
 
 /** Why Flowtime stopped by itself (TimerEvent `stopped`). */
 function stoppedText(reason: 'no-answer' | 'limit', focusMs: number): string {
   return reason === 'limit'
-    ? `Flowtime stopped at its ${minutesText(T.FLOW_MAX_MS)} limit and saved ${minutesText(focusMs)}.`
-    : `No answer to “Still focusing?”, so Flowtime stopped and saved ${minutesText(focusMs)}, up to when it asked.`;
+    ? t('timer.stoppedLimit', { limit: minutesText(T.FLOW_MAX_MS), saved: minutesText(focusMs) })
+    : t('timer.stoppedNoAnswer', { saved: minutesText(focusMs) });
 }
 
-function spokenDuration(ms: number): string {
-  const total = Math.round(ms / 1000);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  if (m === 0) return `${s} seconds`;
-  return s === 0 ? `${m} minute${m === 1 ? '' : 's'}` : `${m} minute${m === 1 ? '' : 's'} ${s} seconds`;
-}
 
 /** The app's rhythm chip: the mode and its lengths, as in "Pomodoro · 25 / 5". */
 function rhythmText(mode: TimerMode, custom: CustomDurations): string {
@@ -88,8 +81,8 @@ function rhythmText(mode: TimerMode, custom: CustomDurations): string {
         ? ''
         : mode === 'custom'
           ? `${custom.workMin} / ${custom.breakMin}`
-          : 'counts up';
-  return lengths ? `${TIMER_MODE_LABELS[mode]} · ${lengths}` : TIMER_MODE_LABELS[mode];
+          : t('timer.countsUp');
+  return lengths ? `${modeLabel(mode)} · ${lengths}` : modeLabel(mode);
 }
 
 function isSameLocalDay(a: number, b: number): boolean {
@@ -193,13 +186,13 @@ function mountTimer(root: HTMLElement): () => void {
       if (events.length) {
         const focusMs = events.reduce((sum, e) => sum + (e.type === 'phase-complete' ? e.focusMs : 0), 0);
         const stopped = events.find((e) => e.type === 'phase-complete' && e.stopped);
-        const next = caught.status === 'idle' ? 'Start the next one when you are ready.' : 'You are on your break now.';
+        const next = caught.status === 'idle' ? t('timer.awayNextIdle') : t('timer.awayOnBreak');
         setMessage(
           stopped?.type === 'phase-complete'
             ? `${stoppedText(stopped.stopped!, stopped.focusMs)} ${next}`
             : focusMs > 0
-              ? `While you were away, your ${minutesText(focusMs)} focus session finished and was logged. ${next}`
-              : `Your break finished while you were away. ${next}`,
+              ? t('timer.awayFocusDone', { time: minutesText(focusMs), next })
+              : t('timer.awayBreakDone', { next }),
         );
         write('timer', caught);
       }
@@ -231,13 +224,13 @@ function mountTimer(root: HTMLElement): () => void {
 
   function handleEvent(e: TimerEvent, silent: boolean): void {
     if (e.type === 'too-short') {
-      setMessage('Less than a minute — not logged. Start again whenever you are ready.');
-      announce('Stopped. Less than a minute, so it was not logged.');
+      setMessage(t('timer.tooShort'));
+      announce(t('timer.tooShortSaid'));
       return;
     }
     if (e.type === 'partial-session') {
       addSession(e.session);
-      setMessage(`Reset. ${minutesText(e.session.focusSeconds * 1000)} of focus still counted.`);
+      setMessage(t('timer.resetCounted', { time: minutesText(e.session.focusSeconds * 1000) }));
       return;
     }
 
@@ -250,19 +243,19 @@ function mountTimer(root: HTMLElement): () => void {
     let text: string;
     let title: string;
     if (e.from === 'work' && e.stopped) {
-      title = 'Flowtime stopped';
-      text = `${stoppedText(e.stopped, e.focusMs)} Take a ${Math.round(e.breakMs / 60_000)}-minute break.`;
+      title = t('timer.titleStopped');
+      text = `${stoppedText(e.stopped, e.focusMs)} ${t('timer.takeBreak', { n: Math.round(e.breakMs / 60_000) })}`;
     } else if (e.from === 'work') {
-      title = 'Focus session done';
+      title = t('timer.titleDone');
       text =
         e.to === 'work'
-          ? `Done — ${minutesText(e.focusMs)} of focus. Ready for the next one.`
+          ? t('timer.doneNext', { time: minutesText(e.focusMs) })
           : state.mode === 'flowtime'
-            ? `You focused for ${minutesText(e.focusMs)}. Take a ${Math.round(e.breakMs / 60_000)}-minute break.`
-            : `Nice work. ${e.to === 'long-break' ? 'Long break' : 'Break'}: ${minutesText(e.breakMs)}.`;
+            ? t('timer.flowDone', { time: minutesText(e.focusMs), n: Math.round(e.breakMs / 60_000) })
+            : t('timer.niceWork', { kind: e.to === 'long-break' ? t('timer.phaseLong') : t('timer.break'), time: minutesText(e.breakMs) });
     } else {
-      title = 'Break over';
-      text = 'Break over. Start the next focus session when you are ready.';
+      title = t('timer.titleBreakOver');
+      text = t('timer.breakOverText');
     }
 
     if (e.from === 'work' && e.session) {
@@ -271,7 +264,7 @@ function mountTimer(root: HTMLElement): () => void {
     }
 
     setMessage(text);
-    announce(pendingLog ? `${text} You can note what you did and what's next below.` : text);
+    announce(pendingLog ? t('timer.noteBelow', { text }) : text);
     if (prefs.sound) playChime(e.from === 'work' ? 'focus-end' : 'break-end', prefs.tone, prefs.volume);
     void notify(title, text, icon);
     celebrate();
@@ -325,17 +318,17 @@ function mountTimer(root: HTMLElement): () => void {
   function renderCheckIn(fresh: boolean): void {
     const due = T.checkInDue(state, Date.now());
     // The main button answers it while it shows.
-    if (due) els.toggle.textContent = 'Keep going';
+    if (due) els.toggle.textContent = t('timer.keepGoing');
     if (due === askedCheckIn) return;
     askedCheckIn = due;
     renderSprig();
     if (!due) return;
     const text = checkInText(T.checkInMs(state));
-    setMessage(`Still focusing? ${text}`);
-    announce(`Still focusing? ${text}`);
+    setMessage(t('timer.stillFocusingText', { text }));
+    announce(t('timer.stillFocusingText', { text }));
     if (!fresh) return;
     if (prefs.sound) playChime('focus-end', prefs.tone, prefs.volume);
-    if (!NATIVE_APP) void notify('Still focusing?', text, icon);
+    if (!NATIVE_APP) void notify(t('timer.stillFocusing'), text, icon);
   }
 
   // ---- Rendering ----
@@ -363,7 +356,7 @@ function mountTimer(root: HTMLElement): () => void {
 
     if (!countUp && state.status === 'running' && rem! <= 60_000 && rem! > 0 && !announcedLastMinute) {
       announcedLastMinute = true;
-      announce(`One minute left in this ${state.phase === 'work' ? 'focus session' : 'break'}.`);
+      announce(t(state.phase === 'work' ? 'timer.lastMinuteFocus' : 'timer.lastMinuteBreak'));
     }
   }
 
@@ -388,17 +381,17 @@ function mountTimer(root: HTMLElement): () => void {
     if (document.activeElement !== els.customWork) els.customWork.value = String(state.custom.workMin);
     if (document.activeElement !== els.customBreak) els.customBreak.value = String(state.custom.breakMin);
 
-    els.phase.textContent = phase === 'work' && countUp ? 'Focus · counting up' : PHASE_LABEL[phase];
+    els.phase.textContent = phase === 'work' && countUp ? t('timer.focusCountingUp') : PHASE_LABEL[phase];
 
     const showDots = mode === 'pomodoro';
     els.dots.hidden = !showDots;
     if (showDots) {
       const filled = Math.min(state.cycle, T.POMODORO.longEvery);
       Array.from(els.dots.children).forEach((d, i) => d.classList.toggle('is-done', i < filled));
-      els.dots.setAttribute('aria-label', `${filled} of ${T.POMODORO.longEvery} sessions before a long break`);
+      els.dots.setAttribute('aria-label', t('timer.dotsLabel', { filled, total: T.POMODORO.longEvery }));
     }
 
-    els.toggle.textContent = status === 'running' ? 'Pause' : status === 'paused' ? 'Resume' : phase === 'work' ? 'Start focus' : 'Start break';
+    els.toggle.textContent = status === 'running' ? t('timer.pause') : status === 'paused' ? t('timer.resume') : phase === 'work' ? t('timer.startFocus') : t('timer.startBreak');
     els.stop.hidden = !(mode === 'flowtime' && phase === 'work' && status !== 'idle');
     renderCheckIn(false);
     renderSprig();
@@ -444,7 +437,7 @@ function mountTimer(root: HTMLElement): () => void {
     // Flowtime's "Still focusing?", with Keep going and Stop on the notification.
     const check = T.checkInMs(state);
     const askAt = state.mode === 'flowtime' && state.phase === 'work' && check < T.FLOW_MAX_MS ? T.reachesAt(state, check) : null;
-    if (askAt !== null && askAt > Date.now()) alerts.push({ at: askAt, title: 'Still focusing?', text: checkInText(check), then: ongoing, checkIn: true });
+    if (askAt !== null && askAt > Date.now()) alerts.push({ at: askAt, title: t('timer.stillFocusing'), text: checkInText(check), then: ongoing, checkIn: true });
     let s = state;
     while (alerts.length < 4 && s.status === 'running') {
       const end = T.endsAt(s);
@@ -454,13 +447,13 @@ function mountTimer(root: HTMLElement): () => void {
       if (e?.type !== 'phase-complete') break;
       const text =
         e.from === 'work' && e.stopped
-          ? `${stoppedText(e.stopped, e.focusMs)} Break: ${minutesText(e.breakMs)}.`
+          ? `${stoppedText(e.stopped, e.focusMs)} ${t('timer.breakLength', { time: minutesText(e.breakMs) })}`
           : e.from !== 'work'
-          ? 'Start the next focus session when you are ready.'
+          ? t('timer.nextWhenReady')
           : e.to === 'work'
-            ? `${minutesText(e.focusMs)} of focus. Ready for the next one.`
-            : `${minutesText(e.focusMs)} of focus. ${e.to === 'long-break' ? 'Long break' : 'Break'}: ${minutesText(e.breakMs)}.`;
-      alerts.push({ at: end, title: e.stopped ? 'Flowtime stopped' : e.from === 'work' ? 'Focus session done' : 'Break over', text, then: ongoingFor(r.state, end) });
+            ? t('timer.ofFocusNext', { time: minutesText(e.focusMs) })
+            : t('timer.ofFocusBreak', { time: minutesText(e.focusMs), kind: e.to === 'long-break' ? t('timer.phaseLong') : t('timer.break'), length: minutesText(e.breakMs) });
+      alerts.push({ at: end, title: e.stopped ? t('timer.titleStopped') : e.from === 'work' ? t('timer.titleDone') : t('timer.titleBreakOver'), text, then: ongoingFor(r.state, end) });
       s = r.state;
     }
     showTimerNotice(ongoing, alerts);
@@ -471,18 +464,18 @@ function mountTimer(root: HTMLElement): () => void {
     if (NATIVE_APP) {
       els.notifyStatus.textContent = '';
       void notificationsGranted().then((granted) => {
-        if (granted) els.notifyStatus.textContent = 'Notifications on';
+        if (granted) els.notifyStatus.textContent = t('timer.notifyOn');
       });
       return;
     }
     const p = notificationPermission();
     els.notifyStatus.textContent =
       p === 'granted'
-        ? 'Notifications on'
+        ? t('timer.notifyOn')
         : p === 'denied'
-          ? 'Notifications blocked in browser settings'
+          ? t('timer.notifyBlocked')
           : p === 'default'
-            ? "You'll be asked about notifications when you start"
+            ? t('timer.notifyAsk')
             : '';
   }
 
@@ -495,7 +488,7 @@ function mountTimer(root: HTMLElement): () => void {
     }
     const mins = Math.round(today.reduce((sum, s) => sum + s.focusSeconds, 0) / 60);
     const done = today.filter((s) => s.completed).length;
-    els.today.textContent = `Today: ${done} session${done === 1 ? '' : 's'} · ${mins} min focused`;
+    els.today.textContent = tn('timer.todaySummary', done, { time: t('unit.min', { n: mins }) });
   }
 
   // ---- Session log ----
@@ -506,8 +499,8 @@ function mountTimer(root: HTMLElement): () => void {
     els.logDid.value = '';
     els.logNext.value = '';
     els.logHint.textContent = task
-      ? `Saved in the Done list and on “${taskName(task)}”; what's next becomes its next step.`
-      : "Saved in the Done list; what's next becomes the label for your next session.";
+      ? t('timer.logHintTask', { task: taskName(task) })
+      : t('timer.logHint');
     els.log.hidden = false;
   }
 
@@ -521,8 +514,10 @@ function mountTimer(root: HTMLElement): () => void {
   function showDone(session: FocusSession, next: string): void {
     const done = els.done;
     if (!done) return;
-    const what = session.label ? ` on “${session.label}”` : '';
-    done.querySelector('[data-done-text]')!.textContent = `${minutesText(session.focusSeconds * 1000)} of focus${what}. ${next}`;
+    const time = minutesText(session.focusSeconds * 1000);
+    done.querySelector('[data-done-text]')!.textContent = session.label
+      ? t('timer.doneTextOn', { time, label: session.label, next })
+      : t('timer.doneText', { time, next });
 
     // Sprig cheers either way; when this session crossed a tier, the title says what it grew into.
     const sessions = getSessions();
@@ -530,7 +525,7 @@ function mountTimer(root: HTMLElement): () => void {
     const grew = stage > sprigStage(sessions.filter((s) => s.id !== session.id));
     const sprig = done.querySelector<HTMLElement>('[data-sprig]');
     if (sprig) paintSprig(sprig, { stage, mood: 'cheer' });
-    done.querySelector('[data-done-title]')!.textContent = grew ? `Sprig grew into ${sprigStageName(stage)}!` : 'Session complete';
+    done.querySelector('[data-done-title]')!.textContent = grew ? t('timer.sprigGrew', { stage: sprigStageName(stage) }) : t('timer.sessionComplete');
 
     const p = trackProgress({ sessions: getSessions(), done: [], chainDays: [] }, TRACKS[0]!);
     const { track, level } = p;
@@ -554,7 +549,7 @@ function mountTimer(root: HTMLElement): () => void {
     });
     const goal = track.thresholds[level];
     const left = goal === undefined ? 0 : Math.ceil((goal - p.value) * 10) / 10;
-    const foot = el('span', 'done__tier-foot', goal === undefined ? 'All five tiers reached.' : `${left.toLocaleString()} more ${track.unit(left)} to a ${tierLabel(level)}`);
+    const foot = el('span', 'done__tier-foot', goal === undefined ? t('timer.allTiers') : t('timer.tierLeft', { n: left.toLocaleString(locale()), unit: track.unit(left), tier: tierLabel(level) }));
     const body = el('div', 'done__tier-body');
     body.append(head, pips, foot);
     done.querySelector('[data-done-tier]')!.replaceChildren(coin, body);
@@ -582,18 +577,18 @@ function mountTimer(root: HTMLElement): () => void {
       leaf.innerHTML =
         '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 22V12M12 12c-4 0-6-3-6-6 3 0 6 2 6 6zM12 15c3 0 6-2 6-6-3 0-6 2-6 6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       const text = el('div', 'done__phone-text');
-      text.append(el('strong', '', 'No phone the whole time'), el('span', 'done__phone-leaf', '+1 phone-free leaf for your grove'));
+      text.append(el('strong', '', t('timer.noPhone')), el('span', 'done__phone-leaf', t('timer.phoneLeaf')));
       box.className = 'done__phone done__phone--clean';
       box.replaceChildren(leaf, text);
       box.hidden = false;
       return;
     }
     const head = el('div', 'done__phone-head');
-    head.append(el('strong', '', 'Phone during focus'), el('span', 'muted', `${used.pickups} ${used.pickups === 1 ? 'time' : 'times'} · ${formatShort(used.ms)}`));
+    head.append(el('strong', '', t('timer.phoneDuringFocus')), el('span', 'muted', tn('timer.pickups', used.pickups, { time: formatShort(used.ms) })));
     const length = Math.max(1, session.end - session.start);
     const line = el('div', 'done__phone-line');
     line.setAttribute('role', 'img');
-    line.setAttribute('aria-label', `Timeline of the session, with the ${used.pickups === 1 ? 'time' : 'times'} another app was open`);
+    line.setAttribute('aria-label', tn('timer.timeline', used.pickups));
     for (const [start, end] of used.spans) {
       const mark = el('span');
       mark.style.insetInlineStart = `${((start - session.start) / length) * 100}%`;
@@ -602,7 +597,7 @@ function mountTimer(root: HTMLElement): () => void {
     }
     const ends = el('div', 'done__phone-ends');
     ends.setAttribute('aria-hidden', 'true');
-    ends.append(el('span', '', '0 min'), el('span', '', `${Math.round(length / 60_000)} min`));
+    ends.append(el('span', '', t('unit.min', { n: 0 })), el('span', '', t('unit.min', { n: Math.round(length / 60_000) })));
     const apps = el('ul', 'done__phone-apps');
     for (const a of used.apps.slice(0, 3)) {
       const li = el('li');
@@ -610,7 +605,7 @@ function mountTimer(root: HTMLElement): () => void {
       apps.append(li);
     }
     const left = Math.max(0, session.focusSeconds * 1000 - used.ms);
-    const tip = el('p', 'muted', `Still ${minutesText(left)} of real focus. Next time, try putting the phone in another room.`);
+    const tip = el('p', 'muted', t('timer.realFocusLeft', { time: minutesText(left) }));
     box.className = 'done__phone';
     box.replaceChildren(head, line, ends, apps, tip);
     box.hidden = false;
@@ -649,7 +644,7 @@ function mountTimer(root: HTMLElement): () => void {
       render();
     }
     closeLog();
-    announce(did.trim() || next ? 'Saved.' : 'Nothing to save.');
+    announce(did.trim() || next ? t('timer.saved') : t('timer.nothingToSave'));
     els.toggle.focus();
   });
   els.logSkip.addEventListener('click', () => {
@@ -679,12 +674,15 @@ function mountTimer(root: HTMLElement): () => void {
 
     if (wasRunning) {
       const rem = T.remaining(state, now);
-      announce(rem === null ? `Paused at ${spokenDuration(T.elapsed(state, now))}.` : `Paused. ${spokenDuration(rem)} left.`);
+      announce(rem === null ? t('timer.pausedAt', { time: spokenDuration(T.elapsed(state, now)) }) : t('timer.pausedLeft', { time: spokenDuration(rem) }));
     } else {
       if (wasIdle) setMessage('');
       const rem = T.remaining(state, now);
+      const phase = PHASE_LABEL[state.phase];
       announce(
-        `${PHASE_LABEL[state.phase]} ${wasIdle ? 'started' : 'resumed'}${rem === null ? ', counting up' : `, ${spokenDuration(rem)}`}.`,
+        rem === null
+          ? t(wasIdle ? 'timer.startedUp' : 'timer.resumedUp', { phase })
+          : t(wasIdle ? 'timer.started' : 'timer.resumed', { phase, time: spokenDuration(rem) }),
       );
       // First start: ask about notifications (never on page load).
       if (notificationPermission() === 'default') {
@@ -703,15 +701,15 @@ function mountTimer(root: HTMLElement): () => void {
     const r = T.reset(state, Date.now());
     if (!r.events.length) setMessage('');
     commit(r.state, r.events);
-    announce('Timer reset.');
+    announce(t('timer.resetSaid'));
   }
 
   els.toggle.addEventListener('click', () => void onToggle());
   els.reset.addEventListener('click', onReset);
   els.skip.addEventListener('click', () => {
     commit(T.skipBreak(state));
-    setMessage('Break skipped. Start when you are ready.');
-    announce('Break skipped.');
+    setMessage(t('timer.breakSkipped'));
+    announce(t('timer.breakSkippedSaid'));
   });
   els.stop.addEventListener('click', () => {
     const r = T.stopFlow(state, Date.now());
@@ -720,8 +718,8 @@ function mountTimer(root: HTMLElement): () => void {
 
   function onKeep(): void {
     commit(T.keepGoing(state, Date.now()));
-    setMessage(`Keep going. You'll be asked again at ${minutesText(T.checkInMs(state))} of focus.`);
-    announce('Keep going.');
+    setMessage(t('timer.keepGoingText', { time: minutesText(T.checkInMs(state)) }));
+    announce(t('timer.keepGoingSaid'));
   }
 
   for (const input of els.modes) {
@@ -731,7 +729,7 @@ function mountTimer(root: HTMLElement): () => void {
       savePrefs({ mode });
       setMessage('');
       commit(T.setMode(state, mode));
-      announce(`${TIMER_MODE_LABELS[mode]} mode.`);
+      announce(t('timer.modeSaid', { mode: modeLabel(mode) }));
       // The app's chip folds the choices away once one is picked (the site keeps them open).
       if (NATIVE_APP && els.rhythm) els.rhythm.open = false;
     });
@@ -793,9 +791,9 @@ function mountTimer(root: HTMLElement): () => void {
     const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
     els.taskLink.hidden = !task && !chapter;
     els.taskLink.textContent = task
-      ? 'Linked to your task — this session will show on it.'
+      ? t('timer.linkedTask')
       : chapter
-        ? 'Linked to your exam chapter — this session counts towards it.'
+        ? t('timer.linkedChapter')
         : '';
     renderJotStatus();
   }
@@ -809,15 +807,12 @@ function mountTimer(root: HTMLElement): () => void {
     const n = getTasks().filter((t) => t.status === 'active' && listOf(t) === 'inbox').length;
     els.jotStatus.hidden = n === 0;
     if (!n) return;
-    const things = n === 1 ? '1 thought' : `${n} thoughts`;
     const focusing = state.phase === 'work' && state.status === 'running';
-    els.jotStatus.replaceChildren(
-      focusing ? `${things} in your Inbox — sort them on your break.` : `${things} in your Inbox. `,
-    );
+    els.jotStatus.replaceChildren(focusing ? tn('timer.inboxFocusing', n) : `${tn('timer.inbox', n)} `);
     if (!focusing) {
       const a = document.createElement('a');
       a.href = root.dataset.tasksUrl ?? '#';
-      a.textContent = 'Sort them now';
+      a.textContent = t('timer.sortNow');
       els.jotStatus.append(a);
     }
   }
@@ -842,7 +837,7 @@ function mountTimer(root: HTMLElement): () => void {
     e.preventDefault();
     const saved = jot(els.jotInput.value);
     closeJot();
-    announce(saved ? 'Jotted. It is in your Inbox for later.' : 'Nothing jotted.');
+    announce(saved ? t('timer.jotted') : t('timer.nothingJotted'));
   });
   els.jotInput.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -870,7 +865,7 @@ function mountTimer(root: HTMLElement): () => void {
     if (!pick) return;
     els.label.value = pick.dataset.pick!;
     onLabel();
-    announce(`Working on ${pick.dataset.pick}.`);
+    announce(t('timer.workingOn', { label: pick.dataset.pick! }));
   });
 
   // Arriving from Start in Coach: /timer?mode=<mode>, picked as if you had tapped it.

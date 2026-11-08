@@ -9,7 +9,8 @@ import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
 import { getTechniques } from '../lib/techniques';
 import { url } from '../lib/paths';
 
-/** How the timer runs each mode, under the technique it comes from. */
+/** How the timer runs each mode, under the technique it comes from (keys in src/lib/i18n). */
+const RUN_KEYS = { pomodoro: 'timer.runsPomodoro', '52-17': 'timer.runsFiftyTwo', flowtime: 'timer.runsFlowtime', custom: 'timer.runsCustom' } as const;
 const RUNS: Record<TimerMode, string> = {
   pomodoro: '25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.',
   '52-17': 'Longer focus blocks with a proper break. Suits work that takes a while to get into.',
@@ -29,27 +30,28 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
     <FocusTabs />
     <header class="page-header">
       {/* In the app the Timer tab already names the screen. */}
-      <h1 class:list={{ 'visually-hidden': NATIVE_APP }}>Focus timer</h1>
+      <h1 data-t="timer.focusTimer" class:list={{ 'visually-hidden': NATIVE_APP }}>Focus timer</h1>
       {/* The Android app keeps the top of the screen for the timer itself. */}
-      {!NATIVE_APP && <p>Pick a rhythm, name your task if you like, and start.</p>}
+      {!NATIVE_APP && <p data-t="timer.pickARhythmNameYour">Pick a rhythm, name your task if you like, and start.</p>}
     </header>
 
     <div class="timer-page">
       <TimerWidget standalone />
 
-      <aside class="timer-side" aria-label="Alongside the timer">
+      <aside data-t-aria-label="timer.alongsideTheTimer" class="timer-side" aria-label="Alongside the timer">
         <section class="card side-card" aria-labelledby="side-today-heading" data-side-today data-timer-url={url('/timer')}>
           <div class="side-card__head">
-            <h2 id="side-today-heading">On Today</h2>
-            <a href={url('/tasks')}>All tasks</a>
+            <h2 data-t="timer.onToday" id="side-today-heading">On Today</h2>
+            <a data-t="timer.allTasks" href={url('/tasks')}>All tasks</a>
           </div>
           <ul class="side-tasks" role="list" data-side-tasks></ul>
           <p class="muted side-card__empty" data-side-empty hidden>
-            Nothing on Today yet. Pick what matters on <a href={url('/tasks')}>Tasks</a>, or just start the timer.
+            <span data-t="timer.sideEmptyBefore">Nothing on Today yet. Pick what matters on</span>
+            <a data-t="timer.tasks" href={url('/tasks')}>Tasks</a><span data-t="timer.sideEmptyAfter">, or just start the timer.</span>
           </p>
         </section>
 
-        <section class="card side-card" aria-label="The rhythm you picked">
+        <section data-t-aria-label="timer.theRhythmYouPicked" class="card side-card" aria-label="The rhythm you picked">
           {
             rhythms.map(({ mode, technique }) => (
               <div class="rhythm" data-rhythm={mode} hidden={mode !== 'pomodoro'}>
@@ -58,16 +60,28 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
                   <EvidenceBadge level={technique.data.evidence} />
                 </div>
                 <h2>{technique.data.title}</h2>
-                <p class="muted">{RUNS[mode]}</p>
-                <a href={url(`/techniques/${technique.id}`)}>Why it works, and when it does not</a>
+                <p class="muted" data-t={RUN_KEYS[mode]}>{RUNS[mode]}</p>
+                <a data-t="timer.whyItWorksAndWhen" href={url(`/techniques/${technique.id}`)}>Why it works, and when it does not</a>
               </div>
             ))
           }
         </section>
 
         <p class="muted note">
-          Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
-          minute or more are saved {NATIVE_APP ? 'on this phone' : 'in this browser'} and grow <a href={url('/progress')}>your grove</a>.
+          {
+            NATIVE_APP ? (
+              <span data-t="timer.noteApp">
+                Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
+                minute or more are saved on this phone and grow
+              </span>
+            ) : (
+              <span data-t="timer.noteSite">
+                Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
+                minute or more are saved in this browser and grow
+              </span>
+            )
+          }{' '}
+          <a data-t="timer.yourGrove" href={url('/progress')}>your grove</a><span data-t="timer.noteEnd">.</span>
         </p>
       </aside>
     </div>
@@ -79,6 +93,7 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
   import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { t } from '../lib/i18n';
 
   onPage('timer-side', () => {
     const today = document.querySelector<HTMLElement>('[data-side-today]');
@@ -97,7 +112,7 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
           const link = el('a', 'side-task');
           link.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
           const seconds = focus.get(task.id) ?? 0;
-          link.append(el('span', 'side-task__name', taskName(task)), el('span', 'muted side-task__time', seconds ? formatFocus(seconds) : 'Not started'));
+          link.append(el('span', 'side-task__name', taskName(task)), el('span', 'muted side-task__time', seconds ? formatFocus(seconds) : t('timer.notStarted')));
           item.append(link);
           return item;
         }),

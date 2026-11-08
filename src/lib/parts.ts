@@ -4,6 +4,7 @@
  * only while a focus session runs on its task, and is a still ring otherwise.
  * Shared by the task rows (TaskList.astro) and the full steps view (BreakdownTool.astro).
  */
+import { t } from './i18n';
 import { read, type Task, type TaskStep } from './storage';
 import { endsAt, isTimerState, type TimerState } from './timer/engine';
 
@@ -63,9 +64,5 @@ export function stepBar(task: Task, live: boolean): HTMLDivElement {
 }
 
 /** Spoken and shown names for a state. */
-export const STATE_WORDS: Record<StepState, string> = {
-  done: 'done',
-  live: 'focusing now',
-  now: 'up now',
-  waiting: 'waiting',
-};
+/** A step's state in words, for screen readers. */
+export const stateWords = (state: StepState): string => t(`step.${state}`);

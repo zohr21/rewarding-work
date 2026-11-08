@@ -21,10 +21,10 @@ import {
   type TaskLogEntry,
 } from './storage';
 import { startOfDay } from './dates';
+import { t } from './i18n';
+import { hoursMinutes } from './i18n/units';
 
-export const UNTITLED = 'Untitled task';
-
-export const taskName = (task: Pick<Task, 'title'>) => task.title || UNTITLED;
+export const taskName = (task: Pick<Task, 'title'>) => task.title || t('tasks.untitled');
 
 /** Between a task and the step being focused on, in a timer label: "Thesis · Write the intro". */
 export const STEP_SEP = ' · ';
@@ -87,7 +87,7 @@ export function setStepDone(taskId: string, stepId: string, done: boolean): void
 
 export function finishTask(id: string): void {
   const task = updateTask(id, () => ({ status: 'done', doneAt: Date.now() }));
-  if (task) addDone(`Finished: ${taskName(task)}`, { source: taskSource(id), taskId: id });
+  if (task) addDone(t('tasks.finishedDone', { task: taskName(task) }), { source: taskSource(id), taskId: id });
 }
 
 export function reopenTask(id: string): void {
@@ -104,11 +104,7 @@ export function focusByTask(sessions: FocusSession[]): Map<string, number> {
 }
 
 export function formatFocus(seconds: number): string {
-  const min = Math.round(seconds / 60);
-  if (min < 60) return `${min} min`;
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
+  return hoursMinutes(seconds / 60);
 }
 
 export function setTaskNotes(id: string, notes: string): void {
@@ -142,7 +138,8 @@ export function logSession({ taskId, did, next, focusSeconds }: SessionLog): voi
 
 // ---------- Lists: Inbox, Today, Next, Someday ----------
 
-export const LIST_LABELS: Record<TaskList, string> = { inbox: 'Inbox', today: 'Today', next: 'Next', someday: 'Someday' };
+/** "Inbox", "Today", "Next", "Someday", in the current language. */
+export const listLabel = (list: TaskList): string => t(`list.${list}`);
 
 /** Today works best short; past this the list nudges you to move some on. */
 export const TODAY_SOFT_MAX = 3;

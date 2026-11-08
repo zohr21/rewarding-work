@@ -8,20 +8,29 @@ import Sheet from '../components/Sheet.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
-const breakdown = { heading: 'Steps', linkToTasks: false, intro: 'Make each step small enough to start in two minutes.' };
+const breakdown = {
+  heading: 'Steps',
+  headingT: 'tasks.steps',
+  linkToTasks: false,
+  intro: 'Make each step small enough to start in two minutes.',
+  introT: 'tasks.stepsIntro',
+} as const;
 ---
 
 <BaseLayout title="Tasks" description="Your tasks, broken into small steps, with the focus time you've spent on each.">
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1 class:list={{ 'visually-hidden': NATIVE_APP }}>Tasks</h1>
+      <h1 data-t="tasks.tasks" class:list={{ 'visually-hidden': NATIVE_APP }}>Tasks</h1>
       {
         /* The Android app goes straight to the lists. */
         !NATIVE_APP && (
           <p>
-            Keep what you're working on in one place. Break a task into small steps, then press Focus to start
-            a <a href={url('/timer')}>timer</a> session on it — the time shows up here.
+            <span data-t="tasks.introBefore">
+              Keep what you're working on in one place. Break a task into small steps, then press Focus to start a
+            </span>
+            <a data-t="tasks.timer" href={url('/timer')}>timer</a>
+            <span data-t="tasks.introAfter">session on it — the time shows up here.</span>
           </p>
         )
       }
@@ -32,7 +41,7 @@ const breakdown = { heading: 'Steps', linkToTasks: false, intro: 'Make each step
     <Sheet id="task-steps" labelledby="bd-heading">
       <BreakdownTool {...breakdown} />
       <div class="task-steps__foot">
-        <a class="btn" href={url('/timer')} data-task-steps-focus data-sheet-close>Start focusing</a>
+        <a data-t="tasks.startFocusing" class="btn" href={url('/timer')} data-task-steps-focus data-sheet-close>Start focusing</a>
       </div>
     </Sheet>
     <TaskGlance />

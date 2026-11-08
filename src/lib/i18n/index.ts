@@ -129,7 +129,7 @@ function isKey(v: string | undefined): v is Key {
   return !!v && v in en;
 }
 
-const ATTRS = ['aria-label', 'title', 'placeholder'] as const;
+const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'] as const;
 
 /**
  * Swap the text of every `data-t` element under `root` into the current language.

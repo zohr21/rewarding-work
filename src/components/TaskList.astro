@@ -11,24 +11,28 @@ import { url } from '../lib/paths';
 
 const timerUrl = url('/timer');
 /** Offered while you have no tasks at all, so the first one is a tap away. */
-const EXAMPLES = ['Reply to emails', 'Read chapter 3', 'Tidy the desk'];
+const EXAMPLES = [
+  { t: 'tasks.example1', text: 'Reply to emails' },
+  { t: 'tasks.example2', text: 'Read chapter 3' },
+  { t: 'tasks.example3', text: 'Tidy the desk' },
+];
 const TABS = [
-  { id: 'inbox', label: 'Inbox' },
-  { id: 'today', label: 'Today' },
-  { id: 'next', label: 'Next' },
-  { id: 'someday', label: 'Someday' },
-  { id: 'finished', label: 'Done' },
+  { id: 'inbox', label: 'Inbox', t: 'list.inbox' },
+  { id: 'today', label: 'Today', t: 'list.today' },
+  { id: 'next', label: 'Next', t: 'list.next' },
+  { id: 'someday', label: 'Someday', t: 'list.someday' },
+  { id: 'finished', label: 'Done', t: 'tasks.tabDone' },
 ];
 ---
 
 <section class="card tasks" data-task-list data-timer-url={timerUrl} aria-labelledby="tasks-heading">
-  <h2 id="tasks-heading" class="panel-title">Your tasks</h2>
+  <h2 data-t="tasks.yourTasks" id="tasks-heading" class="panel-title">Your tasks</h2>
 
-  <div class="tasks__tabs" role="group" aria-label="Lists" data-tl-tabs>
+  <div data-t-aria-label="tasks.lists" class="tasks__tabs" role="group" aria-label="Lists" data-tl-tabs>
     {
       TABS.map((tab) => (
         <button type="button" data-tl-tab={tab.id} aria-pressed={tab.id === 'today' ? 'true' : 'false'}>
-          {tab.label}
+          <span data-t={tab.t}>{tab.label}</span>
           <span class="tasks__tab-count" data-tl-tab-count />
         </button>
       ))
@@ -36,30 +40,30 @@ const TABS = [
   </div>
 
   <form class="tasks__form" data-tl-form>
-    <label for="tl-new" class="visually-hidden">New task</label>
-    <input id="tl-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…" data-tl-input />
-    <label for="tl-new-list" class="visually-hidden">Add to</label>
+    <label data-t="tasks.newTask" for="tl-new" class="visually-hidden">New task</label>
+    <input data-t-placeholder="tasks.addATask" id="tl-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…" data-tl-input />
+    <label data-t="tasks.addTo" for="tl-new-list" class="visually-hidden">Add to</label>
     <select id="tl-new-list" class="input tasks__list-select" data-tl-new-list>
-      <option value="today">Today</option>
-      <option value="next" selected>Next</option>
-      <option value="someday">Someday</option>
+      <option data-t="tasks.today" value="today">Today</option>
+      <option data-t="tasks.next" value="next" selected>Next</option>
+      <option data-t="tasks.someday" value="someday">Someday</option>
     </select>
-    <button type="submit" class="btn">Add</button>
+    <button data-t="tasks.add" type="submit" class="btn">Add</button>
   </form>
 
   <section class="tasks__section tasks__inbox" data-list="inbox" data-tl-inbox-wrap hidden aria-labelledby="tl-inbox-head">
-    <h3 class="tasks__heading tasks__heading--inbox" id="tl-inbox-head" data-tl-inbox-head>Inbox</h3>
-    <p class="muted tasks__hint">Thoughts you jotted on the timer. Sort each one into a list, add it to a task's notes, or clear it.</p>
+    <h3 data-t="tasks.inbox" class="tasks__heading tasks__heading--inbox" id="tl-inbox-head" data-tl-inbox-head>Inbox</h3>
+    <p data-t="tasks.thoughtsYouJottedOnThe" class="muted tasks__hint">Thoughts you jotted on the timer. Sort each one into a list, add it to a task's notes, or clear it.</p>
     <ul class="tasks__items" data-tl-inbox></ul>
   </section>
 
   <section class="tasks__section" data-list="today" aria-labelledby="tl-today-head">
-    <h3 class="tasks__heading tasks__heading--today" id="tl-today-head" data-tl-today-head>Today</h3>
+    <h3 data-t="tasks.today" class="tasks__heading tasks__heading--today" id="tl-today-head" data-tl-today-head>Today</h3>
     <div class="tasks__carry" data-tl-carry hidden>
       <p data-tl-carry-text></p>
       <div class="tasks__carry-actions">
-        <button type="button" class="btn btn--small" data-tl-carry-keep>Keep for today</button>
-        <button type="button" class="btn btn--ghost btn--small" data-tl-carry-move>Move to Next</button>
+        <button data-t="tasks.keepForToday" type="button" class="btn btn--small" data-tl-carry-keep>Keep for today</button>
+        <button data-t="tasks.moveToNext" type="button" class="btn btn--ghost btn--small" data-tl-carry-move>Move to Next</button>
       </div>
     </div>
     <ul class="tasks__items" data-tl-today></ul>
@@ -67,18 +71,18 @@ const TABS = [
   </section>
 
   <section class="tasks__section" data-list="next" aria-labelledby="tl-next-head">
-    <h3 class="tasks__heading tasks__heading--next" id="tl-next-head" data-tl-next-head>Next</h3>
+    <h3 data-t="tasks.next" class="tasks__heading tasks__heading--next" id="tl-next-head" data-tl-next-head>Next</h3>
     <ul class="tasks__items" data-tl-next></ul>
-    <p class="muted tasks__hint" data-tl-next-empty>Nothing here. Add a task above, or break one down below.</p>
+    <p data-t="tasks.nothingHereAddATask" class="muted tasks__hint" data-tl-next-empty>Nothing here. Add a task above, or break one down below.</p>
   </section>
 
   <details class="disclosure tasks__section tasks__someday" data-list="someday" data-tl-someday-wrap hidden>
-    <summary class="tasks__heading tasks__heading--someday" data-tl-someday-head>Someday</summary>
+    <summary data-t="tasks.someday" class="tasks__heading tasks__heading--someday" data-tl-someday-head>Someday</summary>
     <ul class="tasks__items" data-tl-someday></ul>
   </details>
 
   <details class="disclosure tasks__finished" data-list="finished" data-tl-finished-wrap hidden>
-    <summary data-tl-finished-summary>Finished</summary>
+    <summary data-t="tasks.finished" data-tl-finished-summary>Finished</summary>
     <ul class="tasks__items" data-tl-finished></ul>
   </details>
   <p class="muted tasks__hint" data-tl-view-empty hidden></p>
@@ -86,10 +90,10 @@ const TABS = [
     <svg class="tasks__examples-icon" viewBox="0 0 24 24" width="32" height="32" aria-hidden="true">
       <path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
-    <h3 class="tasks__examples-title">Plan today with 1 to 3 tasks</h3>
-    <p class="muted">Put the one you'd most like to avoid first. Tap one to add it:</p>
+    <h3 data-t="tasks.planTodayWith1To" class="tasks__examples-title">Plan today with 1 to 3 tasks</h3>
+    <p data-t="tasks.putTheOneYouD" class="muted">Put the one you'd most like to avoid first. Tap one to add it:</p>
     <div class="tasks__example-list">
-      {EXAMPLES.map((text) => <button type="button" class="tasks__example" data-tl-example>{text}</button>)}
+      {EXAMPLES.map((ex) => <button type="button" class="tasks__example" data-tl-example data-t={ex.t}>{ex.text}</button>)}
     </div>
   </div>
   <p class="visually-hidden" aria-live="polite" data-tl-live></p>
@@ -104,7 +108,7 @@ const TABS = [
     isCarriedOver,
     jotToNotes,
     keepForToday,
-    LIST_LABELS,
+    listLabel,
     listOf,
     moveTask,
     moveToTop,
@@ -118,21 +122,21 @@ const TABS = [
   import { ring } from '../lib/charts';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const dayFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
-  const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const dayFmt = dateFormat({ day: 'numeric', month: 'short' });
+  const weekdayFmt = dateFormat({ weekday: 'short' });
   const MOVABLE: TaskList[] = ['today', 'next', 'someday'];
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   const CLOCK_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l3 2M9 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   /** The list the tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
   let appView = 'today';
   const VIEW_EMPTY: Record<string, string> = {
-    inbox: 'Nothing to sort. Thoughts you jot on the timer land here.',
-    someday: 'Nothing parked for someday.',
-    finished: 'Nothing finished yet. It will show up here when it is.',
+    inbox: t('tasks.emptyInbox'),
+    someday: t('tasks.emptySomeday'),
+    finished: t('tasks.emptyFinished'),
   };
 
   onPage('task-list', () => {
@@ -260,13 +264,14 @@ const TABS = [
       }
 
       /** Delete with Undo (src/lib/undo.ts): hidden now, removed for real once the offer ends. */
-      function remove(task: Task, verb: string, extra = '', note = ''): void {
+      /** Take a task off the list with Undo: `message` on the toast, `said` for the screen reader. */
+      function remove(task: Task, message: string, said: string): void {
         const name = taskName(task);
         input.focus();
         removing.add(task.id);
         render();
         offerUndo({
-          message: `${verb} “${name}”${note}`,
+          message,
           commit: () => {
             deleteTask(task.id);
             removing.delete(task.id);
@@ -274,28 +279,28 @@ const TABS = [
           undo: () => {
             removing.delete(task.id);
             render();
-            announce(`Restored: ${name}`);
+            announce(t('tasks.restored', { name }));
           },
         });
-        announce(`${verb}: ${name}. Press Undo to bring it back.${extra}`);
+        announce(said);
       }
 
       function moveSelect(task: Task): HTMLSelectElement {
         const name = taskName(task);
         const sel = document.createElement('select');
         sel.className = 'input tasks__list-select';
-        sel.setAttribute('aria-label', `List for “${name}”`);
+        sel.setAttribute('aria-label', t('tasks.listFor', { name }));
         for (const list of MOVABLE) {
           const o = document.createElement('option');
           o.value = list;
-          o.textContent = LIST_LABELS[list];
+          o.textContent = listLabel(list);
           o.selected = listOf(task) === list;
           sel.append(o);
         }
         sel.addEventListener('change', () => {
           const list = sel.value as TaskList;
           moveTask(task.id, list);
-          announce(`Moved “${name}” to ${LIST_LABELS[list]}.`);
+          announce(t('tasks.movedTo', { name, list: listLabel(list) }));
           if (list === 'someday') somedayWrap.open = true;
         });
         return sel;
@@ -312,29 +317,31 @@ const TABS = [
         title.textContent = task.title;
         const meta = document.createElement('p');
         meta.className = 'task__meta muted';
-        meta.textContent = `jotted ${dayFmt.format(task.createdAt)}`;
+        meta.textContent = t('tasks.jotted', { date: dayFmt.format(task.createdAt) });
         body.append(title, meta);
 
         const actions = document.createElement('div');
         actions.className = 'task__actions';
         for (const list of MOVABLE) {
-          const b = button(LIST_LABELS[list], () => {
+          const b = button(listLabel(list), () => {
             moveTask(task.id, list);
-            announce(`“${task.title}” is now a task on ${LIST_LABELS[list]}.`);
+            announce(t('tasks.nowATask', { name: task.title, list: listLabel(list) }));
           });
-          b.setAttribute('aria-label', `Make “${task.title}” a task on ${LIST_LABELS[list]}`);
+          b.setAttribute('aria-label', t('tasks.makeTask', { name: task.title, list: listLabel(list) }));
           actions.append(b);
         }
         if (current && current.status === 'active' && current.id !== task.id) {
-          const b = button('To notes', () => {
+          const b = button(t('tasks.toNotes'), () => {
             jotToNotes(task.id, current.id);
-            announce(`Added to the notes of “${taskName(current)}”.`);
+            announce(t('tasks.addedToNotes', { task: taskName(current) }));
           });
-          b.setAttribute('aria-label', `Add “${task.title}” to the notes of “${taskName(current)}”`);
-          b.title = `Add to the notes of “${taskName(current)}”`;
+          b.setAttribute('aria-label', t('tasks.addToNotesOf', { name: task.title, task: taskName(current) }));
+          b.title = t('tasks.addToNotesTitle', { task: taskName(current) });
           actions.append(b);
         }
-        const clear = iconButton(`Clear “${task.title}”`, () => remove(task, 'Cleared'));
+        const clear = iconButton(t('tasks.clear', { name: task.title }), () =>
+          remove(task, t('tasks.clearedMsg', { name: task.title }), t('tasks.clearedSaid', { name: task.title })),
+        );
         li.append(head(body, clear), actions);
         return li;
       }
@@ -350,20 +357,20 @@ const TABS = [
         const title = document.createElement('p');
         title.className = 'task__title';
         title.textContent = name;
-        if (firstUp) title.append(' ', badge('First up', 'task__badge--first'));
-        if (task.id === currentId) title.append(' ', badge('Current'));
-        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(`from ${weekdayFmt.format(task.todayAt)}`, 'task__badge--old'));
+        if (firstUp) title.append(' ', badge(t('tasks.firstUp'), 'task__badge--first'));
+        if (task.id === currentId) title.append(' ', badge(t('tasks.current')));
+        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(t('tasks.fromDay', { day: weekdayFmt.format(task.todayAt!) }), 'task__badge--old'));
         const meta = document.createElement('p');
         meta.className = 'task__meta muted';
         const parts: string[] = [];
         const n = task.steps.length;
         const stepsDone = task.steps.filter((s) => s.done).length;
         const active = task.status === 'active';
-        if (n) parts.push(`${stepsDone} of ${plural(n, 'step')}`);
-        else if (active) parts.push('No steps yet');
+        if (n) parts.push(tn('tasks.stepsOf', n, { done: stepsDone }));
+        else if (active) parts.push(t('tasks.noSteps'));
         const seconds = focus.get(task.id) ?? 0;
-        if (seconds >= 60) parts.push(`${formatFocus(seconds)} focused`);
-        parts.push(task.status === 'done' && task.doneAt ? `finished ${dayFmt.format(task.doneAt)}` : `added ${dayFmt.format(task.createdAt)}`);
+        if (seconds >= 60) parts.push(t('tasks.focused', { time: formatFocus(seconds) }));
+        parts.push(task.status === 'done' && task.doneAt ? t('tasks.finishedOn', { date: dayFmt.format(task.doneAt) }) : t('tasks.addedOn', { date: dayFmt.format(task.createdAt) }));
         meta.textContent = parts.join(' · ');
         body.append(title, meta);
         // The step you're on, under the title: green and turning while a session runs on it.
@@ -371,7 +378,7 @@ const TABS = [
         if (nowStep) {
           const now = document.createElement('p');
           now.className = `task__now${live ? ' is-live' : ''}`;
-          now.textContent = `${live ? 'Now' : 'Next'}: ${nowStep.text}`;
+          now.textContent = t(live ? 'tasks.now' : 'tasks.nextStep', { step: nowStep.text });
           body.append(now);
         }
 
@@ -379,54 +386,53 @@ const TABS = [
         actions.className = 'task__actions';
         if (active && sheet) {
           // One small button; the steps open in the sheet over the list, which keeps its room.
-          const steps = button(n ? `Steps ${stepsDone}/${n}` : 'Add steps', () => {
+          const steps = button(n ? t('tasks.stepsButton', { done: stepsDone, n }) : t('tasks.addSteps'), () => {
             prepareSheet(task);
             // A task with no steps yet goes straight to typing the first one.
             if (!n) window.setTimeout(() => sheet.querySelector<HTMLInputElement>('[data-bd-step]')?.focus(), 60);
           });
           steps.dataset.sheetOpen = 'task-steps';
           steps.setAttribute('aria-haspopup', 'dialog');
-          steps.setAttribute('aria-label', n ? `Steps of “${name}”: ${stepsDone} of ${n} done` : `Add steps to “${name}”`);
+          steps.setAttribute('aria-label', n ? t('tasks.stepsLabel', { name, done: stepsDone, n }) : t('tasks.addStepsTo', { name }));
           actions.append(steps);
         }
         if (active) {
           if (listOf(task) === 'today' && !firstUp) {
             actions.append(
-              button('Do first', () => {
+              button(t('tasks.doFirst'), () => {
                 moveToTop(task.id, getTasks());
-                announce(`“${name}” is first up today.`);
+                announce(t('tasks.isFirstUp', { name }));
               }),
             );
           }
           const focusLink = document.createElement('a');
           focusLink.className = 'btn btn--ghost btn--small task__go';
           focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}${nowStep ? `&step=${encodeURIComponent(nowStep.id)}` : ''}`;
-          focusLink.textContent = 'Focus';
-          focusLink.setAttribute('aria-label', `Start a focus session on “${name}”`);
-          const done = button('Done', () => {
+          focusLink.textContent = t('tasks.focus');
+          focusLink.setAttribute('aria-label', t('tasks.focusOn', { name }));
+          const done = button(t('tasks.done'), () => {
             celebrate(done); // before finishing: the list re-renders and the button goes away
             finishTask(task.id);
-            announce(`Finished: ${name}`);
+            announce(t('tasks.finishedSaid', { name }));
           });
           actions.append(focusLink, done);
         } else {
           actions.append(
-            button('Reopen', () => {
+            button(t('tasks.reopen'), () => {
               reopenTask(task.id);
-              announce(`Reopened: ${name}`);
+              announce(t('tasks.reopenedSaid', { name }));
             }),
           );
         }
-        const del = iconButton(`Delete “${name}”`, () =>
+        const del = iconButton(t('tasks.delete', { name }), () => {
+          const time = formatFocus(seconds);
+          const withFocus = active && seconds > 0;
           remove(
             task,
-            'Deleted',
-            active && seconds
-              ? ` Its ${formatFocus(seconds)} of focus leaves your history and the grove; Done entries stay.`
-              : ' Its focus sessions and Done entries stay in your history.',
-            active && seconds ? ` and its ${formatFocus(seconds)} of focus` : '',
-          ),
-        );
+            withFocus ? t('tasks.deletedMsgFocus', { name, time }) : t('tasks.deletedMsg', { name }),
+            withFocus ? t('tasks.deletedSaidFocus', { name, time }) : t('tasks.deletedSaid', { name }),
+          );
+        });
         const side = active ? [moveSelect(task), del] : [del];
 
         // The same numbers as the meta line, drawn: a ring, a segment per step, a focus bar.
@@ -455,36 +461,41 @@ const TABS = [
 
         const inbox = on('inbox').sort((a, b) => a.createdAt - b.createdAt);
         inboxWrap.hidden = inbox.length === 0;
-        setHead(inboxHead, 'Inbox', `${inbox.length} to sort`);
+        setHead(inboxHead, listLabel('inbox'), t('tasks.toSort', { n: inbox.length }));
         inboxList.replaceChildren(...inbox.map((t) => renderJot(t, current)));
 
         const today = todayTasks(open);
-        setHead(todayHead, 'Today', today.length ? plural(today.length, 'task') : '');
+        setHead(todayHead, listLabel('today'), today.length ? tn('tasks.count', today.length) : '');
         todayList.replaceChildren(...today.map((t, i) => row(t, i === 0)));
         todayHint.hidden = today.length > 0 && today.length <= TODAY_SOFT_MAX;
         todayHint.textContent = today.length
-          ? `That's ${today.length} for today. A short list is easier to finish — consider moving some to Next.`
-          : "Plan today with 1 to 3 tasks. Put the one you'd most like to avoid first.";
+          ? t('tasks.tooMany', { n: today.length })
+          : t('tasks.planHint');
         // Someone with no tasks at all gets a few to start from, in place of the hint.
         examples.hidden = tasks.length > 0;
         if (!examples.hidden) todayHint.hidden = true;
         const carried = today.filter((t) => isCarriedOver(t));
         carry.hidden = carried.length === 0;
-        carryText.textContent = `${carried.length === 1 ? '1 task was' : `${carried.length} tasks were`} planned for an earlier day. Still for today?`;
+        carryText.textContent = tn('tasks.carried', carried.length);
 
         const next = on('next');
-        setHead(nextHead, 'Next', next.length ? plural(next.length, 'task') : '');
+        setHead(nextHead, listLabel('next'), next.length ? tn('tasks.count', next.length) : '');
         nextList.replaceChildren(...next.map((t) => row(t)));
         nextEmpty.hidden = next.length > 0;
 
         const someday = on('someday');
         somedayWrap.hidden = someday.length === 0;
-        setHead(somedayHead, 'Someday', plural(someday.length, 'task'));
+        setHead(somedayHead, listLabel('someday'), tn('tasks.count', someday.length));
         somedayList.replaceChildren(...someday.map((t) => row(t)));
 
         finishedWrap.hidden = finished.length === 0;
         const finishedFocus = finished.reduce((sum, t) => sum + (focus.get(t.id) ?? 0), 0);
-        setHead(finishedSummary, 'Finished', plural(finished.length, 'task') + (finishedFocus >= 60 ? `, ${formatFocus(finishedFocus)} of focus` : ''));
+        const finishedCount = tn('tasks.count', finished.length);
+        setHead(
+          finishedSummary,
+          t('tasks.finished'),
+          finishedFocus >= 60 ? t('tasks.finishedFocus', { count: finishedCount, time: formatFocus(finishedFocus) }) : finishedCount,
+        );
         finishedList.replaceChildren(...finished.map((t) => row(t)));
 
         if (tabs) {
@@ -507,7 +518,7 @@ const TABS = [
         b.addEventListener('click', () => {
           const text = b.textContent!.trim();
           createTask(text, { makeCurrent: !getCurrentTask(), list: 'today' });
-          announce(`Added to Today: ${text}`);
+          announce(t('tasks.addedToday', { text }));
         }),
       );
 
@@ -521,18 +532,18 @@ const TABS = [
         createTask(text, { makeCurrent: !current || current.status === 'done', list });
         input.value = '';
         input.focus();
-        announce(`Added to ${LIST_LABELS[list]}: ${text}`);
+        announce(t('tasks.addedTo', { list: listLabel(list), text }));
       });
 
       // Carried over from an earlier day: keep them (in the same order) or move them on.
       $<HTMLButtonElement>('[data-tl-carry-keep]').addEventListener('click', () => {
         keepForToday(getTasks());
-        announce('Kept on Today.');
+        announce(t('tasks.kept'));
       });
       $<HTMLButtonElement>('[data-tl-carry-move]').addEventListener('click', () => {
         const carried = todayTasks(getTasks()).filter((t) => isCarriedOver(t));
         carried.forEach((t) => moveTask(t.id, 'next'));
-        announce(`Moved ${carried.length} to Next.`);
+        announce(t('tasks.movedNext', { n: carried.length }));
       });
 
       if (tabs) {

@@ -10,6 +10,8 @@
     "check": "astro check",
     "build": "astro check && astro build",
     "preview": "astro preview",
+    "i18n:check": "node scripts/i18n/check.mjs",
+    "i18n:tag": "node scripts/i18n/tag.mjs",
     "build:app": "node scripts/build-app.mjs",
     "apk": "node scripts/build-app.mjs && node scripts/build-apk.mjs full",
     "apk:play": "node scripts/build-app.mjs play && node scripts/build-apk.mjs play",

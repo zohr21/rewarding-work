@@ -6,9 +6,10 @@
  * Pure: returns the request bodies for the Sheets API (spreadsheets.create, then one
  * spreadsheets.batchUpdate for charts and formatting). src/lib/export/google.ts sends them.
  */
-import { TIMER_MODE_LABELS, type TimerMode } from '../../data/taxonomy';
+import { TIMER_MODES, type TimerMode } from '../../data/taxonomy';
+import { modeLabel } from '../i18n/labels';
 import { fromDayKey } from '../dates';
-import { focusByTask, LIST_LABELS, listOf, taskName } from '../tasks';
+import { focusByTask, listLabel, listOf, taskName } from '../tasks';
 import { exportDays, type ExportData } from './collect';
 
 type Json = Record<string, unknown>;
@@ -113,7 +114,7 @@ export function buildSheet(data: ExportData, title: string): SheetBuild {
       rows.push(
         row(
           str(taskName(t)),
-          str(LIST_LABELS[listOf(t)]),
+          str(listLabel(listOf(t))),
           str(t.status === 'done' ? 'Done' : 'Active'),
           num(t.steps.filter((s) => s.done).length),
           num(t.steps.length),
@@ -141,7 +142,7 @@ export function buildSheet(data: ExportData, title: string): SheetBuild {
           day(s.start),
           str(clock(s.start)),
           num(Math.round(s.focusSeconds / 6) / 10),
-          str(TIMER_MODE_LABELS[s.mode as TimerMode] ?? s.mode),
+          str((TIMER_MODES as readonly string[]).includes(s.mode) ? modeLabel(s.mode as TimerMode) : s.mode),
           str((s.taskId && titles.get(s.taskId)) || s.label),
           bool(s.completed),
         ),

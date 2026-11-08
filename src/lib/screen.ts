@@ -11,6 +11,7 @@ import { usageAccess, usageBetween, usageDays, type UsageDay } from './device';
 import { read, write } from './storage';
 import { addDays, dayKey } from './dates';
 import type { FocusSession } from './storage';
+import { shortMinutes } from './i18n/units';
 
 export type ScreenDay = UsageDay;
 
@@ -159,6 +160,5 @@ export function formatMinutes(min: number): string {
 
 /** "3 min", "less than a minute". */
 export function formatShort(ms: number): string {
-  const m = Math.round(ms / 60_000);
-  return m < 1 ? 'less than a minute' : `${m} min`;
+  return shortMinutes(ms);
 }
