@@ -58,7 +58,7 @@ for (const lang of LANGS.filter((l) => l !== 'en')) {
 const astro = files('src', '.astro');
 for (const file of astro) {
   const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/data-t(?:-[\w-]+)?="([\w.]+)"/g)) {
+  for (const m of src.matchAll(/data-t(?:-(?!n=)[\w-]+)?="([\w.-]+)"/g)) {
     if (!en.has(m[1])) {
       console.log(`  ✗ ${file}:${src.slice(0, m.index).split('\n').length} uses '${m[1]}', which en.ts does not have`);
       errors++;

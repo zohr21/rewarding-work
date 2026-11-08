@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 export const LIST_DIR = 'src/lib/i18n';
 export const LANGS = ['en', 'ru', 'az'];
 
-const ENTRY = /^\s*'([\w.]+)':\s*(.+?),?\s*$/;
+const ENTRY = /^\s*'([\w.-]+)':\s*(.+?),?\s*$/;
 const STRING = /^'((?:[^'\\]|\\.)*)'$|^"((?:[^"\\]|\\.)*)"$/;
 
 function unquote(raw) {
@@ -24,7 +24,8 @@ export function readList(lang) {
     const m = line.match(ENTRY);
     if (!m) continue;
     const text = unquote(m[2]);
-    map.set(m[1], text ?? (m[2].match(/other:\s*'((?:[^'\\]|\\.)*)'/)?.[1] ?? '').replace(/\\(.)/g, '$1'));
+    const other = m[2].match(/other:\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")/);
+    map.set(m[1], text ?? (other?.[1] ?? other?.[2] ?? '').replace(/\\(.)/g, '$1'));
   }
   return map;
 }

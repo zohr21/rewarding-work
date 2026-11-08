@@ -13,13 +13,14 @@ import { url } from '../lib/paths';
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1>Exam prep</h1>
+      <h1 data-t="exam.examPrep">Exam prep</h1>
       {/* The app goes straight to the exam; the website explains the page first. */}
       {
         !NATIVE_APP && (
           <p>
-            Set the goal, list the parts, and work through them one at a time. Focus opens the <a href={url('/timer')}>timer</a>{' '}
-            on a chapter, and the time shows up here.
+            <span data-t="exam.introBefore">Set the goal, list the parts, and work through them one at a time. Focus opens the</span>{' '}
+            <a data-t="exam.timer" href={url('/timer')}>timer</a>{' '}
+            <span data-t="exam.introAfter">on a chapter, and the time shows up here.</span>
           </p>
         )
       }

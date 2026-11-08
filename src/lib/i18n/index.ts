@@ -139,7 +139,8 @@ export function translatePage(root: ParentNode = document): void {
   document.documentElement.lang = getLang();
   if (getLang() === 'en') return;
   root.querySelectorAll<HTMLElement>('[data-t]').forEach((node) => {
-    if (isKey(node.dataset.t)) node.textContent = t(node.dataset.t);
+    // data-t-n="5" fills {n} and picks the plural form: <span data-t="x.tryIn" data-t-n="5">Try it in 5 min</span>
+    if (isKey(node.dataset.t)) node.textContent = node.dataset.tN === undefined ? t(node.dataset.t) : tn(node.dataset.t, Number(node.dataset.tN));
   });
   for (const attr of ATTRS) {
     root.querySelectorAll<HTMLElement>(`[data-t-${attr}]`).forEach((node) => {

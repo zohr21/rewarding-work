@@ -12,50 +12,50 @@ const timerUrl = url('/timer');
 
 <div class="exam-goal" data-exam-goal data-timer-url={timerUrl}>
   <form class="card goal-form" data-eg-form hidden aria-labelledby="eg-form-title">
-    <h2 id="eg-form-title" class="panel-title" data-eg-form-title>Set your goal</h2>
+    <h2 data-t="exam.setYourGoal" id="eg-form-title" class="panel-title" data-eg-form-title>Set your goal</h2>
     <div class="goal-form__grid">
       <label class="goal-form__field goal-form__field--wide">
-        <span>Exam or certification</span>
-        <input class="input" type="text" maxlength="120" autocomplete="off" required placeholder="e.g. AWS Solutions Architect – Associate" data-eg-title />
+        <span data-t="exam.examOrCertification">Exam or certification</span>
+        <input data-t-placeholder="exam.eGAwsSolutionsArchitect" class="input" type="text" maxlength="120" autocomplete="off" required placeholder="e.g. AWS Solutions Architect – Associate" data-eg-title />
       </label>
       <label class="goal-form__field">
-        <span>Exam date <span class="muted">(optional)</span></span>
+        <span><span data-t="exam.examDate">Exam date</span> <span data-t="exam.optional" class="muted">(optional)</span></span>
         <input class="input" type="date" data-eg-date />
       </label>
       <label class="goal-form__field">
-        <span>Study hours you're aiming for <span class="muted">(optional)</span></span>
-        <input class="input" type="number" min="1" max="10000" step="1" inputmode="numeric" placeholder="A rough guess is fine" data-eg-hours />
+        <span><span data-t="exam.studyHours">Study hours you're aiming for</span> <span data-t="exam.optional" class="muted">(optional)</span></span>
+        <input data-t-placeholder="exam.aRoughGuessIsFine" class="input" type="number" min="1" max="10000" step="1" inputmode="numeric" placeholder="A rough guess is fine" data-eg-hours />
       </label>
       <label class="goal-form__field goal-form__field--wide" data-eg-chapters-field>
-        <span>Chapters or parts <span class="muted">(one per line; you can add more later)</span></span>
-        <textarea class="input" rows="6" placeholder="Networking, 14&#10;Storage, 10&#10;Databases" data-eg-chapters></textarea>
-        <span class="muted goal-form__hint">Planned hours can follow a comma, as in “Networking, 14”.</span>
+        <span><span data-t="exam.chaptersOrParts">Chapters or parts</span> <span data-t="exam.onePerLineYouCan" class="muted">(one per line; you can add more later)</span></span>
+        <textarea data-t-placeholder="exam.chaptersPlaceholder" class="input" rows="6" placeholder="Networking, 14&#10;Storage, 10&#10;Databases" data-eg-chapters></textarea>
+        <span data-t="exam.plannedHoursCanFollowA" class="muted goal-form__hint">Planned hours can follow a comma, as in “Networking, 14”.</span>
       </label>
     </div>
     <p class="goal-form__plan" data-eg-plan aria-live="polite"></p>
     <div class="goal-form__actions">
-      <button type="submit" class="btn" data-eg-submit>Create exam plan</button>
-      <button type="button" class="btn btn--ghost" data-eg-cancel hidden>Cancel</button>
-      <button type="button" class="btn btn--ghost" data-eg-took hidden>I took the exam</button>
-      <button type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this exam plan</button>
+      <button data-t="exam.createExamPlan" type="submit" class="btn" data-eg-submit>Create exam plan</button>
+      <button data-t="exam.cancel" type="button" class="btn btn--ghost" data-eg-cancel hidden>Cancel</button>
+      <button data-t="exam.iTookTheExam" type="button" class="btn btn--ghost" data-eg-took hidden>I took the exam</button>
+      <button data-t="exam.deleteThisExamPlan" type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this exam plan</button>
     </div>
   </form>
 
   <section class="card goal-finish" data-eg-finish hidden aria-labelledby="eg-finish-title">
-    <h2 id="eg-finish-title" class="panel-title" tabindex="-1" data-eg-finish-title>How did it go?</h2>
+    <h2 data-t="exam.howDidItGo" id="eg-finish-title" class="panel-title" tabindex="-1" data-eg-finish-title>How did it go?</h2>
     <p class="muted" data-eg-finish-text></p>
     <div class="goal-finish__choices">
-      <button type="button" class="btn" data-eg-result="passed">I passed</button>
-      <button type="button" class="btn btn--ghost" data-eg-result="failed">I didn't pass</button>
-      <button type="button" class="btn btn--ghost" data-eg-result="finished">Just mark it finished</button>
+      <button data-t="exam.iPassed" type="button" class="btn" data-eg-result="passed">I passed</button>
+      <button data-t="exam.iDidnTPass" type="button" class="btn btn--ghost" data-eg-result="failed">I didn't pass</button>
+      <button data-t="exam.justMarkItFinished" type="button" class="btn btn--ghost" data-eg-result="finished">Just mark it finished</button>
     </div>
-    <button type="button" class="btn btn--ghost btn--small" data-eg-finish-cancel>Not yet</button>
+    <button data-t="exam.notYet" type="button" class="btn btn--ghost btn--small" data-eg-finish-cancel>Not yet</button>
   </section>
 
   <section class="card goal" data-eg-hero hidden aria-labelledby="eg-name">
     <div class="goal__top">
       <div class="goal__main">
-        <p class="goal__eyebrow">Your exam</p>
+        <p data-t="exam.yourExam" class="goal__eyebrow">Your exam</p>
         <h2 id="eg-name" class="goal__title" data-eg-name></h2>
         <p class="goal__chips" data-eg-chips></p>
       </div>
@@ -63,7 +63,7 @@ const timerUrl = url('/timer');
     </div>
     <div class="goal__actions">
       <a class="btn goal__continue" data-eg-continue hidden></a>
-      <button type="button" class="btn goal__continue" data-eg-took-now hidden>I took the exam</button>
+      <button data-t="exam.iTookTheExam" type="button" class="btn goal__continue" data-eg-took-now hidden>I took the exam</button>
       <button type="button" class="btn btn--ghost goal__continue" data-eg-practice hidden></button>
     </div>
     <div class="goal__target" data-eg-target hidden>
@@ -72,7 +72,7 @@ const timerUrl = url('/timer');
       <p class="goal__pace muted" data-eg-pace></p>
     </div>
     <p class="goal__facts muted" data-eg-facts></p>
-    <button type="button" class="btn btn--ghost btn--small goal__edit" data-eg-edit>Edit goal</button>
+    <button data-t="exam.editGoal" type="button" class="btn btn--ghost btn--small goal__edit" data-eg-edit>Edit goal</button>
   </section>
   <p class="visually-hidden" aria-live="polite" data-eg-live></p>
 </div>
@@ -98,9 +98,9 @@ const timerUrl = url('/timer');
   import { fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const dateFmt = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
 
   onPage('exam-goal', () => {
     const root = document.querySelector<HTMLElement>('[data-exam-goal]');
@@ -129,9 +129,9 @@ const timerUrl = url('/timer');
     let finishing = false;
     let deleteArmed = false;
 
-    const announce = (t: string) => {
+    const announce = (text: string) => {
       live.textContent = '';
-      window.setTimeout(() => (live.textContent = t), 50);
+      window.setTimeout(() => (live.textContent = text), 50);
     };
 
     const draft = () => ({
@@ -145,12 +145,12 @@ const timerUrl = url('/timer');
       const d = draft();
       const parts: string[] = [];
       const days = daysLeft(d);
-      if (days !== null) parts.push(days > 0 ? `${plural(days, 'day')} until the exam` : days === 0 ? 'The exam is today' : 'That date has passed');
-      if (days !== null && days > 0 && d.targetHours) parts.push(`about ${formatHM((d.targetHours * 3600) / days)} a day to reach ${d.targetHours} h`);
+      if (days !== null) parts.push(days > 0 ? tn('exam.daysUntil', days) : days === 0 ? t('exam.theExamIsToday') : t('exam.datePassed'));
+      if (days !== null && days > 0 && d.targetHours) parts.push(t('exam.aDayToReach', { time: formatHM((d.targetHours * 3600) / days), target: t('unit.h', { n: d.targetHours }) }));
       if (!editing) {
         const list = parseChapterLines(chapters.value);
         const planned = list.reduce((sum, ch) => sum + (ch.plannedHours ?? 0), 0);
-        if (list.length) parts.push(plural(list.length, 'chapter') + (planned ? `, ${planned} h planned` : ''));
+        if (list.length) parts.push(planned ? tn('exam.chaptersPlanned', list.length, { planned: t('unit.h', { n: planned }) }) : tn('exam.chaptersN', list.length));
       }
       plan.textContent = parts.join(' · ');
     }
@@ -166,8 +166,8 @@ const timerUrl = url('/timer');
       form.hidden = !showForm;
       finish.hidden = !finishing;
       hero.hidden = showForm || finishing;
-      formTitle.textContent = exam ? 'Edit your goal' : 'Set your goal';
-      submit.textContent = exam ? 'Save' : 'Create exam plan';
+      formTitle.textContent = exam ? t('exam.editYourGoal') : t('exam.setYourGoal');
+      submit.textContent = exam ? t('exam.save') : t('exam.createExamPlan');
       chaptersField.hidden = Boolean(exam);
       cancel.hidden = del.hidden = took.hidden = !exam;
       if (!exam) {
@@ -176,7 +176,7 @@ const timerUrl = url('/timer');
       }
       if (finishing) {
         $<HTMLElement>('[data-eg-finish-text]').textContent =
-          `“${exam.title}” moves to Past exams with the time you studied, and this page is free for your next goal.`;
+          t('exam.finishText', { title: exam.title });
         return;
       }
       if (showForm) return;
@@ -188,15 +188,15 @@ const timerUrl = url('/timer');
       const chips = $<HTMLElement>('[data-eg-chips]');
       chips.replaceChildren();
       const days = daysLeft(exam);
-      if (exam.date) chips.append(chip(`Exam on ${dateFmt.format(fromDayKey(exam.date))}`));
-      if (exam.targetHours) chips.append(chip(`Target ${exam.targetHours} h`));
+      if (exam.date) chips.append(chip(t('exam.examOn', { date: dateFmt.format(fromDayKey(exam.date)) })));
+      if (exam.targetHours) chips.append(chip(t('exam.targetChip', { target: t('unit.h', { n: exam.targetHours }) })));
       // The days left are the headline: what the rest of the page is planned against.
       const countdown = $<HTMLElement>('[data-eg-days]');
       countdown.hidden = days === null;
       if (days !== null) {
         countdown.replaceChildren();
-        if (days > 0) countdown.append(el('strong', '', String(days)), el('span', '', days === 1 ? 'day left' : 'days left'));
-        else countdown.append(el('span', '', days === 0 ? 'Exam is today' : 'Exam date has passed'));
+        if (days > 0) countdown.append(el('strong', '', String(days)), el('span', '', tn('exam.daysLeft', days)));
+        else countdown.append(el('span', '', days === 0 ? t('exam.examIsToday') : t('exam.examDatePassed')));
       }
 
       // From exam day on, the main button asks how it went; Continue stays available as a plain one.
@@ -208,13 +208,13 @@ const timerUrl = url('/timer');
       go.classList.toggle('btn--ghost', examDay);
       if (next) {
         go.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
-        go.textContent = `${time.byChapter.has(next.id) ? 'Continue' : 'Start'}: ${next.name}`;
+        go.textContent = t(time.byChapter.has(next.id) ? 'exam.continueOn' : 'exam.startOn', { name: next.name });
       }
       // Practice sits beside Continue; it starts the question bank's round (ExamBank.astro).
       const practice = $<HTMLButtonElement>('[data-eg-practice]');
       const n = Math.min(ROUND_SIZE, exam.questions.length);
       practice.hidden = n === 0;
-      practice.textContent = `Practice ${plural(n, 'question')}`;
+      practice.textContent = tn('exam.practiceN', n);
       // With nothing left to study, practice is the main thing to do.
       practice.classList.toggle('btn--ghost', Boolean(next) || examDay);
 
@@ -222,12 +222,12 @@ const timerUrl = url('/timer');
       const pct = target ? Math.min(100, Math.round((time.total / target) * 100)) : 0;
       $<HTMLElement>('[data-eg-target]').hidden = !target;
       if (target) {
-        $<HTMLElement>('[data-eg-time]').textContent = `${formatHM(time.total)} of ${exam.targetHours} h`;
+        $<HTMLElement>('[data-eg-time]').textContent = t('exam.timeOfTarget', { time: formatHM(time.total), target: t('unit.h', { n: exam.targetHours! }) });
         $<HTMLElement>('[data-eg-pct]').textContent = `${pct}%`;
         $<HTMLElement>('[data-eg-bar]').style.inlineSize = `${pct}%`;
         const pace = pacePerDay(exam, time.total);
         $<HTMLElement>('[data-eg-pace]').textContent =
-          pace === null ? '' : pace === 0 ? `You've reached your ${exam.targetHours} h target.` : `About ${formatHM(pace)} a day gets you there by exam day.`;
+          pace === null ? '' : pace === 0 ? t('exam.reachedTarget', { target: t('unit.h', { n: exam.targetHours! }) }) : t('exam.paceLine', { time: formatHM(pace) });
       }
 
       // The rest in one line: studied (when there is no target bar), chapters, this week, last round.
@@ -235,21 +235,21 @@ const timerUrl = url('/timer');
       const week = weekMinutes(exam, sessions);
       const round = exam.rounds.at(-1);
       const facts = [
-        target ? '' : time.total >= 60 ? `${formatHM(time.total)} studied` : 'Time on your chapters adds up here',
-        exam.chapters.length ? `${done} of ${exam.chapters.length} chapters` : '',
-        week.total >= 60 ? `${formatHM(week.total)} this week` : '',
-        round ? `last round ${round.correct} of ${round.total}` : '',
+        target ? '' : time.total >= 60 ? t('exam.studied', { time: formatHM(time.total) }) : t('exam.timeAddsUp'),
+        exam.chapters.length ? tn('exam.chaptersDone', exam.chapters.length, { done }) : '',
+        week.total >= 60 ? t('exam.thisWeek', { time: formatHM(week.total) }) : '',
+        round ? t('exam.lastRound', { correct: round.correct, total: round.total }) : '',
       ];
       // Times like "4 h 40 m" stay on one line.
       $<HTMLElement>('[data-eg-facts]').textContent = facts
         .filter(Boolean)
-        .map((f) => f.replace(/(\d) ([hm])\b/g, '$1\u00a0$2'))
+        .map((f) => f.replace(/(\d) (?=\S)/g, '$1\u00a0'))
         .join(' · ');
     }
 
     function disarmDelete(): void {
       deleteArmed = false;
-      del.textContent = 'Delete this exam plan';
+      del.textContent = t('exam.deleteThisExamPlan');
     }
 
     $<HTMLButtonElement>('[data-eg-edit]').addEventListener('click', () => {
@@ -300,10 +300,10 @@ const timerUrl = url('/timer');
         if (result === 'passed') celebrate();
         announce(
           result === 'passed'
-            ? `Passed: ${exam.title}. Well done. It is now under Past exams.`
+            ? t('exam.saidPassed', { title: exam.title })
             : result === 'failed'
-              ? `${exam.title} is under Past exams. You can prepare again from there.`
-              : `Finished: ${exam.title}. It is now under Past exams.`,
+              ? t('exam.saidFailed', { title: exam.title })
+              : t('exam.saidFinished', { title: exam.title }),
         );
         title.focus();
       }),
@@ -313,8 +313,8 @@ const timerUrl = url('/timer');
     del.addEventListener('click', () => {
       if (!deleteArmed) {
         deleteArmed = true;
-        del.textContent = 'Press again to delete';
-        announce('Press again to delete the exam plan, its chapters and its questions. Your focus sessions stay in your history.');
+        del.textContent = t('exam.pressAgainToDelete');
+        announce(t('exam.pressAgainToDeleteSaid'));
         window.setTimeout(disarmDelete, 6000);
         return;
       }
@@ -322,7 +322,7 @@ const timerUrl = url('/timer');
       editing = false;
       deleteExam();
       form.reset();
-      announce('Exam plan deleted.');
+      announce(t('exam.deleted'));
       title.focus();
     });
 
@@ -336,7 +336,7 @@ const timerUrl = url('/timer');
       editing = false;
       form.reset();
       render();
-      announce(wasEditing ? 'Goal saved.' : 'Exam plan created.');
+      announce(wasEditing ? t('exam.goalSaved') : t('exam.created'));
     });
 
     render();

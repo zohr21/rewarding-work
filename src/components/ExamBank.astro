@@ -9,21 +9,21 @@ import { NATIVE_APP } from '../config/app';
 ---
 
 <section class="card bank" data-exam-bank hidden aria-labelledby="bank-heading">
-  <h2 id="bank-heading" class="panel-title">Question bank</h2>
+  <h2 data-t="exam.questionBank" id="bank-heading" class="panel-title">Question bank</h2>
   <p data-eb-count></p>
   <p class="bank__weak" data-eb-weak hidden></p>
   <div class="bank__practice" data-eb-practice-row hidden>
-    <label for="eb-scope" class="visually-hidden">Practise questions from</label>
+    <label data-t="exam.practiseQuestionsFrom" for="eb-scope" class="visually-hidden">Practise questions from</label>
     <select id="eb-scope" class="input" data-eb-scope></select>
-    <button type="button" class="btn" data-eb-start>Practice</button>
+    <button data-t="exam.practice" type="button" class="btn" data-eb-start>Practice</button>
   </div>
   {/* Importing and removing are occasional: folded away once there are questions. */}
   <details class="disclosure bank__manage" data-eb-manage>
-    <summary>Import or remove questions</summary>
+    <summary data-t="exam.importOrRemoveQuestions">Import or remove questions</summary>
     <div class="bank__manage-body">
-      <button type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
-      <p class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
-      <button type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
+      <button data-t="exam.importQuestions" type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
+      <p data-t="exam.fromACsvOrJson" class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
+      <button data-t="exam.removeAllQuestions" type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
     </div>
   </details>
   <p class="visually-hidden" aria-live="polite" data-eb-live></p>
@@ -32,10 +32,10 @@ import { NATIVE_APP } from '../config/app';
 <dialog class="exam-dialog popover" data-eb-import aria-labelledby="eb-import-title">
   <div class="exam-dialog__head">
     <div>
-      <h2 id="eb-import-title" class="exam-dialog__title">Import test questions</h2>
-      <p class="muted exam-dialog__sub">Choose a file, match its chapters to yours, then import.</p>
+      <h2 data-t="exam.importTestQuestions" id="eb-import-title" class="exam-dialog__title">Import test questions</h2>
+      <p data-t="exam.chooseAFileMatchIts" class="muted exam-dialog__sub">Choose a file, match its chapters to yours, then import.</p>
     </div>
-    <button type="button" class="icon-btn" aria-label="Close" data-ei-close>
+    <button data-t-aria-label="exam.close" type="button" class="icon-btn" aria-label="Close" data-ei-close>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
     </button>
   </div>
@@ -44,17 +44,17 @@ import { NATIVE_APP } from '../config/app';
     <div class="import__file">
       <label class="btn btn--ghost import__pick">
         <input type="file" class="visually-hidden" accept=".csv,.json,.txt,text/csv,application/json" data-ei-file />
-        Choose a file
+        <span data-t="exam.chooseAFile">Choose a file</span>
       </label>
-      <span class="muted" data-ei-filename>No file chosen</span>
+      <span data-t="exam.noFileChosen" class="muted" data-ei-filename>No file chosen</span>
     </div>
     <p class="import__error" role="alert" data-ei-error hidden></p>
 
     <section class="import__result" data-ei-result hidden>
       <p class="import__counts" data-ei-counts></p>
       <div data-ei-map-wrap>
-        <h3 class="import__heading">Match chapters</h3>
-        <p class="muted import__hint">Where the questions for each chapter named in the file should go.</p>
+        <h3 data-t="exam.matchChapters" class="import__heading">Match chapters</h3>
+        <p data-t="exam.whereTheQuestionsForEach" class="muted import__hint">Where the questions for each chapter named in the file should go.</p>
         <div class="import__map" data-ei-map></div>
       </div>
       <details class="disclosure" data-ei-problems-wrap>
@@ -62,7 +62,7 @@ import { NATIVE_APP } from '../config/app';
         <div class="import__table-wrap">
           <table class="import__table">
             <thead>
-              <tr><th scope="col">Row</th><th scope="col">Question</th><th scope="col">Why it's skipped</th></tr>
+              <tr><th data-t="exam.row" scope="col">Row</th><th data-t="exam.question" scope="col">Question</th><th data-t="exam.whyItSSkipped" scope="col">Why it's skipped</th></tr>
             </thead>
             <tbody data-ei-problems></tbody>
           </table>
@@ -71,33 +71,33 @@ import { NATIVE_APP } from '../config/app';
     </section>
 
     <details class="disclosure import__format" open data-ei-format>
-      <summary>File format</summary>
-      <p>One question per row. The first row names the columns:</p>
+      <summary data-t="exam.fileFormat">File format</summary>
+      <p data-t="exam.oneQuestionPerRowThe">One question per row. The first row names the columns:</p>
       <dl class="import__cols">
-        <div><dt>chapter</dt><dd>Optional. Matched to your chapters.</dd></div>
-        <div><dt>question</dt><dd>Required.</dd></div>
-        <div><dt>option_a … option_h</dt><dd>Two to eight options.</dd></div>
-        <div><dt>answer</dt><dd>The letter of the right option, or several: A,C</dd></div>
-        <div><dt>explanation</dt><dd>Optional. Shown after you answer.</dd></div>
+        <div><dt><code>chapter</code></dt><dd data-t="exam.optionalMatchedToYourChapters">Optional. Matched to your chapters.</dd></div>
+        <div><dt><code>question</code></dt><dd data-t="exam.required">Required.</dd></div>
+        <div><dt><code>option_a … option_h</code></dt><dd data-t="exam.twoToEightOptions">Two to eight options.</dd></div>
+        <div><dt><code>answer</code></dt><dd data-t="exam.theLetterOfTheRight">The letter of the right option, or several: A,C</dd></div>
+        <div><dt><code>explanation</code></dt><dd data-t="exam.optionalShownAfterYouAnswer">Optional. Shown after you answer.</dd></div>
       </dl>
-      <button type="button" class="btn btn--ghost btn--small" data-ei-template>Download CSV template</button>
-      <p class="muted import__hint">JSON works too: a list of objects with the same names, where <code>options</code> is a list.</p>
+      <button data-t="exam.downloadCsvTemplate" type="button" class="btn btn--ghost btn--small" data-ei-template>Download CSV template</button>
+      <p class="muted import__hint"><span data-t="exam.jsonBefore">JSON works too: a list of objects with the same names, where</span> <code>options</code> <span data-t="exam.jsonAfter">is a list.</span></p>
     </details>
   </div>
 
   <div class="exam-dialog__foot">
-    <p class="muted exam-dialog__trust">Questions stay {NATIVE_APP ? 'on this phone' : 'in this browser'}, and in your account if you're signed in. Only import material you're allowed to use.</p>
-    <button type="button" class="btn" data-ei-go disabled>Import</button>
+    <p class="muted exam-dialog__trust" data-t={NATIVE_APP ? 'exam.trustPhone' : 'exam.trustBrowser'}>Questions stay {NATIVE_APP ? 'on this phone' : 'in this browser'}, and in your account if you're signed in. Only import material you're allowed to use.</p>
+    <button data-t="exam.import" type="button" class="btn" data-ei-go disabled>Import</button>
   </div>
 </dialog>
 
 <dialog class="exam-dialog exam-dialog--practice popover" data-eb-practice aria-labelledby="eb-practice-title">
   <div class="exam-dialog__head">
     <div class="practice__top">
-      <h2 id="eb-practice-title" class="exam-dialog__title" data-ep-title>Practice</h2>
+      <h2 data-t="exam.practice" id="eb-practice-title" class="exam-dialog__title" data-ep-title>Practice</h2>
       <div class="practice__dots" data-ep-dots aria-hidden="true"></div>
     </div>
-    <button type="button" class="icon-btn" aria-label="End practice" data-ep-close>
+    <button data-t-aria-label="exam.endPractice" type="button" class="icon-btn" aria-label="End practice" data-ep-close>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
     </button>
   </div>
@@ -106,8 +106,8 @@ import { NATIVE_APP } from '../config/app';
     <div class="practice__view" data-ep-question>
       <p class="badge practice__chapter" data-ep-chapter hidden></p>
       <p class="practice__text" data-ep-text></p>
-      <p class="muted practice__hint" data-ep-hint hidden>Choose every answer that applies, then press Check answer.</p>
-      <div class="practice__options" role="group" aria-label="Answer options" data-ep-options></div>
+      <p data-t="exam.chooseEveryAnswerThatApplies" class="muted practice__hint" data-ep-hint hidden>Choose every answer that applies, then press Check answer.</p>
+      <div data-t-aria-label="exam.answerOptions" class="practice__options" role="group" aria-label="Answer options" data-ep-options></div>
       <div class="practice__why well" data-ep-why hidden>
         <p class="practice__verdict" data-ep-verdict></p>
         <p data-ep-explanation></p>
@@ -120,12 +120,12 @@ import { NATIVE_APP } from '../config/app';
   </div>
 
   <div class="exam-dialog__foot">
-    <button type="button" class="btn btn--ghost" aria-pressed="false" data-ep-again hidden>Ask me this again</button>
-    <button type="button" class="btn btn--ghost" data-ep-more hidden>Another round</button>
+    <button data-t="exam.askMeThisAgain" type="button" class="btn btn--ghost" aria-pressed="false" data-ep-again hidden>Ask me this again</button>
+    <button data-t="exam.anotherRound" type="button" class="btn btn--ghost" data-ep-more hidden>Another round</button>
     <span class="practice__spacer"></span>
-    <button type="button" class="btn" data-ep-check hidden>Check answer</button>
-    <button type="button" class="btn" data-ep-next hidden>Next question</button>
-    <button type="button" class="btn" data-ep-done hidden>Done</button>
+    <button data-t="exam.checkAnswer" type="button" class="btn" data-ep-check hidden>Check answer</button>
+    <button data-t="exam.nextQuestion" type="button" class="btn" data-ep-next hidden>Next question</button>
+    <button data-t="exam.done" type="button" class="btn" data-ep-done hidden>Done</button>
   </div>
   <p class="visually-hidden" aria-live="polite" data-ep-live></p>
 </dialog>
@@ -153,8 +153,8 @@ import { NATIVE_APP } from '../config/app';
   import { celebrate } from '../lib/appearance';
   import { el } from '../lib/dom';
   import { cleanups, onPage } from '../lib/page';
+  import { t, tn } from '../lib/i18n';
 
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const letter = (i: number) => String.fromCharCode(65 + i);
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -180,9 +180,9 @@ import { NATIVE_APP } from '../config/app';
     const live = $<HTMLElement>('[data-eb-live]');
     let clearArmed = false;
 
-    const announce = (node: HTMLElement, t: string) => {
+    const announce = (node: HTMLElement, text: string) => {
       node.textContent = '';
-      window.setTimeout(() => (node.textContent = t), 50);
+      window.setTimeout(() => (node.textContent = text), 50);
     };
 
     const poolSize = (questions: ExamQuestion[], chapterId: string) =>
@@ -190,7 +190,7 @@ import { NATIVE_APP } from '../config/app';
 
     function renderStart(): void {
       const n = Math.min(ROUND_SIZE, poolSize(getExam()?.questions ?? [], scope.value));
-      start.textContent = `Practice ${plural(n, 'question')}`;
+      start.textContent = tn('exam.practiceN', n);
       start.disabled = n === 0;
     }
 
@@ -201,18 +201,20 @@ import { NATIVE_APP } from '../config/app';
       const n = exam.questions.length;
       const withQuestions = exam.chapters.filter((ch) => exam.questions.some((q) => q.chapterId === ch.id));
       count.textContent = n
-        ? `${plural(n, 'question')}${withQuestions.length ? ` across ${plural(withQuestions.length, 'chapter')}` : ''}`
-        : 'No questions yet.';
+        ? withQuestions.length
+          ? `${tn('exam.questionsN', n)} · ${tn('exam.chaptersN', withQuestions.length)}`
+          : tn('exam.questionsN', n)
+        : t('exam.noQuestionsYetDot');
       const worst = n ? weakestChapter(exam) : null;
       weak.hidden = !worst;
-      if (worst) weak.textContent = `Weakest so far: ${worst.chapter.name}, ${worst.correct} of ${worst.seen} correct`;
+      if (worst) weak.textContent = t('exam.weakest', { name: worst.chapter.name, correct: worst.correct, seen: worst.seen });
 
       practiceRow.hidden = clear.hidden = n === 0;
       // With no questions yet, importing is the only thing to do here.
       if (n === 0) $<HTMLDetailsElement>('[data-eb-manage]').open = true;
       const before = scope.value || 'all';
       const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
-      scope.replaceChildren(option('all', `All chapters (${n})`), ...withQuestions.map((ch) => option(ch.id, `${ch.name} (${poolSize(exam.questions, ch.id)})`)));
+      scope.replaceChildren(option('all', t('exam.allChapters', { n })), ...withQuestions.map((ch) => option(ch.id, `${ch.name} (${poolSize(exam.questions, ch.id)})`)));
       scope.value = [...scope.options].some((o) => o.value === before) ? before : 'all';
       scope.hidden = withQuestions.length === 0;
       renderStart();
@@ -223,19 +225,19 @@ import { NATIVE_APP } from '../config/app';
     // Press twice to remove: the first press says what will happen.
     function disarmClear(): void {
       clearArmed = false;
-      clear.textContent = 'Remove all questions';
+      clear.textContent = t('exam.removeAllQuestions');
     }
     clear.addEventListener('click', () => {
       if (!clearArmed) {
         clearArmed = true;
-        clear.textContent = 'Press again to remove them all';
-        announce(live, 'Press again to remove every question and your practice results.');
+        clear.textContent = t('exam.pressAgainToRemove');
+        announce(live, t('exam.pressAgainToRemoveSaid'));
         window.setTimeout(disarmClear, 6000);
         return;
       }
       disarmClear();
       clearQuestions();
-      announce(live, 'All questions removed.');
+      announce(live, t('exam.allRemoved'));
     });
 
     // ---------- Import ----------
@@ -259,11 +261,11 @@ import { NATIVE_APP } from '../config/app';
       parsed = null;
       choices.clear();
       file.value = '';
-      fileName.textContent = 'No file chosen';
+      fileName.textContent = t('exam.noFileChosen');
       error.hidden = result.hidden = true;
       format.open = true;
       go.disabled = true;
-      go.textContent = 'Import';
+      go.textContent = t('exam.import');
     }
 
     function renderImport(): void {
@@ -272,8 +274,8 @@ import { NATIVE_APP } from '../config/app';
       const ready = parsed.questions.length;
       result.hidden = false;
       format.open = false;
-      counts.replaceChildren(el('span', 'badge import__ready', `${ready} ready`));
-      if (parsed.problems.length) counts.append(' ', el('span', 'badge import__skipped', `${parsed.problems.length} skipped`));
+      counts.replaceChildren(el('span', 'badge import__ready', t('exam.nReady', { n: ready })));
+      if (parsed.problems.length) counts.append(' ', el('span', 'badge import__skipped', t('exam.nSkipped', { n: parsed.problems.length })));
 
       mapWrap.hidden = parsed.chapters.length === 0;
       map.replaceChildren(
@@ -281,14 +283,14 @@ import { NATIVE_APP } from '../config/app';
           const n = parsed!.questions.filter((q) => q.chapter === label).length;
           const row = el('div', 'import__row');
           const from = el('p', 'import__from');
-          from.append(el('strong', '', label), el('span', 'muted', ` · ${plural(n, 'question')}`));
+          from.append(el('strong', '', label), el('span', 'muted', ` · ${tn('exam.questionsN', n)}`));
           const select = el('select', 'input');
-          select.setAttribute('aria-label', `Your chapter for “${label}”`);
+          select.setAttribute('aria-label', t('exam.yourChapterFor', { label }));
           const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
           select.append(
             ...exam.chapters.map((ch) => option(ch.id, ch.name)),
-            option(CHOICE_NEW, `Add “${label}” as a new chapter`),
-            option(CHOICE_NONE, 'No chapter'),
+            option(CHOICE_NEW, t('exam.addAsNew', { label })),
+            option(CHOICE_NONE, t('exam.noChapter')),
           );
           select.value = choices.get(label)!;
           select.addEventListener('change', () => choices.set(label, select.value));
@@ -298,17 +300,17 @@ import { NATIVE_APP } from '../config/app';
       );
 
       problemsWrap.hidden = parsed.problems.length === 0;
-      problemsSummary.textContent = `${plural(parsed.problems.length, 'row')} can't be used`;
+      problemsSummary.textContent = tn('exam.rowsUnusable', parsed.problems.length);
       problems.replaceChildren(
         ...parsed.problems.slice(0, 200).map((p) => {
           const tr = el('tr');
-          tr.append(el('td', 'muted', String(p.row)), el('td', '', p.text || '(empty)'), el('td', 'import__reason', p.reason));
+          tr.append(el('td', 'muted', String(p.row)), el('td', '', p.text || t('exam.empty')), el('td', 'import__reason', p.reason));
           return tr;
         }),
       );
 
       go.disabled = ready === 0;
-      go.textContent = ready ? `Import ${plural(ready, 'question')}` : 'Nothing to import';
+      go.textContent = ready ? tn('exam.importN', ready) : t('exam.nothingToImport');
     }
 
     file.addEventListener('change', async () => {
@@ -325,7 +327,7 @@ import { NATIVE_APP } from '../config/app';
         if (picked.size > 5_000_000) throw new Error('too big');
         text = await picked.text();
       } catch {
-        error.textContent = "This file couldn't be read. It may be too large (the limit is 5 MB).";
+        error.textContent = t('exam.couldNotRead');
         error.hidden = false;
         return;
       }
@@ -354,7 +356,7 @@ import { NATIVE_APP } from '../config/app';
       if (!parsed) return;
       const added = importQuestions(parsed.questions, choices);
       importDialog.close();
-      announce(live, `Imported ${plural(added, 'question')}.`);
+      announce(live, tn('exam.importedN', added));
     });
 
     $<HTMLButtonElement>('[data-eb-import-open]').addEventListener('click', () => {
@@ -411,7 +413,7 @@ import { NATIVE_APP } from '../config/app';
       const exam = getExam();
       questionView.hidden = false;
       summaryView.hidden = true;
-      title.textContent = `Question ${index + 1} of ${round.length}`;
+      title.textContent = t('exam.questionOf', { i: index + 1, n: round.length });
       renderDots();
       const name = exam?.chapters.find((ch) => ch.id === q.chapterId)?.name;
       chapter.hidden = !name;
@@ -433,7 +435,7 @@ import { NATIVE_APP } from '../config/app';
             if (isAnswer || isPicked) {
               const mark = el('span', 'practice__mark');
               mark.innerHTML = isAnswer ? CHECK_SVG : X_SVG;
-              mark.append(isAnswer ? (isPicked ? 'Your answer, correct' : 'Correct answer') : 'Your answer');
+              mark.append(isAnswer ? (isPicked ? t('exam.yourAnswerCorrect') : t('exam.correctAnswer')) : t('exam.yourAnswer'));
               b.append(mark);
             }
           } else {
@@ -457,7 +459,7 @@ import { NATIVE_APP } from '../config/app';
       why.hidden = !answered;
       if (answered) {
         const right = results[index]!;
-        verdict.textContent = right ? 'Correct.' : 'Not quite.';
+        verdict.textContent = right ? t('exam.correct') : t('exam.notQuite');
         verdict.classList.toggle('is-right', right);
         explanation.textContent = q.explanation ?? '';
         explanation.hidden = !q.explanation;
@@ -467,7 +469,7 @@ import { NATIVE_APP } from '../config/app';
       check.hidden = answered || !multi;
       check.disabled = picked.size === 0;
       more.hidden = done.hidden = true;
-      next.textContent = index === round.length - 1 ? 'See results' : 'Next question';
+      next.textContent = index === round.length - 1 ? t('exam.seeResults') : t('exam.nextQuestion');
     }
 
     function answer(): void {
@@ -480,7 +482,7 @@ import { NATIVE_APP } from '../config/app';
       next.focus();
       announce(
         practiceLive,
-        `${right ? 'Correct.' : `Not quite. The answer is ${q.answer.map(letter).join(' and ')}.`} ${q.explanation ?? ''}`,
+        `${right ? t('exam.correct') : t('exam.notQuiteAnswer', { answer: q.answer.map(letter).join(', ') })} ${q.explanation ?? ''}`,
       );
     }
 
@@ -489,10 +491,10 @@ import { NATIVE_APP } from '../config/app';
       const correct = results.filter(Boolean).length;
       questionView.hidden = true;
       summaryView.hidden = false;
-      title.textContent = 'Round finished';
+      title.textContent = t('exam.roundFinished');
       index = round.length;
       renderDots();
-      score.textContent = `${correct} of ${round.length} correct`;
+      score.textContent = t('exam.score', { correct, n: round.length });
       const exam = getExam();
       const misses = new Map<string, number>();
       round.forEach((q, i) => {
@@ -502,10 +504,10 @@ import { NATIVE_APP } from '../config/app';
       const top = [...misses.entries()].sort((a, b) => b[1] - a[1])[0];
       summaryText.textContent =
         correct === round.length
-          ? 'Every one right.'
+          ? t('exam.everyOneRight')
           : top
-            ? `Most misses were in ${top[0]} (${top[1]}). Missed questions come back first next time.`
-            : 'Missed questions come back first next time.';
+            ? t('exam.mostMisses', { name: top[0], n: top[1] })
+            : t('exam.missedComeBack');
       again.hidden = check.hidden = next.hidden = true;
       more.hidden = done.hidden = false;
       done.focus();
@@ -828,6 +830,14 @@ import { NATIVE_APP } from '../config/app';
     width: 10.5rem;
     color: var(--color-accent);
     font-family: var(--font-mono);
+  }
+
+  /* Column names are file headers, kept in English: plain text, not a code chip. */
+  .import__cols dt code {
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
   }
 
   .import__cols dd {
