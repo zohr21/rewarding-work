@@ -129,7 +129,7 @@ function isKey(v: string | undefined): v is Key {
   return !!v && v in en;
 }
 
-const ATTRS = ['aria-label', 'title', 'placeholder'] as const;
+const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'] as const;
 
 /**
  * Swap the text of every `data-t` element under `root` into the current language.
@@ -139,7 +139,8 @@ export function translatePage(root: ParentNode = document): void {
   document.documentElement.lang = getLang();
   if (getLang() === 'en') return;
   root.querySelectorAll<HTMLElement>('[data-t]').forEach((node) => {
-    if (isKey(node.dataset.t)) node.textContent = t(node.dataset.t);
+    // data-t-n="5" fills {n} and picks the plural form: <span data-t="x.tryIn" data-t-n="5">Try it in 5 min</span>
+    if (isKey(node.dataset.t)) node.textContent = node.dataset.tN === undefined ? t(node.dataset.t) : tn(node.dataset.t, Number(node.dataset.tN));
   });
   for (const attr of ATTRS) {
     root.querySelectorAll<HTMLElement>(`[data-t-${attr}]`).forEach((node) => {

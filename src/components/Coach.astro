@@ -4,8 +4,9 @@
  * more questions for a week's plan. Remembers whether what you tried helped and ranks
  * those first next time. Questions and scoring: src/data/coach.ts. Store: src/lib/coach.ts.
  */
-import { BLOCKERS, QUESTIONS, START, SESSION, WHEN, REWARD, TIE_BREAK, TIMER_FOR, START_TEXT, SESSION_TEXT, PLAN_TITLES } from '../data/coach';
+import { BLOCKERS, QUESTIONS, START, SESSION, WHEN, REWARD, TIE_BREAK, TIMER_FOR, START_TEXT, SESSION_TEXT, PLAN_TITLES, CUES } from '../data/coach';
 import { EVIDENCE } from '../data/taxonomy';
+import { en } from '../lib/i18n/en';
 import { getTechniques } from '../lib/techniques';
 import { url } from '../lib/paths';
 
@@ -26,11 +27,21 @@ const used = [
 for (const slug of used) if (!known.has(slug)) throw new Error(`coach.ts uses unknown technique slug "${slug}"`);
 for (const b of BLOCKERS) if (!PLAN_TITLES[b.id]) throw new Error(`coach.ts: PLAN_TITLES has no title for blocker "${b.id}"`);
 
+// Build-time check: every Coach line has its words in en.ts (keys are made from the ids).
+const keys = [
+  ...BLOCKERS.flatMap((b) => [`coach.blocker.${b.id}`, `coach.title.${b.id}`]),
+  ...QUESTIONS.flatMap((q) => [`coach.q.${q.id}`, ...q.options.map((o) => `coach.opt.${q.id}.${o.id}`)]),
+  ...Object.keys(CUES).map((c) => `coach.cue.${c}`),
+  ...Object.keys(START_TEXT).map((slug) => `coach.startText.${slug}`),
+  ...Object.keys(SESSION_TEXT).map((slug) => `coach.sessionText.${slug}`),
+];
+for (const k of keys) if (!(k in en)) throw new Error(`Coach: en.ts has no '${k}'. Add it, and to ru.ts and az.ts.`);
+
 // Only what the script needs, embedded as JSON.
 const info = Object.fromEntries(
   techniques.map((t) => [
     t.id,
-    { title: t.data.title, summary: t.data.summary, evidence: EVIDENCE[t.data.evidence].label, href: url(`/techniques/${t.id}`) },
+    { title: t.data.title, summary: t.data.summary, evidence: EVIDENCE[t.data.evidence].key, href: url(`/techniques/${t.id}`) },
   ]),
 );
 const json = JSON.stringify({ info, timer: url('/timer') }).replace(/</g, '\\u003c');
@@ -51,42 +62,42 @@ const ICONS: Record<string, string> = {
 
   {/* Asked once after you started something from here. */}
   <section class="card coach-ask" data-ask aria-labelledby="ask-heading" hidden>
-    <h2 id="ask-heading" class="coach-ask__q" data-ask-q>Did it help?</h2>
+    <h2 data-t="coach.didItHelp" id="ask-heading" class="coach-ask__q" data-ask-q>Did it help?</h2>
     <div class="coach-ask__answers">
-      <button type="button" class="btn btn--ghost" data-help="1">Yes</button>
-      <button type="button" class="btn btn--ghost" data-help="0.5">A bit</button>
-      <button type="button" class="btn btn--ghost" data-help="0">No</button>
+      <button data-t="coach.yes" type="button" class="btn btn--ghost" data-help="1">Yes</button>
+      <button data-t="coach.aBit" type="button" class="btn btn--ghost" data-help="0.5">A bit</button>
+      <button data-t="coach.no" type="button" class="btn btn--ghost" data-help="0">No</button>
     </div>
-    <button type="button" class="coach-link" data-help="skip">I didn't try it</button>
+    <button data-t="coach.iDidnTTryIt" type="button" class="coach-link" data-help="skip">I didn't try it</button>
   </section>
 
   {/* This week's plan, once you have one. */}
   <section class="card coach-plan" data-plan aria-labelledby="plan-heading" hidden>
     <div class="coach-plan__top">
-      <p class="coach-eyebrow">Your plan for this week</p>
+      <p data-t="coach.yourPlanForThisWeek" class="coach-eyebrow">Your plan for this week</p>
       <span class="muted coach-plan__day" data-plan-day></span>
     </div>
     <h2 id="plan-heading" class="coach-plan__title" data-plan-title></h2>
     <ol class="coach-days" role="list" data-plan-days></ol>
     <ol class="coach-steps" role="list" data-plan-steps></ol>
     <p class="coach-note" data-plan-note hidden></p>
-    <a class="btn coach-go" href={url('/timer')} data-plan-go>Start</a>
+    <a data-t="coach.start" class="btn coach-go" href={url('/timer')} data-plan-go>Start</a>
     <details class="coach-edit" data-plan-edit>
-      <summary>Change the plan</summary>
+      <summary data-t="coach.changeThePlan">Change the plan</summary>
       <form class="coach-edit__form" data-plan-form>
         <label class="coach-field">
-          <span>When</span>
+          <span data-t="coach.when">When</span>
           <input name="cue" maxlength="80" autocomplete="off" required />
         </label>
         <label class="coach-field">
-          <span>I open</span>
+          <span data-t="coach.iOpen">I open</span>
           <input name="task" maxlength="120" autocomplete="off" required />
         </label>
         <div class="coach-edit__actions">
-          <button type="submit" class="btn btn--small">Save</button>
-          <button type="button" class="btn btn--ghost btn--small" data-plan-renew hidden>Keep it another week</button>
-          <button type="button" class="btn btn--ghost btn--small" data-plan-new>New check-in</button>
-          <button type="button" class="coach-link coach-link--danger" data-plan-drop>Drop the plan</button>
+          <button data-t="coach.save" type="submit" class="btn btn--small">Save</button>
+          <button data-t="coach.keepItAnotherWeek" type="button" class="btn btn--ghost btn--small" data-plan-renew hidden>Keep it another week</button>
+          <button data-t="coach.newCheckIn" type="button" class="btn btn--ghost btn--small" data-plan-new>New check-in</button>
+          <button data-t="coach.dropThePlan" type="button" class="coach-link coach-link--danger" data-plan-drop>Drop the plan</button>
         </div>
       </form>
     </details>
@@ -94,7 +105,7 @@ const ICONS: Record<string, string> = {
 
   {/* One tap: what is in the way. */}
   <section class="coach-way" data-way aria-labelledby="way-heading">
-    <h2 id="way-heading" class="coach-way__title" data-way-title>What's in the way right now?</h2>
+    <h2 data-t="coach.whatSInTheWay" id="way-heading" class="coach-way__title" data-way-title>What's in the way right now?</h2>
     <ul class="coach-tiles" role="list">
       {
         BLOCKERS.map((b) => (
@@ -103,14 +114,14 @@ const ICONS: Record<string, string> = {
               <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
                 <path d={ICONS[b.icon]} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <span>{b.label}</span>
+              <span data-t={`coach.blocker.${b.id}`}>{b.label}</span>
             </button>
           </li>
         ))
       }
     </ul>
     <section class="coach-worked" data-worked aria-labelledby="worked-heading" hidden>
-      <h3 id="worked-heading">Worked for you before</h3>
+      <h3 data-t="coach.workedForYouBefore" id="worked-heading">Worked for you before</h3>
       <ul role="list" data-worked-list></ul>
     </section>
   </section>
@@ -121,22 +132,22 @@ const ICONS: Record<string, string> = {
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
       <span data-answer-blocker></span>
     </button>
-    <p class="coach-eyebrow">Try this now</p>
+    <p data-t="coach.tryThisNow" class="coach-eyebrow">Try this now</p>
     <h2 id="answer-heading" class="coach-answer__title" data-answer-title></h2>
     <p class="coach-answer__summary" data-answer-summary></p>
     <p class="muted coach-answer__why" data-answer-why></p>
-    <a class="btn coach-go" href={url('/timer')} data-answer-go>Start</a>
-    <button type="button" class="btn btn--ghost coach-go" data-answer-plan>Make it a plan · {steps - 1} questions</button>
+    <a data-t="coach.start" class="btn coach-go" href={url('/timer')} data-answer-go>Start</a>
+    <button type="button" class="btn btn--ghost coach-go" data-answer-plan data-t="coach.makePlan" data-t-n={steps - 1}>Make it a plan · {steps - 1} questions</button>
     <div class="coach-answer__more">
-      <button type="button" class="coach-link" data-answer-next>Another idea</button>
-      <a class="coach-link" href="#" data-answer-how>How it works</a>
+      <button data-t="coach.anotherIdea" type="button" class="coach-link" data-answer-next>Another idea</button>
+      <a data-t="coach.howItWorks" class="coach-link" href="#" data-answer-how>How it works</a>
     </div>
   </section>
 
   {/* The check-in: the questions after the blocker, then the task. */}
-  <form class="card coach-check" data-check aria-label="Coach check-in" novalidate hidden>
+  <form data-t-aria-label="coach.coachCheckIn" class="card coach-check" data-check aria-label="Coach check-in" novalidate hidden>
     <div class="coach-check__top">
-      <button type="button" class="coach-back" data-check-close aria-label="Close the check-in">
+      <button data-t-aria-label="coach.closeTheCheckIn" type="button" class="coach-back" data-check-close aria-label="Close the check-in">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
       </button>
       <span class="muted" data-check-count></span>
@@ -147,12 +158,12 @@ const ICONS: Record<string, string> = {
     {
       QUESTIONS.map((q) => (
         <fieldset class="coach-step" data-step tabindex="-1" hidden>
-          <legend class="coach-step__q">{q.question}</legend>
+          <legend class="coach-step__q" data-t={`coach.q.${q.id}`}>{q.question}</legend>
           <div class="coach-options">
             {q.options.map((o) => (
               <label class="coach-option">
                 <input type="radio" name={q.id} value={o.id} />
-                <span>{o.label}</span>
+                <span data-t={`coach.opt.${q.id}.${o.id}`}>{o.label}</span>
               </label>
             ))}
           </div>
@@ -160,22 +171,23 @@ const ICONS: Record<string, string> = {
       ))
     }
     <fieldset class="coach-step" data-step tabindex="-1" hidden>
-      <legend class="coach-step__q">Which task is it for?</legend>
+      <legend data-t="coach.whichTaskIsItFor" class="coach-step__q">Which task is it for?</legend>
       <div class="coach-options" data-task-options></div>
       <label class="coach-option coach-option--other">
         <input type="radio" name="task" value="" data-task-other />
-        <input type="text" class="coach-other" name="other" maxlength="120" placeholder="Something else, e.g. Revise chapter 4" aria-label="Something else" autocomplete="off" data-task-text />
+        <input data-t-placeholder="coach.somethingElseEGRevise" data-t-aria-label="coach.somethingElse" type="text" class="coach-other" name="other" maxlength="120" placeholder="Something else, e.g. Revise chapter 4" aria-label="Something else" autocomplete="off" data-task-text />
       </label>
     </fieldset>
     <div class="coach-check__nav">
-      <button type="button" class="btn btn--ghost" data-check-back>Back</button>
-      <button type="submit" class="btn" data-check-next disabled>Next</button>
+      <button data-t="coach.back" type="button" class="btn btn--ghost" data-check-back>Back</button>
+      <button data-t="coach.next" type="submit" class="btn" data-check-next disabled>Next</button>
     </div>
   </form>
 </div>
 
 <script>
-  import { BLOCKERS, CUES, PLAN_TITLES, REWARD_TEXT, SESSION_TEXT, START_TEXT, TIMER_FOR, forBlocker, makePlan } from '../data/coach';
+  import { BLOCKERS, CUES, SESSION_TEXT, START_TEXT, TIMER_FOR, forBlocker, makePlan } from '../data/coach';
+  import { t, tn, type Key } from '../lib/i18n';
   import { answerTried, getCoach, markTried, setCoach, PLAN_DAYS, type CoachPlan } from '../lib/coach';
   import { getSessions, getTasks } from '../lib/storage';
   import { todayTasks } from '../lib/tasks';
@@ -186,6 +198,7 @@ const ICONS: Record<string, string> = {
   interface Info {
     title: string;
     summary: string;
+    /** EVIDENCE key: strong, some or anecdotal. */
     evidence: string;
     href: string;
   }
@@ -196,7 +209,12 @@ const ICONS: Record<string, string> = {
     const { info, timer } = JSON.parse(root.querySelector('[data-coach-info]')!.textContent!) as { info: Record<string, Info>; timer: string };
     const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
     const title = (slug: string) => info[slug]?.title ?? slug;
-    const blockerLabel = (id: string) => BLOCKERS.find((b) => b.id === id)?.label ?? '';
+    const blockerLabel = (id: string) => (BLOCKERS.some((b) => b.id === id) ? t(`coach.blocker.${id}` as Key) : '');
+    const evidence = (slug: string) => (info[slug] ? t(`ev.${info[slug].evidence}` as Key) : '');
+    const cue = (when: string) => t(`coach.cue.${when}` as Key);
+    const startText = (slug: string) => (START_TEXT[slug] ? t(`coach.startText.${slug}` as Key) : (info[slug]?.summary ?? ''));
+    const sessionText = (slug: string) => (SESSION_TEXT[slug] ? t(`coach.sessionText.${slug}` as Key) : (info[slug]?.summary ?? ''));
+    const helped = (w: { helped: number; tries: number }) => tn('coach.helped', w.tries, { helped: Math.round(w.helped) });
 
     const ask = $('[data-ask]');
     const plan = $('[data-plan]');
@@ -219,7 +237,7 @@ const ICONS: Record<string, string> = {
       const { tried } = getCoach();
       // Give it a few minutes before asking.
       ask.hidden = !tried || Date.now() - tried.at < 5 * 60_000 || !info[tried.slug];
-      if (!ask.hidden) $('[data-ask-q]').textContent = `You tried ${title(tried!.slug)}. Did it help?`;
+      if (!ask.hidden) $('[data-ask-q]').textContent = t('coach.youTried', { name: title(tried!.slug) });
     }
     ask.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLElement>('[data-help]');
@@ -247,7 +265,7 @@ const ICONS: Record<string, string> = {
       const body = el('div');
       const tech = el('a', 'coach-step-row__tech');
       tech.href = info[slug]?.href ?? '#';
-      tech.textContent = `${title(slug)} · ${info[slug]?.evidence ?? ''}`;
+      tech.textContent = `${title(slug)} · ${evidence(slug)}`;
       body.append(el('strong', '', text), tech);
       li.append(el('span', 'coach-step-row__label', label), body);
       return li;
@@ -256,16 +274,16 @@ const ICONS: Record<string, string> = {
     function renderPlan(): void {
       const p = getCoach().plan;
       plan.hidden = !p;
-      $('[data-way-title]').textContent = p ? 'Something else in the way?' : "What's in the way right now?";
+      $('[data-way-title]').textContent = p ? t('coach.somethingElseInTheWay') : t('coach.whatSInTheWay');
       if (!p) return;
-      const task = p.task || 'it';
+      const task = p.task ? t('coach.quoted', { text: p.task }) : t('coach.it');
       const first = startOfDay(p.created);
       const today = Math.floor((startOfDay(Date.now()).getTime() - first.getTime()) / 86_400_000);
       const over = today >= PLAN_DAYS;
       const focus = focusByDay(p);
 
-      $('[data-plan-title]').textContent = PLAN_TITLES[p.blocker]!.replace('{task}', p.task ? `“${p.task}”` : 'it');
-      $('[data-plan-day]').textContent = over ? 'Week done' : `Day ${today + 1} of ${PLAN_DAYS}`;
+      $('[data-plan-title]').textContent = t(`coach.title.${p.blocker}` as Key, { task: p.task ? t('coach.quoted', { text: p.task }) : t('coach.itTitle') });
+      $('[data-plan-day]').textContent = over ? t('coach.weekDone') : t('coach.dayOf', { day: today + 1, n: PLAN_DAYS });
 
       const dots = $('[data-plan-days]');
       let done = 0;
@@ -275,30 +293,30 @@ const ICONS: Record<string, string> = {
           const on = focus.has(k);
           if (on) done += 1;
           const li = el('li', `coach-day${on ? ' coach-day--on' : ''}${i === today ? ' coach-day--today' : ''}`);
-          li.append(el('span', 'visually-hidden', `Day ${i + 1}: ${on ? 'done' : i < today ? 'missed' : 'to do'}`));
+          li.append(el('span', 'visually-hidden', t(on ? 'coach.dayDone' : i < today ? 'coach.dayMissed' : 'coach.dayToDo', { day: i + 1 })));
           return li;
         }),
       );
-      dots.setAttribute('aria-label', `${done} of ${PLAN_DAYS} days done`);
+      dots.setAttribute('aria-label', tn('coach.daysDone', PLAN_DAYS, { done }));
 
       $('[data-plan-steps]').replaceChildren(
-        stepRow('When', `${p.cue}, I open ${task}.`, p.when),
-        stepRow('Start with', START_TEXT[p.start] ?? info[p.start]?.summary ?? '', p.start),
-        stepRow('Keep going', SESSION_TEXT[p.session] ?? info[p.session]?.summary ?? '', p.session),
-        stepRow('Reward', REWARD_TEXT, p.reward, true),
+        stepRow(t('coach.when'), t('coach.cueLine', { cue: p.cue, task }), p.when),
+        stepRow(t('coach.stepStart'), startText(p.start), p.start),
+        stepRow(t('coach.stepKeep'), sessionText(p.session), p.session),
+        stepRow(t('coach.stepReward'), t('coach.rewardText'), p.reward, true),
       );
 
       // Grow the start once the small one keeps turning into real sessions.
       const note = $('[data-plan-note]');
       const longDays = [...focus.values()].filter((sec) => sec >= 600).length;
-      if (over) note.textContent = done ? `You showed up on ${done} of ${PLAN_DAYS} days. Keep the plan another week, or do a new check-in.` : 'Your week is up. Try a new check-in, or keep this plan another week.';
-      else if (p.start === 'two-minute-rule' && longDays >= 3) note.textContent = `You kept going past two minutes on ${longDays} days. Next week, start with a full session?`;
+      if (over) note.textContent = done ? tn('coach.noteShowedUp', PLAN_DAYS, { done }) : t('coach.noteWeekUp');
+      else if (p.start === 'two-minute-rule' && longDays >= 3) note.textContent = tn('coach.noteGrow', longDays);
       else note.textContent = '';
       note.hidden = !note.textContent;
 
       const go = $<HTMLAnchorElement>('[data-plan-go]');
       go.href = startHref(p.start, p.session, p.taskId) ?? timer;
-      go.textContent = p.start === 'two-minute-rule' ? 'Start the 2 minutes' : 'Start';
+      go.textContent = p.start === 'two-minute-rule' ? t('coach.startTwo') : t('coach.start');
       go.onclick = () => markTried(p.start);
 
       const form = $<HTMLFormElement>('[data-plan-form]');
@@ -348,7 +366,7 @@ const ICONS: Record<string, string> = {
           const li = el('li');
           const a = el('a');
           a.href = info[slug]!.href;
-          a.append(el('strong', '', title(slug)), el('span', 'muted', ` · helped ${Math.round(w.helped)} of ${w.tries} ${w.tries === 1 ? 'time' : 'times'}`));
+          a.append(el('strong', '', title(slug)), el('span', 'muted', ` · ${helped(w)}`));
           li.append(a);
           return li;
         }),
@@ -378,21 +396,21 @@ const ICONS: Record<string, string> = {
 
     function renderAnswer(): void {
       const slug = picks[pick]!;
-      const t = info[slug]!;
+      const tech = info[slug]!;
       const w = getCoach().worked[slug];
       $('[data-answer-blocker]').textContent = blockerLabel(blocker);
-      $('[data-answer-title]').textContent = t.title;
-      $('[data-answer-summary]').textContent = t.summary;
+      $('[data-answer-title]').textContent = tech.title;
+      $('[data-answer-summary]').textContent = tech.summary;
       $('[data-answer-why]').textContent =
         w && w.tries && w.helped / w.tries >= 0.5
-          ? `Picked because it helped you ${Math.round(w.helped)} of ${w.tries} ${w.tries === 1 ? 'time' : 'times'}. ${t.evidence}.`
-          : `Fits “${blockerLabel(blocker)}”. ${t.evidence}.`;
+          ? t('coach.pickedBecause', { helped: helped(w), evidence: evidence(slug) })
+          : t('coach.fits', { blocker: blockerLabel(blocker), evidence: evidence(slug) });
       const go = $<HTMLAnchorElement>('[data-answer-go]');
       const href = startHref(slug);
-      go.href = href ?? t.href;
-      go.textContent = slug === 'two-minute-rule' ? 'Start the 2 minutes' : href ? 'Start' : 'Try it';
+      go.href = href ?? tech.href;
+      go.textContent = slug === 'two-minute-rule' ? t('coach.startTwo') : href ? t('coach.start') : t('coach.tryIt');
       go.onclick = () => markTried(slug);
-      $<HTMLAnchorElement>('[data-answer-how]').href = t.href;
+      $<HTMLAnchorElement>('[data-answer-how]').href = tech.href;
       $('[data-answer-next]').hidden = picks.length < 2;
     }
 
@@ -438,26 +456,26 @@ const ICONS: Record<string, string> = {
       steps.forEach((s, j) => (s.hidden = j !== i));
       // The blocker was the first step.
       bar.forEach((b, j) => b.classList.toggle('on', j <= i + 1));
-      $('[data-check-count]').textContent = `${i + 2} of ${steps.length + 1}`;
-      next.textContent = i === steps.length - 1 ? 'Make my plan' : 'Next';
+      $('[data-check-count]').textContent = t('coach.stepCount', { i: i + 2, n: steps.length + 1 });
+      next.textContent = i === steps.length - 1 ? t('coach.makeMyPlan') : t('coach.next');
       next.disabled = !answered(i);
       if (moveFocus) steps[i]!.focus();
     }
 
     /** Your open tasks, Today's first, as answers to "Which task is it for?". */
     function fillTasks(): void {
-      const all = getTasks().filter((t) => t.status === 'active' && !t.deletedAt);
+      const all = getTasks().filter((x) => x.status === 'active' && !x.deletedAt);
       const today = todayTasks(all);
-      const rest = all.filter((t) => !today.includes(t)).sort((a, b) => b.updatedAt - a.updatedAt);
+      const rest = all.filter((x) => !today.includes(x)).sort((a, b) => b.updatedAt - a.updatedAt);
       $('[data-task-options]').replaceChildren(
-        ...[...today, ...rest].slice(0, 4).map((t) => {
+        ...[...today, ...rest].slice(0, 4).map((task) => {
           const label = el('label', 'coach-option');
           const input = el('input');
           input.type = 'radio';
           input.name = 'task';
-          input.value = t.id;
-          input.dataset.title = t.title;
-          label.append(input, el('span', '', t.title));
+          input.value = task.id;
+          input.dataset.title = task.title;
+          label.append(input, el('span', '', task.title));
           return label;
         }),
       );
@@ -495,7 +513,7 @@ const ICONS: Record<string, string> = {
       const taskId = chosen && chosen !== other ? chosen.value : undefined;
       const task = taskId ? chosen!.dataset.title! : otherText.value.trim();
       const picked = makePlan(blocker, answers, getCoach().worked);
-      setCoach({ plan: { ...picked, created: Date.now(), blocker, answers, cue: CUES[answers.when!] ?? CUES.varies!, task, taskId } });
+      setCoach({ plan: { ...picked, created: Date.now(), blocker, answers, cue: cue(answers.when && CUES[answers.when] ? answers.when : 'varies'), task, taskId } });
       showView('home');
       plan.scrollIntoView({ block: 'start' });
       $('[data-plan-title]').setAttribute('tabindex', '-1');
@@ -674,6 +692,9 @@ const ICONS: Record<string, string> = {
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    /* Long words in other languages break inside the narrow column instead of running into the text. */
+    overflow-wrap: anywhere;
+    hyphens: auto;
   }
 
   .coach :global(.coach-step-row--reward .coach-step-row__label) {

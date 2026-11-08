@@ -6,11 +6,12 @@
  * There is one shared timer across the whole site: a session started on a technique
  * page keeps running on /timer, after a reload, or in another tab.
  */
-import { TIMER_MODES, TIMER_MODE_LABELS, type TimerMode } from '../data/taxonomy';
+import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
+import { modeKey, modeLabel, toneLabel } from '../lib/i18n/labels';
 import Sprig from './Sprig.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
-import { TONES, TONE_LABELS } from '../lib/timer/cues';
+import { TONES } from '../lib/timer/cues';
 
 interface Props {
   /** Mode shown when no session is in progress. Standalone uses the user's last mode. */
@@ -35,35 +36,35 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   data-status="idle"
   aria-labelledby="timer-heading">
   <div class="timer__head">
-    <h2 id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
+    <h2 data-t="timer.tryItFocusTimer" id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
     {/* In the app the rhythm is a chip under the dial that opens the four choices; the site shows them all, always open. */}
     <details class="timer__rhythm" data-rhythm-menu open={!NATIVE_APP}>
       <summary class="timer__rhythm-chip">
-        <span data-rhythm-label>{TIMER_MODE_LABELS[defaultMode ?? 'pomodoro']}</span>
+        <span data-rhythm-label data-t={modeKey(defaultMode ?? 'pomodoro')}>{modeLabel(defaultMode ?? 'pomodoro')}</span>
         <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </summary>
       <fieldset class="timer__modes" data-modes>
-        <legend class="visually-hidden">Timer mode</legend>
+        <legend data-t="timer.timerMode" class="visually-hidden">Timer mode</legend>
         {
           TIMER_MODES.map((m) => (
             <label class="seg">
               <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
-              <span>{TIMER_MODE_LABELS[m]}</span>
+              <span data-t={modeKey(m)}>{modeLabel(m)}</span>
             </label>
           ))
         }
       </fieldset>
     </details>
-    <p class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
+    <p data-t="timer.resetToChangeMode" class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
   </div>
 
   <div class="timer__custom" data-custom hidden>
     <label>
-      <span>Focus (min)</span>
+      <span data-t="timer.focusMin">Focus (min)</span>
       <input type="number" inputmode="numeric" min="1" max="240" step="1" value="15" data-custom-work />
     </label>
     <label>
-      <span>Break (min)</span>
+      <span data-t="timer.breakMin">Break (min)</span>
       <input type="number" inputmode="numeric" min="0" max="60" step="1" value="5" data-custom-break />
     </label>
   </div>
@@ -99,7 +100,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
           </span>
         )
       }
-      <p class="timer__phase" data-phase-label>Focus</p>
+      <p data-t="timer.focus" class="timer__phase" data-phase-label>Focus</p>
       <p class="timer__time" role="timer" aria-atomic="true" data-time>25:00</p>
       <p class="timer__dots" data-dots hidden>
         <span></span><span></span><span></span><span></span>
@@ -110,46 +111,46 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   <p class="timer__message" data-message></p>
 
   <form class="timer__log" data-log hidden>
-    <p class="timer__log-title">Before you move on <span class="muted">(optional)</span></p>
+    <p class="timer__log-title"><span data-t="timer.beforeYouMoveOn">Before you move on</span> <span data-t="timer.optional" class="muted">(optional)</span></p>
     <label class="timer__log-field">
-      <span>What did you get done?</span>
+      <span data-t="timer.whatDidYouGetDone">What did you get done?</span>
       <input class="input" type="text" maxlength="200" autocomplete="off" data-log-did />
     </label>
     <label class="timer__log-field">
-      <span>What's next?</span>
+      <span data-t="timer.whatSNext">What's next?</span>
       <input class="input" type="text" maxlength="200" autocomplete="off" data-log-next />
     </label>
     <p class="timer__log-hint muted" data-log-hint></p>
     <div class="timer__log-actions">
-      <button type="submit" class="btn btn--small">Save</button>
-      <button type="button" class="btn btn--ghost btn--small" data-log-skip>Skip</button>
+      <button data-t="timer.save" type="submit" class="btn btn--small">Save</button>
+      <button data-t="timer.skip" type="button" class="btn btn--ghost btn--small" data-log-skip>Skip</button>
     </div>
   </form>
 
   <div class="timer__controls">
-    <button type="button" class="btn timer__main" data-action="toggle">Start</button>
-    <button type="button" class="btn btn--ghost" data-action="stop" hidden>Stop &amp; take a break</button>
-    <button type="button" class="btn btn--ghost" data-action="skip" hidden>Skip break</button>
-    <button type="button" class="btn btn--ghost" data-action="reset">Reset</button>
+    <button data-t="timer.start" type="button" class="btn timer__main" data-action="toggle">Start</button>
+    <button data-t="timer.stopTakeABreak" type="button" class="btn btn--ghost" data-action="stop" hidden>Stop &amp; take a break</button>
+    <button data-t="timer.skipBreak" type="button" class="btn btn--ghost" data-action="skip" hidden>Skip break</button>
+    <button data-t="timer.reset" type="button" class="btn btn--ghost" data-action="reset">Reset</button>
   </div>
 
   <label class="timer__label">
-    <span>What are you working on? <span class="muted">(optional)</span></span>
-    <input type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
+    <span><span data-t="timer.whatAreYouWorkingOn">What are you working on?</span> <span data-t="timer.optional" class="muted">(optional)</span></span>
+    <input data-t-placeholder="timer.eGChapter3Notes" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
     <datalist data-task-options></datalist>
   </label>
   {/* The Android app's web view doesn't open the suggestions above, so there your tasks are buttons (timer-ui.ts). */}
-  {NATIVE_APP && <div class="timer__picks" role="group" aria-label="Your tasks" data-task-picks hidden />}
+  {NATIVE_APP && <div data-t-aria-label="timer.yourTasks" class="timer__picks" role="group" aria-label="Your tasks" data-task-picks hidden />}
   <p class="timer__task muted" data-task-link hidden></p>
 
   <div class="timer__jot">
-    <button type="button" class="btn btn--ghost btn--small" aria-expanded="false" aria-controls="timer-jot-form" data-jot-open>
+    <button data-t="timer.jotAThought" type="button" class="btn btn--ghost btn--small" aria-expanded="false" aria-controls="timer-jot-form" data-jot-open>
       Jot a thought
     </button>
     <form id="timer-jot-form" class="timer__jot-form" data-jot-form hidden>
-      <label for="timer-jot" class="visually-hidden">A thought to deal with later</label>
-      <input id="timer-jot" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Something to deal with later…" data-jot-input />
-      <button type="submit" class="btn btn--small">Save</button>
+      <label data-t="timer.aThoughtToDealWith" for="timer-jot" class="visually-hidden">A thought to deal with later</label>
+      <input data-t-placeholder="timer.somethingToDealWithLater" id="timer-jot" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Something to deal with later…" data-jot-input />
+      <button data-t="timer.save" type="submit" class="btn btn--small">Save</button>
     </form>
     <p class="timer__jot-status muted" data-jot-status hidden></p>
   </div>
@@ -157,14 +158,14 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   <div class="timer__footer">
     <label class="timer__sound">
       <input type="checkbox" data-sound checked />
-      <span>Sound</span>
+      <span data-t="timer.sound">Sound</span>
     </label>
     <span class="timer__sound-options" data-sound-options>
-      <label class="visually-hidden" for="timer-tone">End sound</label>
+      <label data-t="timer.endSound" class="visually-hidden" for="timer-tone">End sound</label>
       <select id="timer-tone" class="input timer__tone" data-tone>
-        {TONES.map((t) => <option value={t}>{TONE_LABELS[t]}</option>)}
+        {TONES.map((tone) => <option value={tone} data-t={`tone.${tone}`}>{toneLabel(tone)}</option>)}
       </select>
-      <label class="visually-hidden" for="timer-volume">Volume</label>
+      <label data-t="timer.volume" class="visually-hidden" for="timer-volume">Volume</label>
       <input id="timer-volume" class="timer__volume" type="range" min="5" max="100" step="5" value="70" data-volume />
     </span>
     <span class="muted" data-notify-status></span>
@@ -174,7 +175,8 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   {
     standalone && (
       <p class="timer__keys muted">
-        Keyboard: <kbd>Space</kbd> start / pause · <kbd>R</kbd> reset · <kbd>J</kbd> jot a thought
+        <span data-t="timer.keys">Keyboard:</span> <kbd data-t="timer.space">Space</kbd> <span data-t="timer.keysStartPause">start / pause</span> ·
+        <kbd>R</kbd> <span data-t="timer.keysReset">reset</span> · <kbd>J</kbd> <span data-t="timer.keysJot">jot a thought</span>
       </p>
     )
   }
@@ -186,16 +188,16 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     */
     NATIVE_APP && (
       <dialog class="done" data-done aria-labelledby="done-title">
-        <button type="button" class="done__close" data-done-close aria-label="Close">
+        <button data-t-aria-label="timer.close" type="button" class="done__close" data-done-close aria-label="Close">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </button>
         <Sprig mood="cheer" size={132} class="done__coin" />
-        <h2 id="done-title" class="done__title" data-done-title>Session complete</h2>
+        <h2 data-t="timer.sessionComplete" id="done-title" class="done__title" data-done-title>Session complete</h2>
         <p class="done__text" data-done-text />
         <div class="done__tier" data-done-tier />
-        <section class="done__phone" data-done-phone data-module="screen" aria-label="Phone during focus" hidden />
+        <section data-t-aria-label="timer.phoneDuringFocus" class="done__phone" data-done-phone data-module="screen" aria-label="Phone during focus" hidden />
         {/* "Did you know?": filled in by Guide.astro when this opens. */}
         <div class="done__tip" data-done-tip hidden />
         <div class="done__form" data-done-slot />
@@ -204,7 +206,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   <p class="visually-hidden" aria-live="polite" aria-atomic="true" data-live></p>
-  <noscript><p class="timer__message">The timer needs JavaScript enabled.</p></noscript>
+  <noscript><p data-t="timer.theTimerNeedsJavascriptEnabled" class="timer__message">The timer needs JavaScript enabled.</p></noscript>
 </section>
 
 <script>

@@ -24,6 +24,8 @@ import {
   type PastExam,
 } from './storage';
 import { addDays, fromDayKey, isDayKey, startOfDay, startOfWeek } from './dates';
+import { hoursMinutes } from './i18n/units';
+import { t } from './i18n';
 
 const NAME_MAX = 120;
 const TEXT_MAX = 1000;
@@ -92,7 +94,8 @@ export function deleteExam(): void {
 
 // ---------- Finishing ----------
 
-export const RESULT_LABELS: Record<ExamResult, string> = { passed: 'Passed', failed: "Didn't pass", finished: 'Finished' };
+/** "Passed", "Didn't pass" or "Finished", in the current language. */
+export const resultLabel = (result: ExamResult): string => t(`exam.result.${result}`);
 
 /**
  * You took the exam: the plan becomes a record under Past exams and the page is free
@@ -216,10 +219,7 @@ export function examTime(exam: Exam, sessions: FocusSession[]): ExamTime {
 
 /** "5 h 10 m", "45 m". */
 export function formatHM(seconds: number): string {
-  const min = Math.round(seconds / 60);
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h ? `${h} h ${String(m).padStart(2, '0')} m` : `${m} m`;
+  return hoursMinutes(seconds / 60);
 }
 
 /** Whole days until the exam: 0 on the day, negative once it has passed, null without a date. */
@@ -380,7 +380,7 @@ const questionKey = (text: string) => text.toLowerCase().replace(/\s+/g, ' ').tr
  */
 export function parseQuestionFile(text: string, existing: ExamQuestion[]): ParsedFile {
   const body = text.replace(/^﻿/, '').trim();
-  if (!body) return { ok: false, error: 'This file is empty.' };
+  if (!body) return { ok: false, error: t('exam.err.empty') };
 
   let raws: RawQuestion[];
   if (body.startsWith('[') || body.startsWith('{')) {
@@ -388,10 +388,10 @@ export function parseQuestionFile(text: string, existing: ExamQuestion[]): Parse
     try {
       json = JSON.parse(body);
     } catch {
-      return { ok: false, error: "This file isn't valid JSON." };
+      return { ok: false, error: t('exam.err.json') };
     }
     const list = Array.isArray(json) ? json : typeof json === 'object' && json !== null ? (json as { questions?: unknown }).questions : null;
-    if (!Array.isArray(list)) return { ok: false, error: 'Expected a list of questions.' };
+    if (!Array.isArray(list)) return { ok: false, error: t('exam.err.notList') };
     raws = list.map((item) => rawFromRecord(typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : {}));
   } else {
     const headerLine = body.split(/\r?\n/, 1)[0]!;
@@ -399,11 +399,11 @@ export function parseQuestionFile(text: string, existing: ExamQuestion[]): Parse
     const [header, ...rows] = parseCsv(body, delimiter);
     const keys = (header ?? []).map(normKey);
     if (!keys.some((k) => QUESTION_KEYS.includes(k))) {
-      return { ok: false, error: 'No "question" column found. The first row must name the columns.' };
+      return { ok: false, error: t('exam.err.noColumn') };
     }
     raws = rows.map((r) => rawFromRecord(Object.fromEntries(keys.map((k, i) => [k, r[i] ?? '']))));
   }
-  if (!raws.length) return { ok: false, error: 'No questions found in this file.' };
+  if (!raws.length) return { ok: false, error: t('exam.err.none') };
 
   const seen = new Map<string, number>();
   const inBank = new Set(existing.map((q) => questionKey(q.text)));
@@ -413,16 +413,16 @@ export function parseQuestionFile(text: string, existing: ExamQuestion[]): Parse
   raws.forEach((raw, i) => {
     const row = i + 1;
     const fail = (reason: string) => problems.push({ row, text: raw.text.slice(0, 120), reason });
-    if (!raw.text) return fail('No question text');
+    if (!raw.text) return fail(t('exam.skip.noText'));
     const key = questionKey(raw.text);
-    if (inBank.has(key)) return fail('Already in your question bank');
-    if (seen.has(key)) return fail(`Same as row ${seen.get(key)}`);
-    if (raw.options.length < 2) return fail('Fewer than two options');
-    if (raw.options.some((o) => !o)) return fail('An option is empty');
-    if (!raw.answer) return fail('No answer marked');
+    if (inBank.has(key)) return fail(t('exam.skip.inBank'));
+    if (seen.has(key)) return fail(t('exam.skip.sameAs', { row: seen.get(key)! }));
+    if (raw.options.length < 2) return fail(t('exam.skip.fewOptions'));
+    if (raw.options.some((o) => !o)) return fail(t('exam.skip.emptyOption'));
+    if (!raw.answer) return fail(t('exam.skip.noAnswer'));
     const answer = parseAnswer(raw.answer, raw.options);
-    if (!answer) return fail("The answer doesn't match an option");
-    if (questions.length >= room) return fail(`Over the limit of ${QUESTIONS_MAX} questions`);
+    if (!answer) return fail(t('exam.skip.noMatch'));
+    if (questions.length >= room) return fail(t('exam.skip.overLimit', { n: QUESTIONS_MAX }));
     seen.set(key, row);
     questions.push({
       row,

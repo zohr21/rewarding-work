@@ -6,11 +6,11 @@
  */
 ---
 
-<section class="glance" data-glance aria-label="Today at a glance">
+<section data-t-aria-label="tasks.todayAtAGlance" class="glance" data-glance aria-label="Today at a glance">
   <div class="card glance__card glance__plan">
     <span data-gl-ring></span>
     <div>
-      <p class="glance__label">Today's plan</p>
+      <p data-t="tasks.todaySPlan" class="glance__label">Today's plan</p>
       <p class="glance__big" data-gl-steps></p>
       <div class="glance__slots" data-gl-slots aria-hidden="true"></div>
       <p class="glance__note" data-gl-slots-text></p>
@@ -18,7 +18,7 @@
   </div>
 
   <div class="card glance__card">
-    <p class="glance__label">Focus this week</p>
+    <p data-t="tasks.focusThisWeek" class="glance__label">Focus this week</p>
     <p class="glance__big" data-gl-week></p>
     <div data-gl-bars></div>
   </div>
@@ -31,10 +31,10 @@
   import { addDays, dayKey, startOfWeek } from '../lib/dates';
   import { ring } from '../lib/charts';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const letterFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
-  const nameFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const letterFmt = dateFormat({ weekday: 'narrow' });
+  const nameFmt = dateFormat({ weekday: 'short' });
 
   /** Mon–Sun bars: past days soft, today solid, days with nothing (or still to come) a stub. */
   function weekBars(minutes: number[], todayIndex: number, monday: Date): string {
@@ -53,7 +53,7 @@
       }
       out += `<text class="bar__day${i === todayIndex ? ' bar__day--today' : ''}" x="${x + 11}" y="73">${letterFmt.format(date)}</text>`;
     });
-    return `<svg class="glance__chart" viewBox="0 0 220 76" role="img" aria-label="Focus minutes so far this week: ${said.join(', ')}">${out}</svg>`;
+    return `<svg class="glance__chart" viewBox="0 0 220 76" role="img" aria-label="${t('tasks.glanceChart', { days: said.join(', ') })}">${out}</svg>`;
   }
 
 
@@ -79,7 +79,7 @@
         const all = today.flatMap((t) => t.steps);
         const done = all.filter((s) => s.done).length;
         ringSlot.replaceChildren(ring(done, all.length, 84));
-        steps.textContent = all.length ? `${done} of ${plural(all.length, 'step')}` : today.length ? 'No steps yet' : 'Nothing planned';
+        steps.textContent = all.length ? tn('tasks.stepsOf', all.length, { done }) : today.length ? t('tasks.noSteps') : t('tasks.nothingPlanned');
         slots.replaceChildren(
           ...Array.from({ length: Math.max(TODAY_SOFT_MAX, today.length) }, (_, i) => {
             const s = document.createElement('span');
@@ -87,7 +87,7 @@
             return s;
           }),
         );
-        slotsText.textContent = `${today.length} of ${TODAY_SOFT_MAX} Today slots${today.length > TODAY_SOFT_MAX ? ' — over a short day' : ''}`;
+        slotsText.textContent = t(today.length > TODAY_SOFT_MAX ? 'tasks.slotsOver' : 'tasks.slots', { used: today.length, max: TODAY_SOFT_MAX });
 
         // Focus this week
         const byDay = minutesByDay(getSessions());

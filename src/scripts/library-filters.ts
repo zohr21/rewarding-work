@@ -3,6 +3,8 @@
  * State is mirrored in the URL (?category=time&problem=cant-start&q=pom) so filtered
  * views can be linked to and survive reloads / the back button.
  */
+import { tn } from '../lib/i18n';
+
 export function initLibraryFilters(): void {
   const form = document.querySelector<HTMLFormElement>('[data-filters]');
   const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-technique]'));
@@ -40,7 +42,7 @@ export function initLibraryFilters(): void {
     }
 
     count!.textContent =
-      shown === cards.length ? `Showing all ${cards.length} techniques` : `Showing ${shown} of ${cards.length} techniques`;
+      shown === cards.length ? tn('coach.showingAll', cards.length) : tn('coach.showingSome', cards.length, { shown });
     if (empty) empty.hidden = shown !== 0;
 
     if (updateUrl) {

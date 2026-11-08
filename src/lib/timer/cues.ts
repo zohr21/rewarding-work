@@ -44,7 +44,6 @@ export function armAudioUnlock(): void {
 
 export const TONES = ['chime', 'bell', 'marimba', 'bowl'] as const;
 export type Tone = (typeof TONES)[number];
-export const TONE_LABELS: Record<Tone, string> = { chime: 'Chime', bell: 'Bell', marimba: 'Marimba', bowl: 'Singing bowl' };
 export const isTone = (v: unknown): v is Tone => (TONES as readonly unknown[]).includes(v);
 
 interface Voice {

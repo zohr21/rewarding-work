@@ -28,7 +28,7 @@ const Heading = headingLevel;
     <a href={url(`/techniques/${technique.id}`)}>{title}</a>
   </Heading>
   <p class="tcard__summary">{summary}</p>
-  <p class="tcard__meta">Try it in {time_to_try} min</p>
+  <p class="tcard__meta" data-t="coach.tryIn" data-t-n={time_to_try}>Try it in {time_to_try} min</p>
 </article>
 
 <style>

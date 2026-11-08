@@ -6,19 +6,20 @@
 ---
 
 <section class="card past" data-exam-past hidden aria-labelledby="past-heading">
-  <h2 id="past-heading" class="panel-title">Past exams</h2>
+  <h2 data-t="exam.pastExams" id="past-heading" class="panel-title">Past exams</h2>
   <ul class="past__items" data-px-list></ul>
   <p class="visually-hidden" aria-live="polite" data-px-live></p>
 </section>
 
 <script>
   import { getExamStore, subscribe, type PastExam } from '../lib/storage';
-  import { formatHM, removePastExam, RESULT_LABELS, retryExam } from '../lib/exam';
+  import { formatHM, removePastExam, resultLabel, retryExam } from '../lib/exam';
+  import { dateFormat, t, tn } from '../lib/i18n';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
   import { cleanups, onPage } from '../lib/page';
 
-  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const dateFmt = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
 
   onPage('exam-past', () => {
     const root = document.querySelector<HTMLElement>('[data-exam-past]');
@@ -29,9 +30,9 @@
     /** Removed records still offered for Undo (src/lib/undo.ts). */
     const removing = new Set<string>();
 
-    const announce = (t: string) => {
+    const announce = (text: string) => {
       live.textContent = '';
-      window.setTimeout(() => (live.textContent = t), 50);
+      window.setTimeout(() => (live.textContent = text), 50);
     };
 
     function button(text: string, onClick: () => void): HTMLButtonElement {
@@ -45,7 +46,7 @@
       removing.add(record.id);
       render();
       offerUndo({
-        message: `Removed “${record.title}”`,
+        message: t('exam.removedName', { name: record.title }),
         commit: () => {
           removePastExam(record.id);
           removing.delete(record.id);
@@ -53,32 +54,32 @@
         undo: () => {
           removing.delete(record.id);
           render();
-          announce(`Restored: ${record.title}`);
+          announce(t('exam.restored', { name: record.title }));
         },
       });
-      announce(`Removed: ${record.title}. Press Undo to bring it back.`);
+      announce(t('exam.removedPastSaid', { name: record.title }));
     }
 
     function renderRecord(record: PastExam, free: boolean): HTMLLIElement {
       const li = el('li', 'past__item');
       const body = el('div', 'past__body');
       const title = el('p', 'past__title', record.title);
-      title.append(' ', el('span', `badge past__result past__result--${record.result}`, RESULT_LABELS[record.result]));
-      const parts = [dateFmt.format(record.finishedAt), `${formatHM(record.studiedSeconds)} studied`];
-      if (record.chaptersTotal) parts.push(`${record.chaptersDone} of ${record.chaptersTotal} chapters finished`);
+      title.append(' ', el('span', `badge past__result past__result--${record.result}`, resultLabel(record.result)));
+      const parts = [dateFmt.format(record.finishedAt), t('exam.studied', { time: formatHM(record.studiedSeconds) })];
+      if (record.chaptersTotal) parts.push(tn('exam.chaptersFinished', record.chaptersTotal, { done: record.chaptersDone }));
       body.append(title, el('p', 'past__meta muted', parts.join(' · ')));
 
       const actions = el('div', 'past__actions');
       if (record.retry) {
-        const again = button('Prepare again', () => {
-          if (retryExam(record.id)) announce(`New plan started for ${record.title}, with the same chapters and questions.`);
+        const again = button(t('exam.prepareAgain'), () => {
+          if (retryExam(record.id)) announce(t('exam.retrySaid', { name: record.title }));
         });
         again.disabled = !free;
-        if (!free) again.title = 'Finish or delete your current exam plan first';
+        if (!free) again.title = t('exam.finishFirst');
         actions.append(again);
       }
-      const del = button('Remove', () => remove(record));
-      del.setAttribute('aria-label', `Remove “${record.title}” from past exams`);
+      const del = button(t('exam.remove'), () => remove(record));
+      del.setAttribute('aria-label', t('exam.removePastLabel', { name: record.title }));
       actions.append(del);
       li.append(body, actions);
       return li;

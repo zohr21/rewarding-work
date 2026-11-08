@@ -14,8 +14,8 @@ const techniques = await getTechniques();
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <h1>Coach</h1>
-      {!NATIVE_APP && <p>Tap what is in the way. Four more questions turn it into a plan for the week.</p>}
+      <h1 data-t="coach.coach">Coach</h1>
+      {!NATIVE_APP && <p data-t="coach.tapWhatIsInThe">Tap what is in the way. Four more questions turn it into a plan for the week.</p>}
     </header>
 
     <Coach />
@@ -23,37 +23,37 @@ const techniques = await getTechniques();
     {/* The whole library, folded away. Opens by itself when a link arrives with a filter. */}
     <details class="library-fold" data-library>
       <summary>
-        <span id="all-heading">All {techniques.length} techniques</span>
+        <span id="all-heading" data-t="coach.allTechniques" data-t-n={techniques.length}>All {techniques.length} techniques</span>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </summary>
       <!-- Works without JS (all rows shown); the script below adds filtering. -->
-      <form class="filters" role="search" aria-label="Filter techniques" data-filters>
+      <form data-t-aria-label="coach.filterTechniques" class="filters" role="search" aria-label="Filter techniques" data-filters>
         <div class="filters__search">
-          <label for="q" class="visually-hidden">Search by title</label>
-          <input id="q" name="q" type="search" autocomplete="off" placeholder="Search, e.g. Pomodoro" />
+          <label data-t="coach.searchByTitle" for="q" class="visually-hidden">Search by title</label>
+          <input data-t-placeholder="coach.searchEGPomodoro" id="q" name="q" type="search" autocomplete="off" placeholder="Search, e.g. Pomodoro" />
         </div>
         {/* Opens by itself when a link arrives with ?problem= or ?category=. */}
         <details class="filters__more" data-filters-more>
-          <summary>Filter</summary>
+          <summary data-t="coach.filter">Filter</summary>
           <div class="filters__body">
             <fieldset class="chips">
-              <legend>What's in the way?</legend>
-              <label class="chip"><input type="radio" name="problem" value="" checked /> <span>All</span></label>
+              <legend data-t="coach.whatSInTheWay2">What's in the way?</legend>
+              <label class="chip"><input type="radio" name="problem" value="" checked /> <span data-t="coach.all">All</span></label>
               {
                 PROBLEM_SLUGS.map((p) => (
                   <label class="chip">
-                    <input type="radio" name="problem" value={p} /> <span>{PROBLEMS[p].title}</span>
+                    <input type="radio" name="problem" value={p} /> <span data-t={`problem.${p}`}>{PROBLEMS[p].title}</span>
                   </label>
                 ))
               }
             </fieldset>
             <fieldset class="chips">
-              <legend>Type</legend>
-              <label class="chip"><input type="radio" name="category" value="" checked /> <span>All</span></label>
+              <legend data-t="coach.type">Type</legend>
+              <label class="chip"><input type="radio" name="category" value="" checked /> <span data-t="coach.all">All</span></label>
               {
                 CATEGORY_SLUGS.map((c) => (
                   <label class="chip">
-                    <input type="radio" name="category" value={c} /> <span>{CATEGORIES[c].label}</span>
+                    <input type="radio" name="category" value={c} /> <span data-t={`cat.${c}`}>{CATEGORIES[c].label}</span>
                   </label>
                 ))
               }
@@ -64,7 +64,7 @@ const techniques = await getTechniques();
 
       <section class="card library" aria-labelledby="all-heading">
         <div class="library__head">
-          <p class="muted" aria-live="polite" data-count>Showing all {techniques.length} techniques</p>
+          <p class="muted" aria-live="polite" data-count data-t="coach.showingAll" data-t-n={techniques.length}>Showing all {techniques.length} techniques</p>
         </div>
         <ul class="library__list" role="list" data-grid>
           {techniques.map((t) => <TechniqueRow technique={t} />)}
@@ -72,8 +72,8 @@ const techniques = await getTechniques();
       </section>
 
       <div class="empty card" data-empty hidden>
-        <p>No techniques match these filters.</p>
-        <button type="button" class="btn btn--ghost" data-reset>Clear filters</button>
+        <p data-t="coach.noTechniquesMatchTheseFilters">No techniques match these filters.</p>
+        <button data-t="coach.clearFilters" type="button" class="btn btn--ghost" data-reset>Clear filters</button>
       </div>
 
     </details>
