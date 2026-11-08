@@ -18,12 +18,12 @@ const TAGS = [
 
 <section class="card bp" data-bplan aria-labelledby="bp-label">
   <div class="bp__empty" data-bp-empty>
-    <h2 class="panel-title" id="bp-label-empty">Plan the month</h2>
-    <p class="muted">
+    <h2 data-t="budget.planTheMonth" class="panel-title" id="bp-label-empty">Plan the month</h2>
+    <p data-t="budget.addWhatComesInIt" class="muted">
       Add what comes in. It is split into needs, wants and savings, and the savings are put aside first. Then you get one number: what is safe to
       spend today.
     </p>
-    <button type="button" class="btn" data-sheet-open="income">Add income</button>
+    <button data-t="budget.addIncome" type="button" class="btn" data-sheet-open="income">Add income</button>
   </div>
 
   <div class="bp__main" data-bp-main hidden>
@@ -36,106 +36,106 @@ const TAGS = [
     <ul class="bp__bars" role="list" data-bp-bars></ul>
     <p class="bp__unsorted" data-bp-unsorted hidden></p>
     <div class="bp__actions">
-      <button type="button" class="btn" data-bp-expense>Add expense</button>
-      <button type="button" class="btn btn--ghost" data-sheet-open="income">Income</button>
+      <button data-t="budget.addExpense" type="button" class="btn" data-bp-expense>Add expense</button>
+      <button data-t="budget.income" type="button" class="btn btn--ghost" data-sheet-open="income">Income</button>
     </div>
     <div class="bp__tiles">
-      <button type="button" class="bp__tile" data-sheet-open="goals"><span class="muted">Goals</span><strong data-bp-goals></strong></button>
-      <button type="button" class="bp__tile" data-sheet-open="plan"><span class="muted">Plan</span><strong data-bp-split></strong></button>
-      <button type="button" class="bp__tile" data-sheet-open="budget-cal"><span class="muted">No-spend days</span><strong data-bp-nospend></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="goals"><span data-t="budget.goals" class="muted">Goals</span><strong data-bp-goals></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="plan"><span data-t="budget.plan" class="muted">Plan</span><strong data-bp-split></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="budget-cal"><span data-t="budget.noSpendDays" class="muted">No-spend days</span><strong data-bp-nospend></strong></button>
     </div>
   </div>
 </section>
 
-<Sheet id="income" title="Income">
+<Sheet id="income" title="Income" titleKey="budget.income">
   <form class="bp-form" data-bp-i-form>
     <label class="bp-amount">
-      <span class="visually-hidden">Amount</span>
+      <span data-t="budget.amount" class="visually-hidden">Amount</span>
       <span class="bp-amount__sign" data-bp-sign aria-hidden="true"></span>
-      <input type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bp-i-amount />
+      <input data-t-aria-label="budget.amount" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bp-i-amount />
     </label>
     <fieldset class="bp-seg">
-      <legend class="visually-hidden">Source</legend>
+      <legend data-t="budget.source" class="visually-hidden">Source</legend>
       {
         INCOME_SOURCES.map((s, i) => (
           <label class="bp-seg__opt">
             <input type="radio" name="bp-i-source" value={s} class="visually-hidden" checked={i === 0} />
-            {SOURCE_LABELS[s]}
+            <span data-t={`budget.src.${s}`}>{SOURCE_LABELS[s]}</span>
           </label>
         ))
       }
     </fieldset>
     <div class="bp-pair">
       <label class="bp-field">
-        <span>What <span class="muted">(optional)</span></span>
-        <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. October salary" data-bp-i-what />
+        <span><span data-t="budget.what">What</span> <span data-t="budget.optional" class="muted">(optional)</span></span>
+        <input data-t-placeholder="budget.eGOctoberSalary" class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. October salary" data-bp-i-what />
       </label>
       <label class="bp-field">
-        <span>Date</span>
+        <span data-t="budget.date">Date</span>
         <input class="input" type="date" required data-bp-i-day />
       </label>
     </div>
-    <label class="bp-check"><input type="checkbox" data-bp-i-repeat /><span>Comes every month on this day</span></label>
+    <label class="bp-check"><input type="checkbox" data-bp-i-repeat /><span data-t="budget.comesEveryMonthOnThis">Comes every month on this day</span></label>
     <label class="bp-check"><input type="checkbox" checked data-bp-i-save /><span data-bp-i-save-label></span></label>
-    <button type="submit" class="btn bp-form__save">Save income</button>
+    <button data-t="budget.saveIncome" type="submit" class="btn bp-form__save">Save income</button>
   </form>
   <h3 class="bp-sub" data-bp-i-list-title></h3>
   <ul class="bp-list" role="list" data-bp-i-list></ul>
-  <h3 class="bp-sub" data-bp-ir-title hidden>Every month</h3>
+  <h3 data-t="budget.everyMonth" class="bp-sub" data-bp-ir-title hidden>Every month</h3>
   <ul class="bp-list" role="list" data-bp-ir-list></ul>
 </Sheet>
 
-<Sheet id="goals" title="Savings goals">
+<Sheet id="goals" title="Savings goals" titleKey="budget.savingsGoals">
   <p class="muted bp-intro" data-bp-g-intro></p>
   <ul class="bp-goals" role="list" data-bp-g-list></ul>
   <button type="button" class="btn btn--ghost bp-suggest" data-bp-g-suggest hidden></button>
   <form class="bp-form bp-goal-form" data-bp-g-form hidden>
-    <h3 class="bp-sub" data-bp-g-form-title>New goal</h3>
+    <h3 data-t="budget.newGoal" class="bp-sub" data-bp-g-form-title>New goal</h3>
     <label class="bp-field">
-      <span>Name</span>
-      <input class="input" type="text" maxlength={WHAT_MAX} required autocomplete="off" placeholder="e.g. Laptop" data-bp-g-name />
+      <span data-t="budget.name">Name</span>
+      <input data-t-placeholder="budget.eGLaptop" class="input" type="text" maxlength={WHAT_MAX} required autocomplete="off" placeholder="e.g. Laptop" data-bp-g-name />
     </label>
     <div class="bp-pair">
       <label class="bp-field">
-        <span>Target</span>
+        <span data-t="budget.target">Target</span>
         <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-g-target />
       </label>
       <label class="bp-field">
-        <span>Each month</span>
+        <span data-t="budget.eachMonth">Each month</span>
         <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bp-g-monthly />
       </label>
     </div>
     <label class="bp-field">
-      <span>By <span class="muted">(optional)</span></span>
+      <span><span data-t="budget.by">By</span> <span data-t="budget.optional" class="muted">(optional)</span></span>
       <input class="input" type="month" data-bp-g-by />
     </label>
     <div class="bp-row">
-      <button type="button" class="btn btn--ghost" data-bp-g-delete hidden>Delete</button>
-      <button type="button" class="btn btn--ghost" data-bp-g-cancel>Cancel</button>
-      <button type="submit" class="btn">Save goal</button>
+      <button data-t="budget.delete" type="button" class="btn btn--ghost" data-bp-g-delete hidden>Delete</button>
+      <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bp-g-cancel>Cancel</button>
+      <button data-t="budget.saveGoal" type="submit" class="btn">Save goal</button>
     </div>
   </form>
-  <button type="button" class="btn bp-form__save" data-bp-g-new>New goal</button>
+  <button data-t="budget.newGoal" type="button" class="btn bp-form__save" data-bp-g-new>New goal</button>
   <form class="bp-form bp-put" data-bp-s-form>
-    <h3 class="bp-sub">Put money aside</h3>
+    <h3 data-t="budget.putMoneyAside" class="bp-sub">Put money aside</h3>
     <div class="bp-pair">
       <label class="bp-field">
-        <span>For</span>
+        <span data-t="budget.for">For</span>
         <select class="input" data-bp-s-goal></select>
       </label>
       <label class="bp-field">
-        <span>Amount</span>
+        <span data-t="budget.amount">Amount</span>
         <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-s-amount />
       </label>
     </div>
-    <button type="submit" class="btn btn--ghost">Put aside</button>
+    <button data-t="budget.putAside" type="submit" class="btn btn--ghost">Put aside</button>
   </form>
 </Sheet>
 
-<Sheet id="plan" title="Your plan">
-  <p class="muted bp-intro">How income is split. Savings come off first, when the income comes in.</p>
+<Sheet id="plan" title="Your plan" titleKey="budget.yourPlan">
+  <p data-t="budget.howIncomeIsSplitSavings" class="muted bp-intro">How income is split. Savings come off first, when the income comes in.</p>
   <fieldset class="bp-splits">
-    <legend class="bp-sub">Needs · wants · savings</legend>
+    <legend data-t="budget.needsWantsSavings" class="bp-sub">Needs · wants · savings</legend>
     {
       SPLITS.map((s) => (
         <label class="bp-seg__opt bp-split">
@@ -146,22 +146,22 @@ const TAGS = [
       ))
     }
   </fieldset>
-  <h3 class="bp-sub">Each category counts as</h3>
-  <p class="muted bp-intro">Mixed asks each time, like food: groceries are a need, eating out is a want. One expense can always differ.</p>
+  <h3 data-t="budget.eachCategoryCountsAs" class="bp-sub">Each category counts as</h3>
+  <p data-t="budget.mixedAsksEachTimeLike" class="muted bp-intro">Mixed asks each time, like food: groceries are a need, eating out is a want. One expense can always differ.</p>
   <ul class="bp-tags" role="list">
     {
       CATEGORIES.map((c) => (
         <li class="bp-tags__row">
           <span class="bp-tags__name">
             <i style={`background: ${CATEGORY_COLORS[c]}`} aria-hidden="true" />
-            {CATEGORY_LABELS[c]}
+            <span data-t={`budget.cat.${c}`}>{CATEGORY_LABELS[c]}</span>
           </span>
           <fieldset class="bp-seg bp-seg--small">
-            <legend class="visually-hidden">{CATEGORY_LABELS[c]} counts as</legend>
+            <legend class="visually-hidden" data-t={`budget.cat.${c}`}>{CATEGORY_LABELS[c]} counts as</legend>
             {TAGS.map(([value, label]) => (
               <label class="bp-seg__opt">
                 <input type="radio" name={`bp-tag-${c}`} value={value} class="visually-hidden" data-bp-tag={c} />
-                {label}
+                <span data-t={`budget.tag.${value}`}>{label}</span>
               </label>
             ))}
           </fieldset>
@@ -188,9 +188,10 @@ const TAGS = [
   import {
     addIncome,
     addSave,
-    CATEGORY_SHORT,
+    categoryShort,
     categoryTag,
     currencySign,
+    needLabel,
     daysInMonth,
     formatMoney,
     getBudget,
@@ -203,9 +204,9 @@ const TAGS = [
     repeatDay,
     saveGoal,
     savedFor,
+    sourceLabel,
     setPlan,
     shiftMonth,
-    SOURCE_LABELS,
     type Category,
     type CategoryTag,
     type Goal,
@@ -216,10 +217,11 @@ const TAGS = [
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { offerUndo } from '../lib/undo';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
-  const monthLong = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+  const monthName = dateFormat({ month: 'long' });
+  const monthLong = dateFormat({ month: 'long', year: 'numeric' });
+  const weekday = dateFormat({ weekday: 'short' });
   const CROSS =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
@@ -253,7 +255,6 @@ const TAGS = [
       };
     };
     const whole = (n: number, sign: string) => formatMoney(Math.round(n), sign, 0);
-    const plural = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 
     function iconButton(label: string, onClick: () => void): HTMLButtonElement {
       const b = el('button', 'icon-btn');
@@ -289,47 +290,48 @@ const TAGS = [
       card.querySelector<HTMLElement>('[data-bp-empty]')!.hidden = planned;
       card.querySelector<HTMLElement>('[data-bp-main]')!.hidden = !planned;
       document.querySelector('[data-budget]')?.toggleAttribute('data-planned', planned);
-      setText('#bp-label-empty', current ? 'Plan the month' : `Nothing came in for ${name}`);
+      setText('#bp-label-empty', current ? t('budget.planTheMonth') : t('budget.p.nothingCameIn', { month: name }));
 
       if (planned) {
         const keep = Math.max(p.saved, p.planned.savings);
         if (current) {
           const over = p.leftToday < 0;
-          setText('[data-bp-label]', over ? 'Over for today' : `Safe to spend today · ${formatDay(fromDayKey(today()))}`);
+          setText('[data-bp-label]', over ? t('budget.p.overToday') : `${t('budget.p.safeToday')} · ${formatDay(fromDayKey(today()))}`);
           setText('[data-bp-big]', whole(Math.abs(over ? p.leftToday : Math.max(0, p.leftToday)), sign));
           $('[data-bp-big]').classList.toggle('is-over', over || p.free < 0);
-          const bills = p.billsLater ? `, after ${whole(p.billsLater, sign)} of bills still to come` : '';
+          const bills = p.billsLater ? t('budget.v.afterBills', { amount: whole(p.billsLater, sign) }) : '';
           setText(
             '[data-bp-line]',
             p.free > 0
-              ? `${whole(p.free - p.spentToday, sign)} left for ${plural(p.daysLeft, 'day')}${bills}`
-              : `${whole(-p.free, sign)} over the plan for ${name}${bills}`,
+              ? t('budget.p.leftFor', { amount: whole(p.free - p.spentToday, sign), days: tn('budget.v.days', p.daysLeft) }) + bills
+              : t('budget.p.overPlan', { amount: whole(-p.free, sign), month: name }) + bills,
           );
         } else {
           const left = p.income - keep - p.spent;
-          setText('[data-bp-label]', left >= 0 ? `Left from ${name}` : `Over in ${name}`);
+          setText('[data-bp-label]', left >= 0 ? t('budget.p.leftFrom', { month: name }) : t('budget.p.overIn', { month: name }));
           setText('[data-bp-big]', whole(Math.abs(left), sign));
           $('[data-bp-big]').classList.toggle('is-over', left < 0);
-          setText('[data-bp-line]', `${whole(p.income, sign)} came in, ${whole(p.spent, sign)} spent`);
+          setText('[data-bp-line]', t('budget.p.cameIn', { income: whole(p.income, sign), spent: whole(p.spent, sign) }));
         }
         setText(
           '[data-bp-saved]',
           p.saved
-            ? `${whole(p.saved, sign)} put in savings${p.saved < p.planned.savings ? `, ${whole(p.planned.savings - p.saved, sign)} still to put aside` : ''}`
-            : `${whole(p.planned.savings, sign)} to put in savings, kept out of what is safe to spend`,
+            ? t('budget.p.putInSavings', { amount: whole(p.saved, sign) }) +
+              (p.saved < p.planned.savings ? t('budget.p.stillToPut', { amount: whole(p.planned.savings - p.saved, sign) }) : '')
+            : t('budget.p.toPutInSavings', { amount: whole(p.planned.savings, sign) }),
         );
         const [n, w, sv] = s.plan.split;
         const bars = [
-          { label: 'Needs', got: p.needs, of: p.planned.needs, pct: n, color: 'var(--cat-visual)' },
-          { label: 'Wants', got: p.wants, of: p.planned.wants, pct: w, color: 'var(--cat-reward)' },
-          { label: 'Savings', got: p.saved, of: p.planned.savings, pct: sv, color: 'var(--cat-structure)' },
+          { label: t('budget.p.needs'), savings: false, got: p.needs, of: p.planned.needs, pct: n, color: 'var(--cat-visual)' },
+          { label: t('budget.p.wants'), savings: false, got: p.wants, of: p.planned.wants, pct: w, color: 'var(--cat-reward)' },
+          { label: t('budget.p.savings'), savings: true, got: p.saved, of: p.planned.savings, pct: sv, color: 'var(--cat-structure)' },
         ];
         $('[data-bp-bars]').replaceChildren(
           ...bars.map((b) => {
             const li = el('li', 'bp__bar');
             const head = el('span', 'bp__bar-head');
-            const over = b.label !== 'Savings' && b.got > b.of;
-            head.append(el('strong', '', b.label), el('span', over ? 'bp__over' : 'muted', `${whole(b.got, sign)} of ${whole(b.of, sign)} · ${b.pct}%`));
+            const over = !b.savings && b.got > b.of;
+            head.append(el('strong', '', b.label), el('span', over ? 'bp__over' : 'muted', `${whole(b.got, sign)} / ${whole(b.of, sign)} · ${b.pct}%`));
             const track = el('span', 'bp__track');
             const fill = el('i');
             fill.style.width = `${b.of ? Math.min(100, (b.got / b.of) * 100) : 0}%`;
@@ -341,13 +343,13 @@ const TAGS = [
         );
         const unsorted = $('[data-bp-unsorted]');
         unsorted.hidden = !p.unsorted;
-        unsorted.textContent = `${whole(p.unsorted, sign)} not sorted into need or want yet: tap “Need or want?” on those expenses.`;
+        unsorted.textContent = t('budget.p.unsorted', { amount: whole(p.unsorted, sign), ask: t('budget.needOrWant') });
         const goals = s.goals.filter((g) => g.deletedAt === undefined);
-        setText('[data-bp-goals]', goals.length ? `${goals.length} · ${whole(savedFor(s.saves, '') + goals.reduce((a, g) => a + savedFor(s.saves, g.id), 0), sign)}` : 'Add one');
+        setText('[data-bp-goals]', goals.length ? `${goals.length} · ${whole(savedFor(s.saves, '') + goals.reduce((a, g) => a + savedFor(s.saves, g.id), 0), sign)}` : t('budget.p.addOne'));
         setText('[data-bp-split]', s.plan.split.join('/'));
         const upto = current ? Number(today().slice(8)) : daysInMonth(month);
         const ns = noSpend(p.byDay, upto);
-        setText('[data-bp-nospend]', `${ns.days}${ns.best > 1 ? ` · best run ${ns.best}` : ''}`);
+        setText('[data-bp-nospend]', `${ns.days}${ns.best > 1 ? ` · ${t('budget.p.bestRun', { n: ns.best })}` : ''}`);
       }
       renderIncome();
       renderGoals();
@@ -364,23 +366,23 @@ const TAGS = [
       const s = store();
       const sign = s.currency;
       setText('[data-bp-sign]', currencySign(sign));
-      setText('[data-bp-i-save-label]', `Put ${s.plan.split[2]}% into savings first${s.goals.length ? ', shared over your goals' : ''}`);
+      setText('[data-bp-i-save-label]', t('budget.p.saveFirst', { pct: s.plan.split[2] }) + (s.goals.length ? t('budget.p.sharedOverGoals') : ''));
       const name = monthName.format(fromDayKey(`${month}-01`));
       const mine = s.incomes.filter((i) => monthOf(i.day) === month);
-      setText('[data-bp-i-list-title]', mine.length ? `In ${name}` : `Nothing in ${name} yet`);
+      setText('[data-bp-i-list-title]', mine.length ? t('budget.p.inMonth', { month: name }) : t('budget.p.nothingInMonth', { month: name }));
       $('[data-bp-i-list]').replaceChildren(
         ...mine.map((i) => {
           const li = el('li', 'bp-list__row');
           const main = el('span', 'bp-list__main');
-          main.append(el('strong', '', i.what), el('span', 'muted', [formatDay(fromDayKey(i.day)), SOURCE_LABELS[i.source], i.repeatId ? 'monthly' : ''].filter(Boolean).join(' · ')));
+          main.append(el('strong', '', i.what), el('span', 'muted', [formatDay(fromDayKey(i.day)), sourceLabel(i.source), i.repeatId ? t('budget.p.monthly') : ''].filter(Boolean).join(' · ')));
           li.append(
             main,
             el('span', 'bp-list__amount', `+${formatMoney(i.amount, sign)}`),
-            iconButton(`Delete ${i.what}`, () => {
+            iconButton(t('budget.p.deleteWhat', { what: i.what }), () => {
               removing.add(i.id);
               render();
               offerUndo({
-                message: `Deleted “${i.what}”`,
+                message: t('budget.v.deleted', { what: i.what }),
                 commit: () => {
                   removing.delete(i.id);
                   removeIncome(i.id);
@@ -401,15 +403,15 @@ const TAGS = [
         ...repeats.map((r) => {
           const li = el('li', 'bp-list__row');
           const main = el('span', 'bp-list__main');
-          main.append(el('strong', '', r.what), el('span', 'muted', `Day ${r.dayOfMonth} · ${SOURCE_LABELS[r.source]}${r.saveFirst ? ' · savings first' : ''}`));
+          main.append(el('strong', '', r.what), el('span', 'muted', `${t('budget.p.day', { n: r.dayOfMonth })} · ${sourceLabel(r.source)}${r.saveFirst ? ` · ${t('budget.p.savingsFirst')}` : ''}`));
           li.append(
             main,
             el('span', 'bp-list__amount', `+${formatMoney(r.amount, sign)}`),
-            iconButton(`Stop ${r.what}`, () => {
+            iconButton(t('budget.p.stopWhat', { what: r.what }), () => {
               removing.add(r.id);
               render();
               offerUndo({
-                message: `${r.what} stopped repeating`,
+                message: t('budget.p.stoppedRepeating', { what: r.what }),
                 commit: () => {
                   removing.delete(r.id);
                   removeIncomeRepeat(r.id);
@@ -443,7 +445,7 @@ const TAGS = [
         );
         if (!income) return;
         month = monthOf(income.day);
-        announce(`Added ${income.what}, ${formatMoney(income.amount, getBudget().currency)}`);
+        announce(t('budget.v.added', { what: income.what, amount: formatMoney(income.amount, getBudget().currency) }));
         $<HTMLDialogElement>('[data-sheet="income"]').close();
       }),
     );
@@ -462,8 +464,9 @@ const TAGS = [
       setText(
         '[data-bp-g-intro]',
         p.planned.savings
-          ? `${whole(p.planned.savings, sign)} a month goes to savings (${s.plan.split[2]}% of income), shared over your goals by what each one asks for.${monthly > p.planned.savings ? ` They ask for ${whole(monthly, sign)}.` : ''}`
-          : 'Savings are shared over your goals when income comes in, by what each one asks for a month.',
+          ? t('budget.p.goalsIntro', { amount: whole(p.planned.savings, sign), pct: s.plan.split[2] }) +
+            (monthly > p.planned.savings ? ' ' + t('budget.p.theyAsk', { amount: whole(monthly, sign) }) : '')
+          : t('budget.p.goalsIntroNone'),
       );
       const now = monthOf(today());
       $('[data-bp-g-list]').replaceChildren(
@@ -471,41 +474,43 @@ const TAGS = [
           const saved = savedFor(s.saves, g.id);
           const li = el('li', 'bp-goal');
           const head = el('span', 'bp-goal__head');
-          head.append(el('strong', '', g.name), el('span', 'muted', `${whole(saved, sign)} of ${whole(g.target, sign)}`));
+          head.append(el('strong', '', g.name), el('span', 'muted', `${whole(saved, sign)} / ${whole(g.target, sign)}`));
           const track = el('span', 'bp__track');
           const fill = el('i');
           fill.style.width = `${Math.min(100, (saved / g.target) * 100)}%`;
           fill.style.background = 'var(--cat-structure)';
           track.append(fill);
-          let note = g.monthly ? `${whole(g.monthly, sign)} a month` : 'No monthly amount';
-          if (saved >= g.target) note = 'Reached';
+          let note = g.monthly ? t('budget.p.aMonth', { amount: whole(g.monthly, sign) }) : t('budget.p.noMonthly');
+          let behind = false;
+          if (saved >= g.target) note = t('budget.p.reached');
           else if (g.by) {
             let months = 0;
             for (let m = now; m <= g.by && months < 600; m = shiftMonth(m, 1)) months++;
             const need = months ? (g.target - saved) / months : g.target - saved;
             const by = monthLong.format(fromDayKey(`${g.by}-01`));
-            note += g.monthly >= need ? ` · on track for ${by}` : ` · behind: ${whole(need, sign)} a month for ${by}`;
+            behind = g.monthly < need;
+            note += ' · ' + (behind ? t('budget.p.behind', { amount: whole(need, sign), by }) : t('budget.p.onTrackFor', { by }));
           }
-          const edit = el('button', 'btn btn--ghost btn--small', 'Change');
+          const edit = el('button', 'btn btn--ghost btn--small', t('budget.p.change'));
           edit.type = 'button';
           edit.addEventListener('click', () => openGoal(g));
           const foot = el('span', 'bp-goal__foot');
-          foot.append(el('span', saved < g.target && note.includes('behind') ? 'bp__over' : 'muted', note), edit);
+          foot.append(el('span', behind ? 'bp__over' : 'muted', note), edit);
           li.append(head, track, foot);
           return li;
         }),
-        ...(loose ? [el('li', 'bp-goal bp-goal--loose', `${whole(loose, sign)} saved with no goal`)] : []),
+        ...(loose ? [el('li', 'bp-goal bp-goal--loose', t('budget.p.looseSaved', { amount: whole(loose, sign) }))] : []),
       );
       const suggest = $<HTMLButtonElement>('[data-bp-g-suggest]');
       const needs = Math.max(p.needs, p.planned.needs);
       suggest.hidden = goals.length > 0 || !needs;
-      suggest.textContent = `Start with an emergency fund: 3 months of needs, ${whole(needs * 3, sign)}`;
+      suggest.textContent = t('budget.p.suggest', { amount: whole(needs * 3, sign) });
       suggest.dataset.target = String(Math.round(needs * 3));
       const select = $<HTMLSelectElement>('[data-bp-s-goal]');
       const was = select.value;
       select.replaceChildren(
         ...goals.map((g) => new Option(g.name, g.id)),
-        new Option('Savings, no goal', ''),
+        new Option(t('budget.p.noGoal'), ''),
       );
       select.value = [...select.options].some((o) => o.value === was) ? was : (goals[0]?.id ?? '');
     }
@@ -514,7 +519,7 @@ const TAGS = [
       editingGoal = goal;
       gForm.hidden = false;
       $('[data-bp-g-new]').hidden = true;
-      setText('[data-bp-g-form-title]', goal ? 'Change goal' : 'New goal');
+      setText('[data-bp-g-form-title]', goal ? t('budget.p.changeGoal') : t('budget.newGoal'));
       $<HTMLInputElement>('[data-bp-g-name]').value = goal?.name ?? preset?.name ?? '';
       $<HTMLInputElement>('[data-bp-g-target]').value = String(goal?.target ?? preset?.target ?? '');
       $<HTMLInputElement>('[data-bp-g-monthly]').value = goal?.monthly ? String(goal.monthly) : '';
@@ -540,7 +545,7 @@ const TAGS = [
     c.add(listen($('[data-bp-g-new]'), 'click', () => openGoal(null)));
     c.add(listen($('[data-bp-g-cancel]'), 'click', closeGoal));
     c.add(
-      listen($('[data-bp-g-suggest]'), 'click', () => openGoal(null, { name: 'Emergency fund', target: Number($('[data-bp-g-suggest]').dataset.target) })),
+      listen($('[data-bp-g-suggest]'), 'click', () => openGoal(null, { name: t('budget.p.emergencyFund'), target: Number($('[data-bp-g-suggest]').dataset.target) })),
     );
     c.add(
       listen(gForm, 'submit', (e) => {
@@ -555,7 +560,7 @@ const TAGS = [
           editingGoal?.id,
         );
         if (!goal) return;
-        announce(`Saved goal ${goal.name}`);
+        announce(t('budget.p.savedGoal', { name: goal.name }));
         closeGoal();
       }),
     );
@@ -567,7 +572,7 @@ const TAGS = [
         removing.add(goal.id);
         render();
         offerUndo({
-          message: `Deleted goal “${goal.name}”. What it had stays in savings.`,
+          message: t('budget.p.deletedGoal', { name: goal.name }),
           commit: () => {
             removing.delete(goal.id);
             removeGoal(goal.id);
@@ -586,7 +591,7 @@ const TAGS = [
         const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value));
         if (!save) return;
         amount.value = '';
-        announce(`Put ${formatMoney(save.amount, getBudget().currency)} aside`);
+        announce(t('budget.p.putAsideDone', { amount: formatMoney(save.amount, getBudget().currency) }));
       }),
     );
 
@@ -605,11 +610,11 @@ const TAGS = [
 
     c.add(
       listen($('[data-sheet="plan"]'), 'change', (e) => {
-        const t = e.target as HTMLInputElement;
+        const x = e.target as HTMLInputElement;
         const plan = getBudget().plan;
-        if (t.name === 'bp-split') setPlan({ ...plan, split: t.value.split('/').map(Number) as Split });
-        else if (t.dataset.bpTag) setPlan({ ...plan, tags: { ...plan.tags, [t.dataset.bpTag]: t.value as CategoryTag } });
-        announce('Plan saved');
+        if (x.name === 'bp-split') setPlan({ ...plan, split: x.value.split('/').map(Number) as Split });
+        else if (x.dataset.bpTag) setPlan({ ...plan, tags: { ...plan.tags, [x.dataset.bpTag]: x.value as CategoryTag } });
+        announce(t('budget.p.planSaved'));
       }),
     );
 
@@ -643,9 +648,9 @@ const TAGS = [
         else b.classList.add('is-later');
         if (bill) b.classList.add('has-bill');
         b.setAttribute('aria-pressed', String(key === picked));
-        const amount = past ? (spent ? whole(spent, sign) : '—') : bill ? 'bill' : '';
+        const amount = past ? (spent ? whole(spent, sign) : '—') : bill ? t('budget.p.bill') : '';
         b.append(el('strong', '', String(d)), el('span', '', amount));
-        b.setAttribute('aria-label', `${formatDay(fromDayKey(key))}: ${past ? (spent ? formatMoney(spent, sign) : 'no spend') : bill ? 'bill due' : 'to come'}`);
+        b.setAttribute('aria-label', `${formatDay(fromDayKey(key))}: ${past ? (spent ? formatMoney(spent, sign) : t('budget.p.noSpendLower')) : bill ? t('budget.p.billDueLower') : t('budget.p.toCome')}`);
         b.addEventListener('click', () => {
           picked = key;
           renderCalendar();
@@ -655,10 +660,10 @@ const TAGS = [
       $('[data-bp-cal-grid]').replaceChildren(...cells);
       $('[data-bp-cal-key]').replaceChildren(
         ...[
-          ['is-under', share ? `Under ${whole(share, sign)}` : 'Spent'],
-          ...(share ? [['is-over', 'Over']] : []),
-          ['is-none', 'No spend'],
-          ['has-bill', 'Bill due'],
+          ['is-under', share ? t('budget.p.under', { amount: whole(share, sign) }) : t('budget.p.spent')],
+          ...(share ? [['is-over', t('budget.p.over')]] : []),
+          ['is-none', t('budget.p.noSpend')],
+          ['has-bill', t('budget.p.billDue')],
         ].map(([cls, text]) => {
           const li = el('li');
           li.append(el('i', `bp-cal__swatch ${cls}`), document.createTextNode(text!));
@@ -674,15 +679,15 @@ const TAGS = [
       const rows: [string, string][] = [
         ...entries.map((e): [string, string] => {
           const need = needOf(e, s.plan);
-          return [`${e.what} · ${CATEGORY_SHORT[e.category]}${need ? ` · ${need}` : ''}${e.repeatId ? ' · bill' : ''}`, formatMoney(e.amount, sign)];
+          return [`${e.what} · ${categoryShort(e.category)}${need ? ` · ${needLabel(need)}` : ''}${e.repeatId ? ` · ${t('budget.p.bill')}` : ''}`, formatMoney(e.amount, sign)];
         }),
-        ...incomes.map((i): [string, string] => [`${i.what} · income`, `+${formatMoney(i.amount, sign)}`]),
-        ...dueBills.map((r): [string, string] => [`${r.what} · bill due`, formatMoney(r.amount, sign)]),
+        ...incomes.map((i): [string, string] => [`${i.what} · ${t('budget.p.incomeLower')}`, `+${formatMoney(i.amount, sign)}`]),
+        ...dueBills.map((r): [string, string] => [`${r.what} · ${t('budget.p.billDueLower')}`, formatMoney(r.amount, sign)]),
       ];
       const pickedDate = fromDayKey(picked!);
-      const titleText = `${formatDay(pickedDate)}${picked === today() ? ' · today' : ''}`;
+      const titleText = `${formatDay(pickedDate)}${picked === today() ? ` · ${t('budget.p.todayLower')}` : ''}`;
       day.replaceChildren(el('strong', '', titleText));
-      if (!rows.length) day.append(el('span', 'muted', picked! <= today() ? 'No spend.' : 'Nothing planned yet.'));
+      if (!rows.length) day.append(el('span', 'muted', picked! <= today() ? t('budget.p.noSpendDot') : t('budget.p.nothingPlanned')));
       for (const [what, amount] of rows) {
         const row = el('span', 'bp-cal__row');
         row.append(el('span', '', what), el('strong', '', amount));
@@ -697,9 +702,9 @@ const TAGS = [
         return d;
       };
       $('[data-bp-cal-stats]').replaceChildren(
-        stat('No-spend days', `${ns.days}${ns.best > 1 ? ` · best run ${ns.best}` : ''}`),
-        ...(share ? [stat(`Over ${whole(share, sign)}`, plural(over, 'day'))] : []),
-        stat('Bills left', whole(p.billsLater, sign)),
+        stat(t('budget.noSpendDays'), `${ns.days}${ns.best > 1 ? ` · ${t('budget.p.bestRun', { n: ns.best })}` : ''}`),
+        ...(share ? [stat(t('budget.p.overAmount', { amount: whole(share, sign) }), tn('budget.v.days', over))] : []),
+        stat(t('budget.p.billsLeft'), whole(p.billsLater, sign)),
       );
     }
 

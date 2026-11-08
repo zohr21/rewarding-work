@@ -39,16 +39,16 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
   <span class="bl__icon" aria-hidden="true">
     <svg viewBox="0 0 24 24" width="30" height="30"><rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
   </span>
-  <h1 class="bl__title" id="bl-title">Budget is locked</h1>
+  <h1 data-t="budget.budgetIsLocked" class="bl__title" id="bl-title">Budget is locked</h1>
 
   <div class="bl__device" data-bl-device hidden>
-    <p class="muted">Unlock with your fingerprint, face or the phone’s PIN. Focus, Tasks and your grove stay open.</p>
-    <button type="button" class="btn" data-bl-device-unlock>Unlock</button>
+    <p data-t="budget.unlockWithYourFingerprintFace" class="muted">Unlock with your fingerprint, face or the phone’s PIN. Focus, Tasks and your grove stay open.</p>
+    <button data-t="budget.unlock" type="button" class="btn" data-bl-device-unlock>Unlock</button>
   </div>
 
   <form class="bl__pin" data-bl-pin hidden>
     <label class="bl__field">
-      <span class="muted">Your Budget PIN for {here}</span>
+      <span class="muted" data-t={NATIVE_APP ? 'budget.l.pinForPhone' : 'budget.l.pinForBrowser'}>Your Budget PIN for {here}</span>
       <input
         class="input bl__input"
         type="password"
@@ -66,11 +66,11 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       {
         KEYS.map((k) =>
           k === 'del' ? (
-            <button type="button" class="bl__key" data-bl-key="del" aria-label="Delete last digit">
+            <button data-t-aria-label="budget.deleteLastDigit" type="button" class="bl__key" data-bl-key="del" aria-label="Delete last digit">
               ⌫
             </button>
           ) : k === 'ok' ? (
-            <button type="submit" class="bl__key bl__key--ok" aria-label="Unlock">
+            <button data-t="budget.ok" data-t-aria-label="budget.unlock" type="submit" class="bl__key bl__key--ok" aria-label="Unlock">
               OK
             </button>
           ) : (
@@ -81,52 +81,52 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
         )
       }
     </div>
-    <button type="button" class="btn btn--ghost btn--small" data-bl-forgot>Forgot PIN?</button>
+    <button data-t="budget.forgotPin" type="button" class="btn btn--ghost btn--small" data-bl-forgot>Forgot PIN?</button>
   </form>
 
   <div class="bl__forgot" data-bl-forgot-panel hidden>
     <div data-bl-forgot-account hidden>
-      <p>Sign in again to show it is you. The PIN is then removed and Budget opens.</p>
+      <p data-t="budget.signInAgainToShow">Sign in again to show it is you. The PIN is then removed and Budget opens.</p>
       <form class="bl__confirm" data-bl-confirm-password hidden>
         <label class="bl__field">
-          <span>Your account password</span>
+          <span data-t="budget.yourAccountPassword">Your account password</span>
           <input class="input" type="password" autocomplete="current-password" required data-bl-password />
         </label>
-        <button type="submit" class="btn">Confirm</button>
+        <button data-t="budget.confirm" type="submit" class="btn">Confirm</button>
       </form>
-      <button type="button" class="btn" data-bl-confirm-google hidden>Continue with Google</button>
+      <button data-t="budget.continueWithGoogle" type="button" class="btn" data-bl-confirm-google hidden>Continue with Google</button>
     </div>
     <div data-bl-forgot-local hidden>
-      <p>
+      <p data-t={ACCOUNTS_ENABLED ? (NATIVE_APP ? 'budget.l.wipeAccPhone' : 'budget.l.wipeAccBrowser') : NATIVE_APP ? 'budget.l.wipePhone' : 'budget.l.wipeBrowser'}>
         {ACCOUNTS_ENABLED ? 'Without an account to sign in to, the' : 'The'} only way back in is to remove Budget’s data from {here}: expenses, income, goals
         and the plan. Nothing else is touched.
       </p>
-      <button type="button" class="btn btn--danger" data-bl-wipe>Remove Budget data and the PIN</button>
+      <button data-t="budget.removeBudgetDataAndThe" type="button" class="btn btn--danger" data-bl-wipe>Remove Budget data and the PIN</button>
     </div>
     <p class="bl__error" role="alert" data-bl-forgot-error></p>
-    <button type="button" class="btn btn--ghost btn--small" data-bl-forgot-back>Back to the PIN</button>
+    <button data-t="budget.backToThePin" type="button" class="btn btn--ghost btn--small" data-bl-forgot-back>Back to the PIN</button>
   </div>
 
-  <p class="muted bl__foot">This keeps Budget from a glance at an open screen. Your account sign-in and your device’s own lock are what protect the data.</p>
+  <p data-t="budget.thisKeepsBudgetFromA" class="muted bl__foot">This keeps Budget from a glance at an open screen. Your account sign-in and your device’s own lock are what protect the data.</p>
 </section>
 
-<Sheet id="budget-lock" title="Lock Budget">
+<Sheet id="budget-lock" title="Lock Budget" titleKey="budget.lockBudget">
   <div class="bl-set" data-bl-settings>
-    <p class="muted bl-set__intro">Ask before showing your money. Only Budget locks; the rest of Grovyn stays open.</p>
+    <p data-t="budget.askBeforeShowingYourMoney" class="muted bl-set__intro">Ask before showing your money. Only Budget locks; the rest of Grovyn stays open.</p>
 
     <fieldset class="bl-set__group">
-      <legend>Unlock with</legend>
+      <legend data-t="budget.unlockWith">Unlock with</legend>
       <label class="bl-opt">
         <input type="radio" name="bl-mode" value="off" class="visually-hidden" />
-        <span class="bl-opt__text"><strong>Off</strong><span class="muted">Budget opens straight away</span></span>
+        <span class="bl-opt__text"><strong data-t="budget.off">Off</strong><span data-t="budget.budgetOpensStraightAway" class="muted">Budget opens straight away</span></span>
       </label>
       {
         NATIVE_APP && (
           <label class="bl-opt" data-bl-device-opt>
             <input type="radio" name="bl-mode" value="device" class="visually-hidden" />
             <span class="bl-opt__text">
-              <strong>Phone unlock</strong>
-              <span class="muted" data-bl-device-sub>
+              <strong data-t="budget.phoneUnlock">Phone unlock</strong>
+              <span data-t="budget.fingerprintFaceOrThePhone" class="muted" data-bl-device-sub>
                 Fingerprint, face or the phone’s PIN
               </span>
             </span>
@@ -136,8 +136,8 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       <label class="bl-opt">
         <input type="radio" name="bl-mode" value="pin" class="visually-hidden" />
         <span class="bl-opt__text">
-          <strong>{NATIVE_APP ? 'Grovyn PIN' : 'PIN'}</strong>
-          <span class="muted">{PIN_MIN}–{PIN_MAX} digits, for {here} only</span>
+          <strong data-t={NATIVE_APP ? 'budget.l.grovynPin' : 'budget.l.pin'}>{NATIVE_APP ? 'Grovyn PIN' : 'PIN'}</strong>
+          <span class="muted" data-t={NATIVE_APP ? 'budget.l.digitsPhone' : 'budget.l.digitsBrowser'}>{PIN_MIN}–{PIN_MAX} digits, for {here} only</span>
         </span>
       </label>
     </fieldset>
@@ -145,35 +145,35 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
     <form class="bl-set__pin" data-bl-new-pin hidden>
       <div class="bl-set__pair">
         <label class="bl__field">
-          <span>New PIN</span>
+          <span data-t="budget.newPin">New PIN</span>
           <input class="input" type="password" inputmode="numeric" autocomplete="new-password" pattern="[0-9]*" minlength={PIN_MIN} maxlength={PIN_MAX} required data-bl-new />
         </label>
         <label class="bl__field">
-          <span>Again</span>
+          <span data-t="budget.again">Again</span>
           <input class="input" type="password" inputmode="numeric" autocomplete="new-password" pattern="[0-9]*" minlength={PIN_MIN} maxlength={PIN_MAX} required data-bl-again />
         </label>
       </div>
       <p class="bl__error" role="alert" data-bl-new-error></p>
       <div class="bl-set__row">
-        <button type="button" class="btn btn--ghost btn--small" data-bl-new-cancel>Cancel</button>
-        <button type="submit" class="btn btn--small">Save PIN</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost btn--small" data-bl-new-cancel>Cancel</button>
+        <button data-t="budget.savePin" type="submit" class="btn btn--small">Save PIN</button>
       </div>
     </form>
-    <button type="button" class="btn btn--ghost btn--small bl-set__change" data-bl-change-pin hidden>Change PIN</button>
+    <button data-t="budget.changePin" type="button" class="btn btn--ghost btn--small bl-set__change" data-bl-change-pin hidden>Change PIN</button>
 
     <fieldset class="bl-set__group" data-bl-after-group>
-      <legend>Lock again after</legend>
+      <legend data-t="budget.lockAgainAfter">Lock again after</legend>
       <div class="bl-set__afters">
         {
           [
-            [0, 'Right away'],
-            [60, '1 min'],
-            [300, '5 min'],
-            [900, '15 min'],
-          ].map(([value, label]) => (
+            [0, 'Right away', 0],
+            [60, '1 min', 1],
+            [300, '5 min', 5],
+            [900, '15 min', 15],
+          ].map(([value, label, min]) => (
             <label class="bl-opt bl-opt--small">
               <input type="radio" name="bl-after" value={value} class="visually-hidden" />
-              {label}
+              <span data-t={min ? 'unit.min' : 'budget.l.rightAway'} data-t-n={min || undefined}>{label}</span>
             </label>
           ))
         }
@@ -181,12 +181,12 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
     </fieldset>
 
     <label class="bl-switch">
-      <span class="bl-opt__text"><strong>Hide amounts on open</strong><span class="muted">Budget shows ₼••• until you tap the eye</span></span>
+      <span class="bl-opt__text"><strong data-t="budget.hideAmountsOnOpen">Hide amounts on open</strong><span data-t="budget.budgetShowsUntilYouTap" class="muted">Budget shows ₼••• until you tap the eye</span></span>
       <input type="checkbox" role="switch" data-bl-hide-on-open />
     </label>
 
     <p class="bl-set__note" data-bl-note></p>
-    <button type="button" class="btn btn--ghost" data-bl-lock-now hidden>Lock now</button>
+    <button data-t="budget.lockNow" type="button" class="btn btn--ghost" data-bl-lock-now hidden>Lock now</button>
     <p class="visually-hidden" aria-live="polite" data-bl-live></p>
   </div>
 </Sheet>
@@ -198,6 +198,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
   import { getAccount, loadAccount } from '../lib/account/state';
   import { friendlyError } from '../lib/account/errors';
   import { remove } from '../lib/storage';
+  import { t, tn } from '../lib/i18n';
   import {
     amountsHidden,
     checkPin,
@@ -245,7 +246,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       html.toggleAttribute('data-money-hidden', hidden);
       for (const eye of $$<HTMLButtonElement>('[data-bl-eye]')) {
         eye.setAttribute('aria-pressed', String(hidden));
-        eye.setAttribute('aria-label', hidden ? 'Show amounts' : 'Hide amounts');
+        eye.setAttribute('aria-label', hidden ? t('budget.l.showAmounts') : t('budget.hideAmounts'));
         eye.dataset.hidden = String(hidden);
       }
       document.dispatchEvent(new CustomEvent('budget:refresh'));
@@ -261,7 +262,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       $('[data-bl-device]').hidden = !device;
       $<HTMLFormElement>('[data-bl-pin]').hidden = device;
       $('[data-bl-forgot-panel]').hidden = true;
-      setText('[data-bl-error]', lock.mode === 'pin' && lock.tries <= 0 ? 'Too many wrong PINs. Use “Forgot PIN?” to get back in.' : '');
+      setText('[data-bl-error]', lock.mode === 'pin' && lock.tries <= 0 ? t('budget.l.tooMany') : '');
       pinInput.disabled = lock.mode === 'pin' && lock.tries <= 0;
       if (device) void askDevice();
       else if (!pinInput.disabled) window.setTimeout(() => pinInput.focus(), 50);
@@ -275,13 +276,13 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       markOpen();
       html.removeAttribute('data-budget-locked');
       pinInput.value = '';
-      announce('Budget unlocked');
+      announce(t('budget.l.unlocked'));
     }
 
     async function askDevice(): Promise<void> {
       if (prompting) return;
       prompting = true;
-      const result = await deviceUnlock('Unlock Budget', 'Grovyn');
+      const result = await deviceUnlock(t('budget.l.unlockBudget'), 'Grovyn');
       prompting = false;
       if (result === 'ok') opened();
     }
@@ -293,14 +294,14 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
         e.preventDefault();
         const pin = pinInput.value;
         if (!isPin(pin)) {
-          setText('[data-bl-error]', 'Enter all the digits of your PIN.');
+          setText('[data-bl-error]', t('budget.l.allDigits'));
           return;
         }
         void checkPin(pin).then((ok) => {
           if (ok) return opened();
           pinInput.value = '';
           const left = getLock().tries;
-          setText('[data-bl-error]', left > 0 ? `Wrong PIN. ${left} ${left === 1 ? 'try' : 'tries'} left.` : 'Too many wrong PINs. Use “Forgot PIN?” to get back in.');
+          setText('[data-bl-error]', left > 0 ? tn('budget.l.wrong', left) : t('budget.l.tooMany'));
           pinInput.disabled = left <= 0;
           if (left > 0) pinInput.focus();
         });
@@ -355,7 +356,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
     c.add(listen($('[data-bl-confirm-google]'), 'click', () => void confirmed()));
     c.add(
       listen($('[data-bl-wipe]'), 'click', () => {
-        if (!window.confirm('Remove all Budget data on this device, and the PIN? This cannot be undone.')) return;
+        if (!window.confirm(t('budget.l.wipeConfirm'))) return;
         remove('health');
         forgetPin();
         opened();
@@ -380,14 +381,14 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       const deviceOpt = document.querySelector<HTMLInputElement>('input[name="bl-mode"][value="device"]');
       if (deviceOpt) {
         deviceOpt.disabled = deviceReady === false;
-        setText('[data-bl-device-sub]', deviceReady === false ? 'Set a screen lock in the phone’s settings first' : 'Fingerprint, face or the phone’s PIN');
+        setText('[data-bl-device-sub]', deviceReady === false ? t('budget.l.setScreenLock') : t('budget.fingerprintFaceOrThePhone'));
       }
       const notes: Record<LockMode, string> = {
-        off: `Anyone holding ${NATIVE_APP ? 'your unlocked phone' : 'this open browser'} can see Budget. The eye still hides the amounts.`,
-        device: 'Uses Android’s own prompt. Grovyn never sees your fingerprint or PIN, only whether it matched.',
+        off: NATIVE_APP ? t('budget.l.offPhone') : t('budget.l.offBrowser'),
+        device: t('budget.l.deviceNote'),
         pin: getAccount().user && !getAccount().user!.isAnonymous
-          ? 'Forgot it? Sign in to your account again to remove it. Your data stays in your account.'
-          : 'Forgot it? Without an account, the way back in is to remove Budget’s data from this device.',
+          ? t('budget.l.forgotAccount')
+          : t('budget.l.forgotLocal'),
       };
       setText('[data-bl-note]', notes[mode]);
     }
@@ -407,9 +408,9 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
     }));
     c.add(
       listen(sheet, 'change', (e) => {
-        const t = e.target as HTMLInputElement;
-        if (t.name === 'bl-mode') {
-          const mode = t.value as LockMode;
+        const x = e.target as HTMLInputElement;
+        if (x.name === 'bl-mode') {
+          const mode = x.value as LockMode;
           if (mode === 'pin') {
             if (getLock().mode !== 'pin') openNewPin();
             return;
@@ -417,22 +418,22 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
           choosingPin = false;
           if (mode === 'device') {
             // Try it once first, so a lock that cannot be opened is never set.
-            void deviceUnlock('Turn on the Budget lock', 'Grovyn').then((result) => {
+            void deviceUnlock(t('budget.l.turnOn'), 'Grovyn').then((result) => {
               if (result === 'ok') {
                 setLock({ mode: 'device', pin: null });
                 markOpen();
-                announce('Budget locks with your phone’s unlock');
+                announce(t('budget.l.locksWithPhone'));
               }
               fillSettings();
             });
             return;
           }
           setLock({ mode: 'off', pin: null, tries: MAX_TRIES });
-          announce('Budget lock off');
-        } else if (t.name === 'bl-after') {
-          setLock({ after: Number(t.value) });
-        } else if (t.matches('[data-bl-hide-on-open]')) {
-          setLock({ hideOnOpen: t.checked });
+          announce(t('budget.l.lockOff'));
+        } else if (x.name === 'bl-after') {
+          setLock({ after: Number(x.value) });
+        } else if (x.matches('[data-bl-hide-on-open]')) {
+          setLock({ hideOnOpen: x.checked });
         }
         fillSettings();
       }),
@@ -448,12 +449,12 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
       listen($('[data-bl-new-pin]'), 'submit', (e) => {
         e.preventDefault();
         const pin = $<HTMLInputElement>('[data-bl-new]').value;
-        if (!isPin(pin)) return setText('[data-bl-new-error]', 'Use 4 to 6 digits.');
-        if (pin !== $<HTMLInputElement>('[data-bl-again]').value) return setText('[data-bl-new-error]', 'The two PINs are not the same.');
+        if (!isPin(pin)) return setText('[data-bl-new-error]', t('budget.l.useDigits'));
+        if (pin !== $<HTMLInputElement>('[data-bl-again]').value) return setText('[data-bl-new-error]', t('budget.l.notSame'));
         void setPin(pin).then(() => {
           choosingPin = false;
           fillSettings();
-          announce('PIN saved. Budget is locked with it.');
+          announce(t('budget.l.pinSaved'));
         });
       }),
     );

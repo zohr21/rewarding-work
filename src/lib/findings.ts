@@ -15,7 +15,8 @@ import { getExamStore, read, write, type FocusSession } from './storage';
 import type { BodyDay } from './device';
 import { minutesByDay } from './stats';
 import { addDays, dayKey, type DayKey } from './dates';
-import { workoutType, type Workout } from './workouts';
+import { workoutLabel, workoutType, type Workout } from './workouts';
+import { dateFormat, t, tn } from './i18n';
 
 /** How far back rows are taken from. */
 const WINDOW_DAYS = 42;
@@ -106,8 +107,8 @@ export function finding(list: Row[]): Finding {
     return { kind: 'one-sided', rows: list.length, mostlyLong: long.length >= short.length };
   }
   const group = (rs: Row[], label: string): Group => ({ label, days: rs.length, avgFocusMin: Math.round(avg(rs.map((r) => r.focusMin))) });
-  const longG = group(long, '7h or more');
-  const shortG = group(short, shortBelow === SHORT_NIGHT ? 'Under 6h' : 'Under 7h');
+  const longG = group(long, t('health.group.long'));
+  const shortG = group(short, t(shortBelow === SHORT_NIGHT ? 'health.group.under6' : 'health.group.under7'));
   const whole = gap(long, short);
   if (Math.abs(whole) < MEANINGFUL) return { kind: 'no-link', rows: list.length, long: longG, short: shortG };
 
@@ -122,22 +123,22 @@ export function finding(list: Row[]): Finding {
 
 export const hm = (min: number) => {
   const m = Math.round(Math.abs(min));
-  return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  return m < 60 ? t('unit.min', { n: m }) : t('unit.hmShort', { h: Math.floor(m / 60), m: String(m % 60).padStart(2, '0') });
 };
 
 /** The finding as one sentence. */
 export function sentence(f: Finding): string {
   switch (f.kind) {
     case 'learning':
-      return 'Grovyn is still learning how sleep and focus go together for you.';
+      return t('health.f.learning');
     case 'one-sided':
       return f.mostlyLong
-        ? 'Your nights are almost all 7 hours or more, so there are no short nights to compare them with. That is good news.'
-        : 'Your nights are almost all short, so there are no long nights to compare them with yet.';
+        ? t('health.f.allLong')
+        : t('health.f.allShort');
     case 'no-link':
-      return `So far, how long you sleep makes little difference to your focus the next day.`;
+      return t('health.f.noLink');
     case 'link':
-      return `After 7 hours of sleep or more, you focus about ${hm(f.diffMin)} ${f.diffMin > 0 ? 'longer' : 'less'} the next day.`;
+      return t(f.diffMin > 0 ? 'health.f.longer' : 'health.f.less', { time: hm(f.diffMin) });
   }
 }
 
@@ -145,13 +146,13 @@ export function sentence(f: Finding): string {
 export function short(f: Finding): string {
   switch (f.kind) {
     case 'learning':
-      return `${f.more} more ${f.more === 1 ? 'night' : 'nights'} to go`;
+      return tn('health.s.toGo', f.more);
     case 'one-sided':
-      return f.mostlyLong ? 'Nearly every night is 7h+' : 'Nearly every night is short';
+      return f.mostlyLong ? t('health.s.allLong') : t('health.s.allShort');
     case 'no-link':
-      return 'Sleep makes little difference so far';
+      return t('health.s.noLink');
     case 'link':
-      return `After 7h+ sleep, ~${hm(f.diffMin)} ${f.diffMin > 0 ? 'more' : 'less'} focus`;
+      return t(f.diffMin > 0 ? 'health.s.more' : 'health.s.less', { time: hm(f.diffMin) });
   }
 }
 
@@ -288,22 +289,20 @@ export interface Fact {
   from: string;
 }
 
-const hourFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
-
 export function atHour(hour: number): string {
   const d = new Date();
   d.setHours(hour, 0, 0, 0);
-  return hourFmt.format(d);
+  return dateFormat({ hour: '2-digit', minute: '2-digit' }).format(d);
 }
 
 /** What Grovyn has learned about you so far, in plain words. */
 export function learned(f: Finding, sessions: FocusSession[], workouts: Workout[]): Fact[] {
   const out: Fact[] = [];
-  if (f.kind === 'link' || f.kind === 'no-link') out.push({ id: 'finding', text: short(f), from: `From ${f.rows} nights` });
+  if (f.kind === 'link' || f.kind === 'no-link') out.push({ id: 'finding', text: short(f), from: tn('health.fromNights', f.rows) });
   const hours = focusHours(sessions);
-  if (hours) out.push({ id: 'focusHours', text: `Best focus: ${atHour(hours.first)} to ${atHour(hours.first + 2)}`, from: `From ${hours.sessions} sessions` });
+  if (hours) out.push({ id: 'focusHours', text: t('health.bestFocus', { from: atHour(hours.first), to: atHour(hours.first + 2) }), from: tn('health.fromSessions', hours.sessions) });
   const usual = usualWorkout(workouts);
-  if (usual) out.push({ id: 'workoutTime', text: `${workoutType(usual.type).label} mostly around ${atHour(usual.hour)}`, from: `From ${usual.count} workouts` });
+  if (usual) out.push({ id: 'workoutTime', text: t('health.mostlyAround', { type: workoutLabel(usual.type), time: atHour(usual.hour) }), from: tn('health.fromWorkouts', usual.count) });
   return out;
 }
 
@@ -325,17 +324,17 @@ export function plan(sessions: FocusSession[], workouts: Workout[], f: Finding, 
   const items: PlanItem[] = [];
   const hours = focusHours(sessions, now);
   if (hours) {
-    items.push({ hour: hours.first, kind: 'focus', title: 'Deep focus · 90 min', why: 'When your focus has run longest lately' });
-    items.push({ hour: hours.first + 2, kind: 'walk', title: 'Walk break · 10 min', why: 'A pause before the next block' });
-    if (hours.second !== undefined) items.push({ hour: hours.second, kind: 'focus', title: 'Focus · 50 min', why: 'Your next best hours' });
+    items.push({ hour: hours.first, kind: 'focus', title: t('health.p.deep'), why: t('health.p.deepWhy') });
+    items.push({ hour: hours.first + 2, kind: 'walk', title: t('health.p.walk'), why: t('health.p.walkWhy') });
+    if (hours.second !== undefined) items.push({ hour: hours.second, kind: 'focus', title: t('health.p.focus'), why: t('health.p.focusWhy') });
   }
   const usual = usualWorkout(workouts, now);
   if (usual && !items.some((i) => i.hour === usual.hour)) {
-    const t = workoutType(usual.type);
-    items.push({ hour: usual.hour, kind: 'workout', title: t.label, why: 'When you usually work out', color: t.color });
+    const type = workoutType(usual.type);
+    items.push({ hour: usual.hour, kind: 'workout', title: workoutLabel(usual.type), why: t('health.p.workoutWhy'), color: type.color });
   }
   if (f.kind === 'link' && f.sure && f.diffMin > 0) {
-    items.push({ hour: 23, kind: 'sleep', title: 'Bed for 7h+', why: 'Your finding: longer nights, longer focus' });
+    items.push({ hour: 23, kind: 'sleep', title: t('health.p.bed'), why: t('health.p.bedWhy') });
   }
   return items.sort((a, b) => a.hour - b.hour);
 }

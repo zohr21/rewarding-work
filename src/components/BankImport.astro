@@ -11,7 +11,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 <section class="card bk" aria-labelledby="bk-title" data-bank>
   <div class="bk__head">
     <div class="bk__head-text">
-      <h2 class="panel-title" id="bk-title">Bank alerts</h2>
+      <h2 data-t="budget.bankAlerts" class="panel-title" id="bk-title">Bank alerts</h2>
       <p class="muted bk__status" data-bk-status></p>
     </div>
     <div class="bk__head-actions">
@@ -22,14 +22,14 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
   <ul class="bk__list" role="list" data-bk-imports></ul>
 
   <p class="bk__warn" data-bk-access hidden>
-    <span>Android has not allowed the app to read notifications yet, so no alerts come in.</span>
-    <button type="button" class="btn btn--ghost btn--small" data-bk-open-access>Allow</button>
+    <span data-t="budget.androidHasNotAllowedThe">Android has not allowed the app to read notifications yet, so no alerts come in.</span>
+    <button data-t="budget.allow" type="button" class="btn btn--ghost btn--small" data-bk-open-access>Allow</button>
   </p>
 
   <div data-bk-review hidden>
     <div class="bk__sub-head">
       <h3 class="bk__sub" data-bk-review-title></h3>
-      <button type="button" class="btn btn--ghost btn--small" data-bk-drop-all>Leave all out</button>
+      <button data-t="budget.leaveAllOut" type="button" class="btn btn--ghost btn--small" data-bk-drop-all>Leave all out</button>
     </div>
     <ul class="bk__list" role="list" data-bk-list></ul>
   </div>
@@ -37,34 +37,34 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
 
   <dialog class="bk-dialog" data-bk-s-dialog aria-labelledby="bk-s-title">
     <form method="dialog" data-bk-s-form>
-      <h2 id="bk-s-title">Expenses from bank alerts</h2>
-      <p class="muted">
+      <h2 data-t="budget.expensesFromBankAlerts" id="bk-s-title">Expenses from bank alerts</h2>
+      <p data-t="budget.whenYourBankTellsYou" class="muted">
         When your bank tells you about a payment, the app reads the alert and adds the expense to Budget. It reads only alerts from
         the apps and SMS senders you pick here. One-time codes are never kept, and the alerts stay on this phone: only the
         expenses go to your account.
       </p>
 
       <fieldset class="bk-group">
-        <legend>Bank apps</legend>
+        <legend data-t="budget.bankApps">Bank apps</legend>
         <div class="bk-picks" data-bk-apps></div>
-        <p class="muted bk__note" data-bk-no-apps hidden>None of the bank apps it knows are on this phone.</p>
+        <p data-t="budget.noneOfTheBankApps" class="muted bk__note" data-bk-no-apps hidden>None of the bank apps it knows are on this phone.</p>
       </fieldset>
 
       <fieldset class="bk-group">
-        <legend>SMS from</legend>
+        <legend data-t="budget.smsFrom">SMS from</legend>
         <div class="bk-picks" data-bk-senders></div>
         <div class="bk-add">
-          <label class="visually-hidden" for="bk-sender">Another sender</label>
-          <input class="input" id="bk-sender" type="text" maxlength={SENDER_MAX} autocomplete="off" placeholder="Another sender, as your SMS app shows it" data-bk-sender />
-          <button type="button" class="btn btn--ghost btn--small" data-bk-add-sender>Add</button>
+          <label data-t="budget.anotherSender" class="visually-hidden" for="bk-sender">Another sender</label>
+          <input data-t-placeholder="budget.anotherSenderAsYourSms" class="input" id="bk-sender" type="text" maxlength={SENDER_MAX} autocomplete="off" placeholder="Another sender, as your SMS app shows it" data-bk-sender />
+          <button data-t="budget.add" type="button" class="btn btn--ghost btn--small" data-bk-add-sender>Add</button>
         </div>
       </fieldset>
 
       <label class="bk-check">
         <input type="checkbox" data-bk-auto />
         <span>
-          Add expenses on their own
-          <span class="muted bk__note">
+          <span data-t="budget.addExpensesOnTheirOwn">Add expenses on their own</span>
+          <span data-t="budget.paymentsInYourBudgetCurrency" class="muted bk__note">
             Payments in your Budget currency go straight in, with Undo. Other currencies, transfers and anything unclear wait
             for you to check.
           </span>
@@ -72,32 +72,32 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       </label>
 
       <div class="bk-access">
-        <p><strong>Notification access:</strong> <span data-bk-s-access></span></p>
-        <p class="muted bk__note">
+        <p><strong data-t="budget.notificationAccess">Notification access:</strong> <span data-bk-s-access></span></p>
+        <p data-t="budget.androidAsksYouToAllow" class="muted bk__note">
           Android asks you to allow it once. If it says the setting is restricted, open App info for Grovyn, then ⋮ →
           Allow restricted settings, and try again.
         </p>
-        <button type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
+        <button data-t="budget.openNotificationAccess" type="button" class="btn btn--ghost btn--small" data-bk-s-open-access>Open Notification access</button>
       </div>
 
       <!-- Only in the full Android version: the Play version can't read SMS (BankState.sms). -->
       <div class="bk-past" data-bk-past hidden>
-        <p><strong>Past SMS</strong></p>
-        <p class="muted bk__note">Bring in the payments your banks texted you before.</p>
-        <button type="button" class="btn btn--ghost btn--small" data-bk-history>Read past SMS</button>
+        <p><strong data-t="budget.pastSms">Past SMS</strong></p>
+        <p data-t="budget.bringInThePaymentsYour" class="muted bk__note">Bring in the payments your banks texted you before.</p>
+        <button data-t="budget.readPastSms" type="button" class="btn btn--ghost btn--small" data-bk-history>Read past SMS</button>
       </div>
 
       <details class="bk__log" data-bk-log-box hidden>
-        <summary>Recently read</summary>
-        <p class="muted bk__note">The last alerts the app read on this phone, and what it did with each. Kept on this phone only.</p>
+        <summary data-t="budget.recentlyRead">Recently read</summary>
+        <p data-t="budget.theLastAlertsTheApp" class="muted bk__note">The last alerts the app read on this phone, and what it did with each. Kept on this phone only.</p>
         <ul class="bk__list" role="list" data-bk-log></ul>
       </details>
 
 
       <div class="bk-dialog__actions">
-        <button type="button" class="btn btn--ghost bk-dialog__off" data-bk-off hidden>Turn off</button>
-        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
-        <button type="submit" class="btn" data-bk-save>Save</button>
+        <button data-t="budget.turnOff" type="button" class="btn btn--ghost bk-dialog__off" data-bk-off hidden>Turn off</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button data-t="budget.save" type="submit" class="btn" data-bk-save>Save</button>
       </div>
     </form>
   </dialog>
@@ -105,47 +105,47 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
   <!-- Said before Android's Notification access screen, every time it is opened to switch access on (Play's prominent disclosure). -->
   <dialog class="bk-dialog" data-bk-c-dialog aria-labelledby="bk-c-title">
     <form method="dialog" data-bk-c-form>
-      <h2 id="bk-c-title">Let Grovyn read bank alerts?</h2>
-      <p>
+      <h2 data-t="budget.letGrovynReadBankAlerts" id="bk-c-title">Let Grovyn read bank alerts?</h2>
+      <p data-t="budget.toAddYourPaymentsTo">
         To add your payments to Budget, Grovyn reads new notifications from the bank apps and SMS senders you picked: the
         amount, the shop and the time.
       </p>
       <ul class="bk-c-list">
-        <li>Notifications from every other app are ignored and never kept.</li>
-        <li>The alerts stay on this phone. Only the expenses you keep go to Budget, and to your account if you're signed in.</li>
-        <li>One-time codes are skipped, and card numbers are masked.</li>
-        <li>Turn it off here, or in Android's settings, at any time.</li>
+        <li data-t="budget.notificationsFromEveryOtherApp">Notifications from every other app are ignored and never kept.</li>
+        <li data-t="budget.theAlertsStayOnThis">The alerts stay on this phone. Only the expenses you keep go to Budget, and to your account if you're signed in.</li>
+        <li data-t="budget.oneTimeCodesAreSkipped">One-time codes are skipped, and card numbers are masked.</li>
+        <li data-t="budget.turnItOffHereOr">Turn it off here, or in Android's settings, at any time.</li>
       </ul>
-      <p class="muted bk__note">
+      <p data-t="budget.nextAndroidOpensNotificationAcce" class="muted bk__note">
         Next, Android opens Notification access. Its warning says an app with access can read all notifications; Grovyn
         reads only the ones above.
       </p>
       <div class="bk-dialog__actions">
-        <button type="button" class="btn btn--ghost" data-bk-cancel>Not now</button>
-        <button type="submit" class="btn">Agree</button>
+        <button data-t="budget.notNow" type="button" class="btn btn--ghost" data-bk-cancel>Not now</button>
+        <button data-t="budget.agree" type="submit" class="btn">Agree</button>
       </div>
     </form>
   </dialog>
 
   <dialog class="bk-dialog" data-bk-h-dialog aria-labelledby="bk-h-title">
     <form method="dialog" data-bk-h-form>
-      <h2 id="bk-h-title">Past bank SMS</h2>
-      <p class="muted">
+      <h2 data-t="budget.pastBankSms" id="bk-h-title">Past bank SMS</h2>
+      <p data-t="budget.readsTheSmsYourBanks" class="muted">
         Reads the SMS your banks sent before and shows what it found. Nothing is added until you say so, and you can undo the
         whole import later. Android asks once to let the app read SMS; it reads them only when you press Read.
       </p>
       <div class="bk-dialog__pair">
         <label class="bk-field">
-          <span>From</span>
+          <span data-t="budget.from">From</span>
           <select class="input" data-bk-h-since>
-            <option value="3">The last 3 months</option>
-            <option value="12">The last year</option>
-            <option value="36">The last 3 years</option>
-            <option value="0" selected>As far back as there are</option>
+            <option data-t="budget.theLast3Months" value="3">The last 3 months</option>
+            <option data-t="budget.theLastYear" value="12">The last year</option>
+            <option data-t="budget.theLast3Years" value="36">The last 3 years</option>
+            <option data-t="budget.asFarBackAsThere" value="0" selected>As far back as there are</option>
           </select>
         </label>
         <div class="bk-field bk-h-read">
-          <button type="button" class="btn btn--ghost" data-bk-h-read>Read SMS</button>
+          <button data-t="budget.readSms" type="button" class="btn btn--ghost" data-bk-h-read>Read SMS</button>
         </div>
       </div>
       <p class="muted bk__note" data-bk-h-senders></p>
@@ -154,7 +154,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       <div class="bk-h-result" data-bk-h-result hidden>
         <ul class="bk-h-sum" role="list" data-bk-h-sum></ul>
         <table class="bk-h-months" data-bk-h-months>
-          <thead><tr><th scope="col">Month</th><th scope="col">Expenses</th><th scope="col">Total</th></tr></thead>
+          <thead><tr><th data-t="budget.month" scope="col">Month</th><th data-t="budget.expenses" scope="col">Expenses</th><th data-t="budget.total" scope="col">Total</th></tr></thead>
           <tbody></tbody>
         </table>
         <label class="bk-check" data-bk-h-review-field>
@@ -164,47 +164,47 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       </div>
 
       <div class="bk-dialog__actions">
-        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
-        <button type="submit" class="btn" data-bk-h-add hidden>Add</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button data-t="budget.add" type="submit" class="btn" data-bk-h-add hidden>Add</button>
       </div>
     </form>
   </dialog>
 
   <dialog class="bk-dialog" data-bk-r-dialog aria-labelledby="bk-r-title">
     <form method="dialog" data-bk-r-form>
-      <h2 id="bk-r-title">Check expense</h2>
+      <h2 data-t="budget.checkExpense" id="bk-r-title">Check expense</h2>
       <p class="bk-quote" data-bk-r-text></p>
       <p class="bk__warn" data-bk-r-why></p>
       <div class="bk-dialog__pair">
         <label class="bk-field">
-          <span>Amount <span class="muted" data-bk-r-sign></span></span>
+          <span><span data-t="budget.amount">Amount</span> <span class="muted" data-bk-r-sign></span></span>
           <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bk-r-amount />
         </label>
         <label class="bk-field">
-          <span>Date</span>
+          <span data-t="budget.date">Date</span>
           <input class="input" type="date" required data-bk-r-day />
         </label>
       </div>
       <label class="bk-field">
-        <span>What</span>
+        <span data-t="budget.what">What</span>
         <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" data-bk-r-what />
       </label>
       <fieldset class="bk-cats">
-        <legend class="visually-hidden">Category</legend>
+        <legend data-t="budget.category" class="visually-hidden">Category</legend>
         {
           CATEGORIES.map((c) => (
             <label class="bk-cat" style={`--c: ${CATEGORY_COLORS[c]}`}>
               <input type="radio" name="bk-r-cat" value={c} class="visually-hidden" />
               <i aria-hidden="true" />
-              {CATEGORY_SHORT[c]}
+              <span data-t={`budget.catShort.${c}`}>{CATEGORY_SHORT[c]}</span>
             </label>
           ))
         }
       </fieldset>
       <div class="bk-dialog__actions">
-        <button type="button" class="btn btn--ghost bk-dialog__off" data-bk-r-skip>Leave out</button>
-        <button type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
-        <button type="submit" class="btn">Add</button>
+        <button data-t="budget.leaveOut" type="button" class="btn btn--ghost bk-dialog__off" data-bk-r-skip>Leave out</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
+        <button data-t="budget.add" type="submit" class="btn">Add</button>
       </div>
     </form>
   </dialog>
@@ -223,7 +223,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     dropAllPending,
     dropPending,
     getBank,
-    OUTCOME_LABELS,
+    outcomeLabel,
     planAlerts,
     setBankSettings,
     undoImport,
@@ -233,11 +233,12 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
   import { currencyCode, currencySign, formatMoney, getBudget, type Category } from '../lib/budget';
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
+  import { dateFormat, locale, t, tn } from '../lib/i18n';
 
-  const list = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
-  const time = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
-  const count = new Intl.NumberFormat();
+  const list = (names: string[]) => new Intl.ListFormat(locale(), { type: 'conjunction' }).format(names);
+  const time = dateFormat({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const monthFmt = dateFormat({ month: 'short', year: 'numeric' });
+  const count = new Intl.NumberFormat(locale());
   /** The senders most banks here send card alerts from: the start of a first setup, and of a past import before any setup. */
   const FIRST_SENDERS = ['Azericard', 'ABB', 'Birbank', 'KapitalBank'];
 
@@ -266,32 +267,32 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     function render(): void {
       const store = getBank();
       const access = state?.access ?? false;
-      const sources = [...store.apps.map(appName), ...(store.senders.length ? [`SMS from ${list(store.senders)}`] : [])];
+      const sources = [...store.apps.map(appName), ...(store.senders.length ? [t('budget.b.smsFrom', { list: list(store.senders) })] : [])];
       // Once it is on, one short line: which banks are in Settings.
       const n = store.apps.length + store.senders.length;
       $('[data-bk-status]').textContent = !store.on
-        ? 'Add expenses from the alerts your bank sends, as they come.'
+        ? t('budget.b.intro')
         : n
-          ? `On · ${n} ${n === 1 ? 'source' : 'sources'} · ${store.auto ? 'adds expenses on its own' : 'asks before adding'}`
-          : 'Pick a bank app or SMS sender to read alerts from.';
-      $('[data-bk-status]').title = sources.length ? `Reading ${list(sources)}` : '';
-      $('[data-bk-setup]').textContent = store.on ? 'Settings' : 'Set up';
+          ? `${t('budget.b.on')} · ${tn('budget.b.sources', n)} · ${store.auto ? t('budget.b.addsOwn') : t('budget.b.asks')}`
+          : t('budget.b.pick');
+      $('[data-bk-status]').title = sources.length ? t('budget.b.reading', { list: list(sources) }) : '';
+      $('[data-bk-setup]').textContent = store.on ? t('budget.b.settings') : t('budget.b.setUp');
       card.classList.toggle('bk--quiet', store.on && n > 0 && !store.pending.length && !store.imports.length && (access || state === null));
       $('[data-bk-access]').hidden = !store.on || access || state === null;
 
       const review = $('[data-bk-review]');
       review.hidden = !store.pending.length;
-      $('[data-bk-review-title]').textContent = `To check (${store.pending.length})`;
+      $('[data-bk-review-title]').textContent = `${t('budget.b.toCheck')} (${store.pending.length})`;
       const rows = $('[data-bk-list]');
       rows.replaceChildren(
         ...store.pending.map((p) => {
           const li = el('li', 'bk__row');
           const main = el('span', 'bk__row-main');
-          const why = p.why === 'currency' ? `in ${p.currency}` : p.why === 'transfer' ? 'a transfer?' : 'money out?';
+          const why = p.why === 'currency' ? t('budget.b.inCur', { cur: p.currency }) : p.why === 'transfer' ? t('budget.b.transferQ') : t('budget.b.moneyOutQ');
           main.append(el('strong', '', p.what), el('span', 'muted', `${p.from} · ${formatDay(fromDayKey(p.day))} · ${why}`));
-          const btn = el('button', 'btn btn--ghost btn--small', 'Check');
+          const btn = el('button', 'btn btn--ghost btn--small', t('budget.b.check'));
           btn.type = 'button';
-          btn.setAttribute('aria-label', `Check ${p.what}`);
+          btn.setAttribute('aria-label', t('budget.b.checkWhat', { what: p.what }));
           btn.addEventListener('click', () => openReview(p));
           li.append(main, el('span', 'bk__amount', moneyOf(p)), btn);
           return li;
@@ -303,11 +304,11 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
         ...store.imports.map((b) => {
           const li = el('li', 'bk__row');
           const main = el('span', 'bk__row-main');
-          const parts = [b.ids.length ? `${count.format(b.ids.length)} expenses added` : '', b.pendingIds.length ? `${count.format(b.pendingIds.length)} to check` : ''];
-          main.append(el('strong', '', 'Past SMS imported'), el('span', 'muted', `${time.format(b.at)} · ${parts.filter(Boolean).join(', ')}`));
-          const btn = el('button', 'btn btn--ghost btn--small', 'Undo');
+          const parts = [b.ids.length ? tn('budget.b.expensesAdded', b.ids.length) : '', b.pendingIds.length ? t('budget.b.nToCheck', { n: count.format(b.pendingIds.length) }) : ''];
+          main.append(el('strong', '', t('budget.b.pastImported')), el('span', 'muted', `${time.format(b.at)} · ${parts.filter(Boolean).join(', ')}`));
+          const btn = el('button', 'btn btn--ghost btn--small', t('budget.b.undo'));
           btn.type = 'button';
-          btn.setAttribute('aria-label', `Undo the import of ${time.format(b.at)}`);
+          btn.setAttribute('aria-label', t('budget.b.undoImport', { when: time.format(b.at) }));
           btn.addEventListener('click', () => undoImport(b.id));
           li.append(main, btn);
           return li;
@@ -319,7 +320,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       $('[data-bk-log]').replaceChildren(
         ...store.log.map((l) => {
           const li = el('li', 'bk__log-row');
-          li.append(el('span', 'bk__log-meta', `${time.format(l.at)} · ${l.from} · ${OUTCOME_LABELS[l.outcome]}`), el('span', 'muted bk__log-text', l.text));
+          li.append(el('span', 'bk__log-meta', `${time.format(l.at)} · ${l.from} · ${outcomeLabel(l.outcome)}`), el('span', 'muted bk__log-text', l.text));
           return li;
         }),
       );
@@ -367,7 +368,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       );
       $<HTMLInputElement>('[data-bk-auto]').checked = store.auto;
       $('[data-bk-off]').hidden = !store.on;
-      $('[data-bk-s-access]').textContent = state?.access ? 'On' : 'Off';
+      $('[data-bk-s-access]').textContent = state?.access ? t('budget.b.onWord') : t('budget.off');
       sDialog.showModal();
     }
 
@@ -420,7 +421,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       plan = [];
       $('[data-bk-h-result]').hidden = true;
       $('[data-bk-h-error]').hidden = true;
-      $('[data-bk-h-senders]').textContent = `From ${list(historySenders())}. Change who in Settings.`;
+      $('[data-bk-h-senders]').textContent = t('budget.b.fromSenders', { list: list(historySenders()) });
       hAdd.hidden = true;
       hDialog.showModal();
     }
@@ -431,7 +432,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       const btn = $<HTMLButtonElement>('[data-bk-h-read]');
       const error = $('[data-bk-h-error]');
       btn.disabled = true;
-      btn.textContent = 'Reading…';
+      btn.textContent = t('budget.b.readingDots');
       error.hidden = true;
       try {
         const items = await bankSmsHistory(historySenders(), since);
@@ -440,12 +441,12 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       } catch (e) {
         error.textContent =
           (e as { code?: string }).code === 'sms/denied'
-            ? 'Android did not let the app read SMS. If it no longer asks, allow SMS for Grovyn in App info → Permissions.'
-            : 'The SMS could not be read.';
+            ? t('budget.b.smsDenied')
+            : t('budget.b.smsFailed');
         error.hidden = false;
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Read SMS again';
+        btn.textContent = t('budget.b.readAgain');
       }
     }
 
@@ -460,12 +461,15 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       const transfers = checks.filter((p) => p.pending!.why === 'transfer').length;
       const foreign = checks.filter((p) => p.pending!.why === 'currency').length;
       const lines: [string, string][] = [
-        [`${count.format(adds.length)} expenses to add`, adds.length ? `${formatMoney(Math.round(total), sign, 0)} · ${span}` : ''],
-        [`${count.format(checks.length)} to check yourself`, [transfers ? `${transfers} look like transfers or cash` : '', foreign ? `${foreign} in other currencies` : ''].filter(Boolean).join(', ')],
-        [`${count.format(by('already').length + by('duplicate').length + by('known').length)} already in Budget`, 'typed in by you, imported before, or told twice'],
+        [tn('budget.b.toAdd', adds.length), adds.length ? `${formatMoney(Math.round(total), sign, 0)} · ${span}` : ''],
         [
-          `${count.format(by('income').length + by('declined').length + by('not-money').length)} left out`,
-          `${by('income').length} money in, ${by('declined').length} declined, ${by('not-money').length} not a payment`,
+          t('budget.b.checkYourself', { n: count.format(checks.length) }),
+          [transfers ? t('budget.b.lookTransfers', { n: transfers }) : '', foreign ? t('budget.b.otherCur', { n: foreign }) : ''].filter(Boolean).join(', '),
+        ],
+        [t('budget.b.already', { n: count.format(by('already').length + by('duplicate').length + by('known').length) }), t('budget.b.alreadyWhy')],
+        [
+          t('budget.b.leftOut', { n: count.format(by('income').length + by('declined').length + by('not-money').length) }),
+          t('budget.b.leftOutWhy', { income: by('income').length, declined: by('declined').length, other: by('not-money').length }),
         ],
       ];
       $('[data-bk-h-sum]').replaceChildren(
@@ -494,7 +498,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       );
       $('[data-bk-h-review-field]').hidden = !checks.length;
       hReview.checked = checks.length > 0 && checks.length <= 30;
-      $('[data-bk-h-review-text]').textContent = `Put the ${count.format(checks.length)} to check in To check`;
+      $('[data-bk-h-review-text]').textContent = t('budget.b.putInCheck', { n: count.format(checks.length) });
       $('[data-bk-h-result]').hidden = false;
       updateAdd();
     }
@@ -504,7 +508,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       const checks = hReview.checked ? plan.filter((p) => p.outcome === 'review').length : 0;
       hAdd.hidden = false;
       hAdd.disabled = !adds && !checks;
-      hAdd.textContent = adds ? `Add ${count.format(adds)} expenses` : checks ? 'Put in To check' : 'Nothing to add';
+      hAdd.textContent = adds ? tn('budget.b.addN', adds) : checks ? t('budget.b.putInToCheck') : t('budget.b.nothingToAdd');
     }
 
     // Past SMS sits in Settings: that dialog closes and this one opens.
@@ -517,7 +521,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     $<HTMLFormElement>('[data-bk-h-form]').addEventListener('submit', () => {
       const done = applyPlan(plan, { add: true, review: hReview.checked, log: false, batch: true });
       plan = [];
-      $('[data-bk-live]').textContent = `Added ${done.added.length} past expenses${done.review ? `, ${done.review} to check` : ''}.`;
+      $('[data-bk-live]').textContent = tn('budget.b.addedPast', done.added.length) + (done.review ? t('budget.b.andToCheck', { n: done.review }) : '') + '.';
     });
     $('[data-bk-drop-all]').addEventListener('click', () => dropAllPending());
 
@@ -534,10 +538,10 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       $('[data-bk-r-text]').textContent = p.text;
       $('[data-bk-r-why]').textContent =
         p.why === 'currency'
-          ? `This was paid in ${p.currency} (${formatMoney(p.amount, p.currency)}). Type what it cost in your Budget currency, from your bank app.`
+          ? t('budget.b.whyCur', { cur: p.currency, amount: formatMoney(p.amount, p.currency) })
           : p.why === 'transfer'
-            ? 'This looks like money moved to your own account or wallet, or cash taken out. Add it only if it was spending.'
-            : 'The alert does not say whether money went out. Add it only if it did.';
+            ? t('budget.b.whyTransfer')
+            : t('budget.b.whyUnclear');
       $('[data-bk-r-sign]').textContent = `(${currencySign(budget)})`;
       rAmount.value = foreign ? '' : String(p.amount);
       rWhat.value = p.what;

@@ -12,15 +12,15 @@ import { NATIVE_APP } from '../config/app';
     <BudgetLock />
     {/* In the app the bottom bar already says Budget: the money comes first. */}
     <header class={NATIVE_APP ? 'visually-hidden' : 'page-header'}>
-      <h1>Budget</h1>
-      {!NATIVE_APP && <p>What is left this month, whether you are on pace, and where it goes.</p>}
+      <h1 data-t="budget.budget">Budget</h1>
+      {!NATIVE_APP && <p data-t="budget.whatIsLeftThisMonth">What is left this month, whether you are on pace, and where it goes.</p>}
     </header>
 
     {NATIVE_APP && <BankImport />}
     <BudgetView>
       <BudgetPlan />
     </BudgetView>
-    <p class="muted budget__note">
+    <p data-t="budget.yourIncomeGoalsExpensesAnd" class="muted budget__note">
       Your income, goals, expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
       backup file yet.
     </p>

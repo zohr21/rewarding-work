@@ -11,16 +11,16 @@ import { WORKOUT_TYPES } from '../lib/workouts';
 const PRESETS = [15, 30, 45, 60];
 ---
 
-<Sheet id="log" title="Log activity">
+<Sheet id="log" title="Log activity" titleKey="health.logActivity">
   <form class="wl" data-wl novalidate>
     <fieldset class="wl__group">
-      <legend class="wl__legend">Type</legend>
+      <legend data-t="health.type" class="wl__legend">Type</legend>
       <div class="wl__types">
         {WORKOUT_TYPES.map((t) => (
           <label class="wl__chip" style={`--tint: ${t.color}`}>
             <input type="radio" name="type" value={t.id} />
             <i aria-hidden="true"></i>
-            {t.label}
+            <span data-t={`workout.type.${t.id}`}>{t.label}</span>
           </label>
         ))}
       </div>
@@ -28,39 +28,39 @@ const PRESETS = [15, 30, 45, 60];
 
     <div class="wl__pair">
       <label class="wl__field">
-        Day
+        <span data-t="health.day">Day</span>
         <input type="date" name="day" required />
       </label>
       <label class="wl__field">
-        Start
+        <span data-t="health.start">Start</span>
         <input type="time" name="time" required />
       </label>
     </div>
 
     <fieldset class="wl__group">
-      <legend class="wl__legend">Duration</legend>
+      <legend data-t="health.duration" class="wl__legend">Duration</legend>
       <div class="wl__presets">
         {PRESETS.map((m) => (
-          <button type="button" class="wl__preset" data-wl-preset={m} aria-pressed="false">{m} min</button>
+          <button type="button" class="wl__preset" data-wl-preset={m} aria-pressed="false" data-t="unit.min" data-t-n={m}>{m} min</button>
         ))}
       </div>
       <label class="wl__field wl__field--inline">
-        Minutes
+        <span data-t="health.minutes">Minutes</span>
         <input type="number" name="minutes" min="1" max="600" inputmode="numeric" required />
       </label>
     </fieldset>
 
     <div class="wl__field" data-wl-distance>
       <div class="wl__distance-head">
-        <label for="wl-distance">Distance</label>
-        <div class="wl__unit" role="radiogroup" aria-label="Distance unit">
-          <label><input type="radio" name="unit" value="km" />km</label>
-          <label><input type="radio" name="unit" value="mi" />mi</label>
+        <label data-t="health.distance" for="wl-distance">Distance</label>
+        <div data-t-aria-label="health.distanceUnit" class="wl__unit" role="radiogroup" aria-label="Distance unit">
+          <label><input type="radio" name="unit" value="km" /><span data-t="health.km">km</span></label>
+          <label><input type="radio" name="unit" value="mi" /><span data-t="health.mi">mi</span></label>
         </div>
       </div>
       <div class="wl__with-button">
-        <input id="wl-distance" type="number" name="distance" min="0" step="0.1" inputmode="decimal" placeholder="Optional" />
-        <button type="button" class="btn btn--ghost wl__estimate" data-wl-estimate>Estimate</button>
+        <input data-t-placeholder="health.optional" id="wl-distance" type="number" name="distance" min="0" step="0.1" inputmode="decimal" placeholder="Optional" />
+        <button data-t="health.estimate" type="button" class="btn btn--ghost wl__estimate" data-wl-estimate>Estimate</button>
       </div>
       <p class="muted wl__small" data-wl-distance-hint hidden></p>
     </div>
@@ -68,14 +68,14 @@ const PRESETS = [15, 30, 45, 60];
     <div class="wl__swim" data-wl-swim>
       <div class="wl__pair">
         <label class="wl__field">
-          Laps
-          <input type="number" name="laps" min="0" inputmode="numeric" placeholder="Optional" />
+          <span data-t="health.laps">Laps</span>
+          <input data-t-placeholder="health.optional" type="number" name="laps" min="0" inputmode="numeric" placeholder="Optional" />
         </label>
         <fieldset class="wl__group">
-          <legend class="wl__legend">Pool</legend>
+          <legend data-t="health.pool" class="wl__legend">Pool</legend>
           <div class="wl__presets wl__presets--two">
-            <label class="wl__chip wl__chip--plain"><input type="radio" name="pool" value="25" checked />25 m</label>
-            <label class="wl__chip wl__chip--plain"><input type="radio" name="pool" value="50" />50 m</label>
+            <label class="wl__chip wl__chip--plain"><input type="radio" name="pool" value="25" checked /><span data-t="health.meters" data-t-n="25">25 m</span></label>
+            <label class="wl__chip wl__chip--plain"><input type="radio" name="pool" value="50" /><span data-t="health.meters" data-t-n="50">50 m</span></label>
           </div>
         </fieldset>
       </div>
@@ -83,20 +83,20 @@ const PRESETS = [15, 30, 45, 60];
     </div>
 
     <label class="wl__field">
-      <span class="wl__effort-label">Effort <output data-wl-effort-out></output></span>
+      <span class="wl__effort-label"><span data-t="health.effort">Effort</span> <output data-wl-effort-out></output></span>
       <input type="range" name="effort" min="1" max="10" step="1" />
     </label>
 
     <label class="wl__field">
-      Note
-      <input type="text" name="note" maxlength="120" placeholder="Optional" autocomplete="off" />
+      <span data-t="health.note">Note</span>
+      <input data-t-placeholder="health.optional" type="text" name="note" maxlength="120" placeholder="Optional" autocomplete="off" />
     </label>
 
     <div class="wl__kcal">
-      <p class="wl__kcal-line" aria-live="polite"><span class="muted">About</span> <strong data-wl-kcal></strong></p>
+      <p class="wl__kcal-line" aria-live="polite"><span data-t="health.about" class="muted">About</span> <strong data-wl-kcal></strong></p>
       <p class="muted wl__small" data-wl-kcal-why></p>
       <label class="wl__field wl__field--inline">
-        Your weight (kg)
+        <span data-t="health.yourWeightKg">Your weight (kg)</span>
         <input type="number" name="weight" min="20" max="300" step="0.5" inputmode="decimal" />
       </label>
     </div>
@@ -105,8 +105,8 @@ const PRESETS = [15, 30, 45, 60];
     <p class="wl__error" data-wl-error role="alert" hidden></p>
 
     <div class="wl__actions">
-      <button type="button" class="btn btn--ghost" data-wl-delete hidden>Delete</button>
-      <button type="submit" class="btn wl__save" data-wl-save>Save</button>
+      <button data-t="health.delete" type="button" class="btn btn--ghost" data-wl-delete hidden>Delete</button>
+      <button data-t="health.save" type="submit" class="btn wl__save" data-wl-save>Save</button>
     </div>
   </form>
 </Sheet>
@@ -114,7 +114,7 @@ const PRESETS = [15, 30, 45, 60];
 <script>
   import {
     DEFAULT_KG,
-    EFFORT_WORDS,
+    effortWord,
     getWorkouts,
     isWorkoutType,
     lastWorkoutType,
@@ -128,6 +128,7 @@ const PRESETS = [15, 30, 45, 60];
     saveWorkout,
     usesMiles,
     weightKg,
+    workoutLabel,
     workoutType,
     type Workout,
     type WorkoutType,
@@ -135,8 +136,11 @@ const PRESETS = [15, 30, 45, 60];
   import { getSessions } from '../lib/storage';
   import { dayKey, fromDayKey, isDayKey } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { dateFormat, locale, t as tr } from '../lib/i18n';
 
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const timeFmt = dateFormat({ hour: '2-digit', minute: '2-digit' });
+  const lower = (s: string) => s.toLocaleLowerCase(locale());
+  const minText = (n: number) => tr('unit.min', { n });
   const pad = (n: number) => String(n).padStart(2, '0');
   const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
@@ -191,7 +195,7 @@ const PRESETS = [15, 30, 45, 60];
       hint.hidden = !(estimated && guess);
       if (estimated && guess) {
         const speed = roughKmh(t.id, effort)! / (perUnit() / 1000);
-        hint.textContent = `A guess: ${min} min at about ${Math.round(speed)} ${miles ? 'mph' : 'km/h'}, a ${EFFORT_WORDS[effort]!.toLowerCase()} pace. Change it if you know better.`;
+        hint.textContent = tr('health.wl.guess', { min: minText(min), speed: tr(miles ? 'health.u.mph' : 'health.u.kmh', { n: Math.round(speed) }), effort: lower(effortWord(effort)) });
       }
 
       // Calories: always a rough figure, and the line says what it was worked out from.
@@ -200,9 +204,11 @@ const PRESETS = [15, 30, 45, 60];
       const kcalOut = $('[data-wl-kcal]');
       const why = $('[data-wl-kcal-why]');
       if (min > 0) {
-        kcalOut.textContent = `${roughKcal({ type: t.id, minutes: min, effort, distanceM: distanceM > 0 ? distanceM : undefined }, kg ?? DEFAULT_KG).toLocaleString()} kcal`;
-        const from = distanceM > 0 ? `the distance` : `${min} min at ${EFFORT_WORDS[effort]!.toLowerCase()} effort`;
-        why.textContent = kg ? `From ${from} and your weight. A rough guess, not a measurement.` : `From ${from}, for someone of ${DEFAULT_KG} kg. Add your weight for a closer guess.`;
+        kcalOut.textContent = tr('health.u.kcal', {
+          n: roughKcal({ type: t.id, minutes: min, effort, distanceM: distanceM > 0 ? distanceM : undefined }, kg ?? DEFAULT_KG).toLocaleString(locale()),
+        });
+        const from = distanceM > 0 ? tr('health.wl.fromDistance') : tr('health.wl.fromTime', { min: minText(min), effort: lower(effortWord(effort)) });
+        why.textContent = kg ? tr('health.wl.withWeight', { from }) : tr('health.wl.noWeight', { from, kg: DEFAULT_KG });
       } else {
         kcalOut.textContent = '–';
         why.textContent = '';
@@ -211,9 +217,10 @@ const PRESETS = [15, 30, 45, 60];
       form.querySelectorAll<HTMLElement>('[data-wl-preset]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.wlPreset) === min)));
       const laps = Number(field('laps').value);
       const pool = Number((form.elements.namedItem('pool') as RadioNodeList).value);
-      $('[data-wl-swim-total]').textContent = laps > 0 ? `${(laps * pool).toLocaleString()} m in all · ${((laps * pool) / perUnit()).toFixed(2)} ${unitName()}` : '';
-      $('[data-wl-effort-out]').textContent = `${effort} · ${EFFORT_WORDS[effort]}`;
-      $('[data-wl-save]').textContent = `Save ${t.label.toLowerCase()}${min > 0 ? ` · ${min} min` : ''}`;
+      $('[data-wl-swim-total]').textContent =
+        laps > 0 ? tr('health.wl.swimTotal', { m: (laps * pool).toLocaleString(locale()), d: ((laps * pool) / perUnit()).toFixed(2), unit: tr(miles ? 'health.mi' : 'health.km') }) : '';
+      $('[data-wl-effort-out]').textContent = `${effort} · ${effortWord(effort)}`;
+      $('[data-wl-save]').textContent = tr('health.wl.save', { type: lower(workoutLabel(t.id)) }) + (min > 0 ? ` · ${minText(min)}` : '');
 
       // Where it lands in your day: against the focus sessions already there.
       const fit = $<HTMLElement>('[data-wl-fit]');
@@ -226,15 +233,15 @@ const PRESETS = [15, 30, 45, 60];
       const clash = overlappingSession(start, min, getSessions());
       fit.dataset.clash = String(!!clash);
       fit.textContent = clash
-        ? `Ends ${timeFmt.format(end)}. That overlaps your focus session at ${timeFmt.format(clash.start)}${clash.label ? ` (${clash.label})` : ''}.`
-        : `Ends ${timeFmt.format(end)}. No focus session at that time.`;
+        ? tr('health.wl.overlaps', { end: timeFmt.format(end), start: timeFmt.format(clash.start) }) + (clash.label ? ` (${clash.label})` : '') + '.'
+        : tr('health.wl.free', { end: timeFmt.format(end) });
     }
 
     function fill(detail: Record<string, string | undefined>): void {
       editing = (detail.workout && getWorkouts().find((w) => w.id === detail.workout)) || null;
       error.hidden = true;
       $<HTMLElement>('[data-wl-delete]').hidden = !editing;
-      dialog!.querySelector('.sheet__title')!.textContent = editing ? `Edit ${workoutType(editing.type).label.toLowerCase()}` : 'Log activity';
+      dialog!.querySelector('.sheet__title')!.textContent = editing ? tr('health.wl.edit', { type: lower(workoutLabel(editing.type)) }) : tr('health.logActivity');
       const today = dayKey(new Date());
       field('day').max = today;
       estimated = false;
@@ -271,7 +278,7 @@ const PRESETS = [15, 30, 45, 60];
     c.add(listen(dialog, 'sheet:open', (e) => fill((e as CustomEvent<Record<string, string>>).detail ?? {})));
     c.add(
       listen(dialog, 'sheet:dismiss', (e) => {
-        if (dirty && !window.confirm(editing ? 'Leave without saving your changes?' : 'Discard this workout?')) e.preventDefault();
+        if (dirty && !window.confirm(editing ? tr('health.wl.leave') : tr('health.wl.discard'))) e.preventDefault();
       }),
     );
     c.add(
@@ -308,7 +315,7 @@ const PRESETS = [15, 30, 45, 60];
     );
     c.add(
       listen($('[data-wl-delete]'), 'click', () => {
-        if (!editing || !window.confirm('Delete this workout?')) return;
+        if (!editing || !window.confirm(tr('health.wl.delete'))) return;
         removeWorkout(editing.id);
         dialog.close();
       }),
@@ -322,9 +329,9 @@ const PRESETS = [15, 30, 45, 60];
           error.textContent = text;
           error.hidden = false;
         };
-        if (start === null) return say('Pick a day and a start time.');
-        if (start > Date.now()) return say('That start is still to come. Log a workout once it has happened.');
-        if (!(min > 0 && min <= 600)) return say('Duration should be between 1 and 600 minutes.');
+        if (start === null) return say(tr('health.wl.pickStart'));
+        if (start > Date.now()) return say(tr('health.wl.future'));
+        if (!(min > 0 && min <= 600)) return say(tr('health.wl.duration'));
         const t = type();
         const distance = Number(field('distance').value);
         const laps = Math.round(Number(field('laps').value));
