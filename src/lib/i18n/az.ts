@@ -17,7 +17,7 @@ export const az: Messages = {
   'nav.timer': 'Taymer',
   'nav.tasks': 'Tapşırıqlar',
   'nav.exam': 'İmtahan',
-  'nav.coach': 'Məşqçi',
+  'nav.coach': 'Mentor',
   'nav.skip': 'Məzmuna keç',
 
   'lang.label': 'Dil',
