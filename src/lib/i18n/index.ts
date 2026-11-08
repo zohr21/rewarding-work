@@ -116,6 +116,18 @@ export function t(key: Key, vars?: Record<string, string | number>): string {
   return fill(typeof e === 'string' ? e : e.other, vars);
 }
 
+/** Where one English line of data kept in code lives: the object, its field, and its key. */
+export type Slot = [object, string | number, string];
+
+/**
+ * Data kept in English in code (tours, tips, playbooks): put each line in the current language,
+ * once, when the module loads. Changing the language reloads the page, so this is enough.
+ */
+export function translateData(slots: Slot[]): void {
+  if (getLang() === 'en') return;
+  for (const [o, field, key] of slots) (o as Record<string | number, unknown>)[field] = t(key as Key);
+}
+
 /** A plural: picks the form for `n` (one, few, many…) and fills in `{n}` and `vars`. */
 export function tn(key: Key, n: number, vars?: Record<string, string | number>): string {
   const e = entry(key);
