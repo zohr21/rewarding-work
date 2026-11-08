@@ -14,6 +14,7 @@
  */
 import { newId, read, write } from './storage';
 import { addDays, dayKey, fromDayKey, isDayKey, type DayKey } from './dates';
+import { locale, t, type Key } from './i18n';
 
 export const CATEGORIES = ['food', 'home', 'wellbeing', 'transport', 'fun', 'other'] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -62,6 +63,13 @@ export const KIND_LABELS: Record<WellbeingKind, string> = {
 export type Need = 'need' | 'want';
 export type CategoryTag = Need | 'mixed';
 export const NEED_LABELS: Record<Need, string> = { need: 'Need', want: 'Want' };
+
+/** The labels above in the current language (the constants stay English for markup and exports). */
+export const categoryLabel = (c: Category) => t(`budget.cat.${c}` as Key);
+export const categoryShort = (c: Category) => t(`budget.catShort.${c}` as Key);
+export const kindLabel = (k: WellbeingKind) => t(`budget.kind.${k}` as Key);
+export const needLabel = (n: Need | CategoryTag) => t(`budget.tag.${n}` as Key);
+export const sourceLabel = (s: IncomeSource) => t(`budget.src.${s}` as Key);
 
 /** Groceries are needs and eating out is a want, so food asks. */
 export const DEFAULT_TAGS: Record<Category, CategoryTag> = {
@@ -438,7 +446,7 @@ function makeEntry(input: SpendInput, id = newId('h')): SpendEntry | null {
   const entry: SpendEntry = {
     id,
     day: input.day && isDayKey(input.day) ? input.day : dayKey(new Date()),
-    what: input.what.trim().slice(0, WHAT_MAX) || (input.kind ? KIND_LABELS[input.kind] : CATEGORY_LABELS[input.category]),
+    what: input.what.trim().slice(0, WHAT_MAX) || (input.kind ? kindLabel(input.kind) : categoryLabel(input.category)),
     category: input.category,
     amount,
     createdAt: Date.now(),
@@ -629,7 +637,7 @@ function makeIncome(input: IncomeInput, id = newId('i')): IncomeEntry | null {
   return {
     id,
     day: input.day && isDayKey(input.day) ? input.day : dayKey(new Date()),
-    what: input.what.trim().slice(0, WHAT_MAX) || SOURCE_LABELS[input.source],
+    what: input.what.trim().slice(0, WHAT_MAX) || sourceLabel(input.source),
     source: input.source,
     amount,
     createdAt: Date.now(),
@@ -1058,7 +1066,7 @@ export function formatMoney(amount: number, currency: string, decimals: 'auto' |
   const key = `${code ?? ''}|${JSON.stringify(fraction)}|${compact}`;
   let fmt = moneyFormats.get(key);
   if (!fmt) {
-    fmt = new Intl.NumberFormat(undefined, {
+    fmt = new Intl.NumberFormat(locale(), {
       ...(code ? { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol' } : {}),
       ...(compact ? { notation: 'compact' } : {}),
       ...fraction,

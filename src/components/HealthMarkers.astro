@@ -11,35 +11,35 @@ import { url } from '../lib/paths';
 
 <section class="card markers" aria-labelledby="markers-heading" data-health-markers hidden>
   <div class="markers__head">
-    <h2 id="markers-heading" class="panel-title">Body markers</h2>
-    <a class="markers__all" href={`${url('/progress')}#tiers`}>In your grove</a>
+    <h2 data-t="health.bodyMarkers" id="markers-heading" class="panel-title">Body markers</h2>
+    <a data-t="health.inYourGrove" class="markers__all" href={`${url('/progress')}#tiers`}>In your grove</a>
   </div>
-  <p class="muted markers__lead">Days you looked after yourself, not how hard you pushed.</p>
+  <p data-t="health.daysYouLookedAfterYourself" class="muted markers__lead">Days you looked after yourself, not how hard you pushed.</p>
   <span data-hm-hint hidden></span>
   <ul class="markers__list" role="list" data-hm-list></ul>
   <details class="markers__about">
-    <summary>What counts</summary>
+    <summary data-t="health.whatCounts">What counts</summary>
     <div class="markers__rules">
       <div>
-        <h3>Counts</h3>
+        <h3 data-t="health.counts">Counts</h3>
         <ul>
-          <li>Nights of 7 hours' sleep or more</li>
-          <li>Days of 7,000 steps or more</li>
-          <li>Weeks with 150 active minutes</li>
-          <li>Every workout you log</li>
-          <li>Health Connect and numbers added by hand</li>
+          <li data-t="health.nightsOf7HoursSleep">Nights of 7 hours' sleep or more</li>
+          <li data-t="health.daysOf7000Steps">Days of 7,000 steps or more</li>
+          <li data-t="health.weeksWith150ActiveMinutes">Weeks with 150 active minutes</li>
+          <li data-t="health.everyWorkoutYouLog">Every workout you log</li>
+          <li data-t="health.healthConnectAndNumbersAdded">Health Connect and numbers added by hand</li>
         </ul>
       </div>
       <div>
-        <h3>Never counts</h3>
+        <h3 data-t="health.neverCounts">Never counts</h3>
         <ul>
-          <li>Calories, weight or body size</li>
-          <li>Sleeping or training past a healthy goal: a long night counts once</li>
-          <li>Estimates the app made</li>
+          <li data-t="health.caloriesWeightOrBodySize">Calories, weight or body size</li>
+          <li data-t="health.sleepingOrTrainingPastA">Sleeping or training past a healthy goal: a long night counts once</li>
+          <li data-t="health.estimatesTheAppMade">Estimates the app made</li>
         </ul>
       </div>
     </div>
-    <p class="muted">Tiers never go back, even when old days drop out of Health Connect. All of this stays on this device.</p>
+    <p data-t="health.tiersNeverGoBackEven" class="muted">Tiers never go back, even when old days drop out of Health Connect. All of this stays on this device.</p>
   </details>
 </section>
 
@@ -50,6 +50,7 @@ import { url } from '../lib/paths';
   import { el } from '../lib/dom';
   import { subscribe } from '../lib/storage';
   import { cleanups, onPage } from '../lib/page';
+  import { locale, t, tn } from '../lib/i18n';
 
   function row(p: TrackProgress): HTMLLIElement {
     const li = el('li', 'marker');
@@ -63,14 +64,14 @@ import { url } from '../lib/paths';
     bar.append(el('span'));
     let line: string;
     if (n) {
-      head.append(el('span', 'marker__left', `${n.left.toLocaleString()} to go`));
+      head.append(el('span', 'marker__left', t('health.toGo', { n: n.left.toLocaleString(locale()) })));
       bar.style.setProperty('--share', `${Math.round(n.share * 100)}%`);
       bar.style.setProperty('--next', `var(--tier-${p.level})`);
-      line = `${p.value.toLocaleString()} of ${n.next} ${p.track.unit(n.next)} to ${tierLabel(p.level)}`;
+      line = t('health.markerLine', { value: p.value.toLocaleString(locale()), next: n.next.toLocaleString(locale()), unit: p.track.unit(n.next), tier: tierLabel(p.level) });
     } else {
       bar.style.setProperty('--share', '100%');
       bar.style.setProperty('--next', 'var(--tier-4)');
-      line = `All five tiers. ${p.track.describe(p.value)}.`;
+      line = t('health.allTiers', { what: p.track.describe(p.value) });
     }
     li.append(coin, head, bar, el('p', 'marker__line muted', line));
     return li;
@@ -87,8 +88,8 @@ import { url } from '../lib/paths';
       const tiers = progress.reduce((n, p) => n + p.level, 0);
       const next = closestTiers(progress.filter((p) => p.value > 0), 1)[0];
       root.querySelector('[data-hm-hint]')!.textContent = next
-        ? `${next.left.toLocaleString()} ${next.p.track.unit(next.left)} to ${tierLabel(next.p.level)}`
-        : `${tiers} ${tiers === 1 ? 'tier' : 'tiers'}`;
+        ? t('health.hintNext', { n: next.left.toLocaleString(locale()), unit: next.p.track.unit(next.left), tier: tierLabel(next.p.level) })
+        : tn('health.nTiers', tiers);
       root.querySelector('[data-hm-list]')!.replaceChildren(...progress.map(row));
     };
     render();

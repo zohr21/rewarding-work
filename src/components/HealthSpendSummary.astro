@@ -10,7 +10,7 @@ const budget = url('/budget');
 
 <section class="card ws" aria-labelledby="ws-heading" data-ws>
   <div class="ws__head">
-    <h2 id="ws-heading" class="panel-title"><i aria-hidden="true"></i>Wellbeing spend</h2>
+    <h2 id="ws-heading" class="panel-title"><i aria-hidden="true"></i><span data-t="health.wellbeingSpend">Wellbeing spend</span></h2>
     <span class="muted" data-ws-month></span>
   </div>
   <p class="ws__total"><strong data-ws-total></strong> <span class="muted" data-ws-of></span></p>
@@ -23,10 +23,10 @@ const budget = url('/budget');
   <div class="ws__actions">
     <a class="btn btn--small" href={`${budget}?add=wellbeing`}>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
-      Add wellbeing expense
+      <span data-t="health.addWellbeing">Add wellbeing expense</span>
     </a>
     <a class="ws__link" href={`${budget}?category=wellbeing`}>
-      In Budget
+      <span data-t="health.inBudget">In Budget</span>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
     </a>
   </div>
@@ -34,12 +34,13 @@ const budget = url('/budget');
 
 <script>
   import { subscribe } from '../lib/storage';
-  import { catchUpRepeats, dueSoon, formatMoney, getBudget, KIND_LABELS, monthOf, paceLine, WELLBEING_KINDS } from '../lib/budget';
+  import { catchUpRepeats, dueSoon, formatMoney, getBudget, kindLabel, monthOf, paceLine, WELLBEING_KINDS } from '../lib/budget';
+  import { dateFormat, t } from '../lib/i18n';
   import { dayKey, formatShort, fromDayKey } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
   import { el } from '../lib/dom';
 
-  const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
+  const monthName = dateFormat({ month: 'long' });
 
   onPage('health-spend-summary', () => {
     const root = document.querySelector<HTMLElement>('[data-ws]');
@@ -58,7 +59,9 @@ const budget = url('/budget');
 
       $('[data-ws-month]').textContent = monthName.format(fromDayKey(today));
       $('[data-ws-total]').textContent = money(total);
-      $('[data-ws-of]').textContent = own ? (total <= own ? `of ${money(own)} · ${money(own - total)} left` : `of ${money(own)} · ${money(total - own)} over`) : 'this month';
+      $('[data-ws-of]').textContent = own
+        ? t(total <= own ? 'health.ofLeft' : 'health.ofOver', { own: money(own), diff: money(Math.abs(own - total)) })
+        : t('health.thisMonthLower');
       $('[data-ws-meter]').hidden = !own;
       if (own) {
         const fill = $('[data-ws-fill]');
@@ -73,15 +76,15 @@ const budget = url('/budget');
       $('[data-ws-kinds]').replaceChildren(
         ...[...WELLBEING_KINDS, '' as const]
           .filter((k) => byKind.has(k))
-          .map((k) => el('li', '', `${k ? KIND_LABELS[k] : 'Other'} ${money(byKind.get(k)!)}`)),
+          .map((k) => el('li', '', `${k ? kindLabel(k) : t('budget.cat.other')} ${money(byKind.get(k)!)}`)),
       );
 
       const next = dueSoon(store.repeats.filter((r) => r.category === 'wellbeing'), 14)[0];
       $('[data-ws-note]').textContent = next
-        ? `${next.repeat.what}, ${money(next.repeat.amount)}, is due ${formatShort(fromDayKey(next.day))}.`
+        ? t('health.dueOn', { what: next.repeat.what, amount: money(next.repeat.amount), date: formatShort(fromDayKey(next.day)) })
         : mine.length
           ? ''
-          : 'Nothing logged this month. Gym, therapy, nutrition, medical: what you spend on feeling well.';
+          : t('health.nothingSpent');
       $('[data-ws-note]').hidden = !$('[data-ws-note]').textContent;
     }
 

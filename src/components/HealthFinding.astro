@@ -15,7 +15,7 @@ import { NATIVE_APP } from '../config/app';
         <svg viewBox="0 0 24 24" width="16" height="16"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
       </span>
       <span class="hf__text">
-        <span class="muted hf__kicker" data-hf-kicker>Your finding</span>
+        <span data-t="health.yourFinding" class="muted hf__kicker" data-hf-kicker>Your finding</span>
         <span class="hf__short" data-hf-short></span>
       </span>
       <svg class="hf__chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
@@ -25,11 +25,11 @@ import { NATIVE_APP } from '../config/app';
 
 {
   NATIVE_APP && (
-    <Sheet id="finding" title="Your finding">
+    <Sheet id="finding" title="Your finding" titleKey="health.yourFinding">
       <div class="hfs" data-hfs>
         <button type="button" class="hfs__back" data-hfs-back hidden>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          Finding
+          <span data-t="health.finding">Finding</span>
         </button>
 
         <div class="hfs__view" data-hfs-finding>
@@ -39,18 +39,18 @@ import { NATIVE_APP } from '../config/app';
           <div class="hfs__bars" data-hfs-bars hidden></div>
           <p class="muted hfs__small" data-hfs-note></p>
           <div class="hfs__votes" data-hfs-votes hidden>
-            <button type="button" class="btn btn--ghost" data-hfs-vote="yes">Helpful</button>
-            <button type="button" class="btn btn--ghost" data-hfs-vote="no">Not true for me</button>
+            <button data-t="health.helpful" type="button" class="btn btn--ghost" data-hfs-vote="yes">Helpful</button>
+            <button data-t="health.notTrueForMe" type="button" class="btn btn--ghost" data-hfs-vote="no">Not true for me</button>
           </div>
           <p class="muted hfs__small" data-hfs-voted hidden></p>
-          <button type="button" class="btn hfs__go" data-hfs-plan hidden>See tomorrow with this</button>
+          <button data-t="health.seeTomorrowWithThis" type="button" class="btn hfs__go" data-hfs-plan hidden>See tomorrow with this</button>
         </div>
 
         <div class="hfs__view" data-hfs-plan-view hidden>
           <p class="muted hfs__small" data-hfs-plan-sub></p>
           <ol class="hfs__plan" role="list" data-hfs-plan-list></ol>
-          <p class="muted hfs__small">A rough plan from your last four weeks. Nothing is added to your tasks.</p>
-          <button type="button" class="btn hfs__go" data-sheet-close>Done</button>
+          <p data-t="health.aRoughPlanFromYour" class="muted hfs__small">A rough plan from your last four weeks. Nothing is added to your tasks.</p>
+          <button data-t="health.done" type="button" class="btn hfs__go" data-sheet-close>Done</button>
         </div>
       </div>
     </Sheet>
@@ -64,19 +64,20 @@ import { NATIVE_APP } from '../config/app';
   import { NEED_ROWS, atHour, examIn, finding, hm, plan, rows, saveVote, sentence, setAside, short, sourceOn, voteFor, type Finding, type PlanItem } from '../lib/findings';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { t, tn } from '../lib/i18n';
 
   const COLORS: Record<PlanItem['kind'], string> = { focus: 'var(--heat-3)', walk: 'var(--cat-structure)', workout: 'var(--cat-reward)', sleep: 'var(--cat-visual)' };
 
   function badge(f: Finding): string {
     switch (f.kind) {
       case 'learning':
-        return `Learning · ${f.rows} of ${NEED_ROWS} nights`;
+        return t('health.b.learning', { n: f.rows, total: NEED_ROWS });
       case 'one-sided':
-        return `Nothing to compare yet · ${f.rows} nights`;
+        return tn('health.b.oneSided', f.rows);
       case 'no-link':
-        return `No clear link · ${f.rows} nights`;
+        return tn('health.b.noLink', f.rows);
       case 'link':
-        return `${f.sure ? 'Fairly sure' : 'Maybe'} · ${f.rows} nights`;
+        return tn(f.sure ? 'health.b.sure' : 'health.b.maybe', f.rows);
     }
   }
 
@@ -96,7 +97,7 @@ import { NATIVE_APP } from '../config/app';
       $<HTMLElement>('[data-hfs-finding]').hidden = view !== 'finding';
       $<HTMLElement>('[data-hfs-plan-view]').hidden = view !== 'plan';
       $<HTMLElement>('[data-hfs-back]').hidden = view !== 'plan';
-      dialog!.querySelector('.sheet__title')!.textContent = view === 'plan' ? 'Tomorrow' : 'Your finding';
+      dialog!.querySelector('.sheet__title')!.textContent = view === 'plan' ? t('health.tomorrow') : t('health.yourFinding');
     }
 
     function render(): void {
@@ -112,9 +113,12 @@ import { NATIVE_APP } from '../config/app';
       const aside = setAside(f);
       const vote = voteFor(f);
 
-      row.querySelector<HTMLElement>('[data-hf-kicker]')!.textContent = f.kind === 'learning' ? 'Finding · learning' : 'Your finding';
-      row.querySelector<HTMLElement>('[data-hf-short]')!.textContent = aside ? 'Set aside · checking with more nights' : short(f);
-      row.setAttribute('aria-label', `${f.kind === 'learning' ? 'Finding, still learning' : 'Your finding'}: ${aside ? 'set aside' : short(f)}. Open`);
+      row.querySelector<HTMLElement>('[data-hf-kicker]')!.textContent = f.kind === 'learning' ? t('health.findingLearning') : t('health.yourFinding');
+      row.querySelector<HTMLElement>('[data-hf-short]')!.textContent = aside ? t('health.setAside') : short(f);
+      row.setAttribute(
+        'aria-label',
+        t('health.findingAria', { what: f.kind === 'learning' ? t('health.stillLearning') : t('health.yourFinding'), short: aside ? t('health.setAsideShort') : short(f) }),
+      );
 
       $('[data-hfs-badge]').textContent = badge(f);
       $('[data-hfs-badge]').setAttribute('data-kind', f.kind === 'link' ? (f.sure ? 'sure' : 'maybe') : f.kind);
@@ -143,10 +147,10 @@ import { NATIVE_APP } from '../config/app';
       const note = $<HTMLElement>('[data-hfs-note]');
       note.textContent =
         f.kind === 'learning'
-          ? `Nights that also had some focus the next day. ${f.more} more and Grovyn can tell you something true about you, not a general tip.`
+          ? tn('health.n.learning', f.more)
           : f.kind === 'one-sided'
-            ? 'Grovyn needs at least 5 nights on each side, 7 hours or more and shorter, to compare them.'
-            : 'Average focus the next day, from the last 6 weeks. Exam days and days without any focus are left out.';
+            ? t('health.n.oneSided')
+            : t('health.n.compared');
 
       // Taps are asked only where there is a claim to agree or disagree with.
       const votes = $<HTMLElement>('[data-hfs-votes]');
@@ -154,17 +158,21 @@ import { NATIVE_APP } from '../config/app';
       votes.hidden = !compared || !!vote;
       voted.hidden = !vote;
       voted.textContent = aside
-        ? 'You said this is not true for you. Grovyn will look again after 7 more nights.'
+        ? t('health.v.aside')
         : vote === 'yes'
-          ? 'Thanks. Grovyn keeps this one in mind for your plan.'
+          ? t('health.v.yes')
           : vote === 'no'
-            ? 'Grovyn checked again with more nights and still sees this.'
+            ? t('health.v.no')
             : '';
 
       const items = plan(sessions, getWorkouts(), f);
       $<HTMLElement>('[data-hfs-plan]').hidden = items.length < 2;
       const exam = examIn();
-      $('[data-hfs-plan-sub]').textContent = exam ? `${exam.title} ${exam.days === 0 ? 'is today' : `in ${exam.days} ${exam.days === 1 ? 'day' : 'days'}`}` : 'Built from your own habits';
+      $('[data-hfs-plan-sub]').textContent = exam
+        ? exam.days === 0
+          ? t('health.examToday', { exam: exam.title })
+          : tn('health.examIn', exam.days, { exam: exam.title })
+        : t('health.fromHabits');
       $('[data-hfs-plan-list]').replaceChildren(
         ...items.map((i) => {
           const li = el('li', 'hfs__item');

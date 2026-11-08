@@ -11,11 +11,11 @@ import { WORKOUT_TYPES } from '../lib/workouts';
 <Sheet id="calendar" labelledby="hc-month">
   <div class="hc" data-hc>
     <div class="hc__nav">
-      <button type="button" class="hc__step" data-hc-step="-1" aria-label="Previous month">
+      <button data-t-aria-label="health.previousMonth" type="button" class="hc__step" data-hc-step="-1" aria-label="Previous month">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </button>
       <h2 id="hc-month" class="hc__month" data-hc-month aria-live="polite"></h2>
-      <button type="button" class="hc__step" data-hc-step="1" aria-label="Next month">
+      <button data-t-aria-label="health.nextMonth" type="button" class="hc__step" data-hc-step="1" aria-label="Next month">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       </button>
     </div>
@@ -25,27 +25,28 @@ import { WORKOUT_TYPES } from '../lib/workouts';
 
     <ul class="hc__legend muted" role="list">
       {WORKOUT_TYPES.map((t) => (
-        <li><i style={`background: ${t.color}`}></i>{t.label}</li>
+        <li><i style={`background: ${t.color}`}></i><span data-t={`workout.type.${t.id}`}>{t.label}</span></li>
       ))}
-      <li><i class="hc__focus-key"></i>Focus</li>
+      <li><i class="hc__focus-key"></i><span data-t="health.focus">Focus</span></li>
     </ul>
 
     <div class="hc__detail" aria-live="polite">
       <strong data-hc-day></strong>
       <ul class="hc__rows" role="list" data-hc-rows></ul>
-      <button type="button" class="btn btn--small" data-hc-show>Show this day</button>
+      <button data-t="health.showThisDay" type="button" class="btn btn--small" data-hc-show>Show this day</button>
     </div>
 
     <dl class="hc__totals">
-      <div><dt class="muted">Active days</dt><dd data-hc-active></dd></div>
-      <div><dt class="muted">Workouts</dt><dd data-hc-count></dd></div>
-      <div><dt class="muted">Time moving</dt><dd data-hc-time></dd></div>
+      <div><dt data-t="health.activeDays" class="muted">Active days</dt><dd data-hc-active></dd></div>
+      <div><dt data-t="health.workouts" class="muted">Workouts</dt><dd data-hc-count></dd></div>
+      <div><dt data-t="health.timeMoving" class="muted">Time moving</dt><dd data-hc-time></dd></div>
     </dl>
   </div>
 </Sheet>
 
 <script>
-  import { DEFAULT_KG, getWorkouts, roughKcal, weightKg, workoutsByDay, workoutType } from '../lib/workouts';
+  import { DEFAULT_KG, getWorkouts, roughKcal, weightKg, workoutLabel, workoutsByDay, workoutType } from '../lib/workouts';
+  import { dateFormat, t, tn } from '../lib/i18n';
   import { getSessions, subscribe } from '../lib/storage';
   import { minutesByDay } from '../lib/stats';
   import { formatFocus } from '../lib/tasks';
@@ -53,10 +54,10 @@ import { WORKOUT_TYPES } from '../lib/workouts';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
 
-  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  const wdFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const monthFmt = dateFormat({ month: 'long', year: 'numeric' });
+  const dayFmt = dateFormat({ weekday: 'long', day: 'numeric', month: 'long' });
+  const wdFmt = dateFormat({ weekday: 'narrow' });
+  const timeFmt = dateFormat({ hour: '2-digit', minute: '2-digit' });
 
   onPage('health-calendar', () => {
     const root = document.querySelector<HTMLElement>('[data-hc]');
@@ -97,7 +98,10 @@ import { WORKOUT_TYPES } from '../lib/workouts';
         b.dataset.day = k;
         b.disabled = k > today;
         b.setAttribute('aria-pressed', String(k === picked));
-        b.setAttribute('aria-label', `${dayFmt.format(fromDayKey(k))}: ${list.length ? `${list.length} workouts` : 'no workouts'}${f ? `, ${Math.round(f)} minutes of focus` : ''}`);
+        b.setAttribute(
+          'aria-label',
+          `${dayFmt.format(fromDayKey(k))}: ${list.length ? tn('health.nWorkouts', list.length) : t('health.noWorkouts')}${f ? tn('health.focusTail', Math.round(f)) : ''}`,
+        );
         if (list.length) b.classList.add('has-workout');
         if (k === today) b.classList.add('is-today');
         const dots = el('span', 'hc__dots');
@@ -111,26 +115,29 @@ import { WORKOUT_TYPES } from '../lib/workouts';
         cells.push(b);
       }
       $('[data-hc-grid]').replaceChildren(...cells);
-      $('[data-hc-active]').textContent = `${active} of ${days}`;
+      $('[data-hc-active]').textContent = `${active} / ${days}`;
       $('[data-hc-count]').textContent = String(count);
       $('[data-hc-time]').textContent = formatFocus(minutes * 60);
 
       const list = byDay.get(picked) ?? [];
       const f = focus.get(picked) ?? 0;
-      $('[data-hc-day]').textContent = picked === today ? `Today · ${dayFmt.format(fromDayKey(picked))}` : dayFmt.format(fromDayKey(picked));
+      $('[data-hc-day]').textContent = picked === today ? t('health.todayDate', { date: dayFmt.format(fromDayKey(picked)) }) : dayFmt.format(fromDayKey(picked));
       const rows = list.map((w) => {
         const li = el('li');
         const dot = el('i');
         dot.style.background = workoutType(w.type).color;
-        li.append(dot, `${workoutType(w.type).label} · ${timeFmt.format(w.start)} · ${w.minutes} min · ~${roughKcal(w, weightKg() ?? DEFAULT_KG)} kcal`);
+        li.append(
+          dot,
+          `${workoutLabel(w.type)} · ${timeFmt.format(w.start)} · ${t('unit.min', { n: w.minutes })} · ~${t('health.u.kcal', { n: roughKcal(w, weightKg() ?? DEFAULT_KG) })}`,
+        );
         return li;
       });
       if (f) {
         const li = el('li');
-        li.append(el('i', 'hc__focus-key'), `Focus · ${formatFocus(f * 60)}`);
+        li.append(el('i', 'hc__focus-key'), t('health.focusOn', { label: formatFocus(f * 60) }));
         rows.push(li);
       }
-      if (!rows.length) rows.push(el('li', 'muted', 'Nothing logged.'));
+      if (!rows.length) rows.push(el('li', 'muted', t('health.nothingLogged')));
       $('[data-hc-rows]').replaceChildren(...rows);
     }
 

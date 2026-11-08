@@ -40,88 +40,92 @@ const CHECK = 'M5 12l5 5 9-10';
   NATIVE_APP ? (
     <div class="body" data-body>
       <section class="card body__connect" data-hb-connect hidden aria-labelledby="hb-connect-heading">
-        <h2 id="hb-connect-heading">See how rest and movement shape your focus</h2>
-        <p class="muted">Choose what to read from Health Connect. You can change this at any time.</p>
+        <h2 data-t="health.seeHowRestAndMovement" id="hb-connect-heading">See how rest and movement shape your focus</h2>
+        <p data-t="health.chooseWhatToReadFrom" class="muted">Choose what to read from Health Connect. You can change this at any time.</p>
         <div class="body__asks well">
           {HEALTH_KINDS.map((kind) => (
             <label>
-              <span>{ASK[kind]}</span>
+              <span data-t={`health.ask.${kind}`}>{ASK[kind]}</span>
               <input type="checkbox" value={kind} checked={kind !== 'heart'} data-hb-ask />
             </label>
           ))}
         </div>
-        <button type="button" class="btn body__go" data-hb-go>Connect Health Connect</button>
+        <button data-t="health.connectHealthConnect" type="button" class="btn body__go" data-hb-go>Connect Health Connect</button>
         <p class="body__refused" data-hb-refused hidden>
-          Nothing was allowed. If Android no longer asks, allow it in Health Connect:
-          <button type="button" class="body__link" data-hb-manage>open its settings</button>.
+          <span data-t="health.nothingAllowed">Nothing was allowed. If Android no longer asks, allow it in Health Connect:</span>{' '}
+          <button data-t="health.openItsSettings" type="button" class="body__link" data-hb-manage>open its settings</button>.
         </p>
         <p class="muted body__sub">
-          No watch or app sharing with Health Connect?
-          <button type="button" class="body__link" data-sheet-open="body-entry">Add numbers by hand</button>
+          <span data-t="health.noWatch">No watch or app sharing with Health Connect?</span>{' '}
+          <button data-t="health.addNumbersByHand" type="button" class="body__link" data-sheet-open="body-entry">Add numbers by hand</button>
         </p>
         <ul class="body__promises muted" role="list">
-          {['Read only. The app never writes to your health record.', 'Stays on this phone. It is not part of account sync.', 'Never used for ads or shared with anyone.'].map((text) => (
+          {[['health.promise.read', 'Read only. The app never writes to your health record.'], ['health.promise.stays', 'Stays on this phone. It is not part of account sync.'], ['health.promise.ads', 'Never used for ads or shared with anyone.']].map(([key, text]) => (
             <li>
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d={CHECK} fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
-              {text}
+              <span data-t={key}>{text}</span>
             </li>
           ))}
         </ul>
       </section>
 
       <div class="body__data" data-hb-data hidden>
-        <div class="body__ranges well" role="group" aria-label="Range" data-hb-ranges>
+        <div data-t-aria-label="health.range" class="body__ranges well" role="group" aria-label="Range" data-hb-ranges>
           {RANGES.map((r) => (
-            <button type="button" data-hb-range={r.id} aria-pressed={r.id === 'today' ? 'true' : 'false'}>{r.label}</button>
+            <button type="button" data-hb-range={r.id} aria-pressed={r.id === 'today' ? 'true' : 'false'} data-t={`health.range.${r.id}`}>{r.label}</button>
           ))}
         </div>
 
-        <section class="body__tiles" aria-label="Body data">
+        <section data-t-aria-label="health.bodyData" class="body__tiles" aria-label="Body data">
           {TILES.map((t) => (
             <div class={`card body__tile body__tile--${t.kind}`} data-hb-tile={t.kind}>
               <span class="body__kind">
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d={t.icon} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                {t.label}
+                <span data-t={`health.tile.${t.kind}`}>{t.label}</span>
               </span>
               <strong class="body__value" data-hb-value />
               <div class="body__bar well" data-hb-bar hidden><i /></div>
               <span class="muted body__sub" data-hb-sub />
-              <button type="button" class="body__link body__allow" data-hb-allow hidden>Allow</button>
+              <button data-t="health.allow" type="button" class="body__link body__allow" data-hb-allow hidden>Allow</button>
             </div>
           ))}
         </section>
 
         <p class="body__hint" data-hb-hint hidden>
           <span data-hb-hint-text />{' '}
-          Health Connect only has what other apps put into it. In the app for your watch or band (Samsung Health, Mi Fitness and
-          the like), turn on sharing with Health Connect, then come back here.
+          <span data-t="health.onlyWhatOthers"
+            >Health Connect only has what other apps put into it. In the app for your watch or band (Samsung Health, Mi Fitness and
+            the like), turn on sharing with Health Connect, then come back here.</span
+          >
         </p>
 
         <section class="card body__chart" data-hb-chart hidden aria-labelledby="hb-chart-heading">
           <div>
-            <h2 id="hb-chart-heading" class="panel-title">Sleep and focus</h2>
-            <p class="muted body__sub">Last 7 days</p>
+            <h2 data-t="health.sleepAndFocus" id="hb-chart-heading" class="panel-title">Sleep and focus</h2>
+            <p data-t="health.last7Days" class="muted body__sub">Last 7 days</p>
           </div>
           <div class="body__bars well" role="img" data-hb-bars />
           <p class="body__legend">
-            <span><i class="body__dot body__dot--sleep" />Hours slept</span>
-            <span><i class="body__dot body__dot--focus" />Focus time</span>
+            <span><i class="body__dot body__dot--sleep" /><span data-t="health.hoursSlept">Hours slept</span></span>
+            <span><i class="body__dot body__dot--focus" /><span data-t="health.focusTime">Focus time</span></span>
           </p>
         </section>
 
         <p class="muted body__note">
-          Body data comes from Health Connect and stays on this phone.
-          <button type="button" class="body__link" data-hb-manage>Manage</button> ·
-          <button type="button" class="body__link" data-sheet-open="body-entry" data-hb-entry>Add by hand</button>
+          <span data-t="health.bodyDataStays">Body data comes from Health Connect and stays on this phone.</span>{' '}
+          <button data-t="health.manage" type="button" class="body__link" data-hb-manage>Manage</button> ·{" "}
+          <button data-t="health.addByHand" type="button" class="body__link" data-sheet-open="body-entry" data-hb-entry>Add by hand</button>
         </p>
       </div>
 
-      <p class="muted body__note" data-hb-none hidden>Sleep, steps, calories and activity need Health Connect, which is part of Android 14 and later.</p>
+      <p data-t="health.sleepStepsCaloriesAndActivity" class="muted body__note" data-hb-none hidden>Sleep, steps, calories and activity need Health Connect, which is part of Android 14 and later.</p>
     </div>
   ) : (
     <p class="muted body__note">
-      Sleep, steps, exercise, resting heart rate, calories burned and distance are read from Health Connect by the Android app, and stay on the phone. See the{' '}
-      <a href={url('/privacy')}>privacy page</a>.
+      <span data-t="health.siteNote"
+        >Sleep, steps, exercise, resting heart rate, calories burned and distance are read from Health Connect by the Android app, and stay on the phone. See the</span
+      >{' '}
+      <a data-t="health.privacyPage" href={url('/privacy')}>privacy page</a>.
     </p>
   )
 }
@@ -136,6 +140,7 @@ const CHECK = 'M5 12l5 5 9-10';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
   import { usesMiles } from '../lib/workouts';
+  import { dateFormat, locale, t, tn, type Key } from '../lib/i18n';
 
   type Range = 'today' | 'week' | 'month';
   const SPAN: Record<Range, number> = { today: 1, week: 7, month: 30 };
@@ -144,16 +149,21 @@ const CHECK = 'M5 12l5 5 9-10';
   const KEEP_DAYS = 90;
   /** What a full bar means on Today. */
   const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30 };
-  const weekdayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'narrow' });
-  const dayNameFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
+  const weekdayFmt = dateFormat({ weekday: 'narrow' });
+  const dayNameFmt = dateFormat({ weekday: 'long' });
 
-  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
+  const hm = (min: number) => t('unit.hmShort', { h: Math.floor(min / 60), m: String(Math.round(min % 60)).padStart(2, '0') });
+  const num = (n: number) => n.toLocaleString(locale());
   const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   // Miles where people walk in miles, kilometres everywhere else.
   const distance = (m: number) =>
-    usesMiles() ? `${(m / 1609.344).toFixed(m < 16_093 ? 1 : 0)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m < 10_000 ? 1 : 0)} km`;
-  const kcal = (n: number) => `${Math.round(n).toLocaleString()} kcal`;
+    usesMiles()
+      ? t('health.u.mi', { n: (m / 1609.344).toFixed(m < 16_093 ? 1 : 0) })
+      : m < 1000
+        ? t('health.u.m', { n: Math.round(m) })
+        : t('health.u.km', { n: (m / 1000).toFixed(m < 10_000 ? 1 : 0) });
+  const kcal = (n: number) => t('health.u.kcal', { n: num(Math.round(n)) });
   /** Which kind each field belongs to, for the tiles. */
   const KIND_OF: Record<BodyField, HealthKind> = {
     sleepMin: 'sleep',
@@ -209,41 +219,43 @@ const CHECK = 'M5 12l5 5 9-10';
       const todayKey = dayKey(new Date());
       const finished = shown.filter((d) => d.day !== todayKey);
       const whole = today || !finished.length ? shown : finished;
-      const span = range === 'week' ? 'this week' : 'this month';
+      const span = range === 'week' ? 'week' : 'month';
+      const nothing = t(`health.nothing.${span}` as Key);
+      const min = (n: number) => t('unit.min', { n });
       const allowed = (kind: HealthKind) => !!state?.[kind] || typed.has(kind);
       // Without Health Connect on the phone there is nothing to allow: only typing it in.
       const off = (kind: HealthKind, ask: HealthKind[] = [kind]) =>
-        state?.available ? tile(kind, 'Off', 'Not allowed in Health Connect', undefined, ask) : tile(kind, '–', 'Not recorded · add it by hand');
+        state?.available ? tile(kind, t('health.off'), t('health.notAllowed'), undefined, ask) : tile(kind, '–', t('health.notRecorded'));
 
       const sleep = numbers(shown, 'sleepMin');
       const before = view.find((d) => d.day === dayBack(1));
       if (!allowed('sleep')) off('sleep');
       else if (!sleep.length && today && before?.sleepMin) {
         // Not slept yet since the evening: the night before is the latest there is.
-        tile('sleep', hm(before.sleepMin), `Night to ${dayNameFmt.format(fromDayKey(before.day))} · goal 8h`, before.sleepMin / GOALS.sleepMin);
-      } else if (!sleep.length) tile('sleep', 'No data', today ? 'Nothing recorded for last night' : `Nothing recorded ${span}`);
-      else if (today) tile('sleep', hm(sleep[0]!), 'Last night · goal 8h', sleep[0]! / GOALS.sleepMin);
-      else tile('sleep', hm(avg(sleep)), `Nightly average · ${sleep.length} nights`);
+        tile('sleep', hm(before.sleepMin), t('health.nightTo', { day: dayNameFmt.format(fromDayKey(before.day)) }), before.sleepMin / GOALS.sleepMin);
+      } else if (!sleep.length) tile('sleep', t('health.noData'), today ? t('health.nothingLastNight') : nothing);
+      else if (today) tile('sleep', hm(sleep[0]!), t('health.lastNight'), sleep[0]! / GOALS.sleepMin);
+      else tile('sleep', hm(avg(sleep)), tn('health.nightlyAvg', sleep.length));
 
       const steps = numbers(whole, 'steps');
       if (!allowed('steps')) off('steps');
-      else if (!steps.length && today) tile('steps', '0', `Goal ${GOALS.steps.toLocaleString()}`, 0);
-      else if (!steps.length) tile('steps', 'No data', `Nothing recorded ${span}`);
-      else if (today) tile('steps', steps[0]!.toLocaleString(), `Goal ${GOALS.steps.toLocaleString()}`, steps[0]! / GOALS.steps);
-      else tile('steps', Math.round(avg(steps)).toLocaleString(), `Daily average · ${sum(numbers(shown, 'steps')).toLocaleString()} in all`);
+      else if (!steps.length && today) tile('steps', '0', t('health.goal', { n: num(GOALS.steps) }), 0);
+      else if (!steps.length) tile('steps', t('health.noData'), nothing);
+      else if (today) tile('steps', num(steps[0]!), t('health.goal', { n: num(GOALS.steps) }), steps[0]! / GOALS.steps);
+      else tile('steps', num(Math.round(avg(steps))), t('health.dailyAvgTotal', { total: num(sum(numbers(shown, 'steps'))) }));
 
       const active = numbers(shown, 'activeMin');
       const total = active.reduce((a, b) => a + b, 0);
       if (!allowed('exercise')) off('exercise');
-      else if (!active.length) tile('exercise', today ? '0 min' : 'No data', today ? `Goal ${GOALS.activeMin} min` : `Nothing recorded ${span}`, today ? 0 : undefined);
-      else if (today) tile('exercise', `${total} min`, `Goal ${GOALS.activeMin} min${total >= GOALS.activeMin ? ' · reached' : ''}`, total / GOALS.activeMin);
-      else tile('exercise', formatFocus(total * 60), `${span[0]!.toUpperCase()}${span.slice(1)} · ${active.length} of ${shown.length} days`);
+      else if (!active.length) tile('exercise', today ? min(0) : t('health.noData'), today ? t('health.goal', { n: min(GOALS.activeMin) }) : nothing, today ? 0 : undefined);
+      else if (today) tile('exercise', min(total), t('health.goal', { n: min(GOALS.activeMin) }) + (total >= GOALS.activeMin ? t('health.reached') : ''), total / GOALS.activeMin);
+      else tile('exercise', formatFocus(total * 60), t(`health.daysOf.${span}` as Key, { n: active.length, total: shown.length }));
 
       const heart = numbers(shown, 'restingHr');
       const month = numbers(view, 'restingHr');
       if (!allowed('heart')) off('heart');
-      else if (!heart.length) tile('heart', 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
-      else tile('heart', `${Math.round(avg(heart))} bpm`, month.length > 2 ? `Last 30 days ${Math.min(...month)}–${Math.max(...month)}` : today ? 'Today' : 'Average');
+      else if (!heart.length) tile('heart', t('health.noData'), today ? t('health.nothingToday') : nothing);
+      else tile('heart', t('health.u.bpm', { n: Math.round(avg(heart)) }), month.length > 2 ? t('health.last30', { lo: Math.min(...month), hi: Math.max(...month) }) : today ? t('health.range.today') : t('health.average'));
 
       // Total burned leads, active is the part from moving; either one alone still fills the tile.
       // Health Connect fills a day nothing was recorded for with the resting rate alone (the same
@@ -253,35 +265,39 @@ const CHECK = 'M5 12l5 5 9-10';
       const counted = recorded.length ? recorded : whole;
       const burned = numbers(counted, 'totalKcal');
       const moving = numbers(counted, 'activeKcal');
-      const dayCount = today || counted.length === shown.length ? '' : ` · ${counted.length} ${counted.length === 1 ? 'day' : 'days'}`;
+      const dayCount = today || counted.length === shown.length ? '' : tn('health.dayCount', counted.length);
       const askCalories = (['calories', 'activeCalories'] as const).filter((k) => !allowed(k));
       if (askCalories.length === 2) off('calories', [...askCalories]);
-      else if (!burned.length && !moving.length) tile('calories', today ? '0 kcal' : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
+      else if (!burned.length && !moving.length) tile('calories', today ? kcal(0) : t('health.noData'), today ? t('health.nothingToday') : nothing);
       else if (burned.length) {
-        const activePart = moving.length ? `${kcal(today ? moving[0]! : avg(moving))} active` : allowed('activeCalories') ? 'No active calories recorded' : 'Active not allowed';
-        tile('calories', kcal(today ? burned[0]! : avg(burned)), today ? `${activePart} · so far today` : `Daily average · ${activePart}${dayCount}`);
-      } else tile('calories', kcal(today ? moving[0]! : avg(moving)), today ? 'Active · so far today' : `Active · daily average${dayCount}`);
+        const activePart = moving.length
+          ? t('health.activeKcal', { kcal: kcal(today ? moving[0]! : avg(moving)) })
+          : allowed('activeCalories')
+            ? t('health.noActiveKcal')
+            : t('health.activeNotAllowed');
+        tile('calories', kcal(today ? burned[0]! : avg(burned)), today ? t('health.soFarToday', { part: activePart }) : t('health.dailyAvgPart', { part: activePart, days: dayCount }));
+      } else tile('calories', kcal(today ? moving[0]! : avg(moving)), today ? t('health.activeSoFar') : t('health.activeDailyAvg', { days: dayCount }));
 
       const walked = numbers(whole, 'distanceM');
       if (!allowed('distance')) off('distance');
-      else if (!walked.length) tile('distance', today ? distance(0) : 'No data', today ? 'Nothing recorded today' : `Nothing recorded ${span}`);
-      else if (today) tile('distance', distance(walked[0]!), 'Walked, run and cycled today');
-      else tile('distance', distance(avg(walked)), `Daily average · ${distance(sum(numbers(shown, 'distanceM')))} in all`);
+      else if (!walked.length) tile('distance', today ? distance(0) : t('health.noData'), today ? t('health.nothingToday') : nothing);
+      else if (today) tile('distance', distance(walked[0]!), t('health.walkedToday'));
+      else tile('distance', distance(avg(walked)), t('health.dailyAvgTotal', { total: distance(sum(numbers(shown, 'distanceM'))) }));
     }
 
     /** Allowed, yet nothing in a month: no app on the phone is handing that kind to Health Connect. */
     function renderHint(): void {
-      const kinds: [HealthKind, BodyField, string][] = [
-        ['sleep', 'sleepMin', 'sleep'],
-        ['exercise', 'activeMin', 'exercise'],
-        ['heart', 'restingHr', 'resting heart rate'],
-        ['activeCalories', 'activeKcal', 'active calories'],
-        ['distance', 'distanceM', 'distance'],
+      const kinds: [HealthKind, BodyField, Key][] = [
+        ['sleep', 'sleepMin', 'health.miss.sleep'],
+        ['exercise', 'activeMin', 'health.miss.exercise'],
+        ['heart', 'restingHr', 'health.miss.heart'],
+        ['activeCalories', 'activeKcal', 'health.miss.activeCalories'],
+        ['distance', 'distanceM', 'health.miss.distance'],
       ];
-      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(view, field).length).map(([, , name]) => name);
+      const missing = kinds.filter(([kind, field]) => state?.[kind] && !numbers(view, field).length).map(([, , name]) => t(name));
       const hint = $<HTMLElement>('[data-hb-hint]');
       hint.hidden = !missing.length || !days.length;
-      $('[data-hb-hint-text]').textContent = `No ${missing.join(' or ')} in the last ${days.length} days.`;
+      $('[data-hb-hint-text]').textContent = tn('health.missingIn', days.length, { list: missing.join(` ${t('health.or')} `) });
     }
 
     function renderChart(): void {
@@ -311,7 +327,11 @@ const CHECK = 'M5 12l5 5 9-10';
       );
       bars.setAttribute(
         'aria-label',
-        week.map((d, i) => `${weekdayFmt.format(fromDayKey(d.day))}: ${sleep[i] ? hm(sleep[i]!) : 'no'} sleep, ${focus[i]} minutes of focus`).join('; '),
+        week
+          .map((d, i) =>
+            t(sleep[i] ? 'health.chartDay' : 'health.chartDayNoSleep', { day: weekdayFmt.format(fromDayKey(d.day)), sleep: sleep[i] ? hm(sleep[i]!) : '', focus: focus[i]! }),
+          )
+          .join('; '),
       );
     }
 
@@ -331,7 +351,7 @@ const CHECK = 'M5 12l5 5 9-10';
       const marked = new Set(Object.keys(todayTyped ?? {}).map((f) => KIND_OF[f as BodyField]).map((k) => TILE_OF[k] ?? k));
       for (const kind of marked) {
         const sub = root!.querySelector(`[data-hb-tile="${kind}"] [data-hb-sub]`);
-        if (sub) sub.textContent = `${sub.textContent} · added by you`;
+        if (sub) sub.textContent = sub.textContent + t('health.addedByYou');
       }
       $<HTMLElement>('[data-hb-entry]').dataset.day = dayKey(new Date());
       renderHint();

@@ -15,22 +15,22 @@ const icon = (d: string, w = 2) =>
 <div class="bv" data-budget>
   <div class="bv__bar">
     <div class="bv__month">
-      <button type="button" class="icon-btn" data-bv-prev aria-label="Previous month" set:html={icon('M15 6l-6 6 6 6')} />
+      <button data-t-aria-label="budget.previousMonth" type="button" class="icon-btn" data-bv-prev aria-label="Previous month" set:html={icon('M15 6l-6 6 6 6')} />
       <span data-bv-month aria-live="polite"></span>
-      <button type="button" class="icon-btn" data-bv-next aria-label="Next month" set:html={icon('M9 6l6 6-6 6')} />
+      <button data-t-aria-label="budget.nextMonth" type="button" class="icon-btn" data-bv-next aria-label="Next month" set:html={icon('M9 6l6 6-6 6')} />
     </div>
     <div class="bv__actions">
       {/* Hide amounts and the Budget lock (BudgetLock.astro wires both). */}
-      <button type="button" class="icon-btn bv__eye" data-bl-eye aria-pressed="false" aria-label="Hide amounts">
+      <button data-t-aria-label="budget.hideAmounts" type="button" class="icon-btn bv__eye" data-bl-eye aria-pressed="false" aria-label="Hide amounts">
         <Fragment set:html={icon('M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z')} />
         <Fragment set:html={icon('M3 3l18 18M10.6 6.1A9.7 9.7 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3 3.6M6.4 7.6A16 16 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4.2-1')} />
       </button>
-      <button type="button" class="icon-btn" data-sheet-open="budget-lock" aria-label="Lock Budget" set:html={icon('M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z')} />
+      <button data-t-aria-label="budget.lockBudget" type="button" class="icon-btn" data-sheet-open="budget-lock" aria-label="Lock Budget" set:html={icon('M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z')} />
       {
         !NATIVE_APP && (
           <button type="button" class="btn btn--ghost btn--small" data-bv-csv>
             <Fragment set:html={icon('M12 4v11M7 10l5 5 5-5M5 20h14')} />
-            Export CSV
+            <span data-t="budget.exportCsv">Export CSV</span>
           </button>
         )
       }
@@ -38,7 +38,7 @@ const icon = (d: string, w = 2) =>
         !NATIVE_APP && (
           <button type="button" class="btn btn--small" data-bv-add aria-keyshortcuts="N">
             <Fragment set:html={icon(PLUS, 2.4)} />
-            Add expense
+            <span data-t="budget.addExpense">Add expense</span>
             <kbd class="bv__kbd" aria-hidden="true">N</kbd>
           </button>
         )
@@ -65,26 +65,26 @@ const icon = (d: string, w = 2) =>
     <p class="bv__status" data-bv-status></p>
     <div class="bv__start">
       {/* Before anything is logged the first expense is a button here, not the floating one, which would sit on top of these. */}
-      {NATIVE_APP && <button type="button" class="btn bv__first" data-bv-add>Add your first expense</button>}
-      <button type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
+      {NATIVE_APP && <button data-t="budget.addYourFirstExpense" type="button" class="btn bv__first" data-bv-add>Add your first expense</button>}
+      <button data-t="budget.setAMonthlyBudget" type="button" class="btn btn--ghost btn--small bv__set" data-bv-set hidden>Set a monthly budget</button>
     </div>
   </section>
 
   {/* Short facts in one row that scrolls sideways; a fact with nothing to say is left out. */}
-  <ul class="bv__insights" role="list" aria-label="This month in short" data-bv-insights></ul>
+  <ul data-t-aria-label="budget.thisMonthInShort" class="bv__insights" role="list" aria-label="This month in short" data-bv-insights></ul>
 
   <section class="card bv__entries" aria-labelledby="bv-entries-title">
     <div class="bv__card-head">
-      <h2 class="panel-title" id="bv-entries-title">Expenses</h2>
+      <h2 data-t="budget.expenses" class="panel-title" id="bv-entries-title">Expenses</h2>
       <label class="bv__search">
-        <span class="visually-hidden">Search expenses</span>
+        <span data-t="budget.searchExpenses" class="visually-hidden">Search expenses</span>
         <Fragment set:html={icon('M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4')} />
-        <input class="input" type="search" placeholder="Search" autocomplete="off" data-bv-query />
+        <input data-t-placeholder="budget.search" class="input" type="search" placeholder="Search" autocomplete="off" data-bv-query />
       </label>
     </div>
-    <div class="bv__chips" role="group" aria-label="Show category" data-bv-chips>
-      <button type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
-      {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false">{CATEGORY_SHORT[c]}</button>)}
+    <div data-t-aria-label="budget.showCategory" class="bv__chips" role="group" aria-label="Show category" data-bv-chips>
+      <button data-t="budget.all" type="button" class="bv__chip" data-bv-chip="" aria-pressed="true">All</button>
+      {CATEGORIES.map((c) => <button type="button" class="bv__chip" data-bv-chip={c} aria-pressed="false" data-t={`budget.catShort.${c}`}>{CATEGORY_SHORT[c]}</button>)}
     </div>
     <div class="bv__groups" data-bv-list></div>
     <p class="muted bv__note" data-bv-none hidden></p>
@@ -93,20 +93,20 @@ const icon = (d: string, w = 2) =>
   <div class="bv__pair">
     <section class="card bv__cats" aria-labelledby="bv-cats-title">
       <div class="bv__card-head">
-        <h2 class="panel-title" id="bv-cats-title">Categories</h2>
-        <button type="button" class="btn btn--ghost btn--small" data-bv-edit-budgets>Edit budgets</button>
+        <h2 data-t="budget.categories" class="panel-title" id="bv-cats-title">Categories</h2>
+        <button data-t="budget.editBudgets" type="button" class="btn btn--ghost btn--small" data-bv-edit-budgets>Edit budgets</button>
       </div>
       <ul class="bv__cat-list" role="list" data-bv-cats></ul>
       <p class="muted bv__note" data-bv-cats-note></p>
     </section>
 
     <section class="card bv__repeats" aria-labelledby="bv-repeats-title">
-      <h2 class="panel-title" id="bv-repeats-title">Repeating bills</h2>
-      <p class="muted bv__note">Added for you on their day each month.</p>
+      <h2 data-t="budget.repeatingBills" class="panel-title" id="bv-repeats-title">Repeating bills</h2>
+      <p data-t="budget.addedForYouOnTheir" class="muted bv__note">Added for you on their day each month.</p>
       <ul class="bv__repeat-list" role="list" data-bv-repeats></ul>
       <button type="button" class="btn btn--ghost btn--small" data-bv-add-repeat>
         <Fragment set:html={icon(PLUS, 2.4)} />
-        Add a repeating bill
+        <span data-t="budget.addARepeatingBill">Add a repeating bill</span>
       </button>
     </section>
   </div>
@@ -114,9 +114,9 @@ const icon = (d: string, w = 2) =>
   <div class="bv__pair bv__charts">
     <section class="card bv__chart-card" aria-labelledby="bv-pace-title">
       <div class="bv__card-head">
-        <h2 class="panel-title" id="bv-pace-title" data-bv-pace-title>This month</h2>
+        <h2 data-t="budget.thisMonth" class="panel-title" id="bv-pace-title" data-bv-pace-title>This month</h2>
         <p class="bv__legend muted">
-          <span><i class="bv__key bv__key--line"></i>Spent so far</span>
+          <span><i class="bv__key bv__key--line"></i><span data-t="budget.spentSoFar">Spent so far</span></span>
           <span data-bv-pace-key><i class="bv__key bv__key--dash"></i><span data-bv-pace-key-text></span></span>
         </p>
       </div>
@@ -125,7 +125,7 @@ const icon = (d: string, w = 2) =>
 
     <section class="card bv__months" aria-labelledby="bv-months-title">
       <div class="bv__card-head">
-        <h2 class="panel-title" id="bv-months-title" data-bv-months-title>By month</h2>
+        <h2 data-t="budget.byMonth" class="panel-title" id="bv-months-title" data-bv-months-title>By month</h2>
         <p class="bv__legend muted" data-bv-months-key><span><i class="bv__key bv__key--dash"></i><span data-bv-months-key-text></span></span></p>
       </div>
       <div data-bv-months-chart></div>
@@ -135,7 +135,7 @@ const icon = (d: string, w = 2) =>
 
   {
     NATIVE_APP && (
-      <button type="button" class="btn bv__fab" data-bv-add aria-label="Add expense">
+      <button data-t-aria-label="budget.addExpense" type="button" class="btn bv__fab" data-bv-add aria-label="Add expense">
         <Fragment set:html={icon(PLUS, 2.6)} />
       </button>
     )
@@ -143,90 +143,90 @@ const icon = (d: string, w = 2) =>
 
   <dialog class="bv-dialog" data-bv-x-dialog aria-labelledby="bv-x-title">
     <form method="dialog" data-bv-x-form>
-      <h2 id="bv-x-title" data-bv-x-title>New expense</h2>
+      <h2 data-t="budget.newExpense" id="bv-x-title" data-bv-x-title>New expense</h2>
       <label class="bv-amount">
-        <span class="visually-hidden">Amount</span>
+        <span data-t="budget.amount" class="visually-hidden">Amount</span>
         <span class="bv-amount__sign" data-bv-x-sign aria-hidden="true"></span>
-        <input type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bv-x-amount />
+        <input data-t-aria-label="budget.amount" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Amount" data-bv-x-amount />
       </label>
       <p class="muted bv-dialog__hint" data-bv-x-hint aria-live="polite"></p>
       <fieldset class="bv-cats">
-        <legend class="visually-hidden">Category</legend>
+        <legend data-t="budget.category" class="visually-hidden">Category</legend>
         {
           CATEGORIES.map((c, i) => (
             <label class="bv-cat" style={`--c: ${CATEGORY_COLORS[c]}`}>
               <input type="radio" name="bv-x-cat" value={c} class="visually-hidden" checked={i === 0} />
               <i aria-hidden="true" />
-              {CATEGORY_SHORT[c]}
+              <span data-t={`budget.catShort.${c}`}>{CATEGORY_SHORT[c]}</span>
             </label>
           ))
         }
       </fieldset>
       {/* Need or want: the category's tag is picked for you; a mixed one (food) asks. */}
       <fieldset class="bv-need">
-        <legend>Counts as</legend>
-        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="need" class="visually-hidden" />Need</label>
-        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="want" class="visually-hidden" />Want</label>
+        <legend data-t="budget.countsAs">Counts as</legend>
+        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="need" class="visually-hidden" /><span data-t="budget.tag.need">Need</span></label>
+        <label class="bv-need__opt"><input type="radio" name="bv-x-need" value="want" class="visually-hidden" /><span data-t="budget.tag.want">Want</span></label>
         <p class="muted bv-need__hint" data-bv-x-need-hint></p>
       </fieldset>
       <label class="bv-dialog__field" data-bv-x-kind-field hidden>
-        <span>Kind</span>
+        <span data-t="budget.kind">Kind</span>
         <select class="input" data-bv-x-kind>
-          <option value="">Not set</option>
-          {WELLBEING_KINDS.map((k) => <option value={k}>{KIND_LABELS[k]}</option>)}
+          <option data-t="budget.notSet" value="">Not set</option>
+          {WELLBEING_KINDS.map((k) => <option value={k} data-t={`budget.kind.${k}`}>{KIND_LABELS[k]}</option>)}
         </select>
       </label>
       <div class="bv-dialog__pair">
         <label class="bv-dialog__field">
-          <span>What <span class="muted">(optional)</span></span>
-          <input class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. Groceries" data-bv-x-what />
+          <span><span data-t="budget.what">What</span> <span data-t="budget.optional" class="muted">(optional)</span></span>
+          <input data-t-placeholder="budget.eGGroceries" class="input" type="text" maxlength={WHAT_MAX} autocomplete="off" placeholder="e.g. Groceries" data-bv-x-what />
         </label>
         <label class="bv-dialog__field">
-          <span>Date</span>
+          <span data-t="budget.date">Date</span>
           <input class="input" type="date" required data-bv-x-day />
         </label>
       </div>
       <label class="bv-check" data-bv-x-repeat-field>
         <input type="checkbox" data-bv-x-repeat />
-        <span>Repeat every month on this day</span>
+        <span data-t="budget.repeatEveryMonthOnThis">Repeat every month on this day</span>
       </label>
       <div class="bv-dialog__actions">
-        <button type="button" class="btn btn--ghost bv-dialog__delete" data-bv-x-delete hidden>Delete</button>
-        <button type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
-        <button type="submit" class="btn" data-bv-x-save>Save</button>
+        <button data-t="budget.delete" type="button" class="btn btn--ghost bv-dialog__delete" data-bv-x-delete hidden>Delete</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
+        <button data-t="budget.save" type="submit" class="btn" data-bv-x-save>Save</button>
       </div>
     </form>
   </dialog>
 
   <dialog class="bv-dialog" data-bv-b-dialog aria-labelledby="bv-b-title">
     <form method="dialog" data-bv-b-form>
-      <h2 id="bv-b-title">Budgets</h2>
-      <p class="muted">Leave a box empty for no budget. Without a monthly total, the category budgets are added up.</p>
+      <h2 data-t="budget.budgets" id="bv-b-title">Budgets</h2>
+      <p data-t="budget.leaveABoxEmptyFor" class="muted">Leave a box empty for no budget. Without a monthly total, the category budgets are added up.</p>
       <div class="bv-dialog__pair">
         <label class="bv-dialog__field">
-          <span>Monthly total</span>
+          <span data-t="budget.monthlyTotal">Monthly total</span>
           <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bv-b-total />
         </label>
         <label class="bv-dialog__field">
-          <span>Currency</span>
+          <span data-t="budget.currency">Currency</span>
           <select class="input" data-bv-b-currency>
-            {CURRENCIES.map((c) => <option value={c.code}>{c.code} {c.sign} · {c.name}</option>)}
-            <option value="">Other…</option>
+            {CURRENCIES.map((c) => <option value={c.code} data-t={`budget.cur.${c.code}`}>{c.code} {c.sign} · {c.name}</option>)}
+            <option data-t="budget.other" value="">Other…</option>
           </select>
         </label>
       </div>
       <label class="bv-dialog__field" data-bv-b-sign-field hidden>
-        <span>Sign to show</span>
-        <input class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" placeholder="e.g. ₴ or CHF" data-bv-b-sign />
+        <span data-t="budget.signToShow">Sign to show</span>
+        <input data-t-placeholder="budget.eGOrChf" class="input" type="text" maxlength={CURRENCY_MAX} autocomplete="off" placeholder="e.g. ₴ or CHF" data-bv-b-sign />
       </label>
-      <p class="muted">Changing the currency does not convert amounts you already entered.</p>
+      <p data-t="budget.changingTheCurrencyDoesNot" class="muted">Changing the currency does not convert amounts you already entered.</p>
       <div class="bv-budgets">
         {
           CATEGORIES.map((c) => (
             <label class="bv-dialog__field bv-budgets__row">
               <span>
                 <i style={`background: ${CATEGORY_COLORS[c]}`} aria-hidden="true" />
-                {CATEGORY_LABELS[c]}
+                <span data-t={`budget.cat.${c}`}>{CATEGORY_LABELS[c]}</span>
               </span>
               <input class="input" type="number" inputmode="decimal" min="0" max={AMOUNT_MAX} step="0.01" data-bv-b-cat={c} />
             </label>
@@ -234,8 +234,8 @@ const icon = (d: string, w = 2) =>
         }
       </div>
       <div class="bv-dialog__actions">
-        <button type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
-        <button type="submit" class="btn">Save</button>
+        <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
+        <button data-t="budget.save" type="submit" class="btn">Save</button>
       </div>
     </form>
   </dialog>
@@ -253,8 +253,7 @@ const icon = (d: string, w = 2) =>
     categoryTag,
     CATEGORIES,
     CATEGORY_COLORS,
-    CATEGORY_LABELS,
-    CATEGORY_SHORT,
+    categoryShort,
     changeSpend,
     currencyCode,
     currencySign,
@@ -262,13 +261,13 @@ const icon = (d: string, w = 2) =>
     dueSoon,
     formatMoney,
     getBudget,
-    KIND_LABELS,
+    kindLabel,
     monthBudget,
     monthOf,
     monthSpend,
     monthTotals,
     needOf,
-    NEED_LABELS,
+    needLabel,
     paceLine,
     removeRepeat,
     removeSpend,
@@ -285,10 +284,11 @@ const icon = (d: string, w = 2) =>
   import { addDays, dayKey, formatDay, formatShort, fromDayKey, startOfWeek } from '../lib/dates';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const monthLong = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const monthName = new Intl.DateTimeFormat(undefined, { month: 'long' });
-  const monthShort = new Intl.DateTimeFormat(undefined, { month: 'short' });
+  const monthLong = dateFormat({ month: 'long', year: 'numeric' });
+  const monthName = dateFormat({ month: 'long' });
+  const monthShort = dateFormat({ month: 'short' });
   const svgIcon = (d: string) =>
     `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const EDIT = svgIcon('M4 20h4L19 9l-4-4L4 16z');
@@ -348,7 +348,7 @@ const icon = (d: string, w = 2) =>
         const cls = `mb__bar${last ? ' mb__bar--now' : ''}${over ? ' mb__bar--over' : ''}`;
         const rest = last && current && budget && m.total < budget ? `<rect class="mb__rest" x="${r1(cx - bw / 2)}" y="${y(budget)}" width="${r1(bw)}" height="${r1(Math.max(0, B - h - y(budget) - 2))}" rx="8"/>` : '';
         const name = monthShort.format(fromDayKey(`${m.month}-01`));
-        const note = over ? 'over' : last && current ? 'so far' : '';
+        const note = over ? t('budget.v.overShort') : last && current ? t('budget.v.soFar') : '';
         return (
           `${rest}<rect class="${cls}" x="${r1(cx - bw / 2)}" y="${r1(B - h)}" width="${r1(bw)}" height="${r1(h)}" rx="8"/>` +
           `<text class="mb__value${over ? ' mb__value--over' : ''}" x="${cx}" y="${r1(B - h - 8)}">${esc(m.total ? formatMoney(Math.round(m.total), sign, 0) : '')}</text>` +
@@ -405,22 +405,22 @@ const icon = (d: string, w = 2) =>
       const dot = el('i', 'bv__dot');
       dot.style.background = CATEGORY_COLORS[entry.category];
       const main = el('span', 'bv__entry-main');
-      const sub = [withDay ? formatDay(fromDayKey(entry.day)) : '', CATEGORY_SHORT[entry.category], entry.kind ? KIND_LABELS[entry.kind] : '', entry.repeatId ? 'repeats monthly' : '', entry.from ? `from ${entry.from}` : '']
+      const sub = [withDay ? formatDay(fromDayKey(entry.day)) : '', categoryShort(entry.category), entry.kind ? kindLabel(entry.kind) : '', entry.repeatId ? t('budget.v.repeatsMonthly') : '', entry.from ? t('budget.v.from', { from: entry.from }) : '']
         .filter(Boolean)
         .join(' · ');
       main.append(el('strong', '', entry.what), el('span', 'muted', sub));
       // Need or want; a mixed category without one asks, and the tap opens the expense to choose.
       const need = needOf(entry, getBudget().plan);
-      if (need) main.append(el('span', `bv__need bv__need--${need}`, NEED_LABELS[need]));
+      if (need) main.append(el('span', `bv__need bv__need--${need}`, needLabel(need)));
       else {
-        const ask = el('button', 'bv__need bv__need--ask', 'Need or want?');
+        const ask = el('button', 'bv__need bv__need--ask', t('budget.needOrWant'));
         ask.type = 'button';
         ask.addEventListener('click', () => openExpense(entry));
         main.append(ask);
       }
       const edit = el('button', 'icon-btn');
       edit.type = 'button';
-      edit.setAttribute('aria-label', `Change ${entry.what}`);
+      edit.setAttribute('aria-label', t('budget.v.change', { what: entry.what }));
       edit.innerHTML = EDIT;
       edit.addEventListener('click', () => openExpense(entry));
       item.append(dot, main, el('span', 'bv__amount', formatMoney(entry.amount, sign)), edit);
@@ -459,36 +459,36 @@ const icon = (d: string, w = 2) =>
       meter.hidden = !budget;
       if (budget) {
         const left = budget - spent.total;
-        setText('[data-bv-left-label]', left >= 0 ? (current ? 'Left this month' : `Left in ${name}`) : 'Over budget');
+        setText('[data-bv-left-label]', left >= 0 ? (current ? t('budget.v.leftThisMonth') : t('budget.v.leftIn', { month: name })) : t('budget.v.overBudget'));
         setText('[data-bv-big]', fmt(Math.abs(Math.round(left * 100) / 100)));
-        setText('[data-bv-of]', `of ${fmt(budget)}`);
+        setText('[data-bv-of]', t('budget.v.of', { amount: fmt(budget) }));
         $('[data-bv-fill]').style.width = `${Math.min(100, (spent.total / budget) * 100)}%`;
         $('[data-bv-fill]').classList.toggle('is-over', left < 0);
         const tick = $('[data-bv-tick]');
         tick.hidden = !current;
         tick.style.left = `${Math.min(100, (pace / budget) * 100)}%`;
-        setText('[data-bv-spent]', `${fmt(spent.total)} spent`);
-        setText('[data-bv-pace]', current ? `Pace today: ${whole(pace)}` : '');
+        setText('[data-bv-spent]', t('budget.v.spent', { amount: fmt(spent.total) }));
+        setText('[data-bv-pace]', current ? t('budget.v.paceToday', { amount: whole(pace) }) : '');
         const daysLeft = days - dom + 1;
         const free = left - billsLater;
-        const days_ = `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`;
-        const bills = billsLater ? `, after ${esc(whole(billsLater))} of bills still to come` : '';
+        const days_ = tn('budget.v.days', daysLeft);
+        const bills = billsLater ? t('budget.v.afterBills', { amount: esc(whole(billsLater)) }) : '';
         const perDay =
           free > 0
-            ? `about <strong>${esc(whole(Math.floor(free / daysLeft)))} a day</strong> for the ${days_} left${bills}`
-            : `nothing more beyond the ${esc(whole(billsLater))} of bills still to come`;
+            ? t('budget.v.perDay', { amount: esc(whole(Math.floor(free / daysLeft))), days: days_ }) + bills
+            : t('budget.v.nothingMore', { amount: esc(whole(billsLater)) });
         if (!current) {
-          if (left >= 0) status('ok', `<strong>Finished ${esc(whole(left))} under budget.</strong>`);
-          else status('warn', `<strong>Ended ${esc(whole(-left))} over budget.</strong>`);
+          if (left >= 0) status('ok', t('budget.v.finishedUnder', { amount: esc(whole(left)) }));
+          else status('warn', t('budget.v.endedOver', { amount: esc(whole(-left)) }));
         } else if (left < 0) {
-          status('warn', `<strong>Over budget</strong> by ${esc(whole(-left))}, with ${days_} to go.`);
+          status('warn', t('budget.v.overBy', { amount: esc(whole(-left)), days: days_ }));
         } else if (spent.total > pace) {
-          status('warn', `<strong>Ahead of pace</strong> by ${esc(whole(spent.total - pace))}. To stay in budget: ${perDay}.`);
+          status('warn', t('budget.v.ahead', { amount: esc(whole(spent.total - pace)), perDay }));
         } else {
-          status('ok', `<strong>On track</strong>, ${esc(whole(pace - spent.total))} under pace. You can spend ${perDay}.`);
+          status('ok', t('budget.v.onTrack', { amount: esc(whole(pace - spent.total)), perDay }));
         }
       } else {
-        setText('[data-bv-left-label]', current ? 'Spent this month' : `Spent in ${name}`);
+        setText('[data-bv-left-label]', current ? t('budget.v.spentThisMonth') : t('budget.v.spentIn', { month: name }));
         setText('[data-bv-big]', fmt(spent.total));
         setText('[data-bv-of]', '');
         // The "Set a monthly budget" button under it says what a budget would add.
@@ -508,27 +508,27 @@ const icon = (d: string, w = 2) =>
           return part;
         }),
       );
-      $('[data-bv-mix-bar]').setAttribute('aria-label', byCat.map(([cat, sum]) => `${CATEGORY_SHORT[cat]} ${share(sum)}%`).join(', '));
+      $('[data-bv-mix-bar]').setAttribute('aria-label', byCat.map(([cat, sum]) => `${categoryShort(cat)} ${share(sum)}%`).join(', '));
       $('[data-bv-mix-key]').replaceChildren(
         ...byCat.slice(0, 3).map(([cat, sum]) => {
           const item = el('span');
           const dot = el('i', 'bv__dot');
           dot.style.background = CATEGORY_COLORS[cat];
-          item.append(dot, `${CATEGORY_SHORT[cat]} ${share(sum)}%`);
+          item.append(dot, `${categoryShort(cat)} ${share(sum)}%`);
           return item;
         }),
       );
 
       const run = runningTotals(entries, month);
       $('[data-bv-pace-key]').hidden = !budget;
-      setText('[data-bv-pace-title]', budget ? 'Spending vs. pace' : current ? 'This month so far' : name);
-      setText('[data-bv-pace-key-text]', budget ? `Pace to ${whole(budget)}` : '');
+      setText('[data-bv-pace-title]', budget ? t('budget.v.vsPace') : current ? t('budget.v.thisMonthSoFar') : name);
+      setText('[data-bv-pace-key-text]', budget ? t('budget.v.paceTo', { amount: whole(budget) }) : '');
       $('[data-bv-pace-chart]').innerHTML = paceChart(
         run,
         dom,
         plan?.line ?? null,
         sign,
-        `Spent through ${name}: ${fmt(run[dom - 1] ?? 0)} by day ${dom}${budget ? `, against a pace of ${whole(pace)}` : ''}.`,
+        t('budget.v.chartLabel', { month: name, amount: fmt(run[dom - 1] ?? 0), day: dom }) + (budget ? t('budget.v.againstPace', { amount: whole(pace) }) : '') + '.',
       );
 
       // ---- Short facts: only the ones with something to say ----
@@ -538,13 +538,13 @@ const icon = (d: string, w = 2) =>
       const prevShort = monthShort.format(fromDayKey(`${prevMonth}-01`));
       if (prev > 0 && spent.total > 0) {
         const pct = Math.round(((spent.total - prev) / prev) * 100);
-        facts.push([`${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`, current ? `vs. ${prevShort} by this day` : `vs. ${prevShort}`]);
+        facts.push([`${pct > 0 ? '+' : pct < 0 ? '−' : ''}${Math.abs(pct)}%`, current ? t('budget.v.vsByDay', { month: prevShort }) : t('budget.v.vs', { month: prevShort })]);
       }
-      if (spent.total > 0) facts.push([whole(spent.total / dom), current ? 'a day so far' : 'a day']);
+      if (spent.total > 0) facts.push([whole(spent.total / dom), current ? t('budget.v.aDaySoFar') : t('budget.v.aDay')]);
       const due = current ? dueSoon(repeats) : [];
-      if (due.length) facts.push([whole(due.reduce((sum, d) => sum + d.repeat.amount, 0)), `due in 7 days: ${due.map((d) => d.repeat.what).join(', ')}`]);
+      if (due.length) facts.push([whole(due.reduce((sum, d) => sum + d.repeat.amount, 0)), t('budget.v.due7', { list: due.map((d) => d.repeat.what).join(', ') })]);
       const logged = new Set(spent.entries.map((e) => e.day)).size;
-      if (logged) facts.push([`${logged} of ${dom}`, 'days with spending']);
+      if (logged) facts.push([`${logged} / ${dom}`, t('budget.v.daysWithSpending')]);
       $('[data-bv-insights]').replaceChildren(
         ...facts.map(([big, small]) => {
           const li = el('li', 'bv__insight');
@@ -567,7 +567,7 @@ const icon = (d: string, w = 2) =>
           btn.style.setProperty('--c', CATEGORY_COLORS[cat]);
           const head = el('span', 'bv__cat-head');
           const nameEl = el('span', 'bv__cat-name');
-          nameEl.append(el('i', 'bv__dot'), CATEGORY_SHORT[cat]);
+          nameEl.append(el('i', 'bv__dot'), categoryShort(cat));
           const nums = el('span', 'bv__cat-nums', whole(sum));
           if (own) nums.append(el('span', 'muted', ` / ${whole(own)}`));
           head.append(nameEl, nums);
@@ -590,9 +590,9 @@ const icon = (d: string, w = 2) =>
             const leftCat = own - sum;
             const freeCat = leftCat - (current && catPlan ? billsAfter(catPlan.billsByDay, dom) : 0);
             let note = '';
-            if (leftCat < 0) note = `Over by ${whole(-leftCat)}`;
+            if (leftCat < 0) note = t('budget.v.overByShort', { amount: whole(-leftCat) });
             else if (current && sum > catPace + 0.005)
-              note = freeCat > 0 ? `Ahead of pace, about ${whole(Math.floor(freeCat / (days - dom + 1)))} a day left` : 'Ahead of pace, nothing left after bills';
+              note = freeCat > 0 ? t('budget.v.aheadCat', { amount: whole(Math.floor(freeCat / (days - dom + 1))) }) : t('budget.v.aheadCatNone');
             if (note) {
               const n = el('span', 'bv__cat-warn');
               n.innerHTML = WARN + `<span>${esc(note)}</span>`;
@@ -605,13 +605,13 @@ const icon = (d: string, w = 2) =>
         }),
       );
       const notes: string[] = [];
-      if (!shown.length) notes.push(`Nothing spent in ${name} yet.`);
-      else notes.push('Choose a category to see only its expenses and months.');
+      if (!shown.length) notes.push(t('budget.v.nothingSpentIn', { month: name }));
+      else notes.push(t('budget.v.chooseCat'));
       // Said once for the list, not under every row.
-      if (shown.length && !shown.some((cat) => store.budgets[cat])) notes.unshift('No category budgets yet.');
-      if (current && shown.some((cat) => store.budgets[cat])) notes.push('The white tick is where your pace would be today: repeating bills count on their day, the rest is spread evenly.');
+      if (shown.length && !shown.some((cat) => store.budgets[cat])) notes.unshift(t('budget.v.noCatBudgets'));
+      if (current && shown.some((cat) => store.budgets[cat])) notes.push(t('budget.v.tickNote'));
       const assigned = Object.values(store.budgets).reduce((a, b) => a + (b ?? 0), 0);
-      if (store.budget && assigned > 0 && assigned < store.budget) notes.push(`${whole(store.budget - assigned)} of your budget is not given to a category.`);
+      if (store.budget && assigned > 0 && assigned < store.budget) notes.push(t('budget.v.unassigned', { amount: whole(store.budget - assigned) }));
       setText('[data-bv-cats-note]', notes.join(' '));
 
       // ---- Months ----
@@ -622,15 +622,17 @@ const icon = (d: string, w = 2) =>
       span = Math.max(2, span);
       const months = monthTotals(entries, month, span, filter ?? undefined);
       const line = filter ? (store.budgets[filter] ?? null) : budget;
-      setText('[data-bv-months-title]', `Last ${span} months${filter ? ` · ${CATEGORY_SHORT[filter]}` : ''}`);
+      setText('[data-bv-months-title]', tn('budget.v.lastMonths', span) + (filter ? ` · ${categoryShort(filter)}` : ''));
       $('[data-bv-months-key]').hidden = !line;
-      setText('[data-bv-months-key-text]', line ? `Budget ${whole(line)}` : '');
+      setText('[data-bv-months-key-text]', line ? t('budget.v.budgetLine', { amount: whole(line) }) : '');
       $('[data-bv-months-chart]').innerHTML = monthBars(
         months,
         line,
         current,
         sign,
-        `${filter ? CATEGORY_SHORT[filter] + ' spending' : 'Spending'} by month: ${months.map((m) => `${monthShort.format(fromDayKey(`${m.month}-01`))} ${whole(m.total)}`).join(', ')}${current ? ' so far' : ''}.`,
+        t('budget.v.byMonth', { what: filter ? categoryShort(filter) : t('budget.v.spending'), list: months.map((m) => `${monthShort.format(fromDayKey(`${m.month}-01`))} ${whole(m.total)}`).join(', ') }) +
+          (current ? t('budget.v.soFarTail') : '') +
+          '.',
       );
       const done = (current ? months.slice(0, -1) : months).filter((m) => m.total > 0);
       const finding = $('[data-bv-finding]');
@@ -641,11 +643,11 @@ const icon = (d: string, w = 2) =>
         const overText = !line
           ? ''
           : overs.length === 0
-            ? ' You stayed in budget every month.'
+            ? ' ' + t('budget.v.stayedIn')
             : overs.length === 1
-              ? ` You went over once, in ${monthName.format(fromDayKey(`${overs[0]!.month}-01`))}.`
-              : ` You went over ${overs.length} times.`;
-        finding.innerHTML = `Average month: <strong>${esc(whole(avg))}</strong>.${esc(overText)}`;
+              ? ' ' + t('budget.v.overOnce', { month: monthName.format(fromDayKey(`${overs[0]!.month}-01`)) })
+              : ' ' + tn('budget.v.overTimes', overs.length);
+        finding.innerHTML = t('budget.v.avgMonth', { amount: esc(whole(avg)) }) + esc(overText);
       }
 
       // ---- Expenses ----
@@ -661,7 +663,7 @@ const icon = (d: string, w = 2) =>
           const head = el('summary', 'bv__group-head');
           head.append(
             el('span', 'bv__group-name', g.label),
-            el('span', 'bv__group-meta muted', `${g.entries.length} ${g.entries.length === 1 ? 'expense' : 'expenses'}`),
+            el('span', 'bv__group-meta muted', tn('budget.v.expenses', g.entries.length)),
             el('span', 'bv__amount', fmt(g.entries.reduce((sum, e) => sum + e.amount, 0))),
           );
           const ul = el('ul', 'bv__list');
@@ -673,23 +675,23 @@ const icon = (d: string, w = 2) =>
       );
       const none = $('[data-bv-none]');
       none.hidden = list.length > 0;
-      none.textContent = q || filter ? 'Nothing matches.' : `No expenses in ${name}.`;
+      none.textContent = q || filter ? t('budget.v.noMatch') : t('budget.v.noExpensesIn', { month: name });
 
       // ---- Repeats ----
       $('[data-bv-repeats]').replaceChildren(
         ...repeats.map((r) => {
           const li = el('li', 'bv__repeat');
           const main = el('span', 'bv__entry-main');
-          main.append(el('strong', '', r.what), el('span', 'muted', `Day ${r.dayOfMonth} each month · ${CATEGORY_SHORT[r.category]}`));
+          main.append(el('strong', '', r.what), el('span', 'muted', t('budget.v.dayEachMonth', { day: r.dayOfMonth, cat: categoryShort(r.category) })));
           const stop = el('button', 'icon-btn');
           stop.type = 'button';
-          stop.setAttribute('aria-label', `Stop repeating ${r.what}`);
+          stop.setAttribute('aria-label', t('budget.v.stopRepeating', { what: r.what }));
           stop.innerHTML = CROSS;
           stop.addEventListener('click', () => {
             removing.add(r.id);
             render();
             offerUndo({
-              message: `Stopped “${r.what}”`,
+              message: t('budget.v.stopped', { what: r.what }),
               commit: () => {
                 removing.delete(r.id);
                 removeRepeat(r.id);
@@ -704,7 +706,7 @@ const icon = (d: string, w = 2) =>
           return li;
         }),
       );
-      if (!repeats.length) $('[data-bv-repeats]').append(el('li', 'muted bv__note', 'Rent, phone, memberships: add them once.'));
+      if (!repeats.length) $('[data-bv-repeats]').append(el('li', 'muted bv__note', t('budget.v.repeatHint')));
     }
 
     /**
@@ -720,9 +722,9 @@ const icon = (d: string, w = 2) =>
       const groups: { key: string; label: string; week: boolean; entries: SpendEntry[] }[] = [];
       for (const e of list) {
         let g: Omit<(typeof groups)[number], 'entries'>;
-        if (e.day === now) g = { key: 'today', label: 'Today', week: false };
-        else if (e.day === yesterday) g = { key: 'yesterday', label: 'Yesterday', week: false };
-        else if (e.day >= thisWeek && e.day < now) g = { key: 'week', label: 'Earlier this week', week: true };
+        if (e.day === now) g = { key: 'today', label: t('budget.v.today'), week: false };
+        else if (e.day === yesterday) g = { key: 'yesterday', label: t('budget.v.yesterday'), week: false };
+        else if (e.day >= thisWeek && e.day < now) g = { key: 'week', label: t('budget.v.earlierWeek'), week: true };
         else {
           // Only the part of the week inside the month shown.
           const start = startOfWeek(fromDayKey(e.day));
@@ -763,10 +765,10 @@ const icon = (d: string, w = 2) =>
       setText(
         '[data-bv-x-need-hint]',
         tag === 'mixed'
-          ? `${CATEGORY_SHORT[cat]} is mixed: groceries are a need, eating out is a want.`
+          ? t('budget.v.mixed', { cat: categoryShort(cat) })
           : need && need !== tag
-            ? `Only this expense. ${CATEGORY_SHORT[cat]} stays a ${tag}.`
-            : `${CATEGORY_SHORT[cat]} counts as a ${tag}. Change it for just this one if it is not.`,
+            ? t('budget.v.onlyThis', { cat: categoryShort(cat), tag: needLabel(tag) })
+            : t('budget.v.countsAs', { cat: categoryShort(cat), tag: needLabel(tag) }),
       );
     }
 
@@ -789,14 +791,14 @@ const icon = (d: string, w = 2) =>
       const mName = monthName.format(fromDayKey(day));
       hint.textContent =
         left >= 0
-          ? `${CATEGORY_SHORT[cat]}: ${formatMoney(Math.round(left), store.currency, 0)} left in ${mName}${amount ? ' after this' : ''}`
-          : `${CATEGORY_SHORT[cat]}: ${formatMoney(Math.round(-left), store.currency, 0)} over in ${mName}${amount ? ' with this' : ''}`;
+          ? t(amount ? 'budget.v.catLeftAfter' : 'budget.v.catLeft', { cat: categoryShort(cat), amount: formatMoney(Math.round(left), store.currency, 0), month: mName })
+          : t(amount ? 'budget.v.catOverWith' : 'budget.v.catOver', { cat: categoryShort(cat), amount: formatMoney(Math.round(-left), store.currency, 0), month: mName });
     }
 
     function openExpense(entry: SpendEntry | null, repeat = false): void {
       editing = entry;
       const store = getBudget();
-      setText('[data-bv-x-title]', entry ? 'Change expense' : repeat ? 'New repeating bill' : 'New expense');
+      setText('[data-bv-x-title]', entry ? t('budget.v.changeExpense') : repeat ? t('budget.v.newRepeat') : t('budget.v.newExpense'));
       setText('[data-bv-x-sign]', currencySign(store.currency));
       xAmount.value = entry ? String(entry.amount) : '';
       xWhat.value = entry ? entry.what : '';
@@ -837,15 +839,15 @@ const icon = (d: string, w = 2) =>
         // A bank alert put it in the wrong category: payments there go to the new one from now on.
         if (editing.from && editing.category !== input.category) learnCategory(editing.what, input.category);
         const entry = changeSpend(editing.id, input);
-        if (entry) announce(`Changed ${entry.what}, ${formatMoney(entry.amount, sign)}`);
+        if (entry) announce(t('budget.v.changed', { what: entry.what, amount: formatMoney(entry.amount, sign) }));
       } else if (xRepeat.checked) {
         const r = addRepeat(input);
-        if (r) announce(`${r.what} repeats every month on day ${r.dayOfMonth}`);
+        if (r) announce(t('budget.v.repeats', { what: r.what, day: r.dayOfMonth }));
       } else {
         const entry = addSpend(input);
         if (!entry) return;
         month = monthOf(entry.day);
-        announce(`Added ${entry.what}, ${formatMoney(entry.amount, sign)}`);
+        announce(t('budget.v.added', { what: entry.what, amount: formatMoney(entry.amount, sign) }));
       }
       editing = null;
       render();
@@ -859,7 +861,7 @@ const icon = (d: string, w = 2) =>
       removing.add(entry.id);
       render();
       offerUndo({
-        message: `Deleted “${entry.what}”`,
+        message: t('budget.v.deleted', { what: entry.what }),
         commit: () => {
           removing.delete(entry.id);
           removeSpend(entry.id);
@@ -902,7 +904,7 @@ const icon = (d: string, w = 2) =>
       }
       const picked = $<HTMLSelectElement>('[data-bv-b-currency]').value;
       setBudgets(total > 0 ? total : null, budgets, picked || $<HTMLInputElement>('[data-bv-b-sign]').value.trim() || '$');
-      announce('Budgets saved.');
+      announce(t('budget.v.saved'));
     });
 
     for (const dialog of [xDialog, bDialog]) {

@@ -9,6 +9,7 @@
  * expenses it adds go to the synced Budget store.
  */
 import { read, write } from './storage';
+import { t, type Key } from './i18n';
 import { dayKey, fromDayKey, isDayKey, addDays, type DayKey } from './dates';
 import type { BankNotice, BankSources } from './device';
 import { CATEGORIES, currencyCode, getBudget, importSpend, importSpends, removeSpends, renameSpends, WHAT_MAX, type Category, type SpendEntry } from './budget';
@@ -32,6 +33,9 @@ export const BANK_SENDERS = ['Azericard', 'ABB', 'Birbank', 'KapitalBank', 'Rabi
 export const SENDER_MAX = 30;
 
 export type Outcome = 'added' | 'review' | 'skipped' | 'income' | 'declined' | 'duplicate' | 'not-money';
+
+/** The outcome in the picked language. */
+export const outcomeLabel = (o: Outcome) => t(`budget.out.${o}` as Key);
 
 export const OUTCOME_LABELS: Record<Outcome, string> = {
   added: 'Added',

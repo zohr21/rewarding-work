@@ -15,7 +15,7 @@
 
 <section class="card garden" aria-labelledby="garden-heading" data-garden hidden>
   <div class="garden__head">
-    <h2 id="garden-heading" class="panel-title">Your garden today</h2>
+    <h2 data-t="health.yourGardenToday" id="garden-heading" class="panel-title">Your garden today</h2>
     <span class="muted garden__hint" data-garden-hint></span>
   </div>
   <svg class="garden__bed" data-garden-bed role="img" preserveAspectRatio="xMidYMax meet"></svg>
@@ -33,6 +33,7 @@
   import type { BodyDay } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { locale, t } from '../lib/i18n';
 
   interface Plant {
     id: string;
@@ -51,7 +52,7 @@
   const W = 320;
   const H = 170;
   const GROUND = 140;
-  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
+  const hm = (min: number) => t('unit.hmShort', { h: Math.floor(min / 60), m: String(Math.round(min % 60)).padStart(2, '0') });
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
   /** Full today or yesterday, fading over the next days. */
   const freshness = (ageDays: number) => (ageDays <= 1 ? 1 : ageDays <= 2 ? 0.6 : 0.3);
@@ -65,16 +66,16 @@
 
     const sleep = latest('sleepMin');
     if (sleep?.sleepMin !== undefined) {
-      plants.push({ id: 'sleep', label: 'Sleep', value: hm(sleep.sleepMin), goal: 'goal 8h', share: sleep.sleepMin / GOALS.sleepMin, fresh: freshness(ageInDays(sleep.day, today)) });
+      plants.push({ id: 'sleep', label: t('health.tile.sleep'), value: hm(sleep.sleepMin), goal: t('health.goalLower', { n: t('unit.h', { n: 8 }) }), share: sleep.sleepMin / GOALS.sleepMin, fresh: freshness(ageInDays(sleep.day, today)) });
     }
     const steps = latest('steps');
     if (steps?.steps !== undefined) {
       const isToday = steps.day === today;
       plants.push({
         id: 'steps',
-        label: 'Steps',
-        value: (isToday ? steps.steps : 0).toLocaleString(),
-        goal: `goal ${GOALS.steps.toLocaleString()}`,
+        label: t('health.tile.steps'),
+        value: (isToday ? steps.steps : 0).toLocaleString(locale()),
+        goal: t('health.goalLower', { n: GOALS.steps.toLocaleString(locale()) }),
         share: isToday ? steps.steps / GOALS.steps : 0,
         fresh: freshness(ageInDays(steps.day, today)),
       });
@@ -84,9 +85,9 @@
       const isToday = active.day === today;
       plants.push({
         id: 'active',
-        label: 'Active',
-        value: `${isToday ? active.activeMin : 0} min`,
-        goal: `goal ${GOALS.activeMin} min`,
+        label: t('health.tile.exercise'),
+        value: t('unit.min', { n: isToday ? active.activeMin : 0 }),
+        goal: t('health.goalLower', { n: t('unit.min', { n: GOALS.activeMin }) }),
         share: isToday ? active.activeMin / GOALS.activeMin : 0,
         fresh: freshness(ageInDays(active.day, today)),
       });
@@ -99,9 +100,9 @@
     const last = getSessions().reduce((m, s) => Math.max(m, s.end), 0);
     return {
       id: 'focus',
-      label: 'Focus',
-      value: min ? formatFocus(min * 60) : '0 min',
-      goal: 'goal 2h',
+      label: t('health.focus'),
+      value: min ? formatFocus(min * 60) : t('unit.min', { n: 0 }),
+      goal: t('health.goalLower', { n: t('unit.h', { n: 2 }) }),
       share: min / GOALS.focusMin,
       fresh: last ? freshness(Math.floor((Date.now() - last) / DAY)) : 0.3,
     };
@@ -120,9 +121,9 @@
     const left = budget - spent;
     return {
       id: 'budget',
-      label: 'Budget',
-      value: `${formatMoney(Math.round(Math.abs(left)), store.currency, 0)} ${left >= 0 ? 'left' : 'over'}`,
-      goal: spent <= pace ? 'on pace' : 'over pace',
+      label: t('module.budget'),
+      value: t(left >= 0 ? 'health.moneyLeft' : 'health.moneyOver', { amount: formatMoney(Math.round(Math.abs(left)), store.currency, 0) }),
+      goal: spent <= pace ? t('health.onPace') : t('health.overPace'),
       share: spent <= pace ? 1 : clamp01(pace / spent),
       fresh: lastAdded ? freshness(Math.floor((Date.now() - lastAdded) / DAY)) : 0.3,
     };
@@ -137,9 +138,9 @@
     const usual = week.reduce((a, d) => a + d.totalMin, 0) / week.length;
     return {
       id: 'screen',
-      label: 'Screen',
+      label: t('health.screen'),
       value: hm(yesterday.totalMin),
-      goal: usual ? `usual ${hm(usual)}` : 'yesterday',
+      goal: usual ? t('health.usual', { time: hm(usual) }) : t('health.yesterday'),
       share: yesterday.totalMin <= usual ? 1 : clamp01(usual / yesterday.totalMin),
       fresh: freshness(ageInDays(yesterday.day, today) - 1),
     };
@@ -190,10 +191,10 @@
         const x = gap * (i + 0.5);
         bed.append(drawPlant(p, x, i));
         const label = svg('text', { class: 'garden__label', x, y: GROUND + 15 });
-        label.textContent = p.label.toUpperCase();
+        label.textContent = p.label.toLocaleUpperCase(locale());
         bed.append(label);
       });
-      bed.setAttribute('aria-label', plants.map((p) => `${p.label}: ${p.value}, ${p.goal}${p.fresh < 1 ? ', not updated lately' : ''}`).join('; '));
+      bed.setAttribute('aria-label', plants.map((p) => `${p.label}: ${p.value}, ${p.goal}${p.fresh < 1 ? t('health.notUpdated') : ''}`).join('; '));
 
       list.replaceChildren(
         ...plants.map((p) => {
@@ -202,8 +203,8 @@
           return li;
         }),
       );
-      const stale = plants.filter((p) => p.fresh < 1).map((p) => p.label.toLowerCase());
-      hint.textContent = stale.length ? `Faded: ${stale.join(', ')} needs an update` : 'All up to date';
+      const stale = plants.filter((p) => p.fresh < 1).map((p) => p.label.toLocaleLowerCase(locale()));
+      hint.textContent = stale.length ? t('health.faded', { list: stale.join(', ') }) : t('health.allUpToDate');
     }
 
     render();

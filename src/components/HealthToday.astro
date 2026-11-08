@@ -16,15 +16,15 @@ import { NATIVE_APP } from '../config/app';
 import HealthFinding from './HealthFinding.astro';
 ---
 
-<section class="ht" data-ht data-app={NATIVE_APP ? 'true' : 'false'} aria-label="Your day">
+<section data-t-aria-label="health.yourDay" class="ht" data-ht data-app={NATIVE_APP ? 'true' : 'false'} aria-label="Your day">
   <div class="ht__head">
     <p class="ht__date" data-ht-date></p>
-    <button type="button" class="ht__icon" data-sheet-open="calendar" data-ht-cal aria-label="Open calendar">
+    <button data-t-aria-label="health.openCalendar" type="button" class="ht__icon" data-sheet-open="calendar" data-ht-cal aria-label="Open calendar">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"></rect><path d="M3.5 10h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
     </button>
   </div>
 
-  <nav class="ht__week" aria-label="Pick a day" data-ht-week></nav>
+  <nav data-t-aria-label="health.pickADay" class="ht__week" aria-label="Pick a day" data-ht-week></nav>
 
   <div class="card ht__rings" data-ht-rings></div>
   <HealthFinding />
@@ -32,25 +32,25 @@ import HealthFinding from './HealthFinding.astro';
     NATIVE_APP && (
       <p class="ht__connect" data-ht-connect>
         <span data-ht-connect-none>
-          Sleep and steps come from Health Connect.
-          <button type="button" class="ht__link" data-sheet-open="body">Connect</button>
-          or
+          <span data-t="health.fromHealthConnect">Sleep and steps come from Health Connect.</span>{' '}
+          <button data-t="health.connect" type="button" class="ht__link" data-sheet-open="body">Connect</button>{' '}
+          <span data-t="health.or">or</span>{' '}
         </span>
-        <span data-ht-connect-some>Missing a number?</span>
-        <button type="button" class="ht__link" data-sheet-open="body-entry" data-ht-entry>add them by hand</button>
+        <span data-t="health.missingANumber" data-ht-connect-some>Missing a number?</span>{' '}
+        <button data-t="health.addThemByHand" type="button" class="ht__link" data-sheet-open="body-entry" data-ht-entry>add them by hand</button>
       </p>
     )
   }
 
   <button type="button" class="btn ht__log" data-sheet-open="log" data-ht-log>
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
-    Log activity
+    <span data-t="health.logActivity">Log activity</span>
   </button>
 
   <section class="ht__day" aria-labelledby="ht-day-heading">
     <div class="ht__day-head">
-      <h2 id="ht-day-heading" class="panel-title">Your day</h2>
-      <span class="muted ht__small" data-ht-day-sub>Workouts and focus</span>
+      <h2 data-t="health.yourDay" id="ht-day-heading" class="panel-title">Your day</h2>
+      <span data-t="health.workoutsAndFocus" class="muted ht__small" data-ht-day-sub>Workouts and focus</span>
     </div>
     <ol class="ht__list" role="list" data-ht-list></ol>
     <p class="muted ht__empty" data-ht-empty hidden></p>
@@ -58,16 +58,16 @@ import HealthFinding from './HealthFinding.astro';
 
   <div class="ht__more">
     <button type="button" class="ht__tile" data-sheet-open="garden" data-ht-garden hidden>
-      <span class="muted ht__small">Garden</span>
-      <strong data-ht-garden-sub>Your plants today</strong>
+      <span data-t="health.garden" class="muted ht__small">Garden</span>
+      <strong data-t="health.yourPlantsToday" data-ht-garden-sub>Your plants today</strong>
     </button>
     <button type="button" class="ht__tile" data-sheet-open="markers" data-ht-markers hidden>
-      <span class="muted ht__small">Body markers</span>
-      <strong data-ht-markers-sub>Your tiers</strong>
+      <span data-t="health.bodyMarkers" class="muted ht__small">Body markers</span>
+      <strong data-t="health.yourTiers" data-ht-markers-sub>Your tiers</strong>
     </button>
     <button type="button" class="ht__tile" data-sheet-open="spend">
-      <span class="muted ht__small">Wellbeing spend</span>
-      <strong data-ht-spend-sub>This month</strong>
+      <span data-t="health.wellbeingSpend" class="muted ht__small">Wellbeing spend</span>
+      <strong data-t="health.thisMonth" data-ht-spend-sub>This month</strong>
     </button>
   </div>
 </section>
@@ -76,7 +76,8 @@ import HealthFinding from './HealthFinding.astro';
   import { getSessions, subscribe, type FocusSession } from '../lib/storage';
   import type { BodyDay } from '../lib/device';
   import { bodyDays as allBodyDays } from '../lib/body';
-  import { DEFAULT_KG, getWorkouts, roughKcal, usesMiles, weightKg, workoutsByDay, workoutType, EFFORT_WORDS, type Workout } from '../lib/workouts';
+  import { DEFAULT_KG, effortWord, getWorkouts, roughKcal, usesMiles, weightKg, workoutLabel, workoutsByDay, workoutType, type Workout } from '../lib/workouts';
+  import { dateFormat, locale, t, tn } from '../lib/i18n';
   import { addDays, dayKey, fromDayKey, isDayKey, startOfWeek } from '../lib/dates';
   import { formatFocus } from '../lib/tasks';
   import { cleanups, listen, onPage } from '../lib/page';
@@ -86,11 +87,14 @@ import HealthFinding from './HealthFinding.astro';
   const GOALS = { sleepMin: 8 * 60, steps: 10_000, activeMin: 30, focusMin: 120 };
   /** Focus sessions closer than this, on the same task, show as one block. */
   const JOIN_GAP = 15 * 60_000;
-  const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-  const wdFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
-  const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
-  const distance = (m: number) => (usesMiles() ? `${(m / 1609.344).toFixed(1)} mi` : m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+  const dateFmt = dateFormat({ weekday: 'long', day: 'numeric', month: 'long' });
+  const wdFmt = dateFormat({ weekday: 'short' });
+  const timeFmt = dateFormat({ hour: '2-digit', minute: '2-digit' });
+  const hm = (min: number) => t('unit.hmShort', { h: Math.floor(min / 60), m: String(Math.round(min % 60)).padStart(2, '0') });
+  const num = (n: number) => n.toLocaleString(locale());
+  const min = (n: number) => t('unit.min', { n });
+  const distance = (m: number) =>
+    usesMiles() ? t('health.u.mi', { n: (m / 1609.344).toFixed(1) }) : m < 1000 ? t('health.u.m', { n: Math.round(m) }) : t('health.u.km', { n: (m / 1000).toFixed(1) });
 
   interface Ring {
     label: string;
@@ -152,18 +156,18 @@ import HealthFinding from './HealthFinding.astro';
       start: b.start,
       time: timeFmt.format(b.start),
       color: 'var(--heat-3)',
-      title: b.label ? `Focus · ${b.label}` : 'Focus',
-      sub: `${formatFocus(b.seconds)}${b.count > 1 ? ` · ${b.count} sessions` : ''}`,
+      title: b.label ? t('health.focusOn', { label: b.label }) : t('health.focus'),
+      sub: formatFocus(b.seconds) + (b.count > 1 ? tn('health.sessionsTail', b.count) : ''),
     }));
   }
 
   function workoutRow(w: Workout): Row {
-    const t = workoutType(w.type);
-    const parts = [`${w.minutes} min`];
+    const type = workoutType(w.type);
+    const parts = [min(w.minutes)];
     if (w.distanceM) parts.push(distance(w.distanceM));
-    if (w.laps) parts.push(`${w.laps} laps · ${(w.laps * (w.poolM ?? 25)).toLocaleString()} m`);
-    parts.push(EFFORT_WORDS[w.effort]!.toLowerCase(), `~${roughKcal(w, weightKg() ?? DEFAULT_KG).toLocaleString()} kcal`);
-    return { start: w.start, time: timeFmt.format(w.start), color: t.color, title: t.label, sub: parts.join(' · '), workout: w.id };
+    if (w.laps) parts.push(tn('health.laps.n', w.laps, { m: num(w.laps * (w.poolM ?? 25)) }));
+    parts.push(effortWord(w.effort).toLocaleLowerCase(locale()), '~' + t('health.u.kcal', { n: num(roughKcal(w, weightKg() ?? DEFAULT_KG)) }));
+    return { start: w.start, time: timeFmt.format(w.start), color: type.color, title: workoutLabel(w.type), sub: parts.join(' · '), workout: w.id };
   }
 
   onPage('health-today', () => {
@@ -176,15 +180,15 @@ import HealthFinding from './HealthFinding.astro';
 
     function rings(body: BodyDay | undefined, loggedMin: number, focusMin: number): Ring[] {
       const active = Math.max(body?.activeMin ?? 0, loggedMin);
-      const activeRing: Ring = { label: 'Active', value: `${active} min`, goal: `Goal ${GOALS.activeMin} min`, share: active / GOALS.activeMin, color: 'var(--cat-reward)' };
+      const activeRing: Ring = { label: t('health.tile.exercise'), value: min(active), goal: t('health.goal', { n: min(GOALS.activeMin) }), share: active / GOALS.activeMin, color: 'var(--cat-reward)' };
       if (!app) {
-        return [activeRing, { label: 'Focus', value: formatFocus(focusMin * 60), goal: `Goal ${hm(GOALS.focusMin)}`, share: focusMin / GOALS.focusMin, color: 'var(--heat-3)' }];
+        return [activeRing, { label: t('health.focus'), value: formatFocus(focusMin * 60), goal: t('health.goal', { n: hm(GOALS.focusMin) }), share: focusMin / GOALS.focusMin, color: 'var(--heat-3)' }];
       }
       const sleep = body?.sleepMin;
       const steps = body?.steps;
       return [
-        { label: 'Sleep', value: sleep ? hm(sleep) : '–', goal: 'Goal 8h', share: (sleep ?? 0) / GOALS.sleepMin, color: 'var(--cat-visual)' },
-        { label: 'Steps', value: steps !== undefined ? steps.toLocaleString() : '–', goal: `Goal ${GOALS.steps.toLocaleString()}`, share: (steps ?? 0) / GOALS.steps, color: 'var(--cat-structure)' },
+        { label: t('health.tile.sleep'), value: sleep ? hm(sleep) : '–', goal: t('health.goal', { n: t('unit.h', { n: 8 }) }), share: (sleep ?? 0) / GOALS.sleepMin, color: 'var(--cat-visual)' },
+        { label: t('health.tile.steps'), value: steps !== undefined ? num(steps) : '–', goal: t('health.goal', { n: num(GOALS.steps) }), share: (steps ?? 0) / GOALS.steps, color: 'var(--cat-structure)' },
         activeRing,
       ];
     }
@@ -200,7 +204,7 @@ import HealthFinding from './HealthFinding.astro';
       const body = bodyDays.find((d) => d.day === day);
       const logged = workouts.get(day) ?? [];
 
-      $('[data-ht-date]').textContent = day === today ? `Today · ${dateFmt.format(fromDayKey(day))}` : dateFmt.format(fromDayKey(day));
+      $('[data-ht-date]').textContent = day === today ? t('health.todayDate', { date: dateFmt.format(fromDayKey(day)) }) : dateFmt.format(fromDayKey(day));
       $<HTMLElement>('[data-ht-log]').dataset.day = day;
       $<HTMLElement>('[data-ht-cal]').dataset.day = day;
 
@@ -214,7 +218,7 @@ import HealthFinding from './HealthFinding.astro';
           b.type = 'button';
           b.dataset.day = k;
           b.setAttribute('aria-pressed', String(k === day));
-          b.setAttribute('aria-label', `${dateFmt.format(d)}${workouts.get(k)?.length ? `, ${workouts.get(k)!.length} workouts` : ''}`);
+          b.setAttribute('aria-label', dateFmt.format(d) + (workouts.get(k)?.length ? tn('health.workoutsTail', workouts.get(k)!.length) : ''));
           b.disabled = k > today;
           if (k === today) b.classList.add('is-today');
           const dots = el('span', 'ht__dots');
@@ -246,7 +250,7 @@ import HealthFinding from './HealthFinding.astro';
         $<HTMLElement>('[data-ht-connect-some]').hidden = !bodyDays.length;
         const entry = $<HTMLElement>('[data-ht-entry]');
         entry.dataset.day = day;
-        entry.textContent = bodyDays.length ? 'Add it by hand' : 'add them by hand';
+        entry.textContent = bodyDays.length ? t('health.addItByHand') : t('health.addThemByHand');
       }
 
       const rows = [...logged.map(workoutRow), ...focusRows(sessions)].sort((a, b) => a.start - b.start);
@@ -258,23 +262,23 @@ import HealthFinding from './HealthFinding.astro';
             inner.type = 'button';
             inner.dataset.sheetOpen = 'log';
             inner.dataset.workout = r.workout;
-            inner.setAttribute('aria-label', `${r.title} at ${r.time}, ${r.sub}. Edit`);
+            inner.setAttribute('aria-label', t('health.rowLabel', { title: r.title, time: r.time, sub: r.sub }));
           }
           const dot = el('i', 'ht__dot');
           dot.style.background = r.color;
           const text = el('span', 'ht__row-text');
           text.append(el('strong', '', r.title), el('span', 'muted ht__small', r.sub));
           inner.append(el('span', 'muted ht__time', r.time), dot, text);
-          if (r.workout) inner.append(el('span', 'muted ht__small', 'Edit'));
+          if (r.workout) inner.append(el('span', 'muted ht__small', t('health.edit')));
           li.append(inner);
           return li;
         }),
       );
       const kcal = logged.reduce((a, w) => a + roughKcal(w, weightKg() ?? DEFAULT_KG), 0);
-      $('[data-ht-day-sub]').textContent = kcal > 0 ? `Workouts ~${kcal.toLocaleString()} kcal` : 'Workouts and focus';
+      $('[data-ht-day-sub]').textContent = kcal > 0 ? t('health.workoutsKcal', { kcal: t('health.u.kcal', { n: num(kcal) }) }) : t('health.workoutsAndFocus');
       const empty = $<HTMLElement>('[data-ht-empty]');
       empty.hidden = rows.length > 0;
-      empty.textContent = day === today ? 'Nothing yet today. Log a workout, or start a focus session.' : 'Nothing logged on this day.';
+      empty.textContent = day === today ? t('health.nothingYetToday') : t('health.nothingThisDay');
     }
 
     $('[data-ht-week]').addEventListener('click', (e) => {
@@ -302,7 +306,7 @@ import HealthFinding from './HealthFinding.astro';
       gardenButton.hidden = !garden || garden.hidden;
       const hint = garden?.querySelector('[data-garden-hint]')?.textContent;
       if (hint) $('[data-ht-garden-sub]').textContent = hint;
-      if (total?.textContent) $('[data-ht-spend-sub]').textContent = `${total.textContent} this month`;
+      if (total?.textContent) $('[data-ht-spend-sub]').textContent = t('health.thisMonthAmount', { amount: total.textContent });
       $<HTMLElement>('[data-ht-markers]').hidden = !markers || markers.hidden;
       const next = markers?.querySelector('[data-hm-hint]')?.textContent;
       if (next) $('[data-ht-markers-sub]').textContent = next;

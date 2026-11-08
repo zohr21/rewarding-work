@@ -17,7 +17,7 @@ import { url } from '../lib/paths';
 
   <!-- Silver and above get the whole screen for a moment; the first two tiers stay a toast. -->
   <dialog class="tier-up" data-rn-dialog aria-labelledby="tier-up-name">
-    <button type="button" class="tier-up__close" data-rn-close aria-label="Close">
+    <button data-t-aria-label="health.close" type="button" class="tier-up__close" data-rn-close aria-label="Close">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg>
     </button>
     <span class="tier-up__coin" data-rn-coin></span>
@@ -26,8 +26,8 @@ import { url } from '../lib/paths';
     <p class="tier-up__text" data-rn-text></p>
     <ol class="tier-up__ladder" data-rn-ladder></ol>
     <div class="tier-up__actions">
-      <a class="btn" href={`${url('/progress')}#tiers`} data-rn-grove>See your grove</a>
-      <button type="button" class="btn btn--ghost" data-rn-close>Keep going</button>
+      <a data-t="health.seeYourGrove" class="btn" href={`${url('/progress')}#tiers`} data-rn-grove>See your grove</a>
+      <button data-t="health.keepGoing" type="button" class="btn btn--ghost" data-rn-close>Keep going</button>
     </div>
   </dialog>
 </div>
@@ -35,7 +35,8 @@ import { url } from '../lib/paths';
 <script>
   import { getChain, getDone, getSessions, onWrite, subscribe, type StoreName } from '../lib/storage';
   import { bodyInput } from '../lib/bodytiers';
-  import { chainInput, earnedTierIds, tierInfo, tierLabel, TIER_MATERIALS, TIER_NAMES, type TierInfo } from '../lib/rewards';
+  import { chainInput, earnedTierIds, tierInfo, tierLabel, tierMaterial, tierName, TIER_NAMES, type TierInfo } from '../lib/rewards';
+  import { locale, t } from '../lib/i18n';
   import { tierIcon } from '../lib/tier-icons';
   import { armAudioUnlock, cueVolume, playAchievement } from '../lib/timer/cues';
   import { celebrate } from '../lib/appearance';
@@ -55,7 +56,7 @@ import { url } from '../lib/paths';
   const earnedNow = () => {
     return earnedTierIds({ sessions: getSessions(), done: getDone(), ...chainInput(getChain()), body: bodyInput() });
   };
-  const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const capitalise = (s: string) => s.charAt(0).toLocaleUpperCase(locale()) + s.slice(1);
 
   // Module state outlives page swaps (the script runs once per visit).
   let known = new Set<string>();
@@ -119,7 +120,7 @@ import { url } from '../lib/paths';
       body.href = progressUrl;
       const eyebrow = document.createElement('span');
       eyebrow.className = 'achievement__eyebrow';
-      eyebrow.textContent = 'Achievement unlocked';
+      eyebrow.textContent = t('reward.unlocked');
       const name = document.createElement('span');
       name.className = 'achievement__name';
       name.textContent = `${tierLabel(tier.index)} · ${tier.track.title}`;
@@ -136,13 +137,13 @@ import { url } from '../lib/paths';
       });
       const tierOf = document.createElement('span');
       tierOf.className = 'achievement__of';
-      tierOf.textContent = `Tier ${tier.index + 1} of ${TIER_NAMES.length}`;
+      tierOf.textContent = t('reward.tierOf', { n: tier.index + 1, total: TIER_NAMES.length });
       body.append(eyebrow, name, text, pips, tierOf);
 
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'achievement__close';
-      close.setAttribute('aria-label', 'Dismiss');
+      close.setAttribute('aria-label', t('reward.dismiss'));
       close.innerHTML = X_SVG;
       close.addEventListener('click', () => dismiss(li));
 
@@ -178,10 +179,10 @@ import { url } from '../lib/paths';
       coin.className = `tier-coin tier-coin--t${tier.index} tier-up__coin`;
       coin.innerHTML = tierIcon(tier.index, 92);
       dialog.querySelector('[data-rn-eyebrow]')!.textContent =
-        `${tier.index === TIER_NAMES.length - 1 ? 'Hardest tier' : 'New tier'} · ${tier.track.title}`;
+        `${tier.index === TIER_NAMES.length - 1 ? t('reward.hardest') : t('reward.newTier')} · ${tier.track.title}`;
       dialog.querySelector('[data-rn-name]')!.textContent = tierLabel(tier.index);
       dialog.querySelector('[data-rn-text]')!.textContent =
-        `${capitalise(tier.track.describe(tier.threshold))}. This one stays yours, whatever tomorrow brings.`;
+        `${capitalise(tier.track.describe(tier.threshold))}. ${t('reward.staysYours')}`;
       const ladder = dialog.querySelector<HTMLElement>('[data-rn-ladder]')!;
       ladder.replaceChildren(
         ...TIER_NAMES.map((_, i) => {
@@ -191,10 +192,10 @@ import { url } from '../lib/paths';
           c.className = `tier-coin ${i <= tier.index ? `tier-coin--t${i}` : 'tier-coin--blank'}`;
           c.innerHTML = tierIcon(i, 20);
           const label = document.createElement('span');
-          label.textContent = TIER_MATERIALS[i]!;
+          label.textContent = tierMaterial(i);
           const say = document.createElement('span');
           say.className = 'visually-hidden';
-          say.textContent = i <= tier.index ? ', reached.' : ', not reached yet.';
+          say.textContent = i <= tier.index ? t('reward.reached') : t('reward.notReached');
           label.append(say);
           li.append(c, label);
           return li;
@@ -221,9 +222,9 @@ import { url } from '../lib/paths';
       waiting.push(...sorted.filter((t) => t.index < BIG_FROM));
       big.push(...sorted.filter((t) => t.index >= BIG_FROM));
       openBig();
-      const summary = sorted.map((t) => `${t.name}, ${t.track.describe(t.threshold)}`).join('. ');
+      const summary = sorted.map((x) => `${tierName(x.index)}, ${x.track.describe(x.threshold)}`).join('. ');
       live.textContent = '';
-      window.setTimeout(() => (live.textContent = `Achievement unlocked: ${summary}.`), 50);
+      window.setTimeout(() => (live.textContent = `${t('reward.unlocked')}: ${summary}.`), 50);
       celebrate();
       pump();
     }

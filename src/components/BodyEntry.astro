@@ -8,56 +8,56 @@
 import Sheet from './Sheet.astro';
 ---
 
-<Sheet id="body-entry" title="Add by hand">
+<Sheet id="body-entry" title="Add by hand" titleKey="health.addByHand">
   <form class="be" data-be novalidate>
     <label class="be__field">
-      Day
+      <span data-t="health.day">Day</span>
       <input type="date" name="day" required />
     </label>
 
     <fieldset class="be__group">
-      <legend class="be__legend">Sleep, the night before this day</legend>
+      <legend data-t="health.sleepTheNightBeforeThis" class="be__legend">Sleep, the night before this day</legend>
       <div class="be__pair">
         <label class="be__field be__field--unit">
-          <input type="number" name="sleepH" min="0" max="24" inputmode="numeric" aria-label="Sleep hours" />
-          <span>h</span>
+          <input data-t-aria-label="health.sleepHours" type="number" name="sleepH" min="0" max="24" inputmode="numeric" aria-label="Sleep hours" />
+          <span data-t="health.h">h</span>
         </label>
         <label class="be__field be__field--unit">
-          <input type="number" name="sleepM" min="0" max="59" inputmode="numeric" aria-label="Sleep minutes" />
-          <span>min</span>
+          <input data-t-aria-label="health.sleepMinutes" type="number" name="sleepM" min="0" max="59" inputmode="numeric" aria-label="Sleep minutes" />
+          <span data-t="health.min">min</span>
         </label>
       </div>
     </fieldset>
 
     <div class="be__pair">
       <label class="be__field">
-        Steps
+        <span data-t="health.steps">Steps</span>
         <input type="number" name="steps" min="0" inputmode="numeric" />
       </label>
       <label class="be__field">
-        Active minutes
+        <span data-t="health.activeMinutes">Active minutes</span>
         <input type="number" name="activeMin" min="0" inputmode="numeric" />
       </label>
     </div>
 
     <div class="be__pair">
       <label class="be__field">
-        <span>Distance (<span data-be-unit>km</span>)</span>
+        <span><span data-t="health.distance">Distance</span> (<span data-t="health.km" data-be-unit>km</span>)</span>
         <input type="number" name="distance" min="0" step="0.1" inputmode="decimal" />
       </label>
       <label class="be__field">
-        Resting heart (bpm)
+        <span data-t="health.restingBpm">Resting heart (bpm)</span>
         <input type="number" name="restingHr" min="0" inputmode="numeric" />
       </label>
     </div>
 
     <div class="be__pair">
       <label class="be__field">
-        Calories burned
+        <span data-t="health.caloriesBurned">Calories burned</span>
         <input type="number" name="totalKcal" min="0" inputmode="numeric" />
       </label>
       <label class="be__field">
-        Active calories
+        <span data-t="health.ask.activeCalories">Active calories</span>
         <input type="number" name="activeKcal" min="0" inputmode="numeric" />
       </label>
     </div>
@@ -66,8 +66,8 @@ import Sheet from './Sheet.astro';
     <p class="be__error" data-be-error role="alert" hidden></p>
 
     <div class="be__actions">
-      <button type="button" class="btn btn--ghost" data-be-clear hidden>Clear day</button>
-      <button type="submit" class="btn be__save">Save</button>
+      <button data-t="health.clearDay" type="button" class="btn btn--ghost" data-be-clear hidden>Clear day</button>
+      <button data-t="health.save" type="submit" class="btn be__save">Save</button>
     </div>
   </form>
 </Sheet>
@@ -78,17 +78,18 @@ import Sheet from './Sheet.astro';
   import { dayKey, isDayKey } from '../lib/dates';
   import { usesMiles } from '../lib/workouts';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { t, type Key } from '../lib/i18n';
 
   /** The plain number boxes, each one field; sleep and distance have their own. */
   const PLAIN = ['steps', 'activeMin', 'restingHr', 'totalKcal', 'activeKcal'] as const;
-  const NAMES: Record<BodyField, string> = {
-    sleepMin: 'Sleep',
-    steps: 'Steps',
-    activeMin: 'Active minutes',
-    restingHr: 'Resting heart',
-    totalKcal: 'Calories burned',
-    activeKcal: 'Active calories',
-    distanceM: 'Distance',
+  const NAME_KEYS: Record<BodyField, Key> = {
+    sleepMin: 'health.tile.sleep',
+    steps: 'health.steps',
+    activeMin: 'health.activeMinutes',
+    restingHr: 'health.tile.heart',
+    totalKcal: 'health.caloriesBurned',
+    activeKcal: 'health.ask.activeCalories',
+    distanceM: 'health.distance',
   };
 
   onPage('body-entry', () => {
@@ -126,8 +127,8 @@ import Sheet from './Sheet.astro';
       const any = Object.keys(typed).length > 0;
       $<HTMLElement>('[data-be-clear]').hidden = !any;
       $('[data-be-note]').textContent = Object.keys(synced).some((k) => k !== 'day')
-        ? 'Grey numbers came from Health Connect. What you type replaces them for this day; leave a box empty to keep them.'
-        : 'Nothing synced for this day. What you type shows on your rings and counts toward your finding.';
+        ? t('health.be.synced')
+        : t('health.be.nothingSynced');
       error.hidden = true;
       dirty = false;
     }
@@ -143,17 +144,17 @@ import Sheet from './Sheet.astro';
       const out: BodyValues = {};
       const h = num('sleepH');
       const m = num('sleepM');
-      if (h === null || m === null || (m ?? 0) >= 60) return NAMES.sleepMin;
+      if (h === null || m === null || (m ?? 0) >= 60) return t(NAME_KEYS.sleepMin);
       if (h !== undefined || m !== undefined) out.sleepMin = Math.round((h ?? 0) * 60 + (m ?? 0));
       for (const name of PLAIN) {
         const n = num(name);
-        if (n === null) return NAMES[name];
+        if (n === null) return t(NAME_KEYS[name]);
         if (n !== undefined) out[name] = Math.round(n);
       }
       const d = num('distance');
-      if (d === null) return NAMES.distanceM;
+      if (d === null) return t(NAME_KEYS.distanceM);
       if (d !== undefined) out.distanceM = Math.round(d * perUnit());
-      for (const [k, v] of Object.entries(out) as [BodyField, number][]) if (v > MANUAL_MAX[k]) return NAMES[k];
+      for (const [k, v] of Object.entries(out) as [BodyField, number][]) if (v > MANUAL_MAX[k]) return t(NAME_KEYS[k]);
       return out;
     }
 
@@ -169,7 +170,7 @@ import Sheet from './Sheet.astro';
     );
     c.add(
       listen(dialog, 'sheet:dismiss', (e) => {
-        if (dirty && !window.confirm('Leave without saving these numbers?')) e.preventDefault();
+        if (dirty && !window.confirm(t('health.be.leave'))) e.preventDefault();
       }),
     );
     c.add(
@@ -181,7 +182,7 @@ import Sheet from './Sheet.astro';
       listen(form, 'change', (e) => {
         const day = field('day').value;
         if ((e.target as HTMLInputElement).name !== 'day' || !isDayKey(day) || day > dayKey(new Date())) return;
-        if (dirty && !window.confirm('Switch day without saving these numbers?')) return;
+        if (dirty && !window.confirm(t('health.be.switch'))) return;
         load(day);
       }),
     );
@@ -190,7 +191,7 @@ import Sheet from './Sheet.astro';
         e.preventDefault();
         const day = field('day').value;
         const v = values();
-        const problem = !isDayKey(day) || day > dayKey(new Date()) ? 'Pick a day up to today.' : typeof v === 'string' ? `${v}: that number doesn't look right.` : '';
+        const problem = !isDayKey(day) || day > dayKey(new Date()) ? t('health.be.pickDay') : typeof v === 'string' ? t('health.be.badNumber', { name: v }) : '';
         error.textContent = problem;
         error.hidden = !problem;
         if (problem || typeof v === 'string') return;
@@ -202,7 +203,7 @@ import Sheet from './Sheet.astro';
     c.add(
       listen($('[data-be-clear]'), 'click', () => {
         const day = field('day').value;
-        if (!isDayKey(day) || !window.confirm('Remove what you typed for this day? Synced numbers stay.')) return;
+        if (!isDayKey(day) || !window.confirm(t('health.be.clear'))) return;
         setManual(day, {});
         dirty = false;
         dialog.close();
