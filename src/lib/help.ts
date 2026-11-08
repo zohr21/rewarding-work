@@ -10,6 +10,10 @@
  *   (`done`), or once its "Show me" was opened when nothing can tell.
  *
  * What was shown, put away or tried is kept in the profile (src/lib/profile.ts).
+ *
+ * The words are English; other languages swap them by keys made from the ids (`tip.<id>.title`,
+ * `book.<id>.name`, `book.<id>.<step id>.how`…), see `helpSlots`. Guide.astro checks at build
+ * time that en.ts says the same as this file.
  */
 import { getChains, getDone, getExam, getSessions, getTasks, readJson, type DoneItem, type Exam, type FocusSession, type Task } from './storage';
 import { getBudget } from './budget';
@@ -17,6 +21,7 @@ import { getScreen } from './screen';
 import { getCoach } from './coach';
 import type { ModuleId } from '../config/site';
 import { AREA_MODULE, type Area } from './tours';
+import { translateData, type Slot } from './i18n';
 
 /** What help looks at to know what fits. Built once per use; cheap enough. */
 export interface HelpContext {
@@ -456,6 +461,23 @@ export const PLAYBOOKS: Playbook[] = [
     ],
   },
 ];
+
+/** Every line of the tips and playbooks, with its key. */
+export function helpSlots(): Slot[] {
+  const slots: Slot[] = [];
+  for (const tip of TIPS) {
+    slots.push([tip, 'title', `tip.${tip.id}.title`], [tip, 'text', `tip.${tip.id}.text`]);
+    if (tip.because) slots.push([tip, 'because', `tip.${tip.id}.because`]);
+  }
+  for (const p of PLAYBOOKS) {
+    slots.push([p, 'name', `book.${p.id}.name`], [p, 'sub', `book.${p.id}.sub`], [p, 'why', `book.${p.id}.why`]);
+    for (const s of p.steps) slots.push([s, 'title', `book.${p.id}.${s.id}.title`], [s, 'how', `book.${p.id}.${s.id}.how`]);
+    for (const tech of p.techniques) slots.push([tech, 'name', `book.tech.${tech.slug}`]);
+  }
+  return slots;
+}
+
+translateData(helpSlots());
 
 export function tipById(id: string): Tip | undefined {
   return TIPS.find((t) => t.id === id);

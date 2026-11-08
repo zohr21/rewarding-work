@@ -8,8 +8,13 @@
  * the person taps the thing itself, so the last tip is something to do, not to read.
  * Which tours were seen is kept in the profile (src/lib/profile.ts). Tips & tricks and
  * playbooks, the deeper layers, are in src/lib/help.ts.
+ *
+ * The words here are English; other languages swap them by keys made from the ids
+ * (`tour.<id>.name`, `tour.<id>.<step>.title`, `tour.<id>.q1`…), see `tourSlots`. Guide.astro
+ * checks at build time that en.ts says the same as this file.
  */
 import type { ModuleId } from '../config/site';
+import { t, translateData, type Key, type Slot } from './i18n';
 
 export interface TourStep {
   target: string;
@@ -247,6 +252,27 @@ export const TOURS: Tour[] = [
     ],
   },
 ];
+
+/** The area's name to show (the Area itself stays the id). */
+export const areaKey = (a: Area) => `area.${a.toLowerCase().replace(/ /g, '-')}`;
+export const areaLabel = (a: Area) => t(areaKey(a) as Key);
+
+/** Every line of the tours, with its key. */
+export function tourSlots(): Slot[] {
+  return TOURS.flatMap((tour): Slot[] => [
+    [tour, 'name', `tour.${tour.id}.name`],
+    ...tour.steps.flatMap((s, i): Slot[] => [
+      [s, 'title', `tour.${tour.id}.${i + 1}.title`],
+      [s, 'text', `tour.${tour.id}.${i + 1}.text`],
+    ]),
+    ...tour.faq.flatMap((f, i): Slot[] => [
+      [f, 0, `tour.${tour.id}.q${i + 1}`],
+      [f, 1, `tour.${tour.id}.a${i + 1}`],
+    ]),
+  ]);
+}
+
+translateData(tourSlots());
 
 /** The page path without the base, from `location.pathname` (which may end in index.html). */
 export function pathOf(pathname: string): string {

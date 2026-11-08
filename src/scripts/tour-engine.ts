@@ -6,6 +6,7 @@
 import { el } from '../lib/dom';
 import { cleanups, listen } from '../lib/page';
 import type { TourStep } from '../lib/tours';
+import { t } from '../lib/i18n';
 
 const GAP = 12;
 
@@ -59,9 +60,9 @@ export function runSpotlight(run: Spotlight): boolean {
   const text = el('p', 'tour-tip__text');
   text.setAttribute('aria-live', 'polite');
   const count = el('span', 'tour-tip__count');
-  const skip = el('button', 'tour-tip__skip', steps.length > 1 ? 'Skip tour' : 'Close');
+  const skip = el('button', 'tour-tip__skip', steps.length > 1 ? t('guide.s.skipTour') : t('guide.s.close'));
   skip.type = 'button';
-  const next = el('button', 'btn btn--small tour-tip__next', 'Next');
+  const next = el('button', 'btn btn--small tour-tip__next', t('guide.s.next'));
   next.type = 'button';
   const actions = el('div', 'tour-tip__actions');
   actions.append(skip, next);
@@ -102,9 +103,9 @@ export function runSpotlight(run: Spotlight): boolean {
     node = step.node;
     title.textContent = step.title;
     text.textContent = step.text;
-    count.textContent = steps.length > 1 ? `${i + 1} of ${steps.length}` : '';
+    count.textContent = steps.length > 1 ? t('guide.s.nOfTotal', { n: i + 1, total: steps.length }) : '';
     next.hidden = !!step.tap;
-    next.textContent = i < steps.length - 1 ? 'Next' : run.sayWhere ? 'Done' : 'Got it';
+    next.textContent = i < steps.length - 1 ? t('guide.s.next') : run.sayWhere ? t('guide.s.doneBtn') : t('guide.s.gotIt');
     if (step.tap) tapOff = listen(node, 'click', () => setTimeout(finish, 0));
     node.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
     place();
@@ -128,12 +129,12 @@ export function runSpotlight(run: Spotlight): boolean {
     const help = run.sayWhere ? visible('[data-guide-help]') : null;
     if (!help) return stop();
     node = help;
-    title.textContent = 'Any time';
-    text.textContent = 'Tap ? for this again, tips for this screen, and playbooks.';
+    title.textContent = t('guide.s.anyTime');
+    text.textContent = t('guide.s.tapQ');
     count.textContent = '';
     skip.hidden = true;
     next.hidden = false;
-    next.textContent = 'Got it';
+    next.textContent = t('guide.s.gotIt');
     at = steps.length;
     // The app's header scrolls away with the page; bring it back.
     help.scrollIntoView({ block: 'nearest', behavior: 'instant' });

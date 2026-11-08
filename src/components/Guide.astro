@@ -16,61 +16,73 @@
 import Sheet from './Sheet.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
+import { en } from '../lib/i18n/en';
+import { AREAS, areaKey, tourSlots } from '../lib/tours';
+import { helpSlots } from '../lib/help';
+
+// Build-time check: the tours, tips and playbooks are written in English in code and found by
+// keys made from their ids, so en.ts must say exactly the same for every line.
+const words = en as Record<string, unknown>;
+for (const [o, field, key] of [...tourSlots(), ...helpSlots()]) {
+  const said = (o as Record<string | number, unknown>)[field];
+  if (words[key] !== said) throw new Error(`Help: en.ts '${key}' must be ${JSON.stringify(said)} (as in tours.ts / help.ts). Update ru.ts and az.ts too.`);
+}
+for (const a of AREAS) if (words[areaKey(a)] !== a) throw new Error(`Help: en.ts has no '${areaKey(a)}': '${a}'.`);
 ---
 
 <Sheet id="help" labelledby="help-title">
   <div class="guide" data-help>
-    <h2 id="help-title" class="guide__title" data-help-title>Help</h2>
+    <h2 data-t="guide.help" id="help-title" class="guide__title" data-help-title>Help</h2>
     <button type="button" class="guide__tour" data-help-tour hidden>
       <span class="guide__play" aria-hidden="true">
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 5l11 7-11 7z" fill="currentColor"></path></svg>
       </span>
       <span class="guide__tour-text">
-        <strong>Show me around</strong>
+        <strong data-t="guide.showMeAround">Show me around</strong>
         <small data-help-tour-sub></small>
       </span>
     </button>
     <div class="guide__block" data-help-tabs-wrap hidden>
-      <h3 class="guide__label">Each tab</h3>
+      <h3 data-t="guide.eachTab" class="guide__label">Each tab</h3>
       <ul class="guide__list" data-help-tabs></ul>
     </div>
     <div class="guide__block" data-help-tips-wrap hidden>
-      <h3 class="guide__label">Tips for this screen</h3>
+      <h3 data-t="guide.tipsForThisScreen" class="guide__label">Tips for this screen</h3>
       <div class="guide__cards" data-help-tips></div>
     </div>
     <div class="guide__block guide__faq" data-help-faq-wrap hidden>
-      <h3 class="guide__label">Quick answers</h3>
+      <h3 data-t="guide.quickAnswers" class="guide__label">Quick answers</h3>
       <div data-help-faq></div>
     </div>
-    <button type="button" class="btn btn--ghost guide__all" data-sheet-open="guides">All tours, tips and playbooks</button>
+    <button data-t="guide.allToursTipsAndPlaybooks" type="button" class="btn btn--ghost guide__all" data-sheet-open="guides">All tours, tips and playbooks</button>
   </div>
 </Sheet>
 
-<Sheet id="guides" title="Help & guides">
+<Sheet id="guides" title="Help & guides" titleKey="guide.helpAndGuides">
   <div class="guide" data-guides>
     <label class="guide__search">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M16 16l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-      <span class="visually-hidden">Search help</span>
-      <input type="search" placeholder="Search help, e.g. exam or bank" autocomplete="off" data-guides-q />
+      <span data-t="guide.searchHelp" class="visually-hidden">Search help</span>
+      <input data-t-placeholder="guide.searchHelpEGExam" type="search" placeholder="Search help, e.g. exam or bank" autocomplete="off" data-guides-q />
     </label>
 
-    <div class="guide__kinds" role="group" aria-label="Kind of help" data-guides-kinds>
-      <button type="button" aria-pressed="true" data-guides-kind="tours">Tours</button>
-      <button type="button" aria-pressed="false" data-guides-kind="playbooks">Playbooks</button>
-      <button type="button" aria-pressed="false" data-guides-kind="tips">Tips</button>
+    <div data-t-aria-label="guide.kindOfHelp" class="guide__kinds" role="group" aria-label="Kind of help" data-guides-kinds>
+      <button data-t="guide.tours" type="button" aria-pressed="true" data-guides-kind="tours">Tours</button>
+      <button data-t="guide.playbooks" type="button" aria-pressed="false" data-guides-kind="playbooks">Playbooks</button>
+      <button data-t="guide.tips" type="button" aria-pressed="false" data-guides-kind="tips">Tips</button>
     </div>
 
     <div class="guide__block" data-guides-results hidden></div>
 
     <section class="guide__block" data-guides-panel="tours">
       <div class="guide__block" data-guides-tours></div>
-      <h3 class="guide__label">Settings</h3>
+      <h3 data-t="guide.settings" class="guide__label">Settings</h3>
       <div class="guide__list">
         {
           NATIVE_APP && (
             <a class="guide__row" href={url('/welcome')}>
               <span class="guide__row-main">
-                See Welcome again<small>Pick your sections</small>
+                <span data-t="guide.seeWelcomeAgain">See Welcome again</span><small data-t="guide.pickYourSections">Pick your sections</small>
               </span>
             </a>
           )
@@ -79,7 +91,7 @@ import { url } from '../lib/paths';
           NATIVE_APP && (
             <label class="guide__row">
               <span class="guide__row-main">
-                Tours on new screens<small>A short tour the first time you open a screen or tab</small>
+                <span data-t="guide.toursOnNewScreens">Tours on new screens</span><small data-t="guide.aShortTourTheFirst">A short tour the first time you open a screen or tab</small>
               </span>
               <input type="checkbox" role="switch" data-guides-auto />
             </label>
@@ -87,25 +99,25 @@ import { url } from '../lib/paths';
         }
         <label class="guide__row">
           <span class="guide__row-main">
-            Did you know?<small>One tip at a time, picked from what you do</small>
+            <span data-t="guide.didYouKnow">Did you know?</span><small data-t="guide.oneTipAtATime">One tip at a time, picked from what you do</small>
           </span>
           <input type="checkbox" role="switch" data-guides-nudges />
         </label>
       </div>
-      <button type="button" class="btn btn--ghost guide__all" data-guides-reset>Show every tour and tip again</button>
-      <p class="guide__note muted">What you have seen is kept on this device.</p>
+      <button data-t="guide.showEveryTourAndTip" type="button" class="btn btn--ghost guide__all" data-guides-reset>Show every tour and tip again</button>
+      <p data-t="guide.whatYouHaveSeenIs" class="guide__note muted">What you have seen is kept on this device.</p>
     </section>
 
     <section class="guide__block" data-guides-panel="playbooks" hidden>
       <div class="guide__block" data-guides-books>
-        <p class="muted guide__intro">Pick a goal. Each playbook walks you through the screens that help with it.</p>
+        <p data-t="guide.pickAGoalEachPlaybook" class="muted guide__intro">Pick a goal. Each playbook walks you through the screens that help with it.</p>
         <ul class="guide__list" data-guides-book-list></ul>
       </div>
       <div class="guide__block" data-guides-book hidden></div>
     </section>
 
     <section class="guide__block" data-guides-panel="tips" hidden>
-      <div class="guide__chips" role="group" aria-label="Area" data-guides-areas></div>
+      <div data-t-aria-label="guide.area" class="guide__chips" role="group" aria-label="Area" data-guides-areas></div>
       <div class="guide__cards" data-guides-tips></div>
     </section>
   </div>
@@ -114,7 +126,8 @@ import { url } from '../lib/paths';
 <script>
   import { NATIVE_APP } from '../config/app';
   import { getProfile, getTours, setTours } from '../lib/profile';
-  import { AREAS, TOURS, pathOf, tabToursFor, tourById, tourFor, type Area, type Tour } from '../lib/tours';
+  import { AREAS, TOURS, areaLabel, pathOf, tabToursFor, tourById, tourFor, type Area, type Tour } from '../lib/tours';
+  import { t, tn } from '../lib/i18n';
   import { PLAYBOOKS, TIPS, areaOn, helpContext, pickNudge, playbookById, stepDone, tipById, type Playbook, type Tip } from '../lib/help';
   import { runSpotlight, stopSpotlight, visible } from '../scripts/tour-engine';
   import { readJson } from '../lib/storage';
@@ -158,7 +171,7 @@ import { url } from '../lib/paths';
   async function runTour(tour: Tour): Promise<void> {
     markSeen(tour.id);
     await openTab(tour.tab);
-    runSpotlight({ name: `${tour.name} tour`, steps: tour.steps, sayWhere: true });
+    runSpotlight({ name: t('guide.s.tourName', { name: tour.name }), steps: tour.steps, sayWhere: true });
   }
 
   async function runTip(tip: Tip): Promise<void> {
@@ -166,22 +179,23 @@ import { url } from '../lib/paths';
     await openTab(tip.show.tab);
     const step = { title: tip.title, text: tip.text };
     // When the thing isn't on screen right now (locked, no data yet), still say the tip.
-    if (!tip.show.target || !runSpotlight({ name: 'Tip', steps: [{ ...step, target: tip.show.target }] }))
-      runSpotlight({ name: 'Tip', steps: [{ ...step, target: '[data-guide-help]' }] });
+    const name = t('guide.s.tip');
+    if (!tip.show.target || !runSpotlight({ name, steps: [{ ...step, target: tip.show.target }] }))
+      runSpotlight({ name, steps: [{ ...step, target: '[data-guide-help]' }] });
   }
 
   const tourHref = (t: Tour) => url(`${t.path}?tour=${t.id}`);
   const tipHref = (t: Tip) => (t.show ? url(`${t.show.path}?tip=${t.id}`) : null);
 
   /** A tip as a card: area, title, text, Show me. */
-  function tipCard(t: Tip): HTMLElement {
+  function tipCard(tip: Tip): HTMLElement {
     const card = el('article', 'guide-card');
-    card.append(el('span', 'guide-card__area', t.area), el('h4', 'guide-card__title', t.title), el('p', 'guide-card__text', t.text));
-    const href = tipHref(t);
+    card.append(el('span', 'guide-card__area', areaLabel(tip.area)), el('h4', 'guide-card__title', tip.title), el('p', 'guide-card__text', tip.text));
+    const href = tipHref(tip);
     if (href) {
-      const a = el('a', 'guide-card__go', 'Show me');
+      const a = el('a', 'guide-card__go', t('guide.s.showMe'));
       a.href = href;
-      a.setAttribute('aria-label', `Show me: ${t.title}`);
+      a.setAttribute('aria-label', t('guide.s.showMeWhat', { what: tip.title }));
       card.append(a);
     }
     return card;
@@ -198,10 +212,18 @@ import { url } from '../lib/paths';
     return r;
   }
 
-  function tourRow(t: Tour): HTMLElement {
-    const seen = getTours().seen.includes(t.id);
+  function tourRow(tour: Tour): HTMLElement {
+    const seen = getTours().seen.includes(tour.id);
     const li = el('li');
-    li.append(row(tourHref(t), t.name, `${seen ? 'Seen' : 'New'} · ${t.steps.length} tips`, seen ? 'Replay' : 'Start', !seen));
+    li.append(
+      row(
+        tourHref(tour),
+        tour.name,
+        `${seen ? t('guide.s.seen') : t('guide.s.new')} · ${tn('guide.s.nTips', tour.steps.length)}`,
+        seen ? t('guide.s.replay') : t('guide.s.start'),
+        !seen,
+      ),
+    );
     return li;
   }
 
@@ -307,19 +329,19 @@ import { url } from '../lib/paths';
     const tabs = tabToursFor(location.pathname).filter(tourOn);
 
     const render = () => {
-      $('[data-help-title]').textContent = pageOn ? `Help with ${page.name}` : 'Help';
+      $('[data-help-title]').textContent = pageOn ? t('guide.s.helpWith', { name: page.name }) : t('guide.help');
       $('[data-help-tour]').hidden = !pageOn;
-      if (pageOn) $('[data-help-tour-sub]').textContent = `${page.steps.length} tips on this screen`;
+      if (pageOn) $('[data-help-tour-sub]').textContent = tn('guide.s.tipsOnScreen', page.steps.length);
 
       $('[data-help-tabs-wrap]').hidden = !tabs.length;
       $('[data-help-tabs]').replaceChildren(...tabs.map(tourRow));
 
-      const areas = new Set<Area>([page, ...tabs].filter((t): t is Tour => !!t).map((t) => t.area));
-      const tips = TIPS.filter((t) => areas.has(t.area) && tipOn(t)).slice(0, 4);
+      const areas = new Set<Area>([page, ...tabs].filter((x): x is Tour => !!x).map((x) => x.area));
+      const tips = TIPS.filter((tip) => areas.has(tip.area) && tipOn(tip)).slice(0, 4);
       $('[data-help-tips-wrap]').hidden = !tips.length;
       $('[data-help-tips]').replaceChildren(...tips.map(tipCard));
 
-      const faq = [page, ...tabs].filter((t): t is Tour => !!t && tourOn(t)).flatMap((t) => t.faq);
+      const faq = [page, ...tabs].filter((x): x is Tour => !!x && tourOn(x)).flatMap((x) => x.faq);
       $('[data-help-faq-wrap]').hidden = !faq.length;
       $('[data-help-faq]').replaceChildren(
         ...faq.map(([q, a]) => {
@@ -358,13 +380,13 @@ import { url } from '../lib/paths';
     let book: string | null = null;
 
     const renderTours = () => {
-      const groups = AREAS.map((a) => [a, TOURS.filter((t) => t.area === a && tourOn(t))] as const).filter(([, ts]) => ts.length);
+      const groups = AREAS.map((a) => [a, TOURS.filter((x) => x.area === a && tourOn(x))] as const).filter(([, ts]) => ts.length);
       $('[data-guides-tours]').replaceChildren(
         ...groups.map(([a, ts]) => {
           const wrap = el('div', 'guide__block');
           const ul = el('ul', 'guide__list');
           ul.append(...ts.map(tourRow));
-          wrap.append(el('h3', 'guide__label', a), ul);
+          wrap.append(el('h3', 'guide__label', areaLabel(a)), ul);
           return wrap;
         }),
       );
@@ -387,7 +409,7 @@ import { url } from '../lib/paths';
           const badge = el('span', `guide__badge${n ? ' is-going' : ''}`, n === p.steps.length ? '✓' : `${n}/${p.steps.length}`);
           badge.setAttribute('aria-hidden', 'true');
           const main = el('span', 'guide__row-main', p.name);
-          main.append(el('small', '', `${p.sub} · ${n} of ${p.steps.length} done`));
+          main.append(el('small', '', `${p.sub} · ${t('guide.s.nOfDone', { n, total: p.steps.length })}`));
           b.append(badge, main);
           li.append(b);
           return li;
@@ -401,13 +423,13 @@ import { url } from '../lib/paths';
 
     const renderBook = (p: Playbook, ctx: ReturnType<typeof helpContext>, tried: string[]) => {
       const box = $('[data-guides-book]');
-      const back = el('button', 'guide__back', '‹ All playbooks');
+      const back = el('button', 'guide__back', `‹ ${t('guide.s.allPlaybooks')}`);
       back.type = 'button';
       back.dataset.guidesBack = '';
       const n = p.steps.filter((s) => stepDone(s, ctx, tried)).length;
       const bar = el('span', 'guide__bar');
       bar.setAttribute('role', 'progressbar');
-      bar.setAttribute('aria-label', `${n} of ${p.steps.length} steps done`);
+      bar.setAttribute('aria-label', t('guide.s.nOfStepsDone', { n, total: p.steps.length }));
       const fill = el('span');
       fill.style.inlineSize = `${(n / p.steps.length) * 100}%`;
       bar.append(fill);
@@ -419,48 +441,48 @@ import { url } from '../lib/paths';
         mark.setAttribute('aria-hidden', 'true');
         const main = el('span', 'guide__row-main', s.title);
         main.append(el('small', '', s.how));
-        if (ok) main.append(el('span', 'visually-hidden', ' (done)'));
+        if (ok) main.append(el('span', 'visually-hidden', ` (${t('guide.s.done')})`));
         li.append(mark, main);
         if (!ok) {
-          const a = el('a', 'guide-card__go', 'Show me');
+          const a = el('a', 'guide-card__go', t('guide.s.showMe'));
           const qs = s.go.tour ? `?tour=${s.go.tour}` : s.go.tip ? `?tip=${s.go.tip}` : '';
           a.href = url(`${s.go.path}${qs}`);
           a.dataset.guidesTried = s.id;
-          a.setAttribute('aria-label', `Show me: ${s.title}`);
+          a.setAttribute('aria-label', t('guide.s.showMeWhat', { what: s.title }));
           li.append(a);
         }
         ol.append(li);
       });
       const why = el('details', 'guide__q guide__why');
       const whyText = el('p', 'muted', p.why);
-      why.append(el('summary', '', 'Why this works'), whyText);
+      why.append(el('summary', '', t('guide.s.whyWorks')), whyText);
       if (p.techniques.length) {
         const more = el('p', 'guide__techs');
-        more.append('Read more: ');
-        p.techniques.forEach((t, i) => {
-          const a = el('a', '', t.name);
-          a.href = url(`/techniques/${t.slug}`);
+        more.append(`${t('guide.s.readMore')} `);
+        p.techniques.forEach((tech, i) => {
+          const a = el('a', '', tech.name);
+          a.href = url(`/techniques/${tech.slug}`);
           more.append(...(i ? [', ', a] : [a]));
         });
         why.append(more);
       }
-      const coach = el('a', 'guide__all guide__coach', 'Still stuck? Ask Coach what is in the way');
+      const coach = el('a', 'guide__all guide__coach', t('guide.s.stillStuck'));
       coach.href = url('/techniques');
-      box.replaceChildren(back, el('h3', 'guide__book-title', p.name), bar, el('p', 'muted guide__count', `${n} of ${p.steps.length} done`), ol, why, coach);
+      box.replaceChildren(back, el('h3', 'guide__book-title', p.name), bar, el('p', 'muted guide__count', t('guide.s.nOfDone', { n, total: p.steps.length })), ol, why, coach);
     };
 
     const renderTips = () => {
-      const areas = (['All', ...AREAS] as const).filter((a) => a === 'All' || TIPS.some((t) => t.area === a && tipOn(t)));
+      const areas = (['All', ...AREAS] as const).filter((a) => a === 'All' || TIPS.some((tip) => tip.area === a && tipOn(tip)));
       $('[data-guides-areas]').replaceChildren(
         ...areas.map((a) => {
-          const b = el('button', 'guide__chip', a);
+          const b = el('button', 'guide__chip', a === 'All' ? t('guide.s.all') : areaLabel(a));
           b.type = 'button';
           b.dataset.guidesArea = a;
           b.setAttribute('aria-pressed', String(a === area));
           return b;
         }),
       );
-      $('[data-guides-tips]').replaceChildren(...TIPS.filter((t) => tipOn(t) && (area === 'All' || t.area === area)).map(tipCard));
+      $('[data-guides-tips]').replaceChildren(...TIPS.filter((tip) => tipOn(tip) && (area === 'All' || tip.area === area)).map(tipCard));
     };
 
     /** Search across tours, playbooks and tips; every word must match. */
@@ -470,15 +492,15 @@ import { url } from '../lib/paths';
         const hay = parts.join(' ').toLowerCase();
         return words.every((w) => hay.includes(w));
       };
-      const tours = TOURS.filter((t) => tourOn(t) && hit(t.name, t.area, ...t.steps.flatMap((s) => [s.title, s.text]), ...t.faq.flat()));
+      const tours = TOURS.filter((x) => tourOn(x) && hit(x.name, x.area, areaLabel(x.area), ...x.steps.flatMap((s) => [s.title, s.text]), ...x.faq.flat()));
       const books = PLAYBOOKS.filter((p) => bookOn(p) && hit(p.name, p.sub, p.why, ...p.steps.flatMap((s) => [s.title, s.how])));
-      const tips = TIPS.filter((t) => tipOn(t) && hit(t.title, t.text, t.area));
+      const tips = TIPS.filter((tip) => tipOn(tip) && hit(tip.title, tip.text, tip.area, areaLabel(tip.area)));
       const box = $('[data-guides-results]');
       const parts: HTMLElement[] = [];
       if (tours.length) {
         const ul = el('ul', 'guide__list');
         ul.append(...tours.map(tourRow));
-        parts.push(el('h3', 'guide__label', 'Tours'), ul);
+        parts.push(el('h3', 'guide__label', t('guide.tours')), ul);
       }
       if (books.length) {
         const ul = el('ul', 'guide__list');
@@ -495,14 +517,14 @@ import { url } from '../lib/paths';
             return li;
           }),
         );
-        parts.push(el('h3', 'guide__label', 'Playbooks'), ul);
+        parts.push(el('h3', 'guide__label', t('guide.playbooks')), ul);
       }
       if (tips.length) {
         const cards = el('div', 'guide__cards');
         cards.append(...tips.map(tipCard));
-        parts.push(el('h3', 'guide__label', 'Tips'), cards);
+        parts.push(el('h3', 'guide__label', t('guide.tips')), cards);
       }
-      if (!parts.length) parts.push(el('p', 'muted guide__intro', 'Nothing found. Try another word, or write to us under You › Help.'));
+      if (!parts.length) parts.push(el('p', 'muted guide__intro', t('guide.s.nothingFound')));
       box.replaceChildren(...parts);
     };
 
@@ -531,10 +553,10 @@ import { url } from '../lib/paths';
     c.add(listen(q, 'input', render));
     c.add(
       listen(sheet, 'click', (e) => {
-        const t = e.target as HTMLElement;
-        const k = t.closest<HTMLElement>('[data-guides-kind]');
-        const open = t.closest<HTMLElement>('[data-guides-open]');
-        const a = t.closest<HTMLElement>('[data-guides-area]');
+        const x = e.target as HTMLElement;
+        const k = x.closest<HTMLElement>('[data-guides-kind]');
+        const open = x.closest<HTMLElement>('[data-guides-open]');
+        const a = x.closest<HTMLElement>('[data-guides-area]');
         if (k) {
           kind = k.dataset.guidesKind!;
           book = null;
@@ -542,7 +564,7 @@ import { url } from '../lib/paths';
           q.value = '';
           kind = 'playbooks';
           book = open.dataset.guidesOpen!;
-        } else if (t.closest('[data-guides-back]')) book = null;
+        } else if (x.closest('[data-guides-back]')) book = null;
         else if (a) area = a.dataset.guidesArea as Area | 'All';
         else return;
         render();
@@ -564,7 +586,7 @@ import { url } from '../lib/paths';
 
   function nudgeCard(tip: Tip, onAway: () => void): HTMLElement {
     const card = el('section', 'help-nudge');
-    card.setAttribute('aria-label', 'Did you know?');
+    card.setAttribute('aria-label', t('guide.didYouKnow'));
     const actions = el('div', 'help-nudge__actions');
     const putAway = () => {
       const prefs = getTours();
@@ -576,22 +598,22 @@ import { url } from '../lib/paths';
     };
     const href = tipHref(tip);
     if (href) {
-      const go = el('a', 'btn btn--small', 'Show me');
+      const go = el('a', 'btn btn--small', t('guide.s.showMe'));
       go.href = href;
       // The shared link handler in 'guide-tour' puts it away, then goes.
       go.dataset.guidesAway = tip.id;
       actions.append(go);
     }
-    const no = el('button', 'help-nudge__no', href ? 'Not now' : 'Got it');
+    const no = el('button', 'help-nudge__no', href ? t('guide.s.notNow') : t('guide.s.gotIt'));
     no.type = 'button';
     no.addEventListener('click', away);
     actions.append(no);
     card.append(
-      el('span', 'help-nudge__label', 'Did you know?'),
+      el('span', 'help-nudge__label', t('guide.didYouKnow')),
       el('strong', 'help-nudge__title', tip.title),
       el('p', 'help-nudge__text', tip.text),
       actions,
-      el('p', 'help-nudge__why', `${tip.because ?? ''} Turn these off under You › Help.`.trim()),
+      el('p', 'help-nudge__why', `${tip.because ?? ''} ${t('guide.s.turnOff')}`.trim()),
     );
     return card;
   }
