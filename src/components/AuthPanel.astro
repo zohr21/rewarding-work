@@ -17,11 +17,11 @@ const { id, guest = false } = Astro.props;
 ---
 
 <div class="auth" data-auth-panel>
-  <div class="auth__tabs" role="group" aria-label="Choose">
-    <button type="button" class="auth__tab" data-auth-tab="create" aria-pressed={guest ? 'true' : 'false'}>
+  <div data-t-aria-label="you.choose" class="auth__tabs" role="group" aria-label="Choose">
+    <button type="button" class="auth__tab" data-auth-tab="create" aria-pressed={guest ? 'true' : 'false'} data-t={guest ? 'you.saveWithEmail' : 'you.createAccount'}>
       {guest ? 'Save with email' : 'Create account'}
     </button>
-    <button type="button" class="auth__tab" data-auth-tab="signin" aria-pressed={guest ? 'false' : 'true'}>
+    <button type="button" class="auth__tab" data-auth-tab="signin" aria-pressed={guest ? 'false' : 'true'} data-t={guest ? 'you.iAlreadyHaveAnAccount' : 'you.signIn'}>
       {guest ? 'I already have an account' : 'Sign in'}
     </button>
   </div>
@@ -34,42 +34,42 @@ const { id, guest = false } = Astro.props;
       <path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.1a11 11 0 0 0 0 9.8l3.7-2.8z"></path>
       <path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4z"></path>
     </svg>
-    {guest ? 'Save with Google' : 'Continue with Google'}
+    <span data-t={guest ? 'you.saveWithGoogle' : 'you.continueWithGoogle'}>{guest ? 'Save with Google' : 'Continue with Google'}</span>
   </button>
 
-  <p class="auth__or" style={GOOGLE_SIGNIN_ENABLED ? undefined : 'display: none'}><span>or with email</span></p>
+  <p class="auth__or" style={GOOGLE_SIGNIN_ENABLED ? undefined : 'display: none'}><span data-t="you.orWithEmail">or with email</span></p>
 
   <form class="auth__form" data-form="create" hidden={!guest} novalidate>
     <div class="field">
-      <label for={`${id}-create-email`}>Email</label>
+      <label data-t="you.email" for={`${id}-create-email`}>Email</label>
       <input id={`${id}-create-email`} class="input" type="email" name="email" autocomplete="email" required maxlength="254" />
     </div>
     <PasswordField id={`${id}-create-pw`} label="Choose a password" isNew />
-    <button type="submit" class="btn">{guest ? 'Save my account' : 'Create account'}</button>
-    <p class="auth__fine muted">
+    <button type="submit" class="btn" data-t={guest ? 'you.saveMyAccount' : 'you.createAccount'}>{guest ? 'Save my account' : 'Create account'}</button>
+    <p class="auth__fine muted" data-t={guest ? 'you.confirmGuest' : 'you.confirmEmail'}>
       {guest ? 'Your guest data stays exactly as it is. ' : ''}We'll email you a link to confirm the address.
     </p>
   </form>
 
   <form class="auth__form" data-form="signin" hidden={guest} novalidate>
     <div class="field">
-      <label for={`${id}-signin-email`}>Email</label>
+      <label data-t="you.email" for={`${id}-signin-email`}>Email</label>
       <input id={`${id}-signin-email`} class="input" type="email" name="email" autocomplete="username" required maxlength="254" />
     </div>
     <PasswordField id={`${id}-signin-pw`} label="Password" />
-    <button type="submit" class="btn">Sign in</button>
-    <button type="button" class="auth__link" data-show-reset>Forgot your password?</button>
-    {guest && <p class="auth__fine muted">What you've done as a guest is added to that account.</p>}
+    <button data-t="you.signIn" type="submit" class="btn">Sign in</button>
+    <button data-t="you.forgotYourPassword" type="button" class="auth__link" data-show-reset>Forgot your password?</button>
+    {guest && <p data-t="you.whatYouVeDoneAs" class="auth__fine muted">What you've done as a guest is added to that account.</p>}
   </form>
 
   <form class="auth__form" data-form="reset" hidden novalidate>
-    <p class="muted">Enter your email and we'll send you a link to choose a new password.</p>
+    <p data-t="you.enterYourEmailAndWe" class="muted">Enter your email and we'll send you a link to choose a new password.</p>
     <div class="field">
-      <label for={`${id}-reset-email`}>Email</label>
+      <label data-t="you.email" for={`${id}-reset-email`}>Email</label>
       <input id={`${id}-reset-email`} class="input" type="email" name="email" autocomplete="email" required maxlength="254" />
     </div>
-    <button type="submit" class="btn">Send reset link</button>
-    <button type="button" class="auth__link" data-auth-tab="signin">Back to sign in</button>
+    <button data-t="you.sendResetLink" type="submit" class="btn">Send reset link</button>
+    <button data-t="you.backToSignIn" type="button" class="auth__link" data-auth-tab="signin">Back to sign in</button>
   </form>
 
   <p class="auth__msg" role="status" data-msg></p>

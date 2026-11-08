@@ -3,18 +3,19 @@
  * Account logic is in src/lib/account; this file only wires up the page.
  */
 import { friendlyError } from '../lib/account/errors';
-import { passwordProblem, passwordStrength, timesBreached } from '../lib/account/password';
+import { PASSWORD_MIN, passwordProblem, passwordStrength, timesBreached } from '../lib/account/password';
 import { getAccount, loadAccount, onAccountChange, type AccountState } from '../lib/account/state';
 import { cleanups, onPage } from '../lib/page';
 import { NATIVE_APP } from '../config/app';
+import { locale, t, tn, type Key } from '../lib/i18n';
 
 type Runtime = Awaited<ReturnType<typeof loadAccount>>;
 
-const SYNC_TEXT: Record<AccountState['sync'], string> = {
-  idle: 'Connecting…',
-  saving: 'Saving…',
-  synced: 'Synced',
-  offline: 'Offline · changes kept here',
+const SYNC_TEXT: Record<AccountState['sync'], Key | ''> = {
+  idle: 'you.sync.idle',
+  saving: 'you.sync.saving',
+  synced: 'you.sync.synced',
+  offline: 'you.sync.offline',
   error: '',
 };
 
@@ -27,7 +28,7 @@ onPage('account-page', () => {
 
   const pageMsg = $('[data-page-msg]');
   const runtime = loadAccount();
-  runtime.catch(() => say(pageMsg, "Couldn't load the account code. Check your connection and reload.", true));
+  runtime.catch(() => say(pageMsg, t('you.msg.loadFailed'), true));
 
   function say(el: HTMLElement, text: string, error = false): void {
     el.textContent = text;
@@ -48,7 +49,7 @@ onPage('account-page', () => {
     const buttons = trigger instanceof HTMLFormElement ? $$<HTMLButtonElement>('button', trigger) : [trigger];
     buttons.forEach((b) => (b.disabled = true));
     say(pageMsg, '');
-    say(msg, 'One moment…');
+    say(msg, t('you.msg.moment'));
     try {
       const done = (await fn(await runtime)) ?? '';
       say(toPage ? pageMsg : msg, done);
@@ -70,8 +71,8 @@ onPage('account-page', () => {
   function readEmail(form: HTMLFormElement): string {
     const input = $<HTMLInputElement>('input[name="email"]', form);
     const email = input.value.trim();
-    if (!email) throw invalid('Enter your email address.', input);
-    if (!input.checkValidity()) throw invalid("That email address doesn't look right.", input);
+    if (!email) throw invalid(t('err.noEmail'), input);
+    if (!input.checkValidity()) throw invalid(t('err.badEmail'), input);
     return email;
   }
 
@@ -84,7 +85,7 @@ onPage('account-page', () => {
     const breached = await timesBreached(pw);
     if (breached) {
       throw invalid(
-        `This password has appeared in ${breached.toLocaleString()} data breach${breached === 1 ? '' : 'es'}, so attackers try it. Please choose another.`,
+        tn('you.pw.breached', breached, { n: breached.toLocaleString(locale()) }),
         input,
       );
     }
@@ -99,22 +100,22 @@ onPage('account-page', () => {
     toggle.addEventListener('click', () => {
       const show = input.type === 'password';
       input.type = show ? 'text' : 'password';
-      toggle.textContent = show ? 'Hide' : 'Show';
+      toggle.textContent = show ? t('you.hide') : t('you.show');
       toggle.setAttribute('aria-pressed', String(show));
-      toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      toggle.setAttribute('aria-label', show ? t('you.hidePassword') : t('you.showPassword'));
     });
-    toggle.setAttribute('aria-label', 'Show password');
+    toggle.setAttribute('aria-label', t('you.showPassword'));
 
     if (!input.hasAttribute('data-new')) continue;
     const meter = $('.pw__meter', field);
     const hint = $('[data-pw-hint]', field);
-    const defaultHint = hint.textContent ?? '';
+    const defaultHint = tn('you.pw.hint', PASSWORD_MIN);
     const email = () => input.form?.querySelector<HTMLInputElement>('input[name="email"]')?.value ?? getAccount().user?.email ?? '';
     input.addEventListener('input', () => {
       const pw = input.value;
       const problem = pw ? passwordProblem(pw, email()) : null;
       meter.dataset.strength = pw ? String(passwordStrength(pw, email())) : '0';
-      hint.textContent = problem ?? (pw ? ['', 'Okay — longer is stronger.', 'Good password.', 'Strong password.'][passwordStrength(pw, email())] : defaultHint);
+      hint.textContent = problem ?? (pw ? ['', t('you.pw.okay'), t('you.pw.good'), t('you.pw.strong')][passwordStrength(pw, email())] : defaultHint);
       hint.classList.toggle('is-problem', Boolean(problem) && pw.length >= 8);
     });
   }
@@ -145,7 +146,7 @@ onPage('account-page', () => {
     google.addEventListener('click', () =>
       act(google, msg, async (m) => {
         await m.continueWithGoogle();
-        return 'Signed in with Google.';
+        return t('you.msg.signedInGoogle');
       }, true),
     );
 
@@ -158,17 +159,17 @@ onPage('account-page', () => {
             const pw = await readNewPassword(form, email);
             await m.createWithEmail(email, pw);
             form.reset();
-            return `Account saved. We've sent a confirmation link to ${email}.`;
+            return t('you.msg.saved', { email });
           }
           if (form.dataset.form === 'signin') {
             const input = $<HTMLInputElement>('input[type="password"], input[name="password"]', form);
-            if (!input.value) throw invalid('Enter your password.', input);
+            if (!input.value) throw invalid(t('err.noPassword'), input);
             await m.signInWithEmail(email, input.value);
             form.reset();
-            return 'Signed in.';
+            return t('you.msg.signedIn');
           }
           await m.resetPassword(email);
-          return `If there's an account for ${email}, a reset link is on its way. Check your inbox (and spam folder).`;
+          return t('you.msg.reset', { email });
         }, form.dataset.form !== 'reset');
       });
     }
@@ -178,7 +179,7 @@ onPage('account-page', () => {
   guestBtn.addEventListener('click', () =>
     act(guestBtn, $('[data-guest-msg]'), async (m) => {
       await m.continueAsGuest();
-      return "You're using a guest account. Your progress is now backed up.";
+      return t('you.msg.guest');
     }, true),
   );
 
@@ -189,14 +190,14 @@ onPage('account-page', () => {
   resend.addEventListener('click', () =>
     act(resend, profileMsg, async (m) => {
       await m.resendVerification();
-      return 'Sent. The link is valid for a few days.';
+      return t('you.msg.sent');
     }),
   );
   const verified = $<HTMLButtonElement>('[data-verified]');
   verified.addEventListener('click', () =>
     act(verified, profileMsg, async (m) => {
       await m.refreshUser();
-      return getAccount().user?.emailVerified ? 'Thanks — your email is confirmed.' : "It isn't confirmed yet. Open the link in the email first.";
+      return getAccount().user?.emailVerified ? t('you.msg.confirmed') : t('you.msg.notConfirmed');
     }),
   );
 
@@ -214,10 +215,10 @@ onPage('account-page', () => {
     e.preventDefault();
     void act(nameForm, profileMsg, async (m) => {
       const name = nameInput.value.trim();
-      if (!name) throw invalid('Enter a name.', nameInput);
+      if (!name) throw invalid(t('you.msg.enterName'), nameInput);
       await m.updateName(name);
       nameForm.hidden = true;
-      return 'Name saved.';
+      return t('you.msg.nameSaved');
     });
   });
 
@@ -227,19 +228,19 @@ onPage('account-page', () => {
     e.preventDefault();
     void act(changeForm, securityMsg, async (m) => {
       const current = $<HTMLInputElement>('input[name="current"]', changeForm);
-      if (!current.value) throw invalid('Enter your current password.', current);
+      if (!current.value) throw invalid(t('err.currentPassword'), current);
       const next = await readNewPassword(changeForm, getAccount().user?.email ?? '');
-      if (next === current.value) throw invalid('The new password is the same as the current one.');
+      if (next === current.value) throw invalid(t('you.msg.samePassword'));
       await m.changePassword(current.value, next);
       changeForm.reset();
-      return 'Password changed.';
+      return t('you.msg.passwordChanged');
     });
   });
   const linkGoogle = $<HTMLButtonElement>('[data-link-google]');
   linkGoogle.addEventListener('click', () =>
     act(linkGoogle, $('[data-connect-msg]'), async (m) => {
       await m.linkGoogle();
-      return 'Google connected.';
+      return t('you.msg.googleConnected');
     }),
   );
 
@@ -250,7 +251,7 @@ onPage('account-page', () => {
     act(btn, deviceMsg, async (m) => {
       const ok = await m.signOut(force);
       signOutWarn.hidden = ok;
-      return ok ? 'You are signed out. Your data is safe in your account.' : '';
+      return ok ? t('you.msg.signedOut') : '';
     }, true);
   signOutBtn.addEventListener('click', () => doSignOut(signOutBtn, false));
   const forceBtn = $<HTMLButtonElement>('[data-sign-out-force]');
@@ -265,11 +266,11 @@ onPage('account-page', () => {
   let disarm = 0;
   deleteForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const label = getAccount().user?.isAnonymous ? 'Delete guest account' : 'Delete account';
+    const label = getAccount().user?.isAnonymous ? t('you.deleteGuest') : t('you.deleteAccountBtn');
     if (!armed) {
       armed = true;
-      deleteBtn.textContent = 'Yes, delete it permanently';
-      say(deleteMsg, 'Press again to confirm. This cannot be undone.');
+      deleteBtn.textContent = t('you.deleteForever');
+      say(deleteMsg, t('you.pressAgain'));
       disarm = window.setTimeout(() => {
         armed = false;
         deleteBtn.textContent = label;
@@ -283,10 +284,10 @@ onPage('account-page', () => {
     void act(deleteForm, deleteMsg, async (m) => {
       const pw = $<HTMLInputElement>('input[name="confirm"]', deleteForm);
       const needsPassword = !$('[data-delete-password]').hidden;
-      if (needsPassword && !pw.value) throw invalid('Enter your password to confirm.', pw);
+      if (needsPassword && !pw.value) throw invalid(t('you.msg.passwordToConfirm'), pw);
       await m.deleteAccount(needsPassword ? pw.value : undefined);
       deleteForm.reset();
-      return 'Your account and its data have been deleted.';
+      return t('you.msg.deleted');
     }, true);
   });
   c.add(() => window.clearTimeout(disarm));
@@ -312,15 +313,15 @@ onPage('account-page', () => {
       const hasGoogle = u.providers.includes('google.com');
 
       $('[data-avatar]').textContent = guest ? '?' : (u.name ?? u.email ?? '?').trim().charAt(0).toUpperCase();
-      $('[data-name]').textContent = guest ? 'Guest account' : (u.name ?? u.email ?? 'Your account');
-      $('[data-email]').textContent = guest ? (NATIVE_APP ? 'Saved on this phone only' : 'Saved in this browser only') : u.name && u.email ? u.email : '';
+      $('[data-name]').textContent = guest ? t('you.guestAccount') : (u.name ?? u.email ?? t('you.yourAccount'));
+      $('[data-email]').textContent = guest ? (NATIVE_APP ? t('you.savedPhone') : t('you.savedBrowser')) : u.name && u.email ? u.email : '';
       const badges = guest
-        ? ['Guest']
-        : [...(hasPassword ? ['Email and password'] : []), ...(hasGoogle ? ['Google'] : []), ...(u.emailVerified ? ['Email confirmed'] : [])];
+        ? [t('you.guestBadge')]
+        : [...(hasPassword ? [t('you.emailAndPassword')] : []), ...(hasGoogle ? ['Google'] : []), ...(u.emailVerified ? [t('you.emailConfirmed')] : [])];
       $('[data-badges]').replaceChildren(
         ...badges.map((b) => Object.assign(document.createElement('span'), { className: 'badge badge--plain', textContent: b })),
       );
-      $('[data-email-sub]').textContent = u.email ? `${u.email} · ${u.emailVerified ? 'confirmed' : 'not confirmed yet'}` : '';
+      $('[data-email-sub]').textContent = u.email ? `${u.email} · ${u.emailVerified ? t('you.confirmed') : t('you.notConfirmedYet')}` : '';
       if (guest) nameForm.hidden = true;
 
       $('[data-verify]').hidden = guest || !hasPassword || u.emailVerified;
@@ -332,12 +333,13 @@ onPage('account-page', () => {
       $('[data-google-linked]').hidden = !hasGoogle;
       $('[data-google-unlinked]').hidden = hasGoogle;
       $('[data-delete-password]').hidden = !hasPassword;
-      $('[data-delete-title]').textContent = guest ? 'Delete guest account…' : 'Delete account…';
-      if (!armed) deleteBtn.textContent = guest ? 'Delete guest account' : 'Delete account';
+      $('[data-delete-title]').textContent = guest ? t('you.deleteGuestDots') : t('you.deleteAccount');
+      if (!armed) deleteBtn.textContent = guest ? t('you.deleteGuest') : t('you.deleteAccountBtn');
 
       const sync = $('.sync');
       sync.dataset.sync = s.sync;
-      let text = s.sync === 'error' ? `Sync problem: ${s.syncError ?? 'unknown error'}` : SYNC_TEXT[s.sync];
+      const key = SYNC_TEXT[s.sync];
+      let text = s.sync === 'error' ? t('you.sync.error', { error: s.syncError ?? t('you.sync.unknown') }) : key ? t(key) : '';
       if (s.sync === 'synced' && s.lastSynced) {
         text += ` · ${new Date(s.lastSynced).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
       }

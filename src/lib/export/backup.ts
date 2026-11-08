@@ -1,6 +1,7 @@
 /** The backup file: everything, as JSON that "Import from JSON" reads back. */
 import { dayKey } from '../dates';
 import { chainsOf, exportBackup, type Backup } from '../storage';
+import { t } from '../i18n';
 
 export const backupFileName = (now = new Date()) => `grovyn-${dayKey(now)}.json`;
 
@@ -21,7 +22,7 @@ export function downloadBackup(): Backup {
 export function backupSummary({ data: d }: Backup): string {
   const done = d.done.filter((x) => x.deletedAt === undefined).length;
   const tasks = d.tasks.items.filter((t) => t.deletedAt === undefined).length;
-  const exam = d.exam.exam ? ', your exam plan' : '';
+  const exam = d.exam.exam ? t('you.summaryExam') : '';
   const chainDays = chainsOf(d.chain).reduce((n, c) => n + c.days.length, 0);
-  return `${d.sessions.length} sessions, ${done} done items, ${tasks} tasks${exam} and ${chainDays} chain days`;
+  return t('you.summary', { sessions: d.sessions.length, done, tasks, exam, chain: chainDays });
 }

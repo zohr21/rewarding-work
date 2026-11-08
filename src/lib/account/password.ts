@@ -3,6 +3,7 @@
  * any characters allowed, no forced "one symbol + one digit" rules, and a check
  * against passwords known from data breaches.
  */
+import { t } from '../i18n';
 
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
@@ -15,12 +16,12 @@ const COMMON = new Set([
 
 /** A reason the password can't be used, or null if it's fine. */
 export function passwordProblem(pw: string, email = ''): string | null {
-  if (pw.length < PASSWORD_MIN) return `Use at least ${PASSWORD_MIN} characters.`;
-  if (pw.length > PASSWORD_MAX) return `Use at most ${PASSWORD_MAX} characters.`;
-  if (/^(.)\1+$/.test(pw)) return "Don't repeat a single character.";
-  if (COMMON.has(pw.toLowerCase())) return 'That password is too common.';
+  if (pw.length < PASSWORD_MIN) return t('you.pw.min', { n: PASSWORD_MIN });
+  if (pw.length > PASSWORD_MAX) return t('you.pw.max', { n: PASSWORD_MAX });
+  if (/^(.)\1+$/.test(pw)) return t('you.pw.repeat');
+  if (COMMON.has(pw.toLowerCase())) return t('you.pw.common');
   const name = email.split('@')[0]?.toLowerCase() ?? '';
-  if (name.length >= 3 && pw.toLowerCase().includes(name)) return "Don't include your email name in the password.";
+  if (name.length >= 3 && pw.toLowerCase().includes(name)) return t('you.pw.emailName');
   return null;
 }
 

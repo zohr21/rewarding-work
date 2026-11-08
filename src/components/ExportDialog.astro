@@ -13,10 +13,10 @@ import { NATIVE_APP } from '../config/app';
 <dialog class="export popover" data-export-dialog aria-labelledby="export-heading">
   <div class="export__head">
     <div>
-      <h2 id="export-heading" class="export__title">Export your data</h2>
-      <p class="muted export__sub">Your data stays {NATIVE_APP ? 'on this phone' : 'in this browser'} until you send it somewhere.</p>
+      <h2 data-t="you.exportYourData" id="export-heading" class="export__title">Export your data</h2>
+      <p class="muted export__sub" data-t={NATIVE_APP ? 'you.staysPhone' : 'you.staysBrowser'}>Your data stays {NATIVE_APP ? 'on this phone' : 'in this browser'} until you send it somewhere.</p>
     </div>
-    <button type="button" class="icon-btn" aria-label="Close" data-export-close>
+    <button data-t-aria-label="you.close" type="button" class="icon-btn" aria-label="Close" data-export-close>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
     </button>
   </div>
@@ -24,38 +24,38 @@ import { NATIVE_APP } from '../config/app';
   <div class="export__body">
     <div class="export__choices">
       <div role="group" aria-labelledby="export-dest-label">
-        <p class="export__label" id="export-dest-label">Send it to</p>
+        <p data-t="you.sendItTo" class="export__label" id="export-dest-label">Send it to</p>
         <div class="export__dests">
           <button type="button" class="export__dest" data-export-dest="sheets" aria-pressed="true">
             <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="3" width="20" height="24" rx="3" fill="none" stroke="currentColor" stroke-width="2"></rect><path d="M5 11h20M5 17h20M13 11v16" stroke="currentColor" stroke-width="2"></path></svg>
-            Google Sheets
+            <span translate="no">Google Sheets</span>
           </button>
           <button type="button" class="export__dest" data-export-dest="docs" aria-pressed="false">
             <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M7 3h11l6 6v18H7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"></path><path d="M11 14h10M11 18h10M11 22h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-            Google Docs
+            <span translate="no">Google Docs</span>
           </button>
           <button type="button" class="export__dest" data-export-dest="backup" aria-pressed="false">
             <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><path d="M12 6c-3 0-3 2-3 4s0 3-3 5c3 2 3 3 3 5s0 4 3 4M18 6c3 0 3 2 3 4s0 3 3 5c-3 2-3 3-3 5s0 4-3 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path></svg>
-            Backup file
+            <span data-t="you.backupFile">Backup file</span>
           </button>
         </div>
       </div>
 
       <fieldset class="export__include" data-export-include>
-        <legend class="export__label">Include</legend>
-        <label class="export__check"><input type="checkbox" data-export-opt="tasks" checked />Tasks and their steps</label>
-        <label class="export__check"><input type="checkbox" data-export-opt="notes" checked />Notes and session logs</label>
-        <label class="export__check"><input type="checkbox" data-export-opt="sessions" checked />Focus sessions</label>
-        <label class="export__check"><input type="checkbox" data-export-opt="done" checked />Done list</label>
-        <label class="export__check"><input type="checkbox" data-export-opt="chain" />Chain days</label>
+        <legend data-t="you.include" class="export__label">Include</legend>
+        <label class="export__check"><input type="checkbox" data-export-opt="tasks" checked /><span data-t="you.opt.tasks">Tasks and their steps</span></label>
+        <label class="export__check"><input type="checkbox" data-export-opt="notes" checked /><span data-t="you.opt.notes">Notes and session logs</span></label>
+        <label class="export__check"><input type="checkbox" data-export-opt="sessions" checked /><span data-t="you.opt.sessions">Focus sessions</span></label>
+        <label class="export__check"><input type="checkbox" data-export-opt="done" checked /><span data-t="you.opt.done">Done list</span></label>
+        <label class="export__check"><input type="checkbox" data-export-opt="chain" /><span data-t="you.opt.chain">Chain days</span></label>
       </fieldset>
 
       <div class="export__field">
-        <label class="export__label" for="export-range">Time range</label>
+        <label data-t="you.timeRange" class="export__label" for="export-range">Time range</label>
         <select id="export-range" class="input" data-export-range>
-          <option value="week">This week</option>
-          <option value="30d" selected>Last 30 days</option>
-          <option value="all">All time</option>
+          <option data-t="you.thisWeek" value="week">This week</option>
+          <option data-t="you.last30Days" value="30d" selected>Last 30 days</option>
+          <option data-t="you.allTime" value="all">All time</option>
         </select>
       </div>
 
@@ -66,11 +66,11 @@ import { NATIVE_APP } from '../config/app';
     </div>
 
     <div class="export__preview">
-      <p class="export__label">What goes in <span class="export__aside" data-export-caption></span></p>
+      <p class="export__label"><span data-t="you.whatGoesIn">What goes in</span> <span class="export__aside" data-export-caption></span></p>
       <ul class="export__parts" data-export-parts></ul>
       <p class="muted export__note" data-export-note></p>
       <div class="export__field export__name">
-        <label class="export__label" for="export-name">File name</label>
+        <label data-t="you.fileName" class="export__label" for="export-name">File name</label>
         <input id="export-name" class="input" type="text" maxlength="120" autocomplete="off" data-export-name />
       </div>
     </div>
@@ -79,8 +79,8 @@ import { NATIVE_APP } from '../config/app';
   <div class="export__foot">
     <p class="export__status" role="status" data-export-status></p>
     <div class="export__buttons">
-      <button type="button" class="btn btn--ghost" data-export-close>Cancel</button>
-      <button type="button" class="btn" data-export-go>Create Google Sheet</button>
+      <button data-t="you.cancel" type="button" class="btn btn--ghost" data-export-close>Cancel</button>
+      <button data-t="you.createGoogleSheet" type="button" class="btn" data-export-go>Create Google Sheet</button>
     </div>
   </div>
 </dialog>
@@ -94,32 +94,14 @@ import { NATIVE_APP } from '../config/app';
   import { backupFileName, backupSummary, downloadBackup } from '../lib/export/backup';
   import { createDoc, createSheet, googleReady, loadGoogle, requestToken } from '../lib/export/google';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { dateFormat, t as tx, tn, type Key } from '../lib/i18n';
 
   type Dest = 'sheets' | 'docs' | 'backup';
 
-  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short', year: 'numeric' });
-  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const monthFmt = dateFormat({ month: 'short', year: 'numeric' });
 
-  const COPY: Record<Dest, { go: string; trust: string; caption: string; note: string }> = {
-    sheets: {
-      go: 'Create Google Sheet',
-      trust: 'Creates one new Sheet in your Drive. Grovyn can make files but cannot read your other Drive files.',
-      caption: '· one tab per kind',
-      note: "The Dashboard's numbers are formulas over the other tabs, so it keeps working if you add rows of your own.",
-    },
-    docs: {
-      go: 'Create Google Doc',
-      trust: 'Creates one new Doc in your Drive. Grovyn can make files but cannot read your other Drive files.',
-      caption: '· a readable report',
-      note: 'Good for a weekly review, or to share with a coach. It is a snapshot: it does not update itself.',
-    },
-    backup: {
-      go: 'Download file',
-      trust: 'Downloads a file to this device. Nothing is sent anywhere.',
-      caption: '· everything',
-      note: 'A backup always holds all your data, so it can be imported again on any device with Merge or Replace.',
-    },
-  };
+  /** Each destination's words: export.<dest>.go / .trust / .caption / .note. */
+  const copy = (dest: Dest, part: 'go' | 'trust' | 'caption' | 'note') => tx(`export.${dest}.${part}` as Key);
 
   onPage('export-dialog', () => {
     const dialog = document.querySelector<HTMLDialogElement>('[data-export-dialog]');
@@ -168,31 +150,30 @@ import { NATIVE_APP } from '../config/app';
     }
 
     function refresh(): void {
-      const copy = COPY[dest];
       const data = gather();
       dests.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.exportDest === dest)));
       const backup = dest === 'backup';
       include.disabled = backup;
       rangeSelect.disabled = backup;
       opts.find((o) => o.dataset.exportOpt === 'notes')!.disabled = !opts.find((o) => o.dataset.exportOpt === 'tasks')!.checked;
-      trust.textContent = copy.trust;
-      caption.textContent = copy.caption;
-      note.textContent = copy.note;
-      go.textContent = copy.go;
+      trust.textContent = copy(dest, 'trust');
+      caption.textContent = copy(dest, 'caption');
+      note.textContent = copy(dest, 'note');
+      go.textContent = copy(dest, 'go');
       name.readOnly = backup;
       if (backup || !nameEdited) name.value = defaultName(data);
 
       const rows: [string, string][] =
         dest === 'sheets'
-          ? buildSheet(data, name.value).tabs.map((t) => [t.title, t.title === 'Dashboard' ? 'totals and charts' : plural(t.rows, 'row')])
+          ? buildSheet(data, name.value).tabs.map((t) => [t.title, t.title === 'Dashboard' ? tx('export.totalsCharts') : tn('export.rows', t.rows)])
           : dest === 'docs'
             ? buildDoc(data).outline.map((s) => [s.title, s.detail])
             : [
-                ['Tasks', plural(getTasks().length, 'task')],
-                ['Focus sessions', plural(getSessions().length, 'session')],
-                ['Done list', plural(getDoneStore().filter((d) => d.deletedAt === undefined).length, 'item')],
-                ['Chains', plural(getChains().reduce((n, c) => n + c.days.length, 0), 'day')],
-                ['Settings', 'theme, look, timer'],
+                [tx('you.opt.tasks'), tn('export.n.tasks', getTasks().length)],
+                [tx('you.opt.sessions'), tn('export.n.sessions', getSessions().length)],
+                [tx('you.opt.done'), tn('export.n.done', getDoneStore().filter((d) => d.deletedAt === undefined).length)],
+                [tx('grove.chains'), tn('export.n.days', getChains().reduce((n, c) => n + c.days.length, 0))],
+                [tx('you.settings'), tx('export.settingsDetail')],
               ];
       parts.replaceChildren(
         ...rows.map(([title, detail]) => {
@@ -207,8 +188,8 @@ import { NATIVE_APP } from '../config/app';
       );
       const empty = !backup && rows.length <= (dest === 'sheets' ? 1 : 0);
       go.disabled = busy || empty;
-      if (empty) say('Tick at least one thing to include.');
-      else if (status.textContent === 'Tick at least one thing to include.') say('');
+      if (empty) say(tx('export.tickOne'));
+      else if (status.textContent === tx('export.tickOne')) say('');
     }
 
     function open(): void {
@@ -225,9 +206,9 @@ import { NATIVE_APP } from '../config/app';
     async function send(): Promise<void> {
       if (dest === 'backup') {
         try {
-          say(`Saved ${backupSummary(downloadBackup())}.`);
+          say(tx('export.saved', { what: backupSummary(downloadBackup()) }));
         } catch {
-          say(NATIVE_APP ? 'The download failed. Try again.' : 'The download failed in this browser.');
+          say(NATIVE_APP ? tx('export.downloadFailed') : tx('export.downloadFailedBrowser'));
         }
         return;
       }
@@ -236,17 +217,17 @@ import { NATIVE_APP } from '../config/app';
       const token = requestToken();
       const data = gather();
       const title = name.value.trim() || defaultName(data);
-      const kind = dest === 'sheets' ? 'Sheet' : 'Doc';
+      const sheet = dest === 'sheets';
       busy = true;
       go.disabled = true;
-      say('Waiting for Google…');
+      say(tx('export.waiting'));
       try {
         const access = await token;
-        say(`Creating your ${kind}…`);
+        say(tx(sheet ? 'export.creatingSheet' : 'export.creatingDoc'));
         const href = dest === 'sheets' ? await createSheet(access, buildSheet(data, title)) : await createDoc(access, title, buildDoc(data));
-        say(`Your ${kind} is ready.`, { href, label: `Open “${title}”` });
+        say(tx(sheet ? 'export.sheetReady' : 'export.docReady'), { href, label: tx('export.open', { title }) });
       } catch (err) {
-        say(err instanceof Error ? err.message : 'Something went wrong. Nothing was created.');
+        say(err instanceof Error ? err.message : tx('export.failed'));
       } finally {
         busy = false;
         refresh();

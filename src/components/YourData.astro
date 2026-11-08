@@ -8,36 +8,36 @@ import Sheet from './Sheet.astro';
 import { SOURCES } from '../lib/findings';
 ---
 
-<Sheet id="mydata" title="Your data">
+<Sheet id="mydata" title="Your data" titleKey="you.yourData">
   <div class="yd" data-yd>
-    <p class="muted yd__small">Your finding and tomorrow's plan are worked out on this phone. Health data never leaves it.</p>
+    <p data-t="you.yourFindingAndTomorrowS" class="muted yd__small">Your finding and tomorrow's plan are worked out on this phone. Health data never leaves it.</p>
 
     <fieldset class="yd__group">
-      <legend class="yd__legend">Grovyn learns from</legend>
+      <legend data-t="you.grovynLearnsFrom" class="yd__legend">Grovyn learns from</legend>
       {
         SOURCES.map((s) => (
           <label class="yd__row">
             <span class="yd__text">
-              <strong>{s.label}</strong>
-              <span class="muted yd__small">{s.where}</span>
+              <strong data-t={`you.src.${s.id}`}>{s.label}</strong>
+              <span class="muted yd__small" data-t={`you.src.${s.id}Where`}>{s.where}</span>
             </span>
             <input type="checkbox" role="switch" data-yd-source={s.id} />
           </label>
         ))
       }
     </fieldset>
-    <p class="muted yd__small" data-yd-off-note hidden>With sleep or focus off, your finding is turned off too.</p>
+    <p data-t="you.withSleepOrFocusOff" class="muted yd__small" data-yd-off-note hidden>With sleep or focus off, your finding is turned off too.</p>
 
     <section class="yd__group" aria-labelledby="yd-learned">
-      <h3 id="yd-learned" class="yd__legend">What Grovyn has learned</h3>
+      <h3 data-t="you.whatGrovynHasLearned" id="yd-learned" class="yd__legend">What Grovyn has learned</h3>
       <ul class="yd__facts" role="list" data-yd-facts></ul>
-      <p class="muted yd__small" data-yd-none hidden>Nothing yet. It needs a couple of weeks of your nights and sessions.</p>
-      <p class="muted yd__small">Forgetting keeps your sleep, sessions and workouts. Grovyn only starts learning again from today.</p>
+      <p data-t="you.nothingYetItNeedsA" class="muted yd__small" data-yd-none hidden>Nothing yet. It needs a couple of weeks of your nights and sessions.</p>
+      <p data-t="you.forgettingKeepsYourSleepSessions" class="muted yd__small">Forgetting keeps your sleep, sessions and workouts. Grovyn only starts learning again from today.</p>
     </section>
 
     <div class="yd__actions">
-      <button type="button" class="btn btn--ghost" data-yd-export>Export</button>
-      <button type="button" class="btn btn--ghost yd__danger" data-yd-forget-all>Forget everything</button>
+      <button data-t="you.export" type="button" class="btn btn--ghost" data-yd-export>Export</button>
+      <button data-t="you.forgetEverything" type="button" class="btn btn--ghost yd__danger" data-yd-forget-all>Forget everything</button>
     </div>
     <p class="muted yd__small" role="status" data-yd-msg></p>
   </div>
@@ -51,6 +51,7 @@ import { SOURCES } from '../lib/findings';
   import { dayKey } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { t } from '../lib/i18n';
 
   onPage('your-data', () => {
     const root = document.querySelector<HTMLElement>('[data-yd]');
@@ -70,10 +71,10 @@ import { SOURCES } from '../lib/findings';
           const li = el('li', 'yd__fact');
           const text = el('span', 'yd__text');
           text.append(el('span', '', f.text), el('span', 'muted yd__small', f.from));
-          const b = el('button', 'btn btn--ghost btn--small', 'Forget');
+          const b = el('button', 'btn btn--ghost btn--small', t('you.forget'));
           b.type = 'button';
           b.dataset.ydForget = f.id;
-          b.setAttribute('aria-label', `Forget: ${f.text}`);
+          b.setAttribute('aria-label', t('you.forgetFact', { fact: f.text }));
           li.append(text, b);
           return li;
         }),
@@ -89,16 +90,16 @@ import { SOURCES } from '../lib/findings';
     );
     c.add(
       listen(root, 'click', (e) => {
-        const t = e.target as HTMLElement;
-        const one = t.closest<HTMLElement>('[data-yd-forget]');
+        const target = e.target as HTMLElement;
+        const one = target.closest<HTMLElement>('[data-yd-forget]');
         if (one) {
           forget(one.dataset.ydForget as FactId);
-          msg.textContent = 'Forgotten. Grovyn learns that again from today.';
-        } else if (t.closest('[data-yd-forget-all]')) {
-          if (!window.confirm('Forget everything Grovyn has learned? Your sleep, sessions and workouts stay.')) return;
+          msg.textContent = t('you.forgotten');
+        } else if (target.closest('[data-yd-forget-all]')) {
+          if (!window.confirm(t('you.forgetAllConfirm'))) return;
           forgetAll();
-          msg.textContent = 'Everything forgotten. Grovyn starts learning again from today.';
-        } else if (t.closest('[data-yd-export]')) {
+          msg.textContent = t('you.forgotAll');
+        } else if (target.closest('[data-yd-export]')) {
           const file = exportFile(bodyDays(), getSessions(), getWorkouts());
           const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
           const a = document.createElement('a');
@@ -108,7 +109,7 @@ import { SOURCES } from '../lib/findings';
           a.click();
           a.remove();
           window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-          msg.textContent = `Saved ${a.download}: ${file.rows.length} days, what was learned and tomorrow's plan.`;
+          msg.textContent = t('you.findingSaved', { file: a.download, n: file.rows.length });
         }
       }),
     );

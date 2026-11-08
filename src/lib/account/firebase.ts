@@ -57,6 +57,7 @@ import {
   type Firestore,
 } from 'firebase/firestore';
 import { NATIVE_APP } from '../../config/app';
+import { t } from '../i18n';
 import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
 import { getBoard, weekKey, type BoardEntry } from '../board';
 import { googleIdToken } from '../device';
@@ -314,7 +315,7 @@ function clearLocal(): void {
  * account picker is asked for the credential instead (src/lib/device.ts).
  */
 async function appGoogleCredential(): Promise<AuthCredential> {
-  if (!GOOGLE_SIGNIN_CLIENT_ID) throw new Error("Google sign-in isn't available in the app yet. Use your email and password.");
+  if (!GOOGLE_SIGNIN_CLIENT_ID) throw new Error(t('err.googleNotInApp'));
   return GoogleAuthProvider.credential(await googleIdToken(GOOGLE_SIGNIN_CLIENT_ID));
 }
 
@@ -429,7 +430,7 @@ async function reauthenticate(user: User, password?: string): Promise<void> {
   } else if (providers.includes('google.com')) {
     await google.reauthenticate(user);
   } else if (providers.includes('password')) {
-    throw Object.assign(new Error('Enter your current password.'), { code: 'auth/missing-password' });
+    throw Object.assign(new Error(t('err.currentPassword')), { code: 'auth/missing-password' });
   }
   // Guests have nothing to confirm.
 }
@@ -459,7 +460,7 @@ export async function changePassword(current: string, next: string): Promise<voi
 export async function signOut(force = false): Promise<boolean> {
   const user = auth.currentUser;
   if (!user) return true;
-  if (user.isAnonymous) throw new Error("Guest accounts can't sign in again — delete it instead, or save it with an email first.");
+  if (user.isAnonymous) throw new Error(t('err.guestReauth'));
   if (!(await flush()) && !force) return false;
   stopSync();
   clearLocal();

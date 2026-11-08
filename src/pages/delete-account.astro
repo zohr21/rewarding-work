@@ -16,49 +16,51 @@ const SUBJECT = encodeURIComponent(`Delete my ${SITE.name} account`);
 <BaseLayout title="Delete your account" description={`How to delete your ${SITE.name} account and everything stored in it.`}>
   <div class="container">
     <header class="page-header">
-      <h1>Delete your {SITE.name} account</h1>
-      <p>Your account, and everything stored in it, can be deleted at any time. It takes a minute and can't be undone.</p>
+      <h1 data-t="you.del.title">Delete your {SITE.name} account</h1>
+      <p data-t="you.yourAccountAndEverythingStored">Your account, and everything stored in it, can be deleted at any time. It takes a minute and can't be undone.</p>
     </header>
 
     <div class="prose delete">
-      <h2>In the app</h2>
+      <h2 data-t="you.inTheApp">In the app</h2>
       <ol>
-        <li>Open {SITE.name} and go to <strong>You</strong>.</li>
-        <li>At the bottom, under <strong>Sign out</strong>, press <strong>Delete account…</strong>.</li>
-        <li>Confirm. If you signed in with a password, you're asked for it once more.</li>
+        <li><span data-t="you.del.openApp">Open {SITE.name} and go to</span> <strong data-t="you.you">You</strong>.</li>
+        <li><span data-t="you.del.atBottom">At the bottom, under</span> <strong data-t="you.signOut">Sign out</strong><span data-t="you.del.press">, press</span> <strong data-t="you.deleteAccount">Delete account…</strong>.</li>
+        <li data-t="you.confirmIfYouSignedIn">Confirm. If you signed in with a password, you're asked for it once more.</li>
       </ol>
 
-      <h2>{NATIVE_APP ? 'On the website' : 'Here, without the app'}</h2>
+      <h2 data-t={NATIVE_APP ? 'you.del.onWebsite' : 'you.del.here'}>{NATIVE_APP ? 'On the website' : 'Here, without the app'}</h2>
       <ol>
-        <li>Open <a href={`${url('/account')}#acc-device`}>Account</a> and sign in the same way you did in the app (Google, or email and password).</li>
-        <li>Under <strong>This device</strong>, press <strong>Delete account…</strong> and confirm.</li>
+        <li><span data-t="you.del.open">Open</span> <a data-t="you.account" href={`${url('/account')}#acc-device`}>Account</a> <span data-t="you.del.signInSame">and sign in the same way you did in the app (Google, or email and password).</span></li>
+        <li><span data-t="you.del.under">Under</span> <strong data-t="you.thisDevice">This device</strong><span data-t="you.del.press">, press</span> <strong data-t="you.deleteAccount">Delete account…</strong> <span data-t="you.del.andConfirm">and confirm.</span></li>
       </ol>
 
-      <h2>If you can't sign in</h2>
+      <h2 data-t="you.ifYouCanTSign">If you can't sign in</h2>
       <p>
-        Write to <a href={`mailto:${CONTACT}?subject=${SUBJECT}`}>{CONTACT}</a> from the address you signed up with, and we
-        delete the account within 30 days and write back when it's done.
+        <span data-t="you.del.writeTo">Write to</span> <a href={`mailto:${CONTACT}?subject=${SUBJECT}`}>{CONTACT}</a>{' '}
+        <span data-t="you.del.within30"
+          >from the address you signed up with, and we delete the account within 30 days and write back when it's done.</span
+        >
       </p>
-      <p>
-        A <strong>guest</strong> account lives only on the phone it was made on. Delete it there under You, or uninstall the
+      <p data-t="you.del.guest">
+        A <strong data-t="you.guest">guest</strong> account lives only on the phone it was made on. Delete it there under You, or uninstall the
         app, which removes the guest's data from the phone. To have its copy in the cloud deleted as well, write to us with
         the date you started using {SITE.name}.
       </p>
 
-      <h2>What is deleted</h2>
+      <h2 data-t="you.whatIsDeleted">What is deleted</h2>
       <ul>
-        <li>your sign-in: email address, name and password (or the link to your Google account);</li>
-        <li>everything synced to the account: tasks, focus sessions, done list, chains, exam plan, Budget, and settings;</li>
-        <li>your rows on the weekly board and your friend code;</li>
-        <li>the account's copy on the phone you delete it from.</li>
+        <li data-t="you.yourSignInEmailAddress">your sign-in: email address, name and password (or the link to your Google account);</li>
+        <li data-t="you.everythingSyncedToTheAccount">everything synced to the account: tasks, focus sessions, done list, chains, exam plan, Budget, and settings;</li>
+        <li data-t="you.yourRowsOnTheWeekly">your rows on the weekly board and your friend code;</li>
+        <li data-t="you.theAccountSCopyOn">the account's copy on the phone you delete it from.</li>
       </ul>
-      <p>
+      <p data-t="you.del.nothingKept">
         Nothing is kept afterwards; {SITE.name} has no other copy. Health numbers, screen time, bank alerts and workouts were
-        never in the account. They stay on your phone until you use <strong>Delete all data</strong> under You, or uninstall
+        never in the account. They stay on your phone until you use <strong data-t="you.deleteAllData">Delete all data</strong> under You, or uninstall
         the app. A backup file you saved yourself stays wherever you saved it.
       </p>
 
-      <p class="muted">More about what {SITE.name} stores is in the <a href={url('/privacy')}>privacy policy</a>.</p>
+      <p class="muted"><span data-t="you.del.more">More about what {SITE.name} stores is in the</span> <a data-t="you.privacyPolicy" href={url('/privacy')}>privacy policy</a>.</p>
     </div>
   </div>
 </BaseLayout>
