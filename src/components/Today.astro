@@ -23,7 +23,7 @@ import ChainToday from './ChainToday.astro';
   aria-busy="true">
   <header class="today__head">
     {/* The site's home page has its own heading above this. */}
-    {NATIVE_APP ? <h1 id="today-heading">Today</h1> : <h2 id="today-heading" class="visually-hidden">Today</h2>}
+    {NATIVE_APP ? <h1 id="today-heading" data-t="today.title">Today</h1> : <h2 id="today-heading" class="visually-hidden" data-t="today.title">Today</h2>}
     <p class="muted" data-td-date></p>
   </header>
 
@@ -31,12 +31,12 @@ import ChainToday from './ChainToday.astro';
 
   <div class="card today__start-list" data-td-steps hidden>
     <div class="today__steps-head">
-      <h2>Sprig's first quests</h2>
+      <h2 data-t="today.questsTitle">Sprig's first quests</h2>
       <span class="muted" data-td-steps-count></span>
     </div>
     <span class="today__quest-bar" aria-hidden="true"><span data-td-steps-bar></span></span>
     <ul data-td-steps-list></ul>
-    <button type="button" class="today__quest-hide" data-td-steps-hide>Put away (it stays under You › Help)</button>
+    <button type="button" class="today__quest-hide" data-td-steps-hide data-t="today.questsHide">Put away (it stays under You › Help)</button>
   </div>
 
   {/* "Did you know?": one tip a day at most, filled in by Guide.astro. */}
@@ -44,7 +44,7 @@ import ChainToday from './ChainToday.astro';
 
   <div class="today__pair" data-td-pair hidden>
     <a class="card today__stat" href={`${url('/progress')}#stats`}>
-      <span class="today__label">Focus today</span>
+      <span class="today__label" data-t="today.focusToday">Focus today</span>
       <strong class="today__value" data-td-focus>0 min</strong>
       <span class="today__chart" data-td-bars></span>
     </a>
@@ -82,8 +82,9 @@ import ChainToday from './ChainToday.astro';
   import { addDays, dayKey, startOfWeek } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
   import { el } from '../lib/dom';
+  import { dateFormat, locale, t, tn } from '../lib/i18n';
 
-  const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  const dateFmt = dateFormat({ weekday: 'long', day: 'numeric', month: 'long' });
   /** Sprig, still a seed, waiting for the first session. */
   const SEED_SVG = sprigSvg({ stage: 0, mood: 'happy', size: 84 });
   const CHECK_SVG =
@@ -109,14 +110,14 @@ import ChainToday from './ChainToday.astro';
       if (!task && isFirstDay()) {
         const seed = el('div', 'today__seed');
         seed.innerHTML = SEED_SVG;
-        const title = el('h2', 'today__title', 'Plant your first seed');
-        const text = el('p', 'muted', 'One focus session starts your grove. Twenty-five minutes is plenty.');
+        const title = el('h2', 'today__title', t('today.seedTitle'));
+        const text = el('p', 'muted', t('today.seedText'));
         const actions = el('div', 'today__actions');
         const go = el('a', 'btn today__start');
         go.href = timerUrl;
         go.innerHTML = PLAY_SVG;
-        go.append('Start focus');
-        const add = el('a', 'btn btn--ghost', 'Add a task first');
+        go.append(t('today.startFocus'));
+        const add = el('a', 'btn btn--ghost', t('today.addTaskFirst'));
         add.href = tasksUrl;
         actions.append(go, add);
         box.classList.add('today__first--seed');
@@ -125,12 +126,12 @@ import ChainToday from './ChainToday.astro';
       }
       box.classList.remove('today__first--seed');
       if (!task) {
-        const title = el('h2', 'today__title', 'Nothing on Today yet');
-        const text = el('p', 'muted', 'Pick one thing that matters and put it first, or just start the timer.');
+        const title = el('h2', 'today__title', t('today.emptyTitle'));
+        const text = el('p', 'muted', t('today.emptyText'));
         const actions = el('div', 'today__actions');
-        const add = el('a', 'btn', 'Choose a task');
+        const add = el('a', 'btn', t('today.chooseTask'));
         add.href = tasksUrl;
-        const go = el('a', 'btn btn--ghost', 'Start a focus session');
+        const go = el('a', 'btn btn--ghost', t('today.startSession'));
         go.href = timerUrl;
         actions.append(add, go);
         box.replaceChildren(title, text, actions);
@@ -138,30 +139,30 @@ import ChainToday from './ChainToday.astro';
       }
 
       const top = el('div', 'today__top');
-      top.append(el('span', 'today__eyebrow', 'First up'));
-      if (today.length > 1) top.append(el('span', 'muted today__more', `${today.length - 1} more on Today`));
+      top.append(el('span', 'today__eyebrow', t('today.firstUp')));
+      if (today.length > 1) top.append(el('span', 'muted today__more', tn('today.moreOnToday', today.length - 1)));
 
       const done = task.steps.filter((s) => s.done).length;
       const row = el('div', 'today__task');
-      row.append(ring(done, task.steps.length, 56, task.steps.length ? `${done} of ${task.steps.length} steps done` : 'No steps yet'));
+      row.append(ring(done, task.steps.length, 56, task.steps.length ? t('today.stepsDone', { done, total: task.steps.length }) : t('today.noSteps')));
       const text = el('div', 'today__task-text');
       text.append(el('h2', 'today__title', taskName(task)));
       const seconds = focusByTask(getSessions()).get(task.id) ?? 0;
-      text.append(el('span', 'muted', seconds ? `${formatFocus(seconds)} focused so far` : 'Not started yet'));
+      text.append(el('span', 'muted', seconds ? t('today.focusedSoFar', { time: formatFocus(seconds) }) : t('today.notStarted')));
       row.append(text);
 
       const parts: HTMLElement[] = [top, row];
       const next = task.steps.find((s) => !s.done);
       if (next) {
         const step = el('p', 'today__step');
-        step.append(el('span', 'today__box'), `Next step: ${next.text}`);
+        step.append(el('span', 'today__box'), t('today.nextStep', { step: next.text }));
         parts.push(step);
       }
 
       const start = el('a', 'btn today__start');
       start.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
       start.innerHTML = PLAY_SVG;
-      start.append('Start focusing');
+      start.append(t('today.startFocusing'));
       parts.push(start);
       box.replaceChildren(...parts);
     }
@@ -174,16 +175,16 @@ import ChainToday from './ChainToday.astro';
       const tasks = getTasks();
       const tours = getTours();
       const steps: [string, boolean, string][] = [
-        ['Pick what to grow', getProfile().welcomed, url('/welcome')],
-        ['Finish one focus session', !isFirstDay(), url('/timer?tour=timer')],
-        ['Add one task', tasks.length > 0, url('/tasks?tour=tasks')],
-        ['Split a task into small steps', tasks.some((t) => t.steps.length > 0), url('/tasks?tour=tasks')],
-        ['Visit your grove', tours.seen.includes('grove'), url('/progress?tour=grove')],
+        [t('today.questWelcome'), getProfile().welcomed, url('/welcome')],
+        [t('today.questSession'), !isFirstDay(), url('/timer?tour=timer')],
+        [t('today.questTask'), tasks.length > 0, url('/tasks?tour=tasks')],
+        [t('today.questSplit'), tasks.some((t) => t.steps.length > 0), url('/tasks?tour=tasks')],
+        [t('today.questGrove'), tours.seen.includes('grove'), url('/progress?tour=grove')],
       ];
       const done = steps.filter(([, ok]) => ok).length;
       const box = $('[data-td-steps]');
       box.hidden = done === steps.length || !!tours.questsHidden;
-      $('[data-td-steps-count]').textContent = `${done} of ${steps.length}`;
+      $('[data-td-steps-count]').textContent = t('today.questsCount', { done, total: steps.length });
       $('[data-td-steps-bar]').style.inlineSize = `${(done / steps.length) * 100}%`;
       $('[data-td-steps-list]').replaceChildren(
         ...steps.map(([label, ok, href]) => {
@@ -191,11 +192,11 @@ import ChainToday from './ChainToday.astro';
           const mark = el('span', 'today__check');
           if (ok) mark.innerHTML = CHECK_SVG;
           li.append(mark, el('span', 'today__quest', label));
-          if (ok) li.append(el('span', 'visually-hidden', ' (done)'));
+          if (ok) li.append(el('span', 'visually-hidden', ` ${t('today.questDone')}`));
           else {
-            const show = el('a', 'today__show', 'Show me');
+            const show = el('a', 'today__show', t('today.showMe'));
             show.href = href;
-            show.setAttribute('aria-label', `Show me: ${label}`);
+            show.setAttribute('aria-label', t('today.showMeLabel', { quest: label }));
             li.append(show);
           }
           return li;
@@ -210,7 +211,7 @@ import ChainToday from './ChainToday.astro';
       $('[data-td-bars]').innerHTML = miniBars(
         week.map((d) => d.value),
         6,
-        'Focus minutes for the last seven days, ending today',
+        t('today.focusBars'),
       );
     }
 
@@ -223,14 +224,14 @@ import ChainToday from './ChainToday.astro';
       const value = $('[data-td-chain]');
       const dots = $('[data-td-dots]');
       if (!chain) {
-        label.textContent = 'Chain';
-        value.textContent = 'None yet';
-        dots.replaceChildren(el('span', 'muted today__hint', 'Pick a daily habit to mark'));
+        label.textContent = t('today.chain');
+        value.textContent = t('today.chainNone');
+        dots.replaceChildren(el('span', 'muted today__hint', t('today.chainHint')));
         return;
       }
       const stats = chainStats(chain.days);
-      label.textContent = `Chain · ${chain.habit}`;
-      value.textContent = `${stats.current} ${stats.current === 1 ? 'day' : 'days'}`;
+      label.textContent = t('today.chainNamed', { habit: chain.habit });
+      value.textContent = tn('today.chainDays', stats.current);
       const marked = new Set(chain.days);
       const monday = startOfWeek(new Date());
       const todayKey = dayKey(new Date());
@@ -241,7 +242,7 @@ import ChainToday from './ChainToday.astro';
         }),
       );
       dots.setAttribute('role', 'img');
-      dots.setAttribute('aria-label', `This week, ${stats.doneToday ? 'today is marked' : 'today is still open'}`);
+      dots.setAttribute('aria-label', t(stats.doneToday ? 'today.weekMarked' : 'today.weekOpen'));
     }
 
     /** The one tier that is closest, so the home screen points at a single next thing. */
@@ -258,8 +259,10 @@ import ChainToday from './ChainToday.astro';
       const text = $('[data-td-nudge-text]');
       // Sprig's mood (Sprig.astro) gets a word to go with it.
       const mood = sprigMood(getSessions(), 'curious');
-      const say = mood === 'cheer' ? 'Nice session! ' : mood === 'gentle' ? 'Welcome back! ' : '';
-      text.replaceChildren(say, el('strong', '', `${left.toLocaleString()} more ${p.track.unit(left)}`), ` to a ${tierLabel(p.level)} in your grove`);
+      const say = mood === 'cheer' ? `${t('today.cheer')} ` : mood === 'gentle' ? `${t('today.welcomeBack')} ` : '';
+      // The sentence comes whole from the word list, with the amount in bold where it falls.
+      const [before = '', after = ''] = t('today.toTier', { tier: tierLabel(p.level) }).split('{amount}');
+      text.replaceChildren(say, before, el('strong', '', `${left.toLocaleString(locale())} more ${p.track.unit(left)}`), after);
     }
 
     const render = () => {

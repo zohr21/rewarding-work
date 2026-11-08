@@ -5,6 +5,7 @@ import PasswordField from '../components/PasswordField.astro';
 import BrandMark from '../components/BrandMark.astro';
 import DataTools from '../components/DataTools.astro';
 import AppearanceMenu from '../components/AppearanceMenu.astro';
+import LanguagePicker from '../components/LanguagePicker.astro';
 import RowIcon from '../components/RowIcon.astro';
 import BoardJoin from '../components/BoardJoin.astro';
 import YourData from '../components/YourData.astro';
@@ -313,6 +314,17 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                 <AppearanceMenu inline />
               </div>
             </details>
+            <details class="row-more">
+              <summary class="row">
+                <RowIcon name="globe" />
+                <span class="row__main" data-t="lang.label">Language</span>
+                <span class="row__value" data-pref-lang></span>
+                <RowIcon chevron />
+              </summary>
+              <div class="row-more__body">
+                <LanguagePicker />
+              </div>
+            </details>
             <button type="button" class="row" data-open-sound>
               <RowIcon name="sound" />
               <span class="row__main">Sounds</span>
@@ -442,6 +454,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
   import { onPlayerChange } from '../lib/sound/player';
   import { exactAlarmsAllowed, notificationsGranted, openAlarmSettings, requestNotifications } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
+  import { getLang, LANGS } from '../lib/i18n';
 
   // The profile's tier row: the highest tier reached on any track.
   onPage('account-tier', () => {
@@ -470,6 +483,9 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     if (!page) return;
     const c = cleanups();
     const q = <E extends HTMLElement = HTMLElement>(s: string) => page.querySelector<E>(s);
+
+    const lang = getLang();
+    q('[data-pref-lang]')!.textContent = LANGS.find((l) => l.id === lang)?.name ?? '';
 
     const look = q('[data-pref-look]')!;
     const renderLook = () => {
