@@ -9,35 +9,35 @@ import Sprig from './Sprig.astro';
 ---
 
 <dialog class="screen-setup" data-screen-setup aria-labelledby="screen-setup-title">
-  <button type="button" class="screen-setup__close" data-screen-setup-close aria-label="Close">
+  <button data-t-aria-label="grove.close" type="button" class="screen-setup__close" data-screen-setup-close aria-label="Close">
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
       <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
     </svg>
   </button>
   <Sprig mood="curious" size={96} />
-  <h2 id="screen-setup-title" class="screen-setup__title">See where your phone time goes</h2>
-  <p class="screen-setup__lead">
+  <h2 data-t="grove.seeWhereYourPhoneTime" id="screen-setup-title" class="screen-setup__title">See where your phone time goes</h2>
+  <p data-t="grove.grovynPutsYesterdaySPhone" class="screen-setup__lead">
     Grovyn puts yesterday's phone time next to your plan, and tells you after each focus session if the phone got in.
     To do that it reads how long you use each app, per day and during your focus sessions.
   </p>
   <ul class="screen-setup__list">
     <li>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M11 18h2"></path></svg>
-      <span>Stays on this phone. It is not synced to your account or put in backups.</span>
+      <span data-t="grove.staysOnThisPhoneIt">Stays on this phone. It is not synced to your account or put in backups.</span>
     </li>
     <li>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-      <span>Grovyn sees app names and minutes only, never what you do inside them.</span>
+      <span data-t="grove.grovynSeesAppNamesAnd">Grovyn sees app names and minutes only, never what you do inside them.</span>
     </li>
     <li>
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>
-      <span>Turn it off any time in You › Sections.</span>
+      <span data-t="grove.turnItOffAnyTime">Turn it off any time in You › Sections.</span>
     </li>
   </ul>
   <div class="screen-setup__go">
-    <p class="muted" data-screen-setup-hint>Android opens Usage access. Find Grovyn and switch it on.</p>
-    <button type="button" class="btn screen-setup__open" data-screen-open-settings>Agree and open Usage access</button>
-    <button type="button" class="btn btn--ghost" data-screen-setup-close>Not now</button>
+    <p data-t="grove.androidOpensUsageAccessFind" class="muted" data-screen-setup-hint>Android opens Usage access. Find Grovyn and switch it on.</p>
+    <button data-t="grove.agreeAndOpenUsageAccess" type="button" class="btn screen-setup__open" data-screen-open-settings>Agree and open Usage access</button>
+    <button data-t="grove.notNow" type="button" class="btn btn--ghost" data-screen-setup-close>Not now</button>
   </div>
 </dialog>
 

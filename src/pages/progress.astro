@@ -27,8 +27,8 @@ const TABS = [
 <BaseLayout title="Your grove" description="Your focus history, reward tiers, done list and habit chain.">
   <div class="container">
     <div class="grove-bar">
-      <h1 class="grove-bar__title">Your grove</h1>
-      <div class="grove-tabs" role="tablist" aria-label="Your grove" data-grove-tabs>
+      <h1 data-t="grove.yourGrove" class="grove-bar__title">Your grove</h1>
+      <div data-t-aria-label="grove.yourGrove" class="grove-tabs" role="tablist" aria-label="Your grove" data-grove-tabs>
         {
           TABS.map((tab, i) => (
             <button
@@ -40,7 +40,7 @@ const TABS = [
               tabindex={i === 0 ? 0 : -1}
               data-grove-tab={tab.id}
             >
-              {tab.label}
+              <span data-t={`grove.tab.${tab.id}`}>{tab.label}</span>
             </button>
           ))
         }
@@ -56,7 +56,7 @@ const TABS = [
       <section class="grove-panel" role="tabpanel" id="grove-panel-stats" aria-labelledby="grove-tab-stats" data-grove-panel="stats" hidden>
         {/* The history waits for a first session or finished thing; until then it is charts of zeros. */}
         {NATIVE_APP && <ScreenStats />}
-        <p class="muted progress__later" data-progress-later hidden>Charts and your focus heatmap appear after your first session.</p>
+        <p data-t="grove.chartsAndYourFocusHeatmap" class="muted progress__later" data-progress-later hidden>Charts and your focus heatmap appear after your first session.</p>
         <div class="progress__history" data-progress-history>
           <ProgressStats />
           <FocusTrend />
@@ -85,8 +85,10 @@ const TABS = [
       }
 
       <p class="muted progress__data">
-        Kept on this {NATIVE_APP ? 'phone' : 'device'}, and in your account when you're signed in. Back up, move or delete it under{' '}
-        <a href={`${url('/account')}#acc-data`}>{NATIVE_APP ? 'You' : 'Account'} → Your data</a>.
+        <span data-t={NATIVE_APP ? 'grove.keptPhone' : 'grove.keptDevice'}
+          >Kept on this {NATIVE_APP ? 'phone' : 'device'}, and in your account when you're signed in. Back up, move or delete it under</span
+        >{' '}
+        <a href={`${url('/account')}#acc-data`}><span data-t={NATIVE_APP ? 'grove.youData' : 'grove.accountData'}>{NATIVE_APP ? 'You' : 'Account'} → Your data</span></a>.
       </p>
     </div>
   </div>

@@ -10,27 +10,27 @@ import ScreenSetup from './ScreenSetup.astro';
 
 <section class="card screen-today" data-screen-today data-module="screen" data-timer-url={url('/timer')} aria-labelledby="screen-today-h" hidden>
   <div class="screen-today__ask" data-st-ask hidden>
-    <h2 id="screen-today-h" class="screen-today__ask-title">See where your phone time goes</h2>
-    <p class="muted">Yesterday's phone time next to your plan, and a check after each focus session.</p>
+    <h2 data-t="grove.seeWhereYourPhoneTime" id="screen-today-h" class="screen-today__ask-title">See where your phone time goes</h2>
+    <p data-t="grove.yesterdaySPhoneTimeNext" class="muted">Yesterday's phone time next to your plan, and a check after each focus session.</p>
     <div class="screen-today__ask-go">
-      <button type="button" class="btn" data-screen-setup-open>Turn on</button>
-      <button type="button" class="btn btn--ghost" data-st-off>Not now</button>
+      <button data-t="grove.turnOn" type="button" class="btn" data-screen-setup-open>Turn on</button>
+      <button data-t="grove.notNow" type="button" class="btn btn--ghost" data-st-off>Not now</button>
     </div>
   </div>
 
   <div class="screen-today__body" data-st-body hidden>
     <div class="screen-today__head">
       <div class="screen-today__sum">
-        <h2 class="screen-today__label" data-st-label>Phone yesterday</h2>
+        <h2 data-t="grove.phoneYesterday" class="screen-today__label" data-st-label>Phone yesterday</h2>
         <strong class="screen-today__value" data-st-total></strong>
         <span class="muted screen-today__vs" data-st-vs></span>
       </div>
-      <a class="screen-today__week" href={`${url('/progress')}#stats`}>Week</a>
+      <a data-t="grove.week" class="screen-today__week" href={`${url('/progress')}#stats`}>Week</a>
     </div>
     <ul class="screen-today__apps" data-st-apps></ul>
     <a class="btn screen-today__plan" data-st-plan>
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M4 4l16 16"></path></svg>
-      Plan a phone-free block
+      <span data-t="grove.planPhoneFree">Plan a phone-free block</span>
     </a>
   </div>
 </section>
@@ -42,6 +42,7 @@ import ScreenSetup from './ScreenSetup.astro';
   import { addDays, dayKey } from '../lib/dates';
   import { subscribe } from '../lib/storage';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
   import { el } from '../lib/dom';
 
   onPage('screen-today', () => {
@@ -50,7 +51,7 @@ import ScreenSetup from './ScreenSetup.astro';
     const root = found;
     const c = cleanups();
     const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
-    $<HTMLAnchorElement>('[data-st-plan]').href = `${root.dataset.timerUrl}?label=${encodeURIComponent('Phone-free block')}`;
+    $<HTMLAnchorElement>('[data-st-plan]').href = `${root.dataset.timerUrl}?label=${encodeURIComponent(t('screen.phoneFreeBlock'))}`;
 
     function render(access: boolean): void {
       if (!getProfile().modules.screen) {
@@ -68,13 +69,13 @@ import ScreenSetup from './ScreenSetup.astro';
       // Just turned on: yesterday may be missing, so show today so far.
       const showToday = !yesterday || yesterday.totalMin === 0;
       const day = showToday ? dayOf(store, dayKey(now)) : yesterday;
-      $('[data-st-label]').textContent = showToday ? 'Phone today so far' : 'Phone yesterday';
+      $('[data-st-label]').textContent = showToday ? t('screen.todaySoFar') : t('screen.yesterday');
       $('[data-st-total]').textContent = formatPhone(day?.totalMin ?? 0);
 
       const avg = showToday ? null : weekAverage(store, addDays(now, -1));
       const diff = avg === null || !day ? 0 : day.totalMin - avg;
       $('[data-st-vs]').textContent =
-        avg === null || !day ? (showToday ? 'Other apps, not Grovyn' : '') : Math.abs(diff) < 10 ? 'About your usual' : `${formatMinutes(Math.abs(diff))} ${diff < 0 ? 'under' : 'over'} your weekly average`;
+        avg === null || !day ? (showToday ? t('screen.otherApps') : '') : Math.abs(diff) < 10 ? t('screen.usual') : t(diff < 0 ? 'screen.under' : 'screen.over', { time: formatMinutes(Math.abs(diff)) });
 
       const apps = (day?.apps ?? []).slice(0, 3);
       const max = apps[0]?.min ?? 1;

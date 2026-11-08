@@ -11,7 +11,8 @@ import { usageAccess, usageBetween, usageDays, type UsageDay } from './device';
 import { read, write } from './storage';
 import { addDays, dayKey } from './dates';
 import type { FocusSession } from './storage';
-import { shortMinutes } from './i18n/units';
+import { hoursMinutes, shortMinutes } from './i18n/units';
+import { t } from './i18n';
 
 export type ScreenDay = UsageDay;
 
@@ -149,13 +150,13 @@ export function topApps(days: (ScreenDay | undefined)[], n: number): { label: st
 /** "3 h 40 m", "58 m", "2 h". */
 export function formatPhone(min: number): string {
   const m = Math.max(0, Math.round(min));
-  if (m < 60) return `${m} m`;
-  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} m` : `${m / 60} h`;
+  if (m < 60) return t('unit.mShort', { n: m });
+  return m % 60 ? t('unit.hmShort', { h: Math.floor(m / 60), m: m % 60 }) : t('unit.h', { n: m / 60 });
 }
 
 /** For a sentence: "42 min", "1 h 5 min", "1 h". */
 export function formatMinutes(min: number): string {
-  return formatPhone(min).replace(/ m$/, ' min');
+  return hoursMinutes(Math.max(0, Math.round(min)));
 }
 
 /** "3 min", "less than a minute". */

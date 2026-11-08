@@ -9,13 +9,13 @@
 <section class="card trend" data-focus-trend aria-labelledby="trend-heading">
   <div class="trend__head">
     <div>
-      <h2 id="trend-heading" class="panel-title">Focus over time</h2>
+      <h2 data-t="grove.focusOverTime" id="trend-heading" class="panel-title">Focus over time</h2>
       <p class="muted trend__caption" data-trend-caption aria-live="polite"></p>
     </div>
-    <div class="trend__ranges well" role="group" aria-label="Range">
-      <button type="button" class="trend__range" data-trend-range="14" aria-pressed="true">14 days</button>
-      <button type="button" class="trend__range" data-trend-range="30" aria-pressed="false">30 days</button>
-      <button type="button" class="trend__range" data-trend-range="12w" aria-pressed="false">12 weeks</button>
+    <div data-t-aria-label="grove.range" class="trend__ranges well" role="group" aria-label="Range">
+      <button data-t="grove.n14Days" type="button" class="trend__range" data-trend-range="14" aria-pressed="true">14 days</button>
+      <button data-t="grove.n30Days" type="button" class="trend__range" data-trend-range="30" aria-pressed="false">30 days</button>
+      <button data-t="grove.n12Weeks" type="button" class="trend__range" data-trend-range="12w" aria-pressed="false">12 weeks</button>
     </div>
   </div>
   <div class="trend__chart" data-trend-chart></div>
@@ -28,6 +28,7 @@
   import { formatShort } from '../lib/dates';
   import { formatFocus } from '../lib/tasks';
   import { cleanups, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
 
   type Range = '14' | '30' | '12w';
   const W = 1000;
@@ -50,8 +51,7 @@
           ? weeklySums(sessions, (s) => s.start, (s) => s.focusSeconds / 60, 12)
           : dailyMinutes(sessions, Number(range));
         const values = points.map((p) => p.value);
-        const per = weekly ? 'week' : 'day';
-        const span = weekly ? 'last 12 weeks' : `last ${range} days`;
+        const span = weekly ? t('trend.span12w') : t('trend.spanDays', { n: range });
         const total = values.reduce((a, b) => a + b, 0);
         const avg = total / values.length;
         const best = Math.max(...values);
@@ -59,8 +59,8 @@
         const min = (n: number) => formatFocus(Math.round(n) * 60);
 
         caption.textContent = total
-          ? `Minutes per ${per}, ${span}. Dashed line is your average, ${min(avg)}; your best ${per} was ${min(best)}.`
-          : `Minutes per ${per}, ${span}. No focus sessions in this range yet.`;
+          ? t(weekly ? 'trend.captionWeek' : 'trend.captionDay', { span, avg: min(avg), best: min(best) })
+          : t(weekly ? 'trend.emptyWeek' : 'trend.emptyDay', { span });
 
         // Leave headroom above the tallest point so the line never touches the top.
         const max = Math.max(30, best) * 1.08;
@@ -69,7 +69,7 @@
         const line = values.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(' ');
         const grid = [0.25, 0.5, 0.75, 1].map((f) => `<line class="trend__grid" x1="0" x2="${W}" y1="${y(max * f * 0.92)}" y2="${y(max * f * 0.92)}" />`).join('');
         chart.innerHTML =
-          `<svg viewBox="0 0 ${W} 190" preserveAspectRatio="none" role="img" aria-label="Focus minutes per ${per}, ${span}: ${values.join(', ')}">` +
+          `<svg viewBox="0 0 ${W} 190" preserveAspectRatio="none" role="img" aria-label="${t(weekly ? 'trend.ariaWeek' : 'trend.ariaDay', { span, values: values.join(', ') })}">` +
           `${grid}<line class="trend__base" x1="0" x2="${W}" y1="${BASE}" y2="${BASE}" />` +
           `<path class="trend__area" d="${line} L${W},${BASE} L0,${BASE} Z" />` +
           `<path class="trend__line" d="${line}" />` +
@@ -87,7 +87,7 @@
         );
         const end = document.createElement('span');
         end.className = 'trend__now';
-        end.textContent = `${weekly ? 'This week' : 'Today'} · ${min(latest)}`;
+        end.textContent = `${weekly ? t('trend.thisWeek') : t('trend.today')} · ${min(latest)}`;
         axis.append(end);
       }
 

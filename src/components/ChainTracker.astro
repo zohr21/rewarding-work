@@ -20,14 +20,14 @@ const Heading = headingLevel;
 <section class="card chain" data-chain aria-labelledby="chain-heading">
   <div class="chain__head">
     <div>
-      <Heading id="chain-heading" class="panel-title">Chains</Heading>
+      <Heading id="chain-heading" class="panel-title" data-t="grove.chains">Chains</Heading>
       <p class="muted chain__count" data-chain-count hidden></p>
     </div>
     <button type="button" class="btn btn--ghost btn--small chain__new" data-chain-new hidden>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
         ><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path></svg
       >
-      New chain
+      <span data-t="grove.newChain">New chain</span>
     </button>
   </div>
 
@@ -37,27 +37,27 @@ const Heading = headingLevel;
   <!-- Setup / new chain / rename -->
   <div data-chain-form-home>
     <form class="chain__setup" data-chain-form hidden>
-      <label for="chain-habit" data-chain-label>What small thing will you do every day?</label>
+      <label data-t="grove.whatSmallThingWillYou" for="chain-habit" data-chain-label>What small thing will you do every day?</label>
       <div class="chain__row">
-        <input id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
+        <input data-t-placeholder="grove.eGWrite50Words" id="chain-habit" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Write 50 words" data-chain-input />
       </div>
 
       <div class="chain__templates" data-chain-templates>
-        <p class="chain__small">Or start from one</p>
+        <p data-t="grove.orStartFromOne" class="chain__small">Or start from one</p>
         <div class="chain__chips">
-          {TEMPLATES.map((t, i) => <button type="button" class="chain__chip" data-chain-template={i}>{t.label}</button>)}
+          {TEMPLATES.map((t, i) => <button type="button" class="chain__chip" data-chain-template={i} data-t={`chain.tpl.${i}`}>{t.label}</button>)}
         </div>
       </div>
 
       <fieldset class="chain__kinds">
-        <legend class="chain__small">How do you mark a day?</legend>
+        <legend data-t="grove.howDoYouMarkA" class="chain__small">How do you mark a day?</legend>
         {
           KINDS.map((k) => (
             <label class="chain__kind">
               <input type="radio" name="chain-kind" value={k.id} data-chain-kind />
               <span class="chain__kind-text">
-                <strong>{k.title}</strong>
-                <span>{k.sub}</span>
+                <strong data-t={`chain.kind.${k.id}`}>{k.title}</strong>
+                <span data-t={`chain.kind.${k.id}Sub`}>{k.sub}</span>
               </span>
             </label>
           ))
@@ -65,33 +65,33 @@ const Heading = headingLevel;
       </fieldset>
 
       <div class="chain__opts" data-chain-opt="amount" hidden>
-        <label class="chain__opt">Goal per day<input class="input" type="text" inputmode="decimal" placeholder="20" data-chain-goal /></label>
-        <label class="chain__opt">Counted in<input class="input" type="text" maxlength="20" placeholder="pages" data-chain-unit /></label>
+        <label class="chain__opt"><span data-t="grove.goalPerDay">Goal per day</span><input class="input" type="text" inputmode="decimal" placeholder="20" data-chain-goal /></label>
+        <label class="chain__opt"><span data-t="grove.countedIn">Counted in</span><input data-t-placeholder="grove.pages" class="input" type="text" maxlength="20" placeholder="pages" data-chain-unit /></label>
       </div>
       <div class="chain__opts" data-chain-opt="parts" hidden>
         <label class="chain__opt chain__opt--wide"
-          >Slots, separated by commas<input class="input" type="text" maxlength="200" value={PRAYERS.join(', ')} data-chain-parts /></label
+          ><span data-t="grove.slotsComma">Slots, separated by commas</span><input class="input" type="text" maxlength="200" value={PRAYERS.join(', ')} data-chain-parts /></label
         >
-        <label class="chain__opt">The day counts at<select class="input" data-chain-count-at></select></label>
+        <label class="chain__opt"><span data-t="grove.dayCountsAt">The day counts at</span><select class="input" data-chain-count-at></select></label>
       </div>
       <div class="chain__opts" data-chain-opt="linked" hidden>
         <label class="chain__opt"
-          >Fills from<select class="input" data-chain-source>
-            <option value="focus">Focus time</option>
-            {WORKOUT_TYPES.map((t) => <option value={t.id}>{t.label} on Health</option>)}
+          ><span data-t="grove.fillsFrom">Fills from</span><select class="input" data-chain-source>
+            <option data-t="grove.focusTime" value="focus">Focus time</option>
+            {WORKOUT_TYPES.map((t) => <option value={t.id} data-t={`chain.from.${t.id}`}>{t.label} on Health</option>)}
           </select></label
         >
         <label class="chain__opt"
-          ><span data-chain-link-unit>Goal (minutes)</span><input class="input" type="text" inputmode="decimal" placeholder="0 = any" data-chain-link-goal /></label
+          ><span data-t="grove.goalMinutes" data-chain-link-unit>Goal (minutes)</span><input data-t-placeholder="grove.n0Any" class="input" type="text" inputmode="decimal" placeholder="0 = any" data-chain-link-goal /></label
         >
       </div>
 
       <div class="chain__form-actions">
         <div class="chain__edit-actions" data-chain-edit-actions hidden>
-          <button type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
-          <button type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
+          <button data-t="grove.cancel" type="button" class="btn btn--ghost btn--small" data-chain-cancel>Cancel</button>
+          <button data-t="grove.deleteChain" type="button" class="btn btn--ghost btn--small" data-chain-delete>Delete chain</button>
         </div>
-        <button type="submit" class="btn">Save</button>
+        <button data-t="grove.save" type="submit" class="btn">Save</button>
       </div>
       <p class="chain__small muted" data-chain-form-error hidden></p>
     </form>
@@ -101,37 +101,37 @@ const Heading = headingLevel;
   <div class="chain__body" data-chain-body hidden>
     <div class="chain__stats">
       <div class="chain__best">
-        <p class="chain__label">Best chain</p>
-        <p class="chain__big"><span data-chain-best>0</span> <span class="chain__unit" data-chain-best-unit>days</span></p>
+        <p data-t="grove.bestChain" class="chain__label">Best chain</p>
+        <p class="chain__big"><span data-chain-best>0</span> <span data-t="grove.days" class="chain__unit" data-chain-best-unit>days</span></p>
       </div>
       <div class="chain__side">
-        <p><span class="chain__label">Current</span> <strong data-chain-current>0</strong></p>
-        <p><span class="chain__label">Total days</span> <strong data-chain-total>0</strong></p>
+        <p><span data-t="grove.current" class="chain__label">Current</span> <strong data-chain-current>0</strong></p>
+        <p><span data-t="grove.totalDays" class="chain__label">Total days</span> <strong data-chain-total>0</strong></p>
       </div>
     </div>
 
     <div class="chain__habit">
       <p class="chain__message" data-chain-message></p>
-      <button type="button" class="btn btn--ghost btn--small" data-chain-edit>Edit</button>
+      <button data-t="grove.edit" type="button" class="btn btn--ghost btn--small" data-chain-edit>Edit</button>
     </div>
 
     <div class="chain__cal-wrap">
       <div class="chain__month">
-        <button type="button" class="icon-btn chain__nav" aria-label="Previous month" data-chain-prev>
+        <button data-t-aria-label="grove.previousMonth" type="button" class="icon-btn chain__nav" aria-label="Previous month" data-chain-prev>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
             ><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg
           >
         </button>
         <p class="chain__month-name" id="chain-cal-label" aria-live="polite" data-chain-month></p>
-        <button type="button" class="icon-btn chain__nav" aria-label="Next month" data-chain-next>
+        <button data-t-aria-label="grove.nextMonth" type="button" class="icon-btn chain__nav" aria-label="Next month" data-chain-next>
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
             ><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg
           >
         </button>
-        <button type="button" class="btn btn--ghost btn--small chain__this-month" data-chain-this-month hidden>Today</button>
+        <button data-t="grove.today" type="button" class="btn btn--ghost btn--small chain__this-month" data-chain-this-month hidden>Today</button>
       </div>
       <div class="chain__weekdays" aria-hidden="true">
-        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span data-t={`chain.wd.${i}`}>{d}</span>)}
       </div>
       <div class="chain__cal" role="group" aria-labelledby="chain-cal-label" data-chain-cal></div>
       <p class="chain__cal-hint muted" data-chain-hint></p>
@@ -157,8 +157,10 @@ const Heading = headingLevel;
   } from '../lib/storage';
   import {
     EDIT_DAYS,
-    TEMPLATES,
+    PRAYERS,
     WORKOUT_TYPES,
+    prayers,
+    template,
     chainDay,
     getEntry,
     getSetup,
@@ -177,9 +179,10 @@ const Heading = headingLevel;
   import { addDays, dayKey, formatDay, fromDayKey, startOfDay, startOfWeek } from '../lib/dates';
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t, tn } from '../lib/i18n';
 
-  const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const shortMonthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+  const monthFmt = dateFormat({ month: 'long', year: 'numeric' });
+  const shortMonthFmt = dateFormat({ month: 'short' });
 
   const TICK_SVG =
     '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 12.5l4 4L18 8" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -267,18 +270,20 @@ const Heading = headingLevel;
       const removing = new Set<string>();
       const shown = () => getChains().filter((ch) => !removing.has(ch.id));
 
-      const announce = (t: string) => {
+      const announce = (text: string) => {
         live.textContent = '';
-        window.setTimeout(() => (live.textContent = t), 50);
+        window.setTimeout(() => (live.textContent = text), 50);
       };
-      const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+      const days = (n: number) => tn('chain.days', n);
+      // The slots a new parts chain starts with, in this language.
+      if (partsIn.value === PRAYERS.join(', ')) partsIn.value = prayers().join(', ');
 
       function encouragement(s: ReturnType<typeof chainStats>): string {
-        if (s.total === 0) return 'Mark the first day whenever you have done it.';
-        if (s.current === 0) return `Your best is ${days(s.best)}. Every day you mark counts — start a new chain today.`;
-        if (!s.doneToday) return `${days(s.current)} so far. Mark today when it's done.`;
-        if (s.current >= s.best && s.best > 1) return `${days(s.current)} — that's your best chain yet.`;
-        return `${days(s.current)} and counting.`;
+        if (s.total === 0) return t('chain.say.first');
+        if (s.current === 0) return t('chain.say.restart', { best: days(s.best) });
+        if (!s.doneToday) return t('chain.say.soFar', { days: days(s.current) });
+        if (s.current >= s.best && s.best > 1) return t('chain.say.best', { days: days(s.current) });
+        return t('chain.say.counting', { days: days(s.current) });
       }
 
       // ---------- The kind fields of the form ----------
@@ -290,7 +295,7 @@ const Heading = headingLevel;
           .map((p) => p.trim())
           .filter(Boolean)
           .slice(0, 8);
-      const distanceSource = () => WORKOUT_TYPES.find((t) => t.id === sourceIn.value)?.distance ?? false;
+      const distanceSource = () => WORKOUT_TYPES.find((w) => w.id === sourceIn.value)?.distance ?? false;
 
       function showKind(): void {
         const kind = pickedKind();
@@ -301,12 +306,12 @@ const Heading = headingLevel;
           ...Array.from({ length: n }, (_, i) => {
             const o = document.createElement('option');
             o.value = String(i + 1);
-            o.textContent = `${i + 1} of ${n}`;
+            o.textContent = t('chain.nOf', { n: i + 1, total: n });
             return o;
           }),
         );
         countAtIn.value = String(Math.min(keep, n));
-        linkUnit.textContent = sourceIn.value === 'focus' ? 'Goal (minutes)' : distanceSource() ? 'Goal (km)' : 'Goal (minutes)';
+        linkUnit.textContent = sourceIn.value !== 'focus' && distanceSource() ? t('chain.goalKm') : t('grove.goalMinutes');
         formError.hidden = true;
       }
       kindInputs.forEach((i) => i.addEventListener('change', showKind));
@@ -331,17 +336,17 @@ const Heading = headingLevel;
         const n = (v: string) => Number(v.replace(',', '.'));
         if (kind === 'amount') {
           const goal = n(goalIn.value);
-          if (!(goal > 0)) return 'Give the goal per day as a number, like 20.';
+          if (!(goal > 0)) return t('chain.err.goal');
           return { kind, goal, unit: unitIn.value.trim() || undefined };
         }
         if (kind === 'parts') {
           const parts = slotNames();
-          if (parts.length < 2) return 'Name two slots or more, separated by commas.';
+          if (parts.length < 2) return t('chain.err.slots');
           return { kind, parts, countAt: Number(countAtIn.value) || parts.length };
         }
         if (kind === 'linked') {
           const goal = linkGoalIn.value.trim() ? n(linkGoalIn.value) : 0;
-          if (!(goal >= 0)) return 'Give the goal as a number, or leave it empty for any.';
+          if (!(goal >= 0)) return t('chain.err.linkGoal');
           return { kind, source: sourceIn.value as LinkSource, goal };
         }
         return { kind: 'tick' };
@@ -349,10 +354,10 @@ const Heading = headingLevel;
 
       templates.addEventListener('click', (e) => {
         const b = (e.target as HTMLElement).closest<HTMLElement>('[data-chain-template]');
-        const t = b && TEMPLATES[Number(b.dataset.chainTemplate)];
-        if (!t) return;
-        input.value = t.habit;
-        fillKind(t.setup);
+        const tpl = b && template(Number(b.dataset.chainTemplate));
+        if (!tpl) return;
+        input.value = tpl.habit;
+        fillKind(tpl.setup);
       });
 
       function makeRow(id: string): Row {
@@ -405,7 +410,7 @@ const Heading = headingLevel;
           const counted = togglePart(id, key, Number(b.dataset.part));
           if (counted && !before) celebrate();
           // The write has redrawn the row already, so the button shows the new state.
-          announce(`${b.textContent}: ${b.getAttribute('aria-pressed') === 'true' ? 'done' : 'not yet'}.`);
+          announce(t(b.getAttribute('aria-pressed') === 'true' ? 'chain.slotDone' : 'chain.slotNotYet', { slot: b.textContent ?? '' }));
         });
 
         const slot = document.createElement('div');
@@ -424,9 +429,9 @@ const Heading = headingLevel;
         r.el.style.setProperty('--chain-color', CHAIN_COLORS[ch.color % CHAIN_COLORS.length]!);
         r.el.classList.toggle('is-open', isOpen);
         r.name.textContent = ch.habit;
-        const run = s.total === 0 ? 'Not started yet' : `${s.current ? `${days(s.current)} running` : 'No chain right now'} · best ${s.best}`;
-        r.sub.textContent = setup.kind === 'tick' ? run : `${today.long} today · best ${s.best}`;
-        r.tick.setAttribute('aria-label', setup.kind === 'tick' ? `Done today: ${ch.habit}` : `Fill in today: ${ch.habit}, ${today.long}`);
+        const run = s.total === 0 ? t('chain.notStarted') : `${s.current ? t('chain.running', { days: days(s.current) }) : t('chain.noChainNow')} · ${t('chain.best', { n: s.best })}`;
+        r.sub.textContent = setup.kind === 'tick' ? run : `${t('chain.today', { value: today.long })} · ${t('chain.best', { n: s.best })}`;
+        r.tick.setAttribute('aria-label', setup.kind === 'tick' ? t('chain.doneToday', { habit: ch.habit }) : t('chain.fillToday', { habit: ch.habit, value: today.long }));
         r.tick.setAttribute('aria-pressed', String(today.counted));
         // A chain with a number shows it until the day counts, then the tick.
         const text = setup.kind !== 'tick' && !today.counted ? today.short : '';
@@ -445,7 +450,7 @@ const Heading = headingLevel;
         // Parts of the day: one tap per slot, today.
         const names = setup.kind === 'parts' ? (setup.parts ?? []) : [];
         r.parts.hidden = !names.length;
-        r.parts.setAttribute('aria-label', `${ch.habit} today`);
+        r.parts.setAttribute('aria-label', t('chain.habitToday', { habit: ch.habit }));
         const entry = names.length ? (getEntry(ch.id, todayKey).parts ?? []) : [];
         // Kept and updated in place, so focus stays on the slot just tapped.
         if (r.parts.children.length !== names.length)
@@ -477,7 +482,7 @@ const Heading = headingLevel;
 
         const doneToday = list.filter((ch) => stats.get(ch.id)!.doneToday).length;
         count.hidden = none;
-        count.textContent = `${doneToday} of ${list.length} done today`;
+        count.textContent = t('chain.doneTodayCount', { n: doneToday, total: list.length });
         newBtn.hidden = none || mode !== null || list.length >= MAX_CHAINS;
 
         // Rows are kept and updated in place, so focus stays put while days are marked.
@@ -500,7 +505,7 @@ const Heading = headingLevel;
         const formAt = renaming ? openRow.slot : formHome;
         if (form.parentElement !== formAt) formAt.append(form);
         form.hidden = !(none || mode !== null);
-        label.textContent = renaming ? 'Rename this habit' : none ? 'What small thing will you do every day?' : 'What else will you do every day?';
+        label.textContent = renaming ? t('chain.rename') : none ? t('grove.whatSmallThingWillYou') : t('chain.whatElse');
         editActions.hidden = none;
         del.hidden = !renaming;
         templates.hidden = !!renaming;
@@ -511,7 +516,7 @@ const Heading = headingLevel;
           if (body.parentElement !== openRow.slot) openRow.slot.append(body);
           const s = stats.get(openChain.id)!;
           best.textContent = String(s.best);
-          bestUnit.textContent = s.best === 1 ? 'day' : 'days';
+          bestUnit.textContent = tn('chain.dayWord', s.best);
           current.textContent = days(s.current);
           total.textContent = String(s.total);
           message.textContent = encouragement(s);
@@ -566,7 +571,7 @@ const Heading = headingLevel;
           b.classList.toggle('is-part', !!view?.partial);
           b.setAttribute(
             'aria-label',
-            `${formatDay(date)}${key === todayKey ? ' (today)' : ''}${view ? `, ${view.long}` : ''}${!future && !editable ? ', read only' : ''}`,
+            `${formatDay(date)}${key === todayKey ? ` (${t('chain.todayLower')})` : ''}${view ? `, ${view.long}` : ''}${!future && !editable ? `, ${t('chain.readOnly')}` : ''}`,
           );
           b.classList.toggle('is-outside', outside);
           b.classList.toggle('is-locked', !future && !editable);
@@ -580,7 +585,7 @@ const Heading = headingLevel;
           const day = date;
           b.addEventListener('click', () => {
             if (!editable) {
-              announce(`Only the last ${EDIT_DAYS} days can be changed.`);
+              announce(t('chain.onlyLast', { n: EDIT_DAYS }));
               hint.classList.remove('is-nudged');
               void hint.offsetWidth; // restart the nudge animation
               hint.classList.add('is-nudged');
@@ -593,8 +598,8 @@ const Heading = headingLevel;
         cal.replaceChildren(...buttons);
         if (focusedKey) cal.querySelector<HTMLElement>(`[data-key="${focusedKey}"]`)?.focus();
         hint.textContent = plain
-          ? `Tap a day in the last ${EDIT_DAYS} days to mark or unmark it. Older days are kept as they are.`
-          : `Tap a day in the last ${EDIT_DAYS} days to fill it in. Older days are kept as they are.`;
+          ? t('chain.hintTick', { n: EDIT_DAYS })
+          : t('chain.hintFill', { n: EDIT_DAYS });
       }
 
       function show(month: Date): void {
@@ -618,7 +623,7 @@ const Heading = headingLevel;
         if (marking) celebrate();
         const s = chainStats(getChains().find((ch) => ch.id === id)?.days ?? []);
         announce(
-          `${before.habit}: ${formatDay(date)} ${marking ? 'marked' : 'unmarked'}. Current chain ${days(s.current)}, best ${days(s.best)}.`,
+          t(marking ? 'chain.saidMarked' : 'chain.saidUnmarked', { habit: before.habit, day: formatDay(date), current: days(s.current), best: days(s.best) }),
         );
       }
 
@@ -641,7 +646,7 @@ const Heading = headingLevel;
           renameChain(openId, habit);
           saveSetup(openId, setup);
           render();
-          announce(`Habit saved: ${habit}`);
+          announce(t('chain.saved', { habit }));
           edit.focus();
           return;
         }
@@ -653,7 +658,7 @@ const Heading = headingLevel;
         viewMonth = monthStart(new Date());
         input.value = '';
         render();
-        announce(`Chain started: ${habit}`);
+        announce(t('chain.started', { habit }));
         rows.get(id)?.tick.focus();
       });
 
@@ -695,7 +700,7 @@ const Heading = headingLevel;
         render();
         (newBtn.hidden ? input : newBtn).focus();
         offerUndo({
-          message: `Deleted “${old.habit}”${n ? ` and ${days(n)}` : ''}`,
+          message: n ? t('chain.deletedDays', { habit: old.habit, days: days(n) }) : t('chain.deleted', { habit: old.habit }),
           commit: () => {
             if (!removing.delete(old.id)) return;
             deleteChain(old.id, streakRecords(getChains().find((ch) => ch.id === old.id)?.days ?? []));
@@ -706,11 +711,11 @@ const Heading = headingLevel;
             mode = null;
             openId = old.id;
             render();
-            announce(`Restored your chain: ${old.habit}.`);
+            announce(t('chain.restored', { habit: old.habit }));
             edit.focus();
           },
         });
-        announce(`Deleted your chain “${old.habit}”. Press Undo to bring it back.`);
+        announce(t('chain.deletedSaid', { habit: old.habit }));
       });
 
       // Linked chains follow Focus and Health; syncing writes `chain`, which redraws.

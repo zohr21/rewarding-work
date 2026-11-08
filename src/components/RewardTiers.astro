@@ -13,7 +13,7 @@ import { url } from '../lib/paths';
 ---
 
 <section class="card tiers" id="tiers" data-reward-tiers aria-labelledby="tiers-heading">
-  <h2 id="tiers-heading" class="visually-hidden">Your tiers</h2>
+  <h2 data-t="grove.yourTiers" id="tiers-heading" class="visually-hidden">Your tiers</h2>
   <div class="tiers__sprig" data-tiers-sprig>
     <div class="tiers__sprig-art" data-tiers-sprig-art>
       <Sprig mood="auto" size={96} bob />
@@ -23,29 +23,29 @@ import { url } from '../lib/paths';
       <p class="tiers__sprig-name" data-tiers-sprig-name></p>
       <p class="tiers__sprig-tree" data-tiers-sprig-tree></p>
       <p class="muted" data-tiers-sprig-next></p>
-      <div class="tiers__sprig-bar" role="progressbar" aria-label="Sprig's growth to the next stage" aria-valuemin="0" aria-valuemax="100" data-tiers-sprig-bar>
+      <div data-t-aria-label="grove.sprigSGrowthToThe" class="tiers__sprig-bar" role="progressbar" aria-label="Sprig's growth to the next stage" aria-valuemin="0" aria-valuemax="100" data-tiers-sprig-bar>
         <span></span>
       </div>
     </div>
   </div>
   <section class="tiers__soon" data-tiers-soon aria-labelledby="tiers-soon-heading">
-    <h3 id="tiers-soon-heading" class="tiers__markers">Next up</h3>
+    <h3 data-t="grove.nextUp" id="tiers-soon-heading" class="tiers__markers">Next up</h3>
     <ul class="tiers__soon-list" data-tiers-soon-list></ul>
   </section>
   <div class="tiers__head" data-tiers-head>
-    <h3 class="tiers__markers">All markers</h3>
-    <div class="tiers__groups" role="group" aria-label="Which markers" data-tiers-groups hidden>
-      <button type="button" class="tiers__group" aria-pressed="true" data-tiers-group="focus">Focus</button>
-      <button type="button" class="tiers__group" aria-pressed="false" data-tiers-group="body">Body</button>
+    <h3 data-t="grove.allMarkers" class="tiers__markers">All markers</h3>
+    <div data-t-aria-label="grove.whichMarkers" class="tiers__groups" role="group" aria-label="Which markers" data-tiers-groups hidden>
+      <button data-t="grove.focus" type="button" class="tiers__group" aria-pressed="true" data-tiers-group="focus">Focus</button>
+      <button data-t="grove.body" type="button" class="tiers__group" aria-pressed="false" data-tiers-group="body">Body</button>
     </div>
     <details class="tiers__about">
-      <summary>What are these?</summary>
-      <p class="muted">
+      <summary data-t="grove.whatAreThese">What are these?</summary>
+      <p data-t="grove.markersAlongTheWayThere" class="muted">
         Markers along the way — there to show how far you've come, not to keep score. Green to start, then bronze, silver
         and gold, with diamond for the hardest runs. The chain counts your best run, so a missed day never takes a tier
         away.
       </p>
-      <p class="muted">
+      <p data-t="grove.bodyMarkersCountDaysYou" class="muted">
         Body markers count days you reached a sensible goal, never calories, weight or how hard you pushed. They stay on
         this device.
       </p>
@@ -53,16 +53,16 @@ import { url } from '../lib/paths';
   </div>
   <ul class="tiers__grid" data-tiers-list></ul>
   <p class="muted tiers__body-empty" data-tiers-body-empty hidden>
-    Sleep, steps and workouts start to count here once they're on <a href={url('/health')}>Health</a>.
+    <span data-t="grove.bodyEmpty">Sleep, steps and workouts start to count here once they're on</span> <a data-t="grove.health" href={url('/health')}>Health</a>.
   </p>
 
   <div class="seed" data-tiers-seed hidden>
     <Sprig stage={0} size={100} bob />
-    <h3 class="seed__title">Sprig is a seed, waiting</h3>
+    <h3 data-t="grove.sprigIsASeedWaiting" class="seed__title">Sprig is a seed, waiting</h3>
     <p class="muted" data-tiers-seed-text></p>
     <div class="seed__bar" aria-hidden="true"><span></span></div>
     <p class="muted seed__count" data-tiers-seed-count></p>
-    <h3 class="seed__ahead">Markers ahead</h3>
+    <h3 data-t="grove.markersAhead" class="seed__ahead">Markers ahead</h3>
     <ol class="seed__coins" data-tiers-seed-coins></ol>
   </div>
 </section>
@@ -78,11 +78,12 @@ import { url } from '../lib/paths';
 
 <script>
   import { getChain, getDone, getSessions, subscribe } from '../lib/storage';
-  import { allProgress, chainInput, closestTiers, daysToNext, tierLabel, TIER_NAMES, type NextTier, type TrackId, type TrackProgress } from '../lib/rewards';
+  import { allProgress, chainInput, closestTiers, daysToNext, tierLabel, tierName, TIER_NAMES, type NextTier, type TrackId, type TrackProgress } from '../lib/rewards';
+  import { dateFormat, locale, t, tn } from '../lib/i18n';
   import { bodyInput } from '../lib/bodytiers';
   import { el } from '../lib/dom';
   import { tierIcon } from '../lib/tier-icons';
-  import { SPRIG_TREES, sprigGrowth, sprigStageName } from '../lib/sprig';
+  import { sprigGrowth, sprigStageName, sprigTree } from '../lib/sprig';
   import { cleanups, listen, onPage } from '../lib/page';
   import { url } from '../lib/paths';
   import { webglAvailable } from '../lib/scene';
@@ -114,16 +115,16 @@ import { url } from '../lib/paths';
     };
   }
 
-  const dateFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  const dateFmt = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
 
   const LEAF_SVG =
     '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
   /** Focus hours read better with one decimal below 10. */
   function amount(p: TrackProgress): string {
-    if (p.track.id !== 'focus') return p.value.toLocaleString();
+    if (p.track.id !== 'focus') return p.value.toLocaleString(locale());
     const v = p.value < 10 ? Math.floor(p.value * 10) / 10 : Math.floor(p.value);
-    return v.toLocaleString();
+    return v.toLocaleString(locale());
   }
 
   /** The row's name, as a button that covers the whole row and opens the track's sheet. */
@@ -137,7 +138,7 @@ import { url } from '../lib/paths';
 
   const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   /** "2 more nights", "1.5 more hours". */
-  const more = ({ p, left }: NextTier) => `${left.toLocaleString()} more ${p.track.unit(left)}`;
+  const more = ({ p, left }: NextTier) => t('tier.more', { n: left.toLocaleString(locale()), unit: p.track.unit(left) });
 
   /** One of the closest tiers: the coin it will be, how much is left, and a bar to it. */
   function renderSoon(n: NextTier): HTMLLIElement {
@@ -152,20 +153,20 @@ import { url } from '../lib/paths';
     bar.style.setProperty('--share', `${Math.round(share * 100)}%`);
     bar.style.setProperty('--next', `var(--tier-${p.level})`);
     bar.append(el('span'));
-    const line = el('p', 'soon__line muted', `${amount(p)} of ${next} ${p.track.unit(next)} to ${tierLabel(p.level)}`);
+    const line = el('p', 'soon__line muted', t('tier.ofTo', { amount: amount(p), next, unit: p.track.unit(next), tier: tierLabel(p.level) }));
     li.append(coin, head, bar, line);
     return li;
   }
 
   /** "At your pace", and honest when there is no pace yet. */
   function paceLine(n: NextTier | undefined): string {
-    if (!n) return 'Every tier reached. Nothing left to chase here.';
+    if (!n) return t('tier.everyTier');
     const days = daysToNext(n);
-    const goal = `${capital(more(n))} for ${tierLabel(n.p.level)}.`;
-    if (n.p.track.id === 'streak') return `Keep your chain ${days} more ${days === 1 ? 'day' : 'days'} in a row for ${tierLabel(n.p.level)}.`;
-    if (days === null) return `${goal} Nothing counted in the last two weeks, so no guess at when.`;
-    const when = days <= 1 ? 'about a day' : days < 14 ? `about ${days} days` : days < 60 ? `about ${Math.round(days / 7)} weeks` : 'a few months. No rush';
-    return `${goal} At your last two weeks' pace, ${when}.`;
+    const goal = t('tier.goalFor', { more: capital(more(n)), tier: tierLabel(n.p.level) });
+    if (n.p.track.id === 'streak') return tn('tier.keepChain', days ?? 0, { tier: tierLabel(n.p.level) });
+    if (days === null) return t('tier.noGuess', { goal });
+    const when = days <= 1 ? t('tier.when.day') : days < 14 ? tn('tier.when.days', days) : days < 60 ? tn('tier.when.weeks', Math.round(days / 7)) : t('tier.when.months');
+    return t('tier.atPace', { goal, when });
   }
 
   function renderSheet(root: HTMLElement, p: TrackProgress): void {
@@ -180,7 +181,7 @@ import { url } from '../lib/paths';
         coin.innerHTML = tierIcon(i, 16);
         const name = el('span', 'tier-sheet__name', tierLabel(i));
         name.append(el('span', 'muted', ` · ${track.describe(n)}`));
-        const when = el('span', 'tier-sheet__when', at !== null ? dateFmt.format(at) : i === level ? 'Next' : '');
+        const when = el('span', 'tier-sheet__when', at !== null ? dateFmt.format(at) : i === level ? t('tier.next') : '');
         li.append(coin, name, when);
         return li;
       }),
@@ -201,7 +202,7 @@ import { url } from '../lib/paths';
     const current = document.createElement('p');
     current.className = `tier__current${level ? '' : ' muted'}`;
     current.innerHTML = level ? LEAF_SVG : '';
-    current.append(level ? tierLabel(level - 1) : 'No tier yet');
+    current.append(level ? tierLabel(level - 1) : t('tier.none'));
     const text = document.createElement('div');
     text.className = 'tier__text';
     text.append(title, current);
@@ -229,10 +230,10 @@ import { url } from '../lib/paths';
         pip.append(fill);
       }
       const label = `${tierLabel(i)}: ${track.describe(n)}`;
-      pip.title = at !== null ? `${label} — reached ${dateFmt.format(at)}` : label;
+      pip.title = at !== null ? t('tier.reachedOn', { label, date: dateFmt.format(at) }) : label;
       const name = document.createElement('span');
       name.className = 'visually-hidden';
-      name.textContent = at !== null ? `${pip.title}.` : `${label}, not reached yet.`;
+      name.textContent = at !== null ? pip.title.replace(/\.?$/, '.') : t('tier.notReached', { label });
       pip.append(name);
       pips.append(pip);
     });
@@ -243,9 +244,9 @@ import { url } from '../lib/paths';
     const foot = document.createElement('p');
     foot.className = 'tier__next muted';
     if (next === undefined) {
-      foot.textContent = `All five tiers reached — ${track.describe(track.thresholds.at(-1)!)}.`;
+      foot.textContent = t('tier.allFive', { what: track.describe(track.thresholds.at(-1)!) });
     } else {
-      foot.textContent = `${amount(p)} of ${next} ${track.unit(next)} to ${tierLabel(level)}`;
+      foot.textContent = t('tier.ofTo', { amount: amount(p), next, unit: track.unit(next), tier: tierLabel(level) });
     }
     li.append(foot);
     return li;
@@ -300,15 +301,15 @@ import { url } from '../lib/paths';
           const focus = progress.find((p) => p.track.id === 'focus') ?? progress[0]!;
           const goal = focus.track.thresholds[0]!;
           root.querySelector('[data-tiers-seed-text]')!.textContent =
-            `Focus for ${goal} ${focus.track.unit(goal)} in total to grow your first ${TIER_NAMES[0]}.`;
-          root.querySelector('[data-tiers-seed-count]')!.textContent = `0 of ${goal} ${focus.track.unit(goal)}`;
+            t('tier.seedText', { goal, unit: focus.track.unit(goal), tier: tierName(0) });
+          root.querySelector('[data-tiers-seed-count]')!.textContent = t('tier.of', { amount: 0, next: goal, unit: focus.track.unit(goal) });
           root.querySelector('[data-tiers-seed-coins]')!.replaceChildren(
-            ...TIER_NAMES.map((name, i) => {
+            ...TIER_NAMES.map((_, i) => {
               const li = document.createElement('li');
               const coin = document.createElement('span');
               coin.className = `tier-coin tier-coin--t${i}`;
               coin.innerHTML = tierIcon(i, 18);
-              li.append(coin, name);
+              li.append(coin, tierName(i));
               return li;
             }),
           );
@@ -318,9 +319,9 @@ import { url } from '../lib/paths';
         const focus = progress.find((p) => p.track.id === 'focus')!;
         const goal = focus.track.thresholds[focus.level];
         root.querySelector('[data-tiers-sprig-name]')!.textContent = focus.level
-          ? `Sprig is a ${tierLabel(focus.level - 1)}`
-          : 'Sprig is still a seed';
-        root.querySelector('[data-tiers-sprig-tree]')!.textContent = SPRIG_TREES[Math.min(5, focus.level)]!;
+          ? t('tier.sprigIs', { tier: tierLabel(focus.level - 1) })
+          : t('tier.sprigSeed');
+        root.querySelector('[data-tiers-sprig-tree]')!.textContent = sprigTree(focus.level);
         // A new canvas for each model: a WebGL context can't be handed on cleanly.
         if (focus.level !== stage3D) {
           stage3D = focus.level;
@@ -330,8 +331,8 @@ import { url } from '../lib/paths';
         }
         root.querySelector('[data-tiers-sprig-next]')!.textContent =
           goal === undefined
-            ? 'A whole grove. Sprig has grown as far as it can.'
-            : `${(Math.ceil((goal - focus.value) * 10) / 10).toLocaleString()} more ${focus.track.unit(goal - focus.value)} of focus to grow into ${sprigStageName(focus.level + 1)}.`;
+            ? t('tier.sprigDone')
+            : t('tier.sprigNext', { n: (Math.ceil((goal - focus.value) * 10) / 10).toLocaleString(locale()), unit: focus.track.unit(goal - focus.value), stage: sprigStageName(focus.level + 1) });
         // The bar fills in the next stage's colour, a bud for each quarter of it.
         const bar = root.querySelector<HTMLElement>('[data-tiers-sprig-bar]')!;
         const { share } = sprigGrowth(getSessions());

@@ -25,9 +25,9 @@ const LEGEND = [
 
 <section class="card heat" data-heatmap data-view="flat" aria-labelledby="heat-heading">
   <div class="heat__head">
-    <h2 id="heat-heading" class="panel-title" data-heat-title>Focus, last 12 weeks</h2>
-    <div class="heat__views well" role="group" aria-label="Heatmap view">
-      <button type="button" class="heat__view" data-heat-view="flat" aria-pressed="true">Flat</button>
+    <h2 data-t="grove.focusLast12Weeks" id="heat-heading" class="panel-title" data-heat-title>Focus, last 12 weeks</h2>
+    <div data-t-aria-label="grove.heatmapView" class="heat__views well" role="group" aria-label="Heatmap view">
+      <button data-t="grove.flat" type="button" class="heat__view" data-heat-view="flat" aria-pressed="true">Flat</button>
       <button type="button" class="heat__view" data-heat-view="3d" aria-pressed="false">3D</button>
     </div>
   </div>
@@ -42,10 +42,10 @@ const LEGEND = [
       <div class="heat__iso-wrap" aria-hidden="true">
         <div class="heat__iso" data-heat-iso></div>
       </div>
-      <p class="muted heat__iso-note">The 3D view is for the big picture — switch to Flat to read each day.</p>
+      <p data-t="grove.the3dViewIsFor" class="muted heat__iso-note">The 3D view is for the big picture — switch to Flat to read each day.</p>
 
       <div class="heat__legend" aria-hidden="true">
-        <span class="heat__legend-end">Less</span>
+        <span data-t="grove.less" class="heat__legend-end">Less</span>
         {
           LEGEND.map(({ level, label }) => (
             <span class="heat__legend-item">
@@ -54,32 +54,32 @@ const LEGEND = [
             </span>
           ))
         }
-        <span class="heat__legend-end">More</span>
-        <span class="heat__legend-unit">minutes per day</span>
+        <span data-t="grove.more" class="heat__legend-end">More</span>
+        <span data-t="grove.minutesPerDay" class="heat__legend-unit">minutes per day</span>
       </div>
     </div>
 
     <dl class="heat__facts" data-heat-facts>
-      <div><dt>Total focus</dt><dd data-fact="total">0 min</dd></div>
-      <div><dt>Days with focus</dt><dd data-fact="active">0 of 0</dd></div>
-      <div><dt>Average on focus days</dt><dd data-fact="avg">—</dd></div>
-      <div class="heat__fact-wide"><dt>Best day</dt><dd data-fact="best">—</dd></div>
+      <div><dt data-t="grove.totalFocus">Total focus</dt><dd data-t="grove.n0Min" data-fact="total">0 min</dd></div>
+      <div><dt data-t="grove.daysWithFocus">Days with focus</dt><dd data-t="grove.n0Of0" data-fact="active">0 of 0</dd></div>
+      <div><dt data-t="grove.averageOnFocusDays">Average on focus days</dt><dd data-fact="avg">—</dd></div>
+      <div class="heat__fact-wide"><dt data-t="grove.bestDay">Best day</dt><dd data-fact="best">—</dd></div>
     </dl>
   </div>
 
-  <p class="muted heat__empty" data-heat-empty hidden>Nothing yet — finish a timer session and it shows up here.</p>
+  <p data-t="grove.nothingYetFinishATimer" class="muted heat__empty" data-heat-empty hidden>Nothing yet — finish a timer session and it shows up here.</p>
 
   <details class="heat__table disclosure">
-    <summary>Show as a table</summary>
+    <summary data-t="grove.showAsATable">Show as a table</summary>
     <div class="heat__table-scroll">
       <table>
-        <caption class="visually-hidden">Focus per week, newest first</caption>
+        <caption data-t="grove.focusPerWeekNewestFirst" class="visually-hidden">Focus per week, newest first</caption>
         <thead>
           <tr>
-            <th scope="col">Week of</th>
-            <th scope="col" class="num">Focus</th>
-            <th scope="col" class="num">Days with focus</th>
-            <th scope="col" class="num">Sessions</th>
+            <th data-t="grove.weekOf" scope="col">Week of</th>
+            <th data-t="grove.focus" scope="col" class="num">Focus</th>
+            <th data-t="grove.daysWithFocus" scope="col" class="num">Days with focus</th>
+            <th data-t="grove.sessions" scope="col" class="num">Sessions</th>
           </tr>
         </thead>
         <tbody data-heat-table></tbody>
@@ -94,15 +94,16 @@ const LEGEND = [
   import { heatmapWeeks, type HeatCell } from '../lib/stats';
   import { addDays, dayKey, formatDay, formatMonth, formatShort, startOfWeek } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t } from '../lib/i18n';
+  import { hoursMinutes } from '../lib/i18n/units';
 
-  const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  /** Monday to Sunday, short, in the current language (5 Jan 2026 was a Monday). */
+  const weekdays = () => {
+    const f = dateFormat({ weekday: 'short' });
+    return Array.from({ length: 7 }, (_, i) => f.format(new Date(2026, 0, 5 + i)));
+  };
 
-  function formatDuration(min: number): string {
-    if (min < 60) return `${min} min`;
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return m ? `${h} h ${m} min` : `${h} h`;
-  }
+  const formatDuration = (min: number) => hoursMinutes(min);
 
   function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
     const node = document.createElement(tag);
@@ -151,7 +152,8 @@ const LEGEND = [
         const sessions = getSessions();
         const weeks = heatmapWeeks(sessions, weekSpan(sessions));
         root.style.setProperty('--heat-weeks', String(weeks.length));
-        title.textContent = `Focus, last ${weeks.length} weeks`;
+        title.textContent = t('heat.title', { n: weeks.length });
+        const WEEKDAYS = weekdays();
         const todayKey = dayKey(new Date());
         cellsByKey = new Map(weeks.flat().map((c) => [c.key, c]));
         const frag = document.createDocumentFragment();
@@ -211,7 +213,7 @@ const LEGEND = [
         const total = days.reduce((s, c) => s + c.minutes, 0);
         const best = active.reduce<HeatCell | null>((b, c) => (!b || c.minutes > b.minutes ? c : b), null);
         fact('total', formatDuration(total));
-        fact('active', `${active.length} of ${days.length}`);
+        fact('active', t('chain.nOf', { n: active.length, total: days.length }));
         fact('best', best ? `${formatDay(best.date)} · ${formatDuration(best.minutes)}` : '—');
         fact('avg', active.length ? formatDuration(Math.round(total / active.length)) : '—');
         empty.hidden = total > 0;
@@ -238,7 +240,7 @@ const LEGEND = [
             sumSessions += n;
 
             const tr = el('tr', key === thisWeek ? 'is-current' : undefined);
-            const th = el('th', undefined, key === thisWeek ? 'This week' : `${formatShort(start)} – ${formatShort(addDays(start, 6))}`);
+            const th = el('th', undefined, key === thisWeek ? t('trend.thisWeek') : `${formatShort(start)} – ${formatShort(addDays(start, 6))}`);
             th.scope = 'row';
             tr.append(
               th,
@@ -251,7 +253,7 @@ const LEGEND = [
         tbody.replaceChildren(...rows);
 
         const foot = el('tr');
-        const fth = el('th', undefined, 'Total');
+        const fth = el('th', undefined, t('heat.total'));
         fth.scope = 'row';
         foot.append(fth, el('td', 'num', formatDuration(total)), el('td', 'num', `${active.length} / ${days.length}`), el('td', 'num', String(sumSessions)));
         tfoot.replaceChildren(foot);
@@ -261,7 +263,7 @@ const LEGEND = [
       function showTip(target: HTMLElement): void {
         const cell = target.dataset.key ? cellsByKey.get(target.dataset.key) : undefined;
         if (!cell) return hideTip();
-        tip.textContent = `${formatDay(cell.date)} · ${cell.minutes ? formatDuration(cell.minutes) : 'no focus'}`;
+        tip.textContent = `${formatDay(cell.date)} · ${cell.minutes ? formatDuration(cell.minutes) : t('heat.noFocus')}`;
         tip.hidden = false;
         const wrap = grid.parentElement!.getBoundingClientRect();
         const r = target.getBoundingClientRect();

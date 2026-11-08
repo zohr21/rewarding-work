@@ -24,18 +24,18 @@ import { url } from '../lib/paths';
     <div class="cd__body" data-cd-body></div>
 
     <label class="cd__field">
-      <span>Note (optional)</span>
+      <span data-t="grove.noteOptional">Note (optional)</span>
       <input class="input" type="text" maxlength="200" autocomplete="off" data-cd-note />
     </label>
 
-    <p class="muted cd__private">
+    <p class="muted cd__private" data-t={NATIVE_APP ? 'grove.privatePhone' : 'grove.privateDevice'}>
       What you fill in here stays on this {NATIVE_APP ? 'phone' : 'device'}. Only whether the day counts goes to your chain, and none of it is
       on the leaderboard.
     </p>
 
     <div class="cd__actions">
-      <button type="button" class="btn btn--ghost" data-sheet-close>Cancel</button>
-      <button type="submit" class="btn">Save day</button>
+      <button data-t="grove.cancel" type="button" class="btn btn--ghost" data-sheet-close>Cancel</button>
+      <button data-t="grove.saveDay" type="submit" class="btn">Save day</button>
     </div>
   </form>
 </Sheet>
@@ -54,18 +54,19 @@ import { url } from '../lib/paths';
     type DayEntry,
     type PartState,
   } from '../lib/chainkinds';
-  import { saveWorkout, EFFORT_WORDS } from '../lib/workouts';
+  import { effortWord, saveWorkout, workoutLabel } from '../lib/workouts';
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { celebrate } from '../lib/appearance';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { dateFormat, t, type Key } from '../lib/i18n';
 
-  const STATES: { v: PartState; label: string }[] = [
-    { v: 1, label: 'On time' },
-    { v: 2, label: 'Later' },
-    { v: 0, label: 'Not yet' },
+  const STATES: { v: PartState; label: Key }[] = [
+    { v: 1, label: 'chain.part.onTime' },
+    { v: 2, label: 'chain.part.later' },
+    { v: 0, label: 'chain.notYet' },
   ];
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+  const timeFmt = dateFormat({ hour: '2-digit', minute: '2-digit' });
   const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
   onPage('chain-day', () => {
@@ -107,15 +108,15 @@ import { url } from '../lib/paths';
       const minus = el('button', 'tool-btn cd__step', '−');
       const plus = el('button', 'tool-btn cd__step', '+');
       minus.type = plus.type = 'button';
-      minus.setAttribute('aria-label', 'One less');
-      plus.setAttribute('aria-label', 'One more');
+      minus.setAttribute('aria-label', t('chain.oneLess'));
+      plus.setAttribute('aria-label', t('chain.oneMore'));
       const label = el('label', 'cd__field cd__grow');
       const input = el('input', 'input cd__number');
       input.type = 'text';
       input.inputMode = 'decimal';
       input.value = entry.n ? fmt(entry.n) : '';
       input.placeholder = '0';
-      label.append(el('span', '', `How much${setup.unit ? ` (${setup.unit})` : ''} · goal ${fmt(setup.goal ?? 1)}`), input);
+      label.append(el('span', '', `${setup.unit ? t('chain.howMuchIn', { unit: setup.unit }) : t('chain.howMuch')} · ${t('chain.goal', { n: fmt(setup.goal ?? 1) })}`), input);
       const step = (d: number) => {
         const v = Math.max(0, (Number(input.value.replace(',', '.')) || 0) + d);
         input.value = fmt(v);
@@ -142,7 +143,7 @@ import { url } from '../lib/paths';
         group.setAttribute('role', 'group');
         group.setAttribute('aria-label', name);
         const buttons = STATES.map((s) => {
-          const b = el('button', 'cd__seg-btn', s.label);
+          const b = el('button', 'cd__seg-btn', t(s.label));
           b.type = 'button';
           b.dataset.state = String(s.v);
           b.addEventListener('click', () => {
@@ -158,7 +159,7 @@ import { url } from '../lib/paths';
         list.append(row);
       });
       const need = setup.countAt ?? names.length;
-      list.append(el('p', 'muted cd__hint', `The day counts at ${need} of ${names.length}. “Later” counts too.`));
+      list.append(el('p', 'muted cd__hint', t('chain.countsAt', { n: need, total: names.length, later: t('chain.part.later') })));
       return list;
     }
 
@@ -172,22 +173,23 @@ import { url } from '../lib/paths';
       fill.style.width = `${Math.round(view.share * 100)}%`;
       bar.append(fill);
       if (setup.source === 'focus') {
-        wrap.append(el('p', '', `Fills from your focus sessions on this day: ${view.long}.`), bar);
+        wrap.append(el('p', '', t('chain.fillsFocus', { value: view.long })), bar);
         if (key === dayKey(new Date())) {
-          const go = el('a', 'btn btn--ghost btn--small', 'Start focus');
+          const go = el('a', 'btn btn--ghost btn--small', t('chain.startFocus'));
           go.href = form!.dataset.timerUrl!;
           wrap.append(go);
         }
         return wrap;
       }
-      const type = WORKOUT_TYPES.find((t) => t.id === setup.source)!;
+      const type = WORKOUT_TYPES.find((w) => w.id === setup.source)!;
+      const typeName = workoutLabel(type.id);
       const found = linkedWorkouts(setup, key, data);
-      wrap.append(el('p', 'muted', found.length ? `${type.label} workouts on Health this day` : `No ${type.label.toLowerCase()} on Health this day yet.`));
+      wrap.append(el('p', 'muted', found.length ? t('chain.workoutsFound', { type: typeName }) : t('chain.workoutsNone', { type: typeName })));
       if (found.length) {
         const ul = el('ul', 'cd__found');
         for (const w of found) {
-          const what = [timeFmt.format(w.start), `${w.minutes} min`, w.distanceM ? `${fmt(Math.round(w.distanceM / 100) / 10)} km` : ''].filter(Boolean).join(' · ');
-          ul.append(el('li', '', `${type.label} · ${what}`));
+          const what = [timeFmt.format(w.start), t('unit.min', { n: w.minutes }), w.distanceM ? `${fmt(Math.round(w.distanceM / 100) / 10)} ${t('unit.km')}` : ''].filter(Boolean).join(' · ');
+          ul.append(el('li', '', `${typeName} · ${what}`));
         }
         wrap.append(ul);
       }
@@ -195,7 +197,7 @@ import { url } from '../lib/paths';
 
       // Add one by hand: it goes to Health › Workouts, so it is entered once and shows in both.
       const fold = el('details', 'cd__fold');
-      fold.append(el('summary', '', `Add a ${type.label.toLowerCase()} by hand`));
+      fold.append(el('summary', '', t('chain.addByHand', { type: typeName })));
       const grid = el('div', 'cd__grid');
       const field = (labelText: string, mode: 'decimal' | 'numeric') => {
         const l = el('label', 'cd__field');
@@ -206,21 +208,21 @@ import { url } from '../lib/paths';
         grid.append(l);
         return i;
       };
-      const km = type.distance ? field('Distance (km)', 'decimal') : null;
-      const minutes = field('Minutes', 'numeric');
+      const km = type.distance ? field(t('chain.distanceKm'), 'decimal') : null;
+      const minutes = field(t('chain.minutes'), 'numeric');
       const effortLabel = el('label', 'cd__field cd__wide');
-      const effortText = el('strong', '', `6 · ${EFFORT_WORDS[6]}`);
+      const effortText = el('strong', '', `6 · ${effortWord(6)}`);
       const effort = el('input', 'cd__range');
       effort.type = 'range';
       effort.min = '1';
       effort.max = '10';
       effort.value = '6';
-      effort.addEventListener('input', () => (effortText.textContent = `${effort.value} · ${EFFORT_WORDS[Number(effort.value)]}`));
-      const eHead = el('span', '', 'How hard was it? ');
+      effort.addEventListener('input', () => (effortText.textContent = `${effort.value} · ${effortWord(Number(effort.value))}`));
+      const eHead = el('span', '', `${t('chain.howHard')} `);
       eHead.append(effortText);
       effortLabel.append(eHead, effort);
       grid.append(effortLabel);
-      fold.append(grid, el('p', 'muted cd__hint', 'Saved to Health › Workouts too, so it shows in both places.'));
+      fold.append(grid, el('p', 'muted cd__hint', t('chain.savedToHealth')));
       wrap.append(fold);
       byHand = { minutes, km, effort };
       return wrap;
@@ -239,7 +241,7 @@ import { url } from '../lib/paths';
         parts = [];
         const entry = getEntry(id, key);
         const isToday = key === dayKey(new Date());
-        $('[data-cd-date]').textContent = `${formatDay(fromDayKey(key))}${isToday ? ' · today' : ''}`;
+        $('[data-cd-date]').textContent = `${formatDay(fromDayKey(key))}${isToday ? ` · ${t('chain.todayLower')}` : ''}`;
         $('[data-cd-title]').textContent = ch.habit;
         note.value = entry.note ?? '';
         body.replaceChildren(setup.kind === 'amount' ? amountBody(entry) : setup.kind === 'parts' ? partsBody(entry) : linkedBody());

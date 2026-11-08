@@ -262,7 +262,7 @@ import ChainToday from './ChainToday.astro';
       const say = mood === 'cheer' ? `${t('today.cheer')} ` : mood === 'gentle' ? `${t('today.welcomeBack')} ` : '';
       // The sentence comes whole from the word list, with the amount in bold where it falls.
       const [before = '', after = ''] = t('today.toTier', { tier: tierLabel(p.level) }).split('{amount}');
-      text.replaceChildren(say, before, el('strong', '', `${left.toLocaleString(locale())} more ${p.track.unit(left)}`), after);
+      text.replaceChildren(say, before, el('strong', '', t('tier.more', { n: left.toLocaleString(locale()), unit: p.track.unit(left) })), after);
     }
 
     const render = () => {

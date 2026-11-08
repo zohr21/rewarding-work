@@ -7,8 +7,9 @@
  * Pure SVG markup, so the same drawing works in .astro (set:html) and in scripts
  * (innerHTML). Design canvas: https://claude.ai/artifact/5Vu4gAmsEq768cD9tsN6Yf
  */
-import { TIER_NAMES, TRACKS, trackProgress } from './rewards';
+import { TRACKS, trackProgress } from './rewards';
 import type { FocusSession } from './storage';
+import { t, type Key } from './i18n';
 
 export const SPRIG_MOODS = ['happy', 'cheer', 'focus', 'curious', 'gentle', 'sleepy'] as const;
 export type SprigMood = (typeof SPRIG_MOODS)[number];
@@ -17,6 +18,7 @@ export type SprigMood = (typeof SPRIG_MOODS)[number];
  * The real tree Sprig is at each stage in 3D (public/sprig/sprig-<stage>.glb, made by
  * art/sprig/sprig3d.py): common trees first, rarer ones as focus grows.
  */
+/** English, for reference; show sprigTree(stage). */
 export const SPRIG_TREES = [
   'An acorn, just sprouting',
   'An oak seedling',
@@ -241,7 +243,12 @@ export function sprigMood(sessions: FocusSession[], rest: SprigMood = 'happy', n
 
 /** "a seed", "a Sapling" — what Sprig is at a stage, for sentences. */
 export function sprigStageName(stage: number): string {
-  return stage <= 0 ? 'a seed' : `a ${TIER_NAMES[Math.min(5, stage) - 1]}`;
+  return t(`sprig.stage.${Math.max(0, Math.min(5, stage))}` as Key);
+}
+
+/** The real tree Sprig is at a stage, in the current language. */
+export function sprigTree(stage: number): string {
+  return t(`sprig.tree.${Math.max(0, Math.min(5, stage))}` as Key);
 }
 
 /** Redraw a [data-sprig] element after its stage, buds or mood changed. */

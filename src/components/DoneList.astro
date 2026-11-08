@@ -8,17 +8,17 @@
 ---
 
 <section class="card done" data-done-list aria-labelledby="done-heading">
-  <h2 id="done-heading" class="panel-title">Done</h2>
-  <p class="muted done__intro">Finished something? Log it — seeing what you've done is its own reward.</p>
+  <h2 data-t="grove.done" id="done-heading" class="panel-title">Done</h2>
+  <p data-t="grove.finishedSomethingLogItSeeing" class="muted done__intro">Finished something? Log it — seeing what you've done is its own reward.</p>
 
   <form class="done__form" data-done-form>
-    <label for="done-input" class="visually-hidden">Something you finished</label>
-    <input id="done-input" class="input" type="text" maxlength="200" autocomplete="off" placeholder="I finished…" data-done-input />
-    <button type="submit" class="btn">Add</button>
+    <label data-t="grove.somethingYouFinished" for="done-input" class="visually-hidden">Something you finished</label>
+    <input data-t-placeholder="grove.iFinished" id="done-input" class="input" type="text" maxlength="200" autocomplete="off" placeholder="I finished…" data-done-input />
+    <button data-t="grove.add" type="submit" class="btn">Add</button>
   </form>
 
   <div class="done__quick" data-done-quick hidden>
-    <p class="done__quick-label muted">From today's timer:</p>
+    <p data-t="grove.fromTodaySTimer" class="done__quick-label muted">From today's timer:</p>
     <div class="done__chips" data-done-chips></div>
   </div>
 
@@ -27,7 +27,7 @@
     <button type="button" class="btn btn--ghost btn--small" data-done-all></button>
   </div>
   <div class="done__well" data-done-groups hidden></div>
-  <p class="muted done__empty" data-done-empty>Nothing logged yet. Small things count.</p>
+  <p data-t="grove.nothingLoggedYetSmallThings" class="muted done__empty" data-done-empty>Nothing logged yet. Small things count.</p>
   <p class="visually-hidden" aria-live="polite" data-done-live></p>
 </section>
 
@@ -37,6 +37,7 @@
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { cleanups, onPage } from '../lib/page';
+  import { dateFormat, t, tn, type Key } from '../lib/i18n';
 
   /** Items a group shows before "Show more", and how many more each click reveals. */
   const PREVIEW = 10;
@@ -50,8 +51,16 @@
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
-  const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
-  const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+  const timeFmt = dateFormat({ hour: 'numeric', minute: '2-digit' });
+  const dayFmt = dateFormat({ weekday: 'short', day: 'numeric', month: 'short' });
+  /** Group ids (English) to what they are called. */
+  const GROUP: Record<string, Key> = { Today: 'done.group.today', 'Earlier this week': 'done.group.week', 'Before that': 'done.group.before' };
+  /** A finished task's "Finished: " prefix, in English or the current language. */
+  const finished = () => [t('tasks.finishedDone', { task: '' }).trim(), 'Finished:'];
+  const dropFinished = (text: string) => {
+    for (const p of finished()) if (p && text.startsWith(p)) return text.slice(p.length).trim();
+    return text;
+  };
 
   onPage('done-list', () => {
     const c = cleanups();
@@ -87,7 +96,7 @@
         if (!item) return;
         justAdded = item.id;
         celebrate();
-        announce(`Logged: ${item.text}`);
+        announce(t('done.logged', { text: item.text }));
         // Render happens via the storage subscription.
       }
 
@@ -104,7 +113,7 @@
         body.className = 'done__text';
         const name = document.createElement('span');
         name.className = 'done__name';
-        name.textContent = item.text.replace(/^Finished:\s*/, '');
+        name.textContent = dropFinished(item.text);
 
         const when = document.createElement('time');
         when.className = 'done__time muted';
@@ -115,7 +124,7 @@
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'icon-btn done__remove';
-        del.setAttribute('aria-label', `Remove “${item.text}”`);
+        del.setAttribute('aria-label', t('done.remove', { text: item.text }));
         del.innerHTML = X_SVG;
         del.addEventListener('click', () => {
           // Move focus to a neighbour first, so keyboard users don't lose their place.
@@ -124,7 +133,7 @@
           removing.add(item.id);
           render();
           offerUndo({
-            message: `Removed “${item.text}”`,
+            message: t('done.removed', { text: item.text }),
             commit: () => {
               removeDone(item.id);
               removing.delete(item.id);
@@ -133,10 +142,10 @@
               removing.delete(item.id);
               justAdded = item.id;
               render();
-              announce(`Restored: ${item.text}`);
+              announce(t('done.restored', { text: item.text }));
             },
           });
-          announce(`Removed: ${item.text}. Press Undo to bring it back.`);
+          announce(t('done.removedSaid', { text: item.text }));
         });
 
         li.append(check, body, del);
@@ -157,8 +166,8 @@
         const isOpen = (title: string) => open.get(title) ?? title === titles[0];
         anyOpen = titles.some(isOpen);
         bar.hidden = groups.hidden = items.length === 0;
-        totalEl.textContent = `${items.length} logged`;
-        allBtn.textContent = anyOpen ? 'Collapse all' : 'Expand all';
+        totalEl.textContent = tn('done.total', items.length);
+        allBtn.textContent = anyOpen ? t('done.collapseAll') : t('done.expandAll');
 
         const frag = document.createDocumentFragment();
         for (const [title, list, showDay] of buckets) {
@@ -174,7 +183,7 @@
           toggle.innerHTML = CHEVRON_SVG;
           const name = document.createElement('span');
           name.className = 'done__group-name';
-          name.textContent = title;
+          name.textContent = t(GROUP[title]!);
           const n = document.createElement('span');
           n.className = 'done__count';
           n.textContent = String(list.length);
@@ -201,7 +210,7 @@
             b.className = 'btn btn--ghost btn--small done__more';
             if (more > 0) {
               const n = Math.min(more, PAGE);
-              b.textContent = `Show ${n === more ? `all ${list.length}` : `${n} more`}`;
+              b.textContent = n === more ? t('done.showAll', { n: list.length }) : t('done.showMore', { n });
               b.addEventListener('click', () => {
                 shown.set(title, limit + n);
                 render();
@@ -212,7 +221,7 @@
                   ?.focus();
               });
             } else {
-              b.textContent = 'Show fewer';
+              b.textContent = t('done.showFewer');
               b.addEventListener('click', () => {
                 shown.delete(title);
                 render();
@@ -242,7 +251,7 @@
             b.type = 'button';
             b.className = 'done__chip';
             b.textContent = `+ ${label}`;
-            b.setAttribute('aria-label', `Log “${label}” as done`);
+            b.setAttribute('aria-label', t('done.logChip', { label }));
             b.addEventListener('click', () => add(label, taskOf.get(label)));
             return b;
           }),
@@ -251,7 +260,7 @@
 
       allBtn.addEventListener('click', () => {
         const next = !anyOpen;
-        titles.forEach((t) => open.set(t, next));
+        titles.forEach((title) => open.set(title, next));
         render();
       });
 

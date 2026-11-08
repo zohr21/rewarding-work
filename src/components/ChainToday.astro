@@ -11,8 +11,8 @@ import { url } from '../lib/paths';
 
 <section class="card ct" data-ct aria-labelledby="ct-heading" hidden>
   <div class="ct__head">
-    <h2 id="ct-heading" class="ct__title">Today’s chains</h2>
-    <a class="ct__all" href={`${url('/progress')}#chains`}>All chains</a>
+    <h2 data-t="grove.todaySChains" id="ct-heading" class="ct__title">Today’s chains</h2>
+    <a data-t="grove.allChains" class="ct__all" href={`${url('/progress')}#chains`}>All chains</a>
   </div>
   <ul class="ct__list" data-ct-list></ul>
   <p class="visually-hidden" aria-live="polite" data-ct-live></p>
@@ -28,6 +28,7 @@ import { url } from '../lib/paths';
   import { el } from '../lib/dom';
   import { celebrate } from '../lib/appearance';
   import { cleanups, onPage } from '../lib/page';
+  import { t, tn } from '../lib/i18n';
 
   const TICK_SVG =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 12.5l4 4L18 8" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -66,7 +67,7 @@ import { url } from '../lib/paths';
 
       const name = el('span', 'ct__name', ch.habit);
       const s = chainStats(ch.days);
-      const sub = el('span', 'ct__sub', setup.kind === 'tick' ? (s.current ? `${s.current} running · best ${s.best}` : `best ${s.best}`) : today.long);
+      const sub = el('span', 'ct__sub', setup.kind === 'tick' ? (s.current ? `${t('chain.running', { days: tn('chain.days', s.current) })} · ${t('chain.best', { n: s.best })}` : t('chain.best', { n: s.best })) : today.long);
       let label: HTMLElement;
       if (setup.kind === 'tick') {
         label = el('span', 'ct__label');
@@ -78,7 +79,7 @@ import { url } from '../lib/paths';
         label.dataset.chainId = ch.id;
         label.dataset.chainDay = key;
         label.dataset.ctKey = `${ch.id}:open`;
-        label.setAttribute('aria-label', `${ch.habit}, ${today.long}. Fill in today`);
+        label.setAttribute('aria-label', t('chain.fillToday', { habit: ch.habit, value: today.long }));
       }
       label.append(name, ' ', sub);
       li.append(dot, label);
@@ -89,12 +90,12 @@ import { url } from '../lib/paths';
         tick.innerHTML = TICK_SVG;
         tick.dataset.ctKey = `${ch.id}:tick`;
         tick.setAttribute('aria-pressed', String(today.counted));
-        tick.setAttribute('aria-label', `Done today: ${ch.habit}`);
+        tick.setAttribute('aria-label', t('chain.doneToday', { habit: ch.habit }));
         tick.addEventListener('click', () => {
           const marking = !ch.days.includes(key);
           toggleChainDay(key, ch.id);
           if (marking) celebrate(tick);
-          announce(`${ch.habit}: today ${marking ? 'marked' : 'unmarked'}.`);
+          announce(t(marking ? 'chain.todayMarked' : 'chain.todayUnmarked', { habit: ch.habit }));
         });
         li.append(tick);
       } else if (setup.kind === 'parts') {
@@ -102,7 +103,7 @@ import { url } from '../lib/paths';
         const done = getEntry(ch.id, key).parts ?? [];
         const group = el('span', 'ct__parts');
         group.setAttribute('role', 'group');
-        group.setAttribute('aria-label', `${ch.habit} today`);
+        group.setAttribute('aria-label', t('chain.habitToday', { habit: ch.habit }));
         initials(names).forEach((short, i) => {
           const b = el('button', 'ct__part', short);
           b.type = 'button';
@@ -113,7 +114,7 @@ import { url } from '../lib/paths';
             const before = ch.days.includes(key);
             const counted = togglePart(ch.id, key, i);
             if (counted && !before) celebrate(b);
-            announce(`${names[i]}: ${done[i] ? 'not yet' : 'done'}.`);
+            announce(t(done[i] ? 'chain.slotNotYet' : 'chain.slotDone', { slot: names[i] ?? '' }));
           });
           group.append(b);
         });
