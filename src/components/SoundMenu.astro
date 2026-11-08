@@ -49,7 +49,7 @@ NAMES.youtube = 'YouTube';
 ---
 
 <details class="sound" data-sound-menu data-names={JSON.stringify(NAMES)}>
-  <summary class="sound__button tool-btn" aria-label="Background sound">
+  <summary data-t-aria-label="you.backgroundSound" class="sound__button tool-btn" aria-label="Background sound">
     <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
       <path
         d="M4 14v-2a8 8 0 0 1 16 0v2"
@@ -60,7 +60,7 @@ NAMES.youtube = 'YouTube';
       <rect x="3" y="13.5" width="4.5" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
       <rect x="16.5" y="13.5" width="4.5" height="7" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
     </svg>
-    <span class="sound__text">Sound</span>
+    <span data-t="you.sound" class="sound__text">Sound</span>
     <span class="sound__eq" aria-hidden="true"><i></i><i></i><i></i></span>
   </summary>
 
@@ -72,23 +72,23 @@ NAMES.youtube = 'YouTube';
           ><rect x="6.5" y="5.5" width="4" height="13" rx="1" fill="currentColor"></rect><rect x="13.5" y="5.5" width="4" height="13" rx="1" fill="currentColor"
           ></rect></svg
         >
-        <span class="visually-hidden" data-sound-toggle-label>Play</span>
+        <span data-t="you.play" class="visually-hidden" data-sound-toggle-label>Play</span>
       </button>
       <div class="sound__meta">
-        <p class="sound__name" data-sound-name>Rain</p>
-        <p class="sound__status" data-sound-status>Paused</p>
+        <p data-t="you.rain" class="sound__name" data-sound-name>Rain</p>
+        <p data-t="you.paused" class="sound__status" data-sound-status>Paused</p>
       </div>
     </div>
 
     <label class="sound__volume">
-      <span>Volume</span>
+      <span data-t="you.volume">Volume</span>
       <input type="range" min="0" max="100" step="1" value="50" data-sound-volume />
     </label>
 
     {
       GROUPS.map((g) => (
         <fieldset>
-          <legend>{g.title}</legend>
+          <legend data-t={`sound.group.${g.title}`}>{g.title}</legend>
           <div class="sound__options">
             {g.items.map((i) => (
               <label class="sound__option">
@@ -97,28 +97,28 @@ NAMES.youtube = 'YouTube';
                   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
                     <path d={ICONS[i.value]} fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" />
                   </svg>
-                  {i.label}
+                  <span data-t={`sound.${i.value}`}>{i.label}</span>
                 </span>
               </label>
             ))}
           </div>
-          {g.note && <p class="sound__note">{g.note}</p>}
+          {g.note && <p class="sound__note" data-t="sound.natureNote">{g.note}</p>}
         </fieldset>
       ))
     }
 
     <fieldset>
-      <legend>YouTube</legend>
+      <legend data-t="you.youtube">YouTube</legend>
       <form class="sound__yt" data-yt-form novalidate>
-        <label class="visually-hidden" for="rw-yt-link">YouTube link</label>
-        <input id="rw-yt-link" class="input" type="url" inputmode="url" placeholder="Paste a video or playlist link" data-yt-input />
-        <button type="submit" class="btn btn--small">Play</button>
+        <label data-t="you.youtubeLink" class="visually-hidden" for="rw-yt-link">YouTube link</label>
+        <input data-t-placeholder="you.pasteAVideoOrPlaylist" id="rw-yt-link" class="input" type="url" inputmode="url" placeholder="Paste a video or playlist link" data-yt-input />
+        <button data-t="you.play" type="submit" class="btn btn--small">Play</button>
       </form>
-      <p class="sound__error" data-yt-error role="alert" hidden>That doesn't look like a YouTube video or playlist link.</p>
-      <p class="sound__note">Plays in a small player in the corner — YouTube requires the video to stay visible. Needs an internet connection.</p>
+      <p data-t="you.thatDoesnTLookLike" class="sound__error" data-yt-error role="alert" hidden>That doesn't look like a YouTube video or playlist link.</p>
+      <p data-t="you.playsInASmallPlayer" class="sound__note">Plays in a small player in the corner — YouTube requires the video to stay visible. Needs an internet connection.</p>
     </fieldset>
 
-    <p class="sound__note">Rain, waves and fireplace download the first time you play them (a few MB each), then work offline; the rest is made on your device. Sound keeps playing as you move between pages.</p>
+    <p data-t="you.rainWavesAndFireplaceDownload" class="sound__note">Rain, waves and fireplace download the first time you play them (a few MB each), then work offline; the rest is made on your device. Sound keeps playing as you move between pages.</p>
     <p class="visually-hidden" aria-live="polite" data-sound-live></p>
   </div>
 </details>
@@ -127,6 +127,7 @@ NAMES.youtube = 'YouTube';
   import { getSoundPrefs, subscribe, type SoundId } from '../lib/storage';
   import { onPlayerChange, play, playYouTube, setVolume, toggle } from '../lib/sound/player';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { t, type Key } from '../lib/i18n';
 
   onPage('sound', () => {
     const c = cleanups();
@@ -146,16 +147,16 @@ NAMES.youtube = 'YouTube';
 
       function render(playing: boolean): void {
         const prefs = getSoundPrefs();
-        const name = names[prefs.source] ?? prefs.source;
+        const name = names[prefs.source] ? t(`sound.${prefs.source}` as Key) : prefs.source;
         menu.classList.toggle('is-playing', playing);
         toggleBtn.setAttribute('aria-pressed', String(playing));
-        toggleLabel.textContent = playing ? `Pause ${name}` : `Play ${name}`;
+        toggleLabel.textContent = t(playing ? 'sound.pause' : 'sound.play', { name });
         nameEl.textContent = name;
-        status.textContent = playing ? 'Playing' : 'Paused';
+        status.textContent = playing ? t('sound.playing') : t('you.paused');
         if (document.activeElement !== volume) volume.value = String(Math.round(prefs.volume * 100));
         if (document.activeElement !== ytInput) ytInput.value = prefs.youtube;
         menu.querySelectorAll<HTMLInputElement>('input[name="rw-sound"]').forEach((i) => (i.checked = i.value === prefs.source));
-        const text = `${name}: ${playing ? 'playing' : 'paused'}`;
+        const text = `${name}: ${playing ? t('sound.playingLower') : t('sound.pausedLower')}`;
         if (menu.open && text !== lastAnnounced) live.textContent = text;
         lastAnnounced = text;
       }

@@ -15,33 +15,33 @@ import { url } from '../lib/paths';
 <BaseLayout title="Welcome" bare>
   <div class="container welcome" data-welcome>
     <header class="welcome__head">
-      <p class="welcome__word"><BrandMark size={32} />grovyn</p>
-      <p class="welcome__say">Hi, I'm Sprig! I'm just a seed for now.</p>
+      <p class="welcome__word" translate="no"><BrandMark size={32} />grovyn</p>
+      <p data-t="you.hiIMSprigI" class="welcome__say">Hi, I'm Sprig! I'm just a seed for now.</p>
       <Sprig stage={0} size={124} bob />
-      <h1 class="welcome__lead">Every minute you focus helps Sprig grow, from a seed to a whole grove.</h1>
+      <h1 data-t="you.everyMinuteYouFocusHelps" class="welcome__lead">Every minute you focus helps Sprig grow, from a seed to a whole grove.</h1>
     </header>
 
     <section class="welcome__pick" aria-labelledby="welcome-pick-h">
-      <h2 id="welcome-pick-h">What should Grovyn help with?</h2>
+      <h2 data-t="you.whatShouldGrovynHelpWith" id="welcome-pick-h">What should Grovyn help with?</h2>
       <div class="chips">
-        <span class="chip chip--fixed" aria-label="Focus timer and tasks, always included">
+        <span data-t-aria-label="you.focusTimerAndTasksAlways" class="chip chip--fixed" aria-label="Focus timer and tasks, always included">
           <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12l5 5 9-10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-          Focus and tasks
+          <span data-t="you.focusAndTasks">Focus and tasks</span>
         </span>
         {
           MODULES.filter((m) => NATIVE_APP || !APP_ONLY_MODULES.includes(m.id)).map((m) => (
-            <button type="button" class="chip" aria-pressed="false" data-module-pick={m.id}>
+            <button type="button" class="chip" aria-pressed="false" data-module-pick={m.id} data-t={`module.${m.id}`}>
               {m.label}
             </button>
           ))
         }
       </div>
-      <p class="welcome__note">Only what you pick shows up. Change it any time under You.</p>
+      <p data-t="you.onlyWhatYouPickShows" class="welcome__note">Only what you pick shows up. Change it any time under You.</p>
     </section>
 
     <div class="welcome__go">
-      <a class="btn welcome__start" href={url('/timer')} data-welcome-done>Start my first 25 minutes</a>
-      <a class="welcome__signin" href={url('/account')} data-welcome-done>I already have an account</a>
+      <a data-t="you.startMyFirst25Minutes" class="btn welcome__start" href={url('/timer')} data-welcome-done>Start my first 25 minutes</a>
+      <a data-t="you.iAlreadyHaveAnAccount" class="welcome__signin" href={url('/account')} data-welcome-done>I already have an account</a>
     </div>
   </div>
 </BaseLayout>

@@ -33,7 +33,7 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
 <Tag class:list={['appearance', { 'appearance--inline': inline }]} data-appearance>
   {
     !inline && (
-      <summary class="appearance__button tool-btn" aria-label="Appearance: theme and background">
+      <summary data-t-aria-label="you.appearanceThemeAndBackground" class="appearance__button tool-btn" aria-label="Appearance: theme and background">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path
             d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.5-4-8.2-9-8.2z"
@@ -46,20 +46,20 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
           <circle cx="10" cy="7.3" r="1.3" fill="currentColor" />
           <circle cx="14.5" cy="7.3" r="1.3" fill="currentColor" />
         </svg>
-        <span class="appearance__text">Look</span>
+        <span data-t="you.look" class="appearance__text">Look</span>
       </summary>
     )
   }
 
   <div class="appearance__panel">
     <fieldset>
-      <legend>Theme</legend>
+      <legend data-t="you.theme">Theme</legend>
       <div class="appearance__seg">
         {
           THEMES.map((t) => (
             <label>
               <input type="radio" name={`rw-theme-${group}`} data-pref="theme" value={t.value} />
-              <span>{t.label}</span>
+              <span data-t={`you.themeName.${t.value}`}>{t.label}</span>
             </label>
           ))
         }
@@ -67,14 +67,14 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
     </fieldset>
 
     <fieldset>
-      <legend>Background · soft glow</legend>
+      <legend data-t="you.backgroundSoftGlow">Background · soft glow</legend>
       <div class="appearance__swatches">
         {
           BACKGROUNDS.map((b) => (
             <label class="swatch">
               <input type="radio" name={`rw-bg-${group}`} data-pref="bg" value={b.value} />
               <span class="swatch__chip" style={`background:${b.swatch}`} />
-              <span class="swatch__label">{b.label}</span>
+              <span class="swatch__label" data-t={`you.bg.${b.value}`}>{b.label}</span>
             </label>
           ))
         }
@@ -82,27 +82,27 @@ const SCENE_OPTIONS = SCENES.map((id) => ({ value: id, label: SCENE_INFO[id].lab
     </fieldset>
 
     <fieldset>
-      <legend>Background · live scene</legend>
+      <legend data-t="you.backgroundLiveScene">Background · live scene</legend>
       <div class="appearance__scenes">
         {
           SCENE_OPTIONS.map((sc) => (
             <label class="scene">
               <input type="radio" name={`rw-bg-${group}`} data-pref="bg" value={sc.value} />
               <span class="scene__preview" style={`background:${sc.preview}`} />
-              <span class="scene__label">{sc.label}</span>
+              <span class="scene__label" data-t={`you.scene.${sc.value}`}>{sc.label}</span>
             </label>
           ))
         }
       </div>
-      <p class="appearance__note" data-scene-note>Drawn live in 3D. Scenes slow down and fade back while a focus session runs.</p>
-      <p class="appearance__note" data-no-webgl hidden>This device can't draw scenes, so a soft glow is shown instead.</p>
+      <p data-t="you.drawnLiveIn3dScenes" class="appearance__note" data-scene-note>Drawn live in 3D. Scenes slow down and fade back while a focus session runs.</p>
+      <p data-t="you.thisDeviceCanTDraw" class="appearance__note" data-no-webgl hidden>This device can't draw scenes, so a soft glow is shown instead.</p>
     </fieldset>
 
     <label class="appearance__switch">
       <input type="checkbox" data-pref="motion" role="switch" />
-      <span>Gentle background motion</span>
+      <span data-t="you.gentleBackgroundMotion">Gentle background motion</span>
     </label>
-    <p class="appearance__note" data-reduced-note hidden>Your system asks for reduced motion, so the background stays still.</p>
+    <p data-t="you.yourSystemAsksForReduced" class="appearance__note" data-reduced-note hidden>Your system asks for reduced motion, so the background stays still.</p>
   </div>
 </Tag>
 

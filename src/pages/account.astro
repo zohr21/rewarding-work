@@ -23,8 +23,8 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
   <div class="container account" data-account-page>
     <header class="page-header account__head">
       <div>
-        <h1>{NATIVE_APP ? 'You' : 'Account'}</h1>
-        {!NATIVE_APP && <p>Your sign-in, your data and how things look. Signing in is optional.</p>}
+        <h1 data-t={NATIVE_APP ? 'you.you' : 'you.account'}>{NATIVE_APP ? 'You' : 'Account'}</h1>
+        {!NATIVE_APP && <p data-t="you.yourSignInYourData">Your sign-in, your data and how things look. Signing in is optional.</p>}
       </div>
     </header>
 
@@ -38,7 +38,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </svg>
         <BrandMark size={54} />
       </span>
-      <p class="muted">Loading your account…</p>
+      <p data-t="you.loadingYourAccount" class="muted">Loading your account…</p>
     </div>
 
     <!-- Signed in: a card on a phone, the page's heading on wide screens -->
@@ -50,44 +50,46 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
           <p class="profile__email muted" data-email></p>
         </div>
         <button type="button" class="btn btn--ghost btn--small" data-edit-open data-member-only hidden>
-          <span>Edit<span class="profile__edit-more"> profile</span></span>
+          <span><span data-t="you.edit">Edit</span> <span data-t="you.profile" class="profile__edit-more">profile</span></span>
         </button>
       </div>
 
       <form class="profile__edit" data-form="name" novalidate hidden>
         <div class="field">
-          <label for="acc-name">Your name</label>
+          <label data-t="you.yourName" for="acc-name">Your name</label>
           <input id="acc-name" class="input" type="text" name="name" autocomplete="name" maxlength="80" />
         </div>
         <div class="account__actions">
-          <button type="submit" class="btn btn--small">Save</button>
-          <button type="button" class="btn btn--ghost btn--small" data-edit-cancel>Cancel</button>
+          <button data-t="you.save" type="submit" class="btn btn--small">Save</button>
+          <button data-t="you.cancel" type="button" class="btn btn--ghost btn--small" data-edit-cancel>Cancel</button>
         </div>
       </form>
 
       <p class="profile__chips">
         <span class="sync badge" data-sync="idle">
           <span class="sync__dot" aria-hidden="true"></span>
-          <span data-sync-text>Connecting…</span>
+          <span data-t="you.connecting" data-sync-text>Connecting…</span>
         </span>
         <span class="profile__badges" data-badges></span>
       </p>
 
       <div class="profile__verify" data-verify hidden>
         <p>
-          Please confirm your email: we sent a link to <strong data-verify-email></strong>. Check your spam folder too.
+          <span data-t="you.verifyLead">Please confirm your email: we sent a link to</span> <strong data-verify-email></strong><span
+            data-t="you.verifySpam">. Check your spam folder too.</span
+          >
         </p>
         <div class="account__actions">
-          <button type="button" class="btn btn--small" data-verified>I've confirmed it</button>
-          <button type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
+          <button data-t="you.iVeConfirmedIt" type="button" class="btn btn--small" data-verified>I've confirmed it</button>
+          <button data-t="you.sendTheLinkAgain" type="button" class="btn btn--ghost btn--small" data-resend>Send the link again</button>
         </div>
       </div>
 
       <a class="profile__tier" href={`${url('/progress')}#tiers`} data-tier-row>
         <span class="tier-coin tier-coin--blank" data-tier-coin aria-hidden="true"></span>
         <span class="profile__tier-text">
-          <strong data-tier-name>No tier yet</strong>
-          <span class="muted">Your grove and reward tiers</span>
+          <strong data-t="you.noTierYet" data-tier-name>No tier yet</strong>
+          <span data-t="you.yourGroveAndRewardTiers" class="muted">Your grove and reward tiers</span>
         </span>
         <RowIcon chevron />
       </a>
@@ -96,16 +98,16 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
 
     <div class="you">
       {/* Wide screens only: the sections are one short scroll on a phone. */}
-      <nav class="you__nav" aria-label="On this page" data-you-nav>
+      <nav data-t-aria-label="you.onThisPage" class="you__nav" aria-label="On this page" data-you-nav>
         <ul>
-          <li data-view="signed-out" hidden><a href="#acc-signin">Sign in</a></li>
-          <li data-view="signed-in" data-member-only hidden><a href="#acc-security">Sign-in and security</a></li>
-          {BOARD_ENABLED && <li><a href="#acc-board">Weekly board</a></li>}
-          <li><a href="#acc-data">Data and sync</a></li>
-          <li><a href="#acc-connections">Connections</a></li>
-          <li><a href="#acc-prefs">Preferences</a></li>
-          <li data-view="signed-in" hidden><a href="#acc-device">This device</a></li>
-          <li><a href="#acc-help">Help</a></li>
+          <li data-view="signed-out" hidden><a data-t="you.signIn" href="#acc-signin">Sign in</a></li>
+          <li data-view="signed-in" data-member-only hidden><a data-t="you.signInAndSecurity" href="#acc-security">Sign-in and security</a></li>
+          {BOARD_ENABLED && <li><a data-t="you.weeklyBoard" href="#acc-board">Weekly board</a></li>}
+          <li><a data-t="you.dataAndSync" href="#acc-data">Data and sync</a></li>
+          <li><a data-t="you.connections" href="#acc-connections">Connections</a></li>
+          <li><a data-t="you.preferences" href="#acc-prefs">Preferences</a></li>
+          <li data-view="signed-in" hidden><a data-t="you.thisDevice" href="#acc-device">This device</a></li>
+          <li><a data-t="you.help" href="#acc-help">Help</a></li>
         </ul>
       </nav>
 
@@ -114,8 +116,8 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
           /* Set-up note for whoever runs a copy of the site. The Play build refuses to build without accounts. */
           !ACCOUNTS_ENABLED && !NATIVE_APP && (
             <section class="card">
-              <h2 class="panel-title">Accounts aren't set up on this copy of the site</h2>
-              <p class="muted">
+              <h2 data-t="you.accountsArenTSetUp" class="panel-title">Accounts aren't set up on this copy of the site</h2>
+              <p data-t="you.everythingStillWorksAndIs" class="muted">
                 Everything still works and is saved in this browser. To turn on accounts, connect a Firebase project — see
                 “Accounts” in the README.
               </p>
@@ -132,30 +134,30 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
               </svg>
             </span>
             <div class="profile__who">
-              <h2 id="acc-signin-h" class="profile__name">Not signed in</h2>
-              <p class="profile__email muted">Saved {NATIVE_APP ? 'on this phone' : 'in this browser'} only</p>
+              <h2 data-t="you.notSignedIn" id="acc-signin-h" class="profile__name">Not signed in</h2>
+              <p class="profile__email muted" data-t={NATIVE_APP ? 'you.savedPhone' : 'you.savedBrowser'}>Saved {NATIVE_APP ? 'on this phone' : 'in this browser'} only</p>
             </div>
           </div>
-          <p class="signin__lead">
+          <p class="signin__lead" data-t={NATIVE_APP ? 'you.clearingPhone' : 'you.clearingBrowser'}>
             Clearing {NATIVE_APP ? "the app's" : "this browser's"} data would lose your progress. Add Google or an email to keep it for good and
             use it on your other devices.
           </p>
           {/* Google first; the email forms open on request. Without a Google client they are simply shown. */}
           <div class="signin__auth" data-collapsed={GOOGLE_SIGNIN_ENABLED ? '' : undefined}>
             <AuthPanel id="acc" />
-            <button type="button" class="btn btn--ghost signin__email" data-use-email>Use an email instead</button>
+            <button data-t="you.useAnEmailInstead" type="button" class="btn btn--ghost signin__email" data-use-email>Use an email instead</button>
           </div>
-          <p class="signin__fine muted">Everything already here is added to your account. Nothing is overwritten.</p>
+          <p data-t="you.everythingAlreadyHereIsAdded" class="signin__fine muted">Everything already here is added to your account. Nothing is overwritten.</p>
           <div class="signin__guest">
-            <button type="button" class="btn btn--ghost btn--small" data-guest>Continue as guest</button>
-            <p class="muted">No email or password: a backup tied to this {NATIVE_APP ? 'phone' : 'browser'}, which you can save properly later.</p>
+            <button data-t="you.continueAsGuest" type="button" class="btn btn--ghost btn--small" data-guest>Continue as guest</button>
+            <p class="muted" data-t={NATIVE_APP ? 'you.guestPhone' : 'you.guestBrowser'}>No email or password: a backup tied to this {NATIVE_APP ? 'phone' : 'browser'}, which you can save properly later.</p>
           </div>
           <p class="account__msg" role="status" data-guest-msg></p>
         </section>
 
         <section class="card" id="acc-save" aria-labelledby="acc-save-h" data-view="signed-in" data-guest-only hidden>
-          <h2 id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
-          <p class="muted account__lead">
+          <h2 data-t="you.keepYourGuestAccountFor" id="acc-save-h" class="panel-title">Keep your guest account for good</h2>
+          <p class="muted account__lead" data-t={NATIVE_APP ? 'you.onlyPhone' : 'you.onlyBrowser'}>
             Right now it only exists {NATIVE_APP ? "on this phone: clearing the app's data" : 'in this browser: clearing browser data'} would lose it. Add an email or Google to keep
             it safe and to sign in on your other devices.
           </p>
@@ -163,16 +165,16 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </section>
 
         <section class="group o-sec" id="acc-security" aria-labelledby="acc-security-h" data-view="signed-in" data-member-only hidden>
-          <h2 id="acc-security-h" class="group__title">Sign-in and security</h2>
+          <h2 data-t="you.signInAndSecurity" id="acc-security-h" class="group__title">Sign-in and security</h2>
           <div class="rows">
             <div class="row">
               <RowIcon name="mail" />
-              <span class="row__main">Email<small data-email-sub></small></span>
+              <span class="row__main"><span data-t="you.email">Email</span><small data-email-sub></small></span>
             </div>
             <details class="row-more" data-has-password hidden>
               <summary class="row">
                 <RowIcon name="lock" />
-                <span class="row__main">Password<small>Change your password</small></span>
+                <span class="row__main"><span data-t="you.password">Password</span><small data-t="you.changeYourPassword">Change your password</small></span>
                 <RowIcon chevron />
               </summary>
               <div class="row-more__body">
@@ -180,7 +182,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                   <PasswordField id="acc-cur-pw" label="Current password" name="current" />
                   <PasswordField id="acc-new-pw" label="New password" isNew />
                   <div class="account__actions">
-                    <button type="submit" class="btn btn--small">Change password</button>
+                    <button data-t="you.changePassword" type="submit" class="btn btn--small">Change password</button>
                   </div>
                 </form>
               </div>
@@ -192,52 +194,52 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         {
           BOARD_ENABLED && (
             <section class="group o-board" id="acc-board" aria-labelledby="acc-board-h" data-board-card>
-              <h2 id="acc-board-h" class="group__title">Weekly board</h2>
+              <h2 data-t="you.weeklyBoard" id="acc-board-h" class="group__title">Weekly board</h2>
               <div class="rows">
                 <label class="row row--toggle">
                   <RowIcon name="leaf" />
                   <span class="row__main">
-                    Show me on the weekly board<small data-board-line>Off · nobody sees you</small>
+                    <span data-t="you.showOnBoard">Show me on the weekly board</span><small data-t="you.offNobodySeesYou" data-board-line>Off · nobody sees you</small>
                   </span>
                   <input type="checkbox" role="switch" data-board-switch />
                 </label>
                 <a class="row" href={`${url('/progress')}#board`} data-board-on hidden>
                   <span class="board-rank" data-board-rank>#–</span>
                   <span class="row__main">
-                    <span data-board-league>Your league</span>
-                    <small data-board-sub>Open the board</small>
+                    <span data-t="you.yourLeague" data-board-league>Your league</span>
+                    <small data-t="you.openTheBoard" data-board-sub>Open the board</small>
                   </span>
                   <RowIcon chevron />
                 </a>
                 <details class="row-more" data-board-on hidden>
                   <summary class="row">
                     <RowIcon name="people" />
-                    <span class="row__main">Nickname</span>
+                    <span data-t="you.nickname" class="row__main">Nickname</span>
                     <span class="row__value" data-board-nick></span>
                     <RowIcon chevron />
                   </summary>
                   <div class="row-more__body">
                     <form class="auth__form" data-form="board-nick" novalidate>
                       <div class="field">
-                        <label for="acc-board-nick">Nickname on the board</label>
+                        <label data-t="you.nicknameOnTheBoard" for="acc-board-nick">Nickname on the board</label>
                         <input id="acc-board-nick" class="input" type="text" name="nick" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false" />
                       </div>
                       <div class="account__actions">
-                        <button type="submit" class="btn btn--small">Save</button>
+                        <button data-t="you.save" type="submit" class="btn btn--small">Save</button>
                       </div>
                     </form>
                   </div>
                 </details>
                 <fieldset class="row board-vis" data-board-on hidden>
-                  <legend class="board-vis__legend">Who can see me</legend>
+                  <legend data-t="you.whoCanSeeMe" class="board-vis__legend">Who can see me</legend>
                   <span class="board-vis__opts">
-                    <label><input type="radio" name="board-vis" value="all" data-board-vis /> Everyone</label>
-                    <label><input type="radio" name="board-vis" value="friends" data-board-vis /> Friends only</label>
+                    <label><input type="radio" name="board-vis" value="all" data-board-vis /> <span data-t="you.visAll">Everyone</span></label>
+                    <label><input type="radio" name="board-vis" value="friends" data-board-vis /> <span data-t="you.visFriends">Friends only</span></label>
                   </span>
                 </fieldset>
                 <div class="row" data-board-on hidden>
                   <RowIcon name="link" />
-                  <span class="row__main">My friend code<small>Share it or add friends in Grove › Board › Friends</small></span>
+                  <span class="row__main"><span data-t="you.friendCode">My friend code</span><small data-t="you.shareItOrAddFriends">Share it or add friends in Grove › Board › Friends</small></span>
                   <span class="row__value board-code" data-board-code></span>
                 </div>
                 <p class="account__msg row-note" role="status" data-board-msg></p>
@@ -252,27 +254,31 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </div>
 
         <section class="group o-conn" id="acc-connections" aria-labelledby="acc-connections-h">
-          <h2 id="acc-connections-h" class="group__title">Connections</h2>
+          <h2 data-t="you.connections" id="acc-connections-h" class="group__title">Connections</h2>
           <div class="rows">
             <div class="row" data-view="signed-in" data-member-only hidden>
               <RowIcon name="link" />
-              <span class="row__main">Google<small>Sign in with one tap</small></span>
-              <span class="badge badge--ok" data-google-linked hidden>Connected</span>
+              <span class="row__main"><span translate="no">Google</span><small data-t="you.signInWithOneTap">Sign in with one tap</small></span>
+              <span data-t="you.connected" class="badge badge--ok" data-google-linked hidden>Connected</span>
               <span data-google-unlinked hidden>
-                <button type="button" class="btn btn--ghost btn--small" data-link-google>Connect</button>
+                <button data-t="you.connect" type="button" class="btn btn--ghost btn--small" data-link-google>Connect</button>
               </span>
             </div>
             <div class="row">
               <RowIcon name="heart" />
-              <span class="row__main">{NATIVE_APP ? 'Health Connect' : 'Health data'}<small>{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small></span>
-              <a class="btn btn--ghost btn--small" href={url('/health')}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
+              <span class="row__main"
+                ><span data-t={NATIVE_APP ? 'you.healthConnect' : 'you.healthData'}>{NATIVE_APP ? 'Health Connect' : 'Health data'}</span><small data-t={NATIVE_APP ? 'you.healthConnectSub' : 'you.healthDataSub'}
+                  >{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small
+                ></span
+              >
+              <a class="btn btn--ghost btn--small" href={url('/health')} data-t={NATIVE_APP ? 'you.manage' : 'you.open'}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
             </div>
             {
               NATIVE_APP && (
                 <button type="button" class="row" data-sheet-open="mydata">
                   <RowIcon name="shield" />
                   <span class="row__main">
-                    Your data<small>What your finding learns from, and forgetting it</small>
+                    <span data-t="you.yourData">Your data</span><small data-t="you.whatYourFindingLearnsFrom">What your finding learns from, and forgetting it</small>
                   </span>
                   <RowIcon chevron />
                 </button>
@@ -283,30 +289,30 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </section>
 
         <section class="group o-prefs" id="acc-sections" aria-labelledby="acc-sections-h">
-          <h2 id="acc-sections-h" class="group__title">Sections</h2>
+          <h2 data-t="you.sections" id="acc-sections-h" class="group__title">Sections</h2>
           <div class="rows">
             {
               MODULES.filter((m) => NATIVE_APP || !APP_ONLY_MODULES.includes(m.id)).map((m) => (
                 <label class="row row--toggle">
                   <span class="row__main">
-                    {m.label}
-                    <small>{m.hint}</small>
+                    <span data-t={`module.${m.id}`}>{m.label}</span>
+                    <small data-t={`module.${m.id}Hint`}>{m.hint}</small>
                   </span>
                   <input type="checkbox" role="switch" data-module-toggle={m.id} />
                 </label>
               ))
             }
-            <p class="row-note muted">Focus, Tasks and your grove are always on.</p>
+            <p data-t="you.focusTasksAndYourGrove" class="row-note muted">Focus, Tasks and your grove are always on.</p>
           </div>
         </section>
 
         <section class="group o-prefs" id="acc-prefs" aria-labelledby="acc-prefs-h">
-          <h2 id="acc-prefs-h" class="group__title">Preferences</h2>
+          <h2 data-t="you.preferences" id="acc-prefs-h" class="group__title">Preferences</h2>
           <div class="rows">
             <details class="row-more">
               <summary class="row">
                 <RowIcon name="sun" />
-                <span class="row__main">Appearance</span>
+                <span data-t="you.appearance" class="row__main">Appearance</span>
                 <span class="row__value" data-pref-look></span>
                 <RowIcon chevron />
               </summary>
@@ -327,13 +333,13 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
             </details>
             <button type="button" class="row" data-open-sound>
               <RowIcon name="sound" />
-              <span class="row__main">Sounds</span>
+              <span data-t="you.sounds" class="row__main">Sounds</span>
               <span class="row__value" data-pref-sound></span>
               <RowIcon chevron />
             </button>
             <a class="row" href={url('/timer')}>
               <RowIcon name="timer" />
-              <span class="row__main">Timer defaults</span>
+              <span data-t="you.timerDefaults" class="row__main">Timer defaults</span>
               <span class="row__value" data-pref-timer></span>
               <RowIcon chevron />
             </a>
@@ -342,7 +348,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                 <button type="button" class="row" data-notify>
                   <RowIcon name="bell" />
                   <span class="row__main">
-                    Notifications and widgets<small data-notify-note>Timer alerts. Widgets are added from your home screen.</small>
+                    <span data-t="you.notifications">Notifications and widgets</span><small data-t="you.timerAlertsWidgetsAreAdded" data-notify-note>Timer alerts. Widgets are added from your home screen.</small>
                   </span>
                   <span class="row__value" data-pref-notify />
                 </button>
@@ -352,26 +358,26 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </section>
 
         <section class="group device o-device" id="acc-device" aria-labelledby="acc-device-h" data-view="signed-in" hidden>
-          <h2 id="acc-device-h" class="group__title">This device</h2>
+          <h2 data-t="you.thisDevice" id="acc-device-h" class="group__title">This device</h2>
           <div class="rows">
             <div data-member-only hidden>
               <div class="row row--signout">
                 <RowIcon name="signout" />
                 <span class="row__main">
-                  <span class="row__label">Sign out</span>
-                  <small>Removes your data from this {NATIVE_APP ? 'phone' : 'browser'}. It stays in your account.</small>
+                  <span data-t="you.signOut" class="row__label">Sign out</span>
+                  <small data-t={NATIVE_APP ? 'you.signOutPhone' : 'you.signOutBrowser'}>Removes your data from this {NATIVE_APP ? 'phone' : 'browser'}. It stays in your account.</small>
                 </span>
-                <button type="button" class="btn btn--ghost btn--small" data-sign-out>Sign out</button>
+                <button data-t="you.signOut" type="button" class="btn btn--ghost btn--small" data-sign-out>Sign out</button>
               </div>
               <div class="account__warn row-note" data-sign-out-warn hidden>
-                <p>Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
+                <p data-t="you.someChangesHavenTReached">Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
                 <div class="account__actions">
-                  <button type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
-                  <button type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
+                  <button data-t="you.signOutAnyway" type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
+                  <button data-t="you.staySignedIn" type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
                 </div>
               </div>
             </div>
-            <p class="muted row-note" data-guest-only hidden>
+            <p data-t="you.youReUsingAGuest" class="muted row-note" data-guest-only hidden>
               You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
               Google first if you want to use it elsewhere.
             </p>
@@ -381,22 +387,24 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
               <summary class="row">
                 <RowIcon name="trash" />
                 <span class="row__main">
-                  <span class="row__label" data-delete-title>Delete account…</span>
-                  <small>Permanently deletes your account and everything in it. Export a backup first.</small>
+                  <span data-t="you.deleteAccount" class="row__label" data-delete-title>Delete account…</span>
+                  <small data-t="you.permanentlyDeletesYourAccountAnd">Permanently deletes your account and everything in it. Export a backup first.</small>
                 </span>
                 <RowIcon chevron />
               </summary>
               <div class="row-more__body">
                 <p class="muted">
-                  This removes your account, everything stored in it, and this {NATIVE_APP ? "phone's" : "browser's"} copy. It can't be undone —{' '}
-                  <a href="#acc-data">export a backup</a> first if you might want your data.
+                  <span data-t={NATIVE_APP ? 'you.deletePhone' : 'you.deleteBrowser'}
+                    >This removes your account, everything stored in it, and this {NATIVE_APP ? "phone's" : "browser's"} copy. It can't be undone —</span
+                  >{' '}
+                  <a data-t="you.exportABackup" href="#acc-data">export a backup</a> <span data-t="you.deleteTail">first if you might want your data.</span>
                 </p>
                 <form class="auth__form" data-form="delete" novalidate>
                   <div data-delete-password hidden>
                     <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
                   </div>
                   <div class="account__actions">
-                    <button type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
+                    <button data-t="you.deleteAccount2" type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
                   </div>
                 </form>
                 <p class="account__msg" role="status" data-delete-msg></p>
@@ -406,33 +414,33 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         </section>
 
         <section class="group o-help" id="acc-help" aria-labelledby="acc-help-h">
-          <h2 id="acc-help-h" class="group__title">Help</h2>
+          <h2 data-t="you.help" id="acc-help-h" class="group__title">Help</h2>
           <div class="rows">
             <button type="button" class="row" data-sheet-open="guides">
               <RowIcon name="help" />
               <span class="row__main">
-                Help &amp; guides<small>Tours, tips and tricks, and playbooks for your goals</small>
+                <span data-t="you.help">Help &amp; guides</span><small data-t="you.toursTipsAndTricksAnd">Tours, tips and tricks, and playbooks for your goals</small>
               </span>
               <RowIcon chevron />
             </button>
             <a class="row" href={HELP_MAIL}>
               <RowIcon name="mail" />
               <span class="row__main">
-                Write to us<small>Questions, problems or ideas: {SITE.supportEmail}</small>
+                <span data-t="you.writeToUs">Write to us</span><small><span data-t="you.questions">Questions, problems or ideas:</span> {SITE.supportEmail}</small>
               </span>
               <RowIcon chevron />
             </a>
             <a class="row" href={url('/delete-account')}>
               <RowIcon name="link" />
               <span class="row__main">
-                Deleting your account<small>How, and what goes with it</small>
+                <span data-t="you.deleting">Deleting your account</span><small data-t="you.howAndWhatGoesWith">How, and what goes with it</small>
               </span>
               <RowIcon chevron />
             </a>
           </div>
         </section>
 
-        {NATIVE_APP && <p class="account__version muted o-ver">Version {pkg.version}</p>}
+        {NATIVE_APP && <p class="account__version muted o-ver"><span data-t="you.version">Version</span> {pkg.version}</p>}
       </div>
     </div>
   </div>
@@ -454,7 +462,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
   import { onPlayerChange } from '../lib/sound/player';
   import { exactAlarmsAllowed, notificationsGranted, openAlarmSettings, requestNotifications } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
-  import { getLang, LANGS } from '../lib/i18n';
+  import { getLang, LANGS, t, type Key } from '../lib/i18n';
 
   // The profile's tier row: the highest tier reached on any track.
   onPage('account-tier', () => {
@@ -468,7 +476,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       const level = Math.max(0, ...progress.map((p) => p.level));
       coin.className = `tier-coin ${level ? `tier-coin--t${level - 1}` : 'tier-coin--blank'}`;
       coin.innerHTML = tierIcon(Math.max(0, level - 1), 20);
-      name.textContent = level ? tierLabel(level - 1) : 'No tier yet';
+      name.textContent = level ? tierLabel(level - 1) : t('tier.none');
     };
     render();
     c.add(subscribe('sessions', render));
@@ -492,7 +500,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       const theme = getTheme();
       const bg = page.querySelector<HTMLInputElement>(`input[data-pref="bg"][value="${getAppearance().bg}"]`);
       const bgName = bg?.closest('label')?.textContent?.trim();
-      look.textContent = [theme.charAt(0).toUpperCase() + theme.slice(1), bgName].filter(Boolean).join(' · ');
+      look.textContent = [t(`you.themeName.${theme}` as Key), bgName].filter(Boolean).join(' · ');
     };
     renderLook();
     c.add(subscribe('theme', renderLook));
@@ -506,10 +514,10 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         mode === 'flowtime'
           ? 'Flowtime'
           : mode === '52-17'
-            ? `${FIFTY_TWO.workMin} / ${FIFTY_TWO.breakMin} min`
+            ? t('unit.min', { n: `${FIFTY_TWO.workMin} / ${FIFTY_TWO.breakMin}` })
             : mode === 'custom' && p?.custom?.workMin
-              ? `${p.custom.workMin} / ${p.custom.breakMin ?? 0} min`
-              : `${POMODORO.workMin} / ${POMODORO.shortMin} min`;
+              ? t('unit.min', { n: `${p.custom.workMin} / ${p.custom.breakMin ?? 0}` })
+              : t('unit.min', { n: `${POMODORO.workMin} / ${POMODORO.shortMin}` });
     };
     renderTimer();
     c.add(subscribe('timer-prefs', renderTimer));
@@ -519,7 +527,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     const sound = q('[data-pref-sound]')!;
     const names: Record<string, string> = JSON.parse(soundMenu?.dataset.names ?? '{}');
     let playing = false;
-    const renderSound = () => (sound.textContent = playing ? (names[getSoundPrefs().source] ?? 'On') : 'Off');
+    const renderSound = () => (sound.textContent = playing ? (names[getSoundPrefs().source] ? t(`sound.${getSoundPrefs().source}` as Key) : t('you.on')) : t('you.off'));
     c.add(
       onPlayerChange((s) => {
         playing = s.playing;
@@ -556,8 +564,8 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       let late = false;
       const show = async (granted: boolean | null) => {
         late = granted === true && (await exactAlarmsAllowed()) === false;
-        value.textContent = granted === null ? '' : granted ? 'On' : 'Off';
-        note.textContent = late ? 'Timer alerts can come a few minutes late. Tap to allow them on time.' : plain;
+        value.textContent = granted === null ? '' : granted ? t('you.on') : t('you.off');
+        note.textContent = late ? t('you.alertsLate') : t('you.timerAlertsWidgetsAreAdded');
       };
       void notificationsGranted().then(show);
       notify.addEventListener('click', () => (late ? openAlarmSettings() : void requestNotifications().then(show)));
@@ -600,6 +608,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
   import { formatMinutes, getBoard, leaveBoard, leagueName, loadLeague, myTier, nicknameProblem, pushEntry, setBoard, weekMinutes, type Visibility } from '../lib/board';
   import { getSessions, subscribe } from '../lib/storage';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
 
   onPage('account-board', () => {
     const found = document.querySelector<HTMLElement>('[data-board-card]');
@@ -620,16 +629,16 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       const on = joined();
       toggle.checked = on;
       $('[data-board-line]').textContent = !on
-        ? 'Off · nobody sees you'
+        ? t('you.offNobodySeesYou')
         : settings.visibility === 'all'
-          ? 'On · everyone sees your nickname'
-          : 'On · only friends see you';
+          ? t('you.board.onAll')
+          : t('you.board.onFriends');
       card.querySelectorAll<HTMLElement>('[data-board-on]').forEach((n) => (n.hidden = !on));
       if (!on) return;
       const sessions = getSessions();
       $('[data-board-rank]').textContent = rank === null || settings.visibility === 'friends' ? '#–' : `#${rank}`;
       $('[data-board-league]').textContent = leagueName(myTier(sessions));
-      $('[data-board-sub]').textContent = `${formatMinutes(weekMinutes(sessions))} this week · open the board`;
+      $('[data-board-sub]').textContent = t('you.board.sub', { time: formatMinutes(weekMinutes(sessions)) });
       $('[data-board-nick]').textContent = settings.name;
       $('[data-board-code]').textContent = settings.code || '…';
       card.querySelectorAll<HTMLInputElement>('[data-board-vis]').forEach((r) => (r.checked = r.value === settings.visibility));
@@ -660,7 +669,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         }
         leaveBoard()
           .then(() => {
-            msg.textContent = 'You left the board. Your row was removed.';
+            msg.textContent = t('you.board.left');
             render();
           })
           .catch((err: unknown) => (msg.textContent = friendlyError(err)));
@@ -693,7 +702,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         nickForm.closest('details')!.open = false;
         render();
         pushEntry()
-          .then(() => (msg.textContent = 'Nickname saved.'))
+          .then(() => (msg.textContent = t('you.board.nickSaved')))
           .catch((err: unknown) => (msg.textContent = friendlyError(err)));
       }),
     );
@@ -705,7 +714,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     );
 
     c.add(listen(document, 'board:changed', () => {
-      msg.textContent = 'You are on the board.';
+      msg.textContent = t('you.board.joined');
       void lookUpRank();
     }));
     c.add(subscribe('board', render));

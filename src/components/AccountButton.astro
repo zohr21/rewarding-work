@@ -25,13 +25,14 @@ const current = Astro.url.pathname;
       <path d="M4.5 20a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
     </svg>
   </span>
-  <span class="account-btn__text" data-account-label>
+  <span class="account-btn__text" data-account-label data-t={ACCOUNTS_ENABLED ? 'you.signIn' : 'you.settings'}>
     {ACCOUNTS_ENABLED ? 'Sign in' : 'Settings'}
   </span>
   <span class="account-btn__dot" aria-hidden="true"></span>
 </a>
 
 <script>
+  import { t, type Key } from '../lib/i18n';
   import { onAccountChange, startAccount, type AccountState } from '../lib/account/state';
   import { startBoard } from '../lib/board';
   import { BOARD_ENABLED } from '../config/firebase';
@@ -39,10 +40,10 @@ const current = Astro.url.pathname;
 
   const SYNC_TEXT: Record<AccountState['sync'], string> = {
     idle: '',
-    saving: 'saving',
-    synced: 'synced',
-    offline: 'offline, changes kept',
-    error: 'sync problem',
+    saving: 'you.syncShort.saving',
+    synced: 'you.syncShort.synced',
+    offline: 'you.syncShort.offline',
+    error: 'you.syncShort.error',
   };
 
   onPage('account-button', () => {
@@ -60,17 +61,17 @@ const current = Astro.url.pathname;
       btn.dataset.state = u ? 'signed-in' : 'signed-out';
       btn.dataset.sync = s.sync;
       if (!u) {
-        label.textContent = 'Sign in';
+        label.textContent = t('you.signIn');
         avatar.innerHTML = icon;
-        btn.setAttribute('aria-label', 'Sign in or create an account');
+        btn.setAttribute('aria-label', t('you.signInOrCreate'));
         return;
       }
-      const who = u.isAnonymous ? 'Guest' : (u.name ?? u.email ?? 'Account');
-      label.textContent = u.isAnonymous ? 'Guest' : 'Account';
+      const who = u.isAnonymous ? t('you.guestBadge') : (u.name ?? u.email ?? t('you.account'));
+      label.textContent = u.isAnonymous ? t('you.guestBadge') : t('you.account');
       if (u.isAnonymous) avatar.innerHTML = icon;
       else avatar.textContent = who.trim().charAt(0).toUpperCase();
-      const sync = SYNC_TEXT[s.sync];
-      btn.setAttribute('aria-label', `Account: ${who}${sync ? ` (${sync})` : ''}`);
+      const sync = SYNC_TEXT[s.sync] ? t(SYNC_TEXT[s.sync] as Key) : '';
+      btn.setAttribute('aria-label', t('you.accountWho', { who }) + (sync ? ` (${sync})` : ''));
     });
   });
 </script>

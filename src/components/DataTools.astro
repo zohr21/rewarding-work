@@ -13,7 +13,7 @@ import { url } from '../lib/paths';
 ---
 
 <section class="group data" data-data-tools aria-labelledby="data-heading">
-  <h2 id="data-heading" class="group__title">Data and sync</h2>
+  <h2 data-t="you.dataAndSync" id="data-heading" class="group__title">Data and sync</h2>
   <div class="rows">
     {
       ACCOUNTS_ENABLED && (
@@ -21,32 +21,32 @@ import { url } from '../lib/paths';
           <summary class="row">
             <RowIcon name="cloud" />
             <span class="row__main">
-              What's kept in your account<small>Sessions, tasks, chain, settings</small>
+              <span data-t="you.keptInAccount">What's kept in your account</span><small data-t="you.sessionsTasksChainSettings">Sessions, tasks, chain, settings</small>
             </span>
             <RowIcon chevron />
           </summary>
           <div class="row-more__body data__kept">
             <ul>
-              <li>Kept in your account: focus sessions, done list, habit chain, tasks, timer settings, theme and background.</li>
-              <li>Stays on each device: the running timer and sound settings.</li>
-              <li>Without an account everything is stored {NATIVE_APP ? 'on this phone' : 'in this browser'} only.</li>
-              <li>Anything already here is added to your account when you sign in — nothing is overwritten.</li>
+              <li data-t="you.keptInYourAccountFocus">Kept in your account: focus sessions, done list, habit chain, tasks, timer settings, theme and background.</li>
+              <li data-t="you.staysOnEachDeviceThe">Stays on each device: the running timer and sound settings.</li>
+              <li data-t={NATIVE_APP ? 'you.withoutAccountPhone' : 'you.withoutAccountBrowser'}>Without an account everything is stored {NATIVE_APP ? 'on this phone' : 'in this browser'} only.</li>
+              <li data-t="you.anythingAlreadyHereIsAdded">Anything already here is added to your account when you sign in — nothing is overwritten.</li>
             </ul>
           </div>
         </details>
       )
     }
-    <p class="data__warn row-note" data-data-warn hidden>
+    <p class="data__warn row-note" data-data-warn hidden data-t={NATIVE_APP ? 'you.warnPhone' : 'you.warnBrowser'}>
       {NATIVE_APP ? 'Grovyn can\x27t save data on this phone right now. Export it if you want to keep it.' : 'This browser isn\x27t saving data (private browsing or blocked storage?). It will be lost when you close the tab — export it if you want to keep it.'}
     </p>
     <button type="button" class="row" data-export>
       <RowIcon name="download" />
-      <span class="row__main">Export a backup<small>A file with everything, to keep or move</small></span>
+      <span class="row__main"><span data-t="you.exportBackup">Export a backup</span><small data-t="you.aFileWithEverythingTo">A file with everything, to keep or move</small></span>
       <RowIcon chevron />
     </button>
     <label class="row data__import">
       <RowIcon name="upload" />
-      <span class="row__main">Import a backup<small>Merge a file with your data, or replace it</small></span>
+      <span class="row__main"><span data-t="you.importBackup">Import a backup</span><small data-t="you.mergeAFileWithYour">Merge a file with your data, or replace it</small></span>
       <RowIcon chevron />
       <input type="file" accept="application/json,.json" class="visually-hidden" data-import />
     </label>
@@ -55,7 +55,7 @@ import { url } from '../lib/paths';
         <button type="button" class="row" data-export-open>
           <RowIcon name="sheet" />
           <span class="row__main">
-            Send to Google…<small>A Sheet with charts, or a Doc report, in your own Drive</small>
+            <span data-t="you.sendToGoogle">Send to Google…</span><small data-t="you.aSheetWithChartsOr">A Sheet with charts, or a Doc report, in your own Drive</small>
           </span>
           <RowIcon chevron />
         </button>
@@ -65,38 +65,38 @@ import { url } from '../lib/paths';
     <div class="data__confirm row-note" data-import-panel hidden>
       <p data-import-summary></p>
       <div class="data__actions">
-        <button type="button" class="btn btn--small" data-import-merge>Merge with my data</button>
-        <button type="button" class="btn btn--ghost btn--small" data-import-replace>Replace my data</button>
-        <button type="button" class="btn btn--ghost btn--small" data-import-cancel>Cancel</button>
+        <button data-t="you.mergeWithMyData" type="button" class="btn btn--small" data-import-merge>Merge with my data</button>
+        <button data-t="you.replaceMyData" type="button" class="btn btn--ghost btn--small" data-import-replace>Replace my data</button>
+        <button data-t="you.cancel" type="button" class="btn btn--ghost btn--small" data-import-cancel>Cancel</button>
       </div>
-      <p class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
+      <p data-t="you.mergeKeepsEverythingYouHave" class="muted data__hint">Merge keeps everything you have and adds what's new. Replace swaps your current data for the file.</p>
     </div>
 
     <a class="row" href={url('/budget?lock=settings')}>
       <RowIcon name="lock" />
-      <span class="row__main">Lock Budget<small>Ask before showing your money</small></span>
+      <span class="row__main"><span data-t="you.lockBudget">Lock Budget</span><small data-t="you.askBeforeShowingYourMoney">Ask before showing your money</small></span>
       <RowIcon chevron />
     </a>
 
     <a class="row" href={url('/privacy')}>
       <RowIcon name="shield" />
-      <span class="row__main">Privacy</span>
+      <span data-t="you.privacy" class="row__main">Privacy</span>
       <RowIcon chevron />
     </a>
 
     <details class="row-more">
       <summary class="row">
         <RowIcon name="trash" />
-        <span class="row__main">Delete all data</span>
+        <span data-t="you.deleteAllData" class="row__main">Delete all data</span>
         <RowIcon chevron />
       </summary>
       <div class="row-more__body">
-        <p class="muted">
+        <p class="muted" data-t={`you.clear${NATIVE_APP ? 'Phone' : 'Browser'}${ACCOUNTS_ENABLED ? 'Account' : ''}`}>
           Removes your sessions, done list, tasks, chain and settings from {NATIVE_APP ? 'this phone' : 'this browser'}{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
           Export first if you might want them back.
         </p>
         <div class="data__actions">
-          <button type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
+          <button data-t="you.deleteEverything" type="button" class="btn btn--danger btn--small" data-clear>Delete everything</button>
         </div>
       </div>
     </details>
@@ -122,6 +122,14 @@ import { url } from '../lib/paths';
   import { backupSummary, downloadBackup } from '../lib/export/backup';
   import { onPage } from '../lib/page';
   import { NATIVE_APP } from '../config/app';
+  import { t, tn, type Key } from '../lib/i18n';
+
+  /** parseBackup's messages (English, from storage.ts) and what they are called here. */
+  const PARSE_ERRORS: Record<string, Key> = {
+    "This file isn't valid JSON.": 'you.parse.json',
+    "This doesn't look like a Grovyn export.": 'you.parse.notGrovyn',
+    'This export comes from a newer version of the site. Reload the page and try again.': 'you.parse.newer',
+  };
 
   onPage('data-tools', () => {
     document.querySelectorAll<HTMLElement>('[data-data-tools]').forEach((root) => {
@@ -145,9 +153,9 @@ import { url } from '../lib/paths';
 
       $<HTMLButtonElement>('[data-export]').addEventListener('click', () => {
         try {
-          say(`Exported ${backupSummary(downloadBackup())}.`);
+          say(t('you.exported', { what: backupSummary(downloadBackup()) }));
         } catch {
-          say(NATIVE_APP ? 'Export failed. Try again.' : 'Export failed in this browser.');
+          say(NATIVE_APP ? t('you.exportFailed') : t('you.exportFailedBrowser'));
         }
       });
 
@@ -156,30 +164,28 @@ import { url } from '../lib/paths';
         fileInput.value = '';
         if (!file) return;
         if (file.size > 5_000_000) {
-          say('That file is too large to be an export from this site.');
+          say(t('you.tooLarge'));
           return;
         }
         const result = parseBackup(await file.text());
         if (!result.ok) {
           panel.hidden = true;
-          say(result.error);
+          say(PARSE_ERRORS[result.error] ? t(PARSE_ERRORS[result.error]!) : result.error);
           return;
         }
         pending = result.data;
         const d = result.data;
         const chains = chainsOf(d.chain);
         const chainDays = chains.reduce((n, c) => n + c.days.length, 0);
-        const chainText =
-          chains.length > 1
-            ? ` and ${chains.length} chains (${chainDays} days)`
-            : chains.length
-              ? ` and a chain for “${chains[0]!.habit}” (${chainDays} days)`
-              : '';
         summary.textContent =
-          `“${file.name}” contains ${d.sessions.length} focus sessions, ${d.done.filter((x) => x.deletedAt === undefined).length} done items, ` +
-          `${d.tasks.items.filter((t) => t.deletedAt === undefined).length} tasks` +
-          `${chainText}.` +
-          `${result.skipped ? ` ${result.skipped} unreadable ${result.skipped === 1 ? 'entry' : 'entries'} will be skipped.` : ''}`;
+          t('you.fileContains', {
+            file: file.name,
+            sessions: d.sessions.length,
+            done: d.done.filter((x) => x.deletedAt === undefined).length,
+            tasks: d.tasks.items.filter((x) => x.deletedAt === undefined).length,
+            chains: chains.length,
+            chain: chainDays,
+          }) + (result.skipped ? ` ${tn('you.skipped', result.skipped)}` : '');
         panel.hidden = false;
         say('');
         $<HTMLButtonElement>('[data-import-merge]').focus();
@@ -191,7 +197,7 @@ import { url } from '../lib/paths';
         if (mode === 'replace') applyThemeNow();
         pending = null;
         panel.hidden = true;
-        say(mode === 'merge' ? 'Imported and merged with your data.' : 'Your data was replaced with the file.');
+        say(mode === 'merge' ? t('you.merged') : t('you.replaced'));
       }
 
       $<HTMLButtonElement>('[data-import-merge]').addEventListener('click', () => finishImport('merge'));
@@ -199,26 +205,26 @@ import { url } from '../lib/paths';
       $<HTMLButtonElement>('[data-import-cancel]').addEventListener('click', () => {
         pending = null;
         panel.hidden = true;
-        say('Import cancelled.');
+        say(t('you.importCancelled'));
       });
 
       // Two-step delete: the first press asks, the second press deletes.
       clearBtn.addEventListener('click', () => {
         if (!clearArmed) {
           clearArmed = true;
-          clearBtn.textContent = 'Yes, delete everything';
-          say('Press again to confirm. This cannot be undone.');
+          clearBtn.textContent = t('you.yesDeleteEverything');
+          say(t('you.pressAgain'));
           window.setTimeout(() => {
             clearArmed = false;
-            clearBtn.textContent = 'Delete everything';
+            clearBtn.textContent = t('you.deleteEverything');
           }, 6000);
           return;
         }
         clearArmed = false;
-        clearBtn.textContent = 'Delete everything';
+        clearBtn.textContent = t('you.deleteEverything');
         clearAll();
         applyThemeNow();
-        say(`All data deleted from this ${NATIVE_APP ? 'phone' : 'browser'}.`);
+        say(NATIVE_APP ? t('you.allDeletedPhone') : t('you.allDeletedBrowser'));
       });
     });
   });
