@@ -1,0 +1,67 @@
+/**
+ * Azərbaycanca. Draft translation: have a native speaker review it before it leaves beta.
+ * Informal «sən», like the English. Nouns after a number stay singular («3 gün»), and
+ * case endings change with the number before them, so templates avoid `{n}-i` forms.
+ * Missing keys show in English (see en.ts).
+ */
+import type { Messages } from './en';
+
+export const az: Messages = {
+  'nav.main': 'Əsas naviqasiya',
+  'nav.today': 'Bu gün',
+  'nav.focus': 'Fokus',
+  'nav.health': 'Sağlamlıq',
+  'nav.budget': 'Büdcə',
+  'nav.grove': 'Bağ',
+  'nav.you': 'Profil',
+  'nav.timer': 'Taymer',
+  'nav.tasks': 'Tapşırıqlar',
+  'nav.exam': 'İmtahan',
+  'nav.coach': 'Məşqçi',
+  'nav.skip': 'Məzmuna keç',
+
+  'lang.label': 'Dil',
+  'lang.beta': 'beta',
+  'lang.betaNote': 'Rus və Azərbaycan dilləri yenidir. Tərcümə davam etdiyi üçün Grovyn-in bəzi hissələri hələ ingilis dilindədir.',
+
+  'today.title': 'Bu gün',
+  'today.seedTitle': 'İlk toxumunu ək',
+  'today.seedText': 'Bir fokus seansı bağını başladır. İyirmi beş dəqiqə kifayətdir.',
+  'today.startFocus': 'Fokusa başla',
+  'today.addTaskFirst': 'Əvvəlcə tapşırıq əlavə et',
+  'today.emptyTitle': 'Bu gün üçün hələ heç nə yoxdur',
+  'today.emptyText': 'Vacib olan bir işi seç və onu birinci qoy, ya da sadəcə taymeri başlat.',
+  'today.chooseTask': 'Tapşırıq seç',
+  'today.startSession': 'Fokus seansına başla',
+  'today.firstUp': 'İlk növbədə',
+  'today.moreOnToday': { one: 'Bu gün üçün daha {n}', other: 'Bu gün üçün daha {n}' },
+  'today.stepsDone': 'Hazır addımlar: {done}/{total}',
+  'today.noSteps': 'Hələ addım yoxdur',
+  'today.focusedSoFar': 'İndiyədək fokus: {time}',
+  'today.notStarted': 'Hələ başlanmayıb',
+  'today.nextStep': 'Növbəti addım: {step}',
+  'today.startFocusing': 'Fokusa başla',
+  'today.questsTitle': 'Sprig-in ilk tapşırıqları',
+  'today.questsCount': '{done}/{total}',
+  'today.questsHide': 'Gizlət (Profil › Kömək bölməsində qalır)',
+  'today.questWelcome': 'Nə yetişdirəcəyini seç',
+  'today.questSession': 'Bir fokus seansını bitir',
+  'today.questTask': 'Bir tapşırıq əlavə et',
+  'today.questSplit': 'Tapşırığı kiçik addımlara böl',
+  'today.questGrove': 'Bağına bax',
+  'today.questDone': '(hazırdır)',
+  'today.showMe': 'Göstər',
+  'today.showMeLabel': 'Göstər: {quest}',
+  'today.focusToday': 'Bu günkü fokus',
+  'today.focusBars': 'Son yeddi günün fokus dəqiqələri, bu gün daxil',
+  'today.chain': 'Zəncir',
+  'today.chainNamed': 'Zəncir · {habit}',
+  'today.chainNone': 'Hələ yoxdur',
+  'today.chainHint': 'Hər gün qeyd etmək üçün vərdiş seç',
+  'today.chainDays': { one: '{n} gün', other: '{n} gün' },
+  'today.weekMarked': 'Bu həftə: bu gün qeyd olunub',
+  'today.weekOpen': 'Bu həftə: bu gün hələ qeyd olunmayıb',
+  'today.cheer': 'Əla seans!',
+  'today.welcomeBack': 'Yenidən xoş gəldin!',
+  'today.toTier': 'Bağında «{tier}» səviyyəsinə {amount} qalıb',
+};

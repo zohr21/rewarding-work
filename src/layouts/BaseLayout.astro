@@ -97,6 +97,14 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
         }
         apply();
         document.addEventListener('astro:after-swap', apply);
+        // A picked language other than English: hide the page until src/scripts/i18n-boot.ts
+        // has swapped its text in, so English never flashes first. Shown anyway after 2 s.
+        var lang = get('lang');
+        if (typeof lang === 'string' && lang !== 'en') {
+          root.lang = lang;
+          root.setAttribute('data-i18n-wait', '');
+          setTimeout(function () { root.removeAttribute('data-i18n-wait'); }, 2000);
+        }
         // A brand-new user opening Today goes to Welcome first.
         var here = location.pathname.replace(/index\.html$/, '');
         if (welcomeUrl && here === homePath && !(applyModules() || {}).welcomed) location.replace(welcomeUrl);
@@ -106,7 +114,7 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
   </head>
   <body>
     <Ambient />
-    <a class="skip-link" href="#main">Skip to content</a>
+    <a class="skip-link" href="#main" data-t="nav.skip">Skip to content</a>
     {!bare && <SiteHeader />}
     <main id="main" tabindex="-1">
       <slot />
@@ -117,6 +125,10 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
     <UndoToast />
     {!bare && <Guide />}
     <GroveSpark />
+
+    <script>
+      import '../scripts/i18n-boot';
+    </script>
 
     {
       /* Service worker only in production builds — in dev it would cache stale files.
@@ -135,6 +147,10 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
 </html>
 
 <style>
+  :global(html[data-i18n-wait] body) {
+    visibility: hidden;
+  }
+
   .skip-link {
     position: absolute;
     left: var(--space-4);

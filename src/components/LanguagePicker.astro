@@ -1,0 +1,94 @@
+---
+/**
+ * The language choice under You › Preferences: "Same as this device" or one of LANGS.
+ * Each name is written in its own language, so it can be found whatever is showing.
+ * Picking one reloads the page in it (src/lib/i18n).
+ */
+import { BETA_LANGS, LANGS } from '../lib/i18n';
+---
+
+<div class="lang-pick" data-lang-pick>
+  <fieldset>
+    <legend class="visually-hidden" data-t="lang.label">Language</legend>
+    {
+      LANGS.map((l) => (
+        <label class="lang-pick__option">
+          <input type="radio" name="rw-lang" value={l.id} />
+          <span lang={l.id}>{l.name}</span>
+          {BETA_LANGS.includes(l.id) && (
+            <span class="lang-pick__beta" data-t="lang.beta">
+              beta
+            </span>
+          )}
+        </label>
+      ))
+    }
+  </fieldset>
+  <p class="muted lang-pick__note" data-t="lang.betaNote">
+    Russian and Azerbaijani are new. Parts of Grovyn are still in English while we translate them.
+  </p>
+</div>
+
+<script>
+  import { getLang, setLang, type Lang } from '../lib/i18n';
+  import { cleanups, listen, onPage } from '../lib/page';
+
+  onPage('lang-pick', () => {
+    const box = document.querySelector<HTMLElement>('[data-lang-pick]');
+    if (!box) return;
+    const c = cleanups();
+    const lang = getLang();
+    box.querySelectorAll<HTMLInputElement>('input[name="rw-lang"]').forEach((i) => (i.checked = i.value === lang));
+    c.add(
+      listen(box, 'change', (e) => {
+        const value = (e.target as HTMLInputElement).value as Lang;
+        if (value !== getLang()) setLang(value);
+      }),
+    );
+    return c.run;
+  });
+</script>
+
+<style>
+  .lang-pick fieldset {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .lang-pick__option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-block-size: 2.75rem;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-2, transparent);
+    cursor: pointer;
+  }
+
+  .lang-pick__option:has(input:checked) {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+  }
+
+  .lang-pick__option input {
+    accent-color: var(--color-accent);
+  }
+
+  .lang-pick__beta {
+    margin-inline-start: auto;
+    padding: 0.1em 0.6em;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    color: var(--color-accent);
+    border: 1px solid currentColor;
+  }
+
+  .lang-pick__note {
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-sm);
+  }
+</style>

@@ -18,6 +18,7 @@ const META_KEY = `${NAMESPACE}:meta`;
 export type StoreName =
   | 'theme'
   | 'appearance'
+  | 'lang' // the language picked under You › Preferences (src/lib/i18n); absent = follow the device; this device only
   | 'sessions'
   | 'timer'
   | 'timer-prefs'
@@ -43,7 +44,7 @@ export type StoreName =
   | 'sync';
 
 /** Cleared by "Delete all data". `sync` (account bookkeeping) is left alone. */
-const ALL_STORES: StoreName[] = ['theme', 'appearance', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'body-manual', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings', 'body-tiers'];
+const ALL_STORES: StoreName[] = ['theme', 'appearance', 'lang', 'sessions', 'timer', 'timer-prefs', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'breakdown', 'sound', 'health', 'body', 'body-manual', 'bank', 'profile', 'coach', 'screen', 'board', 'workouts', 'lock', 'findings', 'body-tiers'];
 
 /**
  * Stores copied to your account when you're signed in (src/lib/account).

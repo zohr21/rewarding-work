@@ -1,3 +1,5 @@
+import type { Key } from '../lib/i18n/en';
+
 /** Site-wide settings. Change the name here — it is used everywhere. */
 export const SITE = {
   name: 'Grovyn',
@@ -13,6 +15,8 @@ export const SITE = {
 
 export interface NavItem {
   label: string;
+  /** Its label's key in the word lists (src/lib/i18n/en.ts). */
+  t: Key;
   href: string;
   /** Every path that belongs to this item, when that is more than `href` and its children. */
   under?: string[];
@@ -33,22 +37,23 @@ export const APP_ONLY_MODULES: readonly ModuleId[] = ['screen'];
 
 /** The pages inside Focus, in the order of its tabs (FocusTabs.astro). Focus opens on the first. */
 export const FOCUS_TABS: NavItem[] = [
-  { label: 'Timer', href: '/timer' },
-  { label: 'Tasks', href: '/tasks' },
-  { label: 'Exam prep', href: '/exam', module: 'exam' },
-  { label: 'Coach', href: '/techniques', under: ['/techniques', '/problems'] },
+  { label: 'Timer', t: 'nav.timer', href: '/timer' },
+  { label: 'Tasks', t: 'nav.tasks', href: '/tasks' },
+  { label: 'Exam prep', t: 'nav.exam', href: '/exam', module: 'exam' },
+  { label: 'Coach', t: 'nav.coach', href: '/techniques', under: ['/techniques', '/problems'] },
 ];
 
 export const FOCUS: NavItem = {
   label: 'Focus',
+  t: 'nav.focus',
   href: FOCUS_TABS[0]!.href,
   under: FOCUS_TABS.flatMap((tab) => tab.under ?? [tab.href]),
 };
 
 export const NAV: NavItem[] = [
-  { label: 'Today', href: '/' },
+  { label: 'Today', t: 'nav.today', href: '/' },
   FOCUS,
-  { label: 'Health', href: '/health', module: 'health' },
-  { label: 'Budget', href: '/budget', module: 'budget' },
-  { label: 'Grove', href: '/progress' },
+  { label: 'Health', t: 'nav.health', href: '/health', module: 'health' },
+  { label: 'Budget', t: 'nav.budget', href: '/budget', module: 'budget' },
+  { label: 'Grove', t: 'nav.grove', href: '/progress' },
 ];

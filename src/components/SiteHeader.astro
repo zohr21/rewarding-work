@@ -20,11 +20,11 @@ const current = Astro.url.pathname;
     {
       /* The Android app navigates from its bottom bar (AppNav.astro) instead. */
       !NATIVE_APP && (
-        <nav class="site-nav" aria-label="Main">
+        <nav class="site-nav" aria-label="Main" data-t-aria-label="nav.main">
           <ul>
             {NAV.map((item) => (
               <li data-module={item.module}>
-                <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined}>
+                <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined} data-t={item.t}>
                   {item.label}
                 </a>
               </li>

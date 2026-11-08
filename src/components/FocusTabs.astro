@@ -11,11 +11,11 @@ const current = Astro.url.pathname;
 ---
 
 <div class="focus-bar">
-  <p class="focus-bar__title">{FOCUS.label}</p>
-  <nav class="focus-tabs" aria-label={FOCUS.label}>
+  <p class="focus-bar__title" data-t={FOCUS.t}>{FOCUS.label}</p>
+  <nav class="focus-tabs" aria-label={FOCUS.label} data-t-aria-label={FOCUS.t}>
     {
       FOCUS_TABS.map((tab) => (
-        <a href={url(tab.href)} data-module={tab.module} aria-current={isCurrent(current, tab) ? 'page' : undefined}>
+        <a href={url(tab.href)} data-module={tab.module} aria-current={isCurrent(current, tab) ? 'page' : undefined} data-t={tab.t}>
           {tab.label}
         </a>
       ))
