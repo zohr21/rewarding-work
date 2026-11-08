@@ -17,6 +17,7 @@ import { getChains, getSessions, read, setChainDay, write, type ChainEntry, type
 import { addDays, dayKey, isDayKey, startOfDay, type DayKey } from './dates';
 import { minutesByDay } from './stats';
 import { WORKOUT_TYPES, getWorkouts, isWorkoutType, workoutsByDay, type Workout, type WorkoutType } from './workouts';
+import { t, type Key } from './i18n';
 
 export type ChainKind = 'tick' | 'amount' | 'parts' | 'linked';
 export type LinkSource = 'focus' | WorkoutType;
@@ -62,9 +63,13 @@ export const KINDS: { id: ChainKind; title: string; sub: string }[] = [
   { id: 'amount', title: 'Amount', sub: 'A number with a goal: pages, glasses' },
   { id: 'parts', title: 'Parts of the day', sub: 'Several slots: prayers, meals, pills' },
   { id: 'linked', title: 'Linked', sub: 'Fills itself from Focus or Health' },
+  // Shown through data-t="chain.kind.<id>" / "chain.kind.<id>Sub" (ChainTracker.astro).
 ];
 
 export const PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
+/** The five prayers as this language names them, for a new chain's slots. */
+export const prayers = (): string[] => t('chain.prayers').split(',').map((p) => p.trim());
 
 /** Ready-made chains for the New chain form. */
 export const TEMPLATES: { label: string; habit: string; setup: ChainSetup }[] = [
@@ -75,6 +80,19 @@ export const TEMPLATES: { label: string; habit: string; setup: ChainSetup }[] = 
   { label: 'Water', habit: 'Water', setup: { kind: 'amount', goal: 8, unit: 'glasses' } },
   { label: 'Focus time', habit: 'Focus 50 min', setup: { kind: 'linked', source: 'focus', goal: 50 } },
 ];
+
+/**
+ * Template `i` in the current language: its chip (data-t="chain.tpl.<i>"), and the name and unit
+ * it fills in. Those are saved as the user's own text, so they stay in the language they were made in.
+ */
+export function template(i: number): { habit: string; setup: ChainSetup } | undefined {
+  const tpl = TEMPLATES[i];
+  if (!tpl) return undefined;
+  const setup: ChainSetup = { ...tpl.setup };
+  if (setup.kind === 'parts') setup.parts = prayers();
+  if (setup.kind === 'amount' && setup.unit) setup.unit = t(`chain.unit.${setup.unit}` as Key);
+  return { habit: t(`chain.tpl.${i}.habit` as Key), setup };
+}
 
 const KIND_IDS: readonly string[] = KINDS.map((k) => k.id);
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -212,7 +230,7 @@ export function linkData(sessions: FocusSession[] = getSessions(), workouts: Wor
 const usesKm = (source: LinkSource | undefined) => !!source && source !== 'focus' && WORKOUT_TYPES.find((t) => t.id === source)!.distance;
 
 export function linkUnit(setup: ChainSetup): string {
-  return usesKm(setup.source) ? 'km' : 'min';
+  return usesKm(setup.source) ? t('unit.km') : t('unit.minShort');
 }
 
 /** Workouts of the linked type on a day. */
@@ -237,25 +255,26 @@ export function dayOf(setup: ChainSetup, entry: DayEntry, key: DayKey, data?: Li
   if (setup.kind === 'amount') {
     const n = entry.n ?? 0;
     const goal = setup.goal || 1;
-    const unit = setup.unit ? ` ${setup.unit}` : '';
-    return { counted: n >= goal, partial: n > 0 && n < goal, short: fmt(n), long: `${fmt(n)} of ${fmt(goal)}${unit}`, share: Math.min(1, n / goal) };
+    return { counted: n >= goal, partial: n > 0 && n < goal, short: fmt(n), long: t('chain.nOfGoal', { n: fmt(n), goal: fmt(goal), unit: setup.unit ?? '' }).trim(), share: Math.min(1, n / goal) };
   }
   if (setup.kind === 'parts') {
     const total = setup.parts?.length ?? 0;
     const done = (entry.parts ?? []).slice(0, total).filter(Boolean).length;
     const need = setup.countAt ?? total;
-    return { counted: done >= need, partial: done > 0 && done < need, short: `${done}/${total}`, long: `${done} of ${total}`, share: total ? done / total : 0 };
+    return { counted: done >= need, partial: done > 0 && done < need, short: `${done}/${total}`, long: t('chain.nOf', { n: done, total }), share: total ? done / total : 0 };
   }
   if (setup.kind === 'linked') {
     const value = linkedValue(setup, key, data ?? linkData());
     const goal = setup.goal ?? 0;
     const unit = linkUnit(setup);
     const counted = goal > 0 ? value >= goal : value > 0;
-    const short = unit === 'km' ? fmt(Math.floor(value * 10) / 10) : `${Math.floor(value)}′`;
-    const long = goal > 0 ? `${short.replace('′', '')} of ${fmt(goal)} ${unit}` : value > 0 ? `${short.replace('′', '')} ${unit}` : 'Nothing yet';
+    const km = usesKm(setup.source);
+    const amount = km ? fmt(Math.floor(value * 10) / 10) : String(Math.floor(value));
+    const short = km ? amount : `${amount}′`;
+    const long = goal > 0 ? t('chain.nOfGoal', { n: amount, goal: fmt(goal), unit }) : value > 0 ? `${amount} ${unit}` : t('chain.nothingYet');
     return { counted, partial: !counted && value > 0, short, long, share: goal > 0 ? Math.min(1, value / goal) : counted ? 1 : 0 };
   }
-  return { counted: marked, partial: false, short: '', long: marked ? 'Done' : 'Not yet', share: marked ? 1 : 0 };
+  return { counted: marked, partial: false, short: '', long: marked ? t('chain.done') : t('chain.notYet'), share: marked ? 1 : 0 };
 }
 
 /** dayOf for a chain as the tracker lists it. */

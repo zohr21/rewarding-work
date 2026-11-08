@@ -9,13 +9,20 @@
  */
 import { addDays, dayKey, fromDayKey, type DayKey } from './dates';
 import type { Chain, DoneItem, FocusSession } from './storage';
+import { t, tn, type Key } from './i18n';
 
+/** English names, also the count of tiers. Show tierName(i) instead. */
 export const TIER_NAMES = ['Seedling', 'Sprout', 'Sapling', 'Tree', 'Grove'] as const;
 /** What each tier's coin is made of: gold is the best regular tier, diamond is for the hardest thresholds. */
 export const TIER_MATERIALS = ['Green', 'Bronze', 'Silver', 'Gold', 'Diamond'] as const;
 
-/** "Silver Sapling" — the tier at `index` with its material. */
-export const tierLabel = (index: number) => `${TIER_MATERIALS[index]} ${TIER_NAMES[index]}`;
+/** "Sapling", in the current language. */
+export const tierName = (index: number) => t(`tier.name.${index}` as Key);
+/** "Silver", in the current language. */
+export const tierMaterial = (index: number) => t(`tier.material.${index}` as Key);
+
+/** "Silver Sapling" — the tier at `index` with its material. One key each, since some languages make the two agree. */
+export const tierLabel = (index: number) => t(`tier.label.${index}` as Key);
 
 export type TrackId = 'focus' | 'sessions' | 'streak' | 'done' | 'rest' | 'move' | 'active' | 'workouts';
 
@@ -34,44 +41,58 @@ export interface Track {
   unit: (n: number) => string;
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => (n === 1 ? one : many);
-
 export const TRACKS: readonly Track[] = [
   {
     id: 'focus',
     group: 'focus',
-    how: 'All your focus minutes, finished sessions or not. Sprig grows with this one.',
-    title: 'Focus time',
+    get how() {
+      return t('tier.focus.how');
+    },
+    get title() {
+      return t('tier.focus.title');
+    },
     thresholds: [1, 5, 15, 40, 100],
-    describe: (n) => `${n} ${plural(n, 'hour')} of focus`,
-    unit: (n) => plural(n, 'hour'),
+    describe: (n) => tn('tier.focus.describe', n),
+    unit: (n) => tn('tier.focus.unit', n),
   },
   {
     id: 'sessions',
     group: 'focus',
-    how: 'Timer sessions you ran to the end.',
-    title: 'Sessions completed',
+    get how() {
+      return t('tier.sessions.how');
+    },
+    get title() {
+      return t('tier.sessions.title');
+    },
     thresholds: [1, 10, 30, 75, 150],
-    describe: (n) => `${n} completed ${plural(n, 'session')}`,
-    unit: (n) => plural(n, 'session'),
+    describe: (n) => tn('tier.sessions.describe', n),
+    unit: (n) => tn('tier.sessions.unit', n),
   },
   {
     id: 'streak',
     group: 'focus',
-    how: 'Your longest run of chain days. A missed day never takes a tier away.',
-    title: 'Best chain',
+    get how() {
+      return t('tier.streak.how');
+    },
+    get title() {
+      return t('tier.streak.title');
+    },
     thresholds: [3, 7, 14, 30, 66],
-    describe: (n) => `a ${n}-day chain`,
-    unit: (n) => plural(n, 'day'),
+    describe: (n) => tn('tier.streak.describe', n),
+    unit: (n) => tn('tier.streak.unit', n),
   },
   {
     id: 'done',
     group: 'focus',
-    how: 'Every task you finished, counted once.',
-    title: 'Things done',
+    get how() {
+      return t('tier.done.how');
+    },
+    get title() {
+      return t('tier.done.title');
+    },
     thresholds: [1, 10, 30, 75, 150],
-    describe: (n) => `${n} ${plural(n, 'thing')} done`,
-    unit: (n) => plural(n, 'thing'),
+    describe: (n) => tn('tier.done.describe', n),
+    unit: (n) => tn('tier.done.unit', n),
   },
 ];
 
@@ -84,38 +105,54 @@ export const BODY_TRACKS: readonly Track[] = [
   {
     id: 'rest',
     group: 'body',
-    title: 'Rested nights',
-    how: 'Nights with 7 hours of sleep or more, from Health Connect or added by hand.',
+    get title() {
+      return t('tier.rest.title');
+    },
+    get how() {
+      return t('tier.rest.how');
+    },
     thresholds: [3, 10, 30, 75, 150],
-    describe: (n) => `${n} rested ${plural(n, 'night')}`,
-    unit: (n) => plural(n, 'night'),
+    describe: (n) => tn('tier.rest.describe', n),
+    unit: (n) => tn('tier.rest.unit', n),
   },
   {
     id: 'move',
     group: 'body',
-    title: 'Moving days',
-    how: 'Days with 7,000 steps or more.',
+    get title() {
+      return t('tier.move.title');
+    },
+    get how() {
+      return t('tier.move.how');
+    },
     thresholds: [3, 10, 30, 75, 150],
-    describe: (n) => `${n} moving ${plural(n, 'day')}`,
-    unit: (n) => plural(n, 'day'),
+    describe: (n) => tn('tier.move.describe', n),
+    unit: (n) => tn('tier.move.unit', n),
   },
   {
     id: 'active',
     group: 'body',
-    title: 'Active weeks',
-    how: 'Weeks (Monday to Sunday) with 150 active minutes, workouts and brisk walks together.',
+    get title() {
+      return t('tier.active.title');
+    },
+    get how() {
+      return t('tier.active.how');
+    },
     thresholds: [1, 4, 12, 26, 52],
-    describe: (n) => `${n} active ${plural(n, 'week')}`,
-    unit: (n) => plural(n, 'week'),
+    describe: (n) => tn('tier.active.describe', n),
+    unit: (n) => tn('tier.active.unit', n),
   },
   {
     id: 'workouts',
     group: 'body',
-    title: 'Workouts logged',
-    how: 'Every workout you log on Health.',
+    get title() {
+      return t('tier.workouts.title');
+    },
+    get how() {
+      return t('tier.workouts.how');
+    },
     thresholds: [1, 10, 30, 75, 150],
-    describe: (n) => `${n} ${plural(n, 'workout')} logged`,
-    unit: (n) => plural(n, 'workout'),
+    describe: (n) => tn('tier.workouts.describe', n),
+    unit: (n) => tn('tier.workouts.unit', n),
   },
 ];
 

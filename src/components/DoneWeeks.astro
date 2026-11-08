@@ -3,8 +3,8 @@
 ---
 
 <section class="card done-weeks" data-done-weeks aria-labelledby="done-weeks-heading">
-  <h2 id="done-weeks-heading" class="panel-title">Things done per week</h2>
-  <p class="muted done-weeks__caption">From your Done list, last 8 weeks.</p>
+  <h2 data-t="grove.thingsDonePerWeek" id="done-weeks-heading" class="panel-title">Things done per week</h2>
+  <p data-t="grove.fromYourDoneListLast" class="muted done-weeks__caption">From your Done list, last 8 weeks.</p>
   <div class="done-weeks__chart" data-done-weeks-chart></div>
 </section>
 
@@ -13,6 +13,7 @@
   import { weeklySums } from '../lib/stats';
   import { formatShort } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
 
   const WEEKS = 8;
 
@@ -36,11 +37,11 @@
           out += `<text class="done-weeks__n${now ? ' is-now' : ''}" x="${x + 17}" y="${114 - h}">${w.value}</text>`;
           // Month on the first bar and whenever it changes; just the day otherwise.
           const prev = weeks[i - 1];
-          const label = now ? 'This wk' : !prev || prev.date.getMonth() !== w.date.getMonth() ? formatShort(w.date) : String(w.date.getDate());
+          const label = now ? t('doneWeeks.thisWk') : !prev || prev.date.getMonth() !== w.date.getMonth() ? formatShort(w.date) : String(w.date.getDate());
           out += `<text class="done-weeks__wk${now ? ' is-now' : ''}" x="${x + 17}" y="140">${label}</text>`;
         });
         const said = weeks.map((w) => w.value).join(', ');
-        chart.innerHTML = `<svg viewBox="0 0 400 146" role="img" aria-label="Things done per week over ${WEEKS} weeks, ending this week: ${said}">${out}</svg>`;
+        chart.innerHTML = `<svg viewBox="0 0 400 146" role="img" aria-label="${t('doneWeeks.aria', { n: WEEKS, values: said })}">${out}</svg>`;
       }
 
       render();

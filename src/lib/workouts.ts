@@ -7,6 +7,7 @@
  */
 import { read, write, type FocusSession } from './storage';
 import { dayKey, type DayKey } from './dates';
+import { t, type Key } from './i18n';
 
 export const WORKOUT_TYPES = [
   { id: 'run', label: 'Run', color: 'var(--cat-reward)', distance: true },
@@ -91,7 +92,9 @@ export function removeWorkout(id: string): void {
   write<WorkoutStore>('workouts', { ...s, items: s.items.filter((x) => x.id !== id) });
 }
 
-export const workoutType = (id: WorkoutType) => WORKOUT_TYPES.find((t) => t.id === id)!;
+export const workoutType = (id: WorkoutType) => WORKOUT_TYPES.find((w) => w.id === id)!;
+/** "Run", in the current language. */
+export const workoutLabel = (id: string) => t(`workout.type.${id}` as Key);
 
 export function workoutsByDay(items: Workout[]): Map<DayKey, Workout[]> {
   const out = new Map<DayKey, Workout[]>();
@@ -166,3 +169,5 @@ export function saveUsesMiles(miles: boolean): void {
 }
 
 export const EFFORT_WORDS = ['', 'Very easy', 'Easy', 'Easy', 'Moderate', 'Moderate', 'Fairly hard', 'Hard', 'Very hard', 'Near max', 'All out'];
+/** EFFORT_WORDS[n], in the current language. */
+export const effortWord = (n: number) => t(`workout.effort.${Math.max(1, Math.min(10, Math.round(n)))}` as Key);

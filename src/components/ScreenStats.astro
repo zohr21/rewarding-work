@@ -9,27 +9,27 @@ import ScreenSetup from './ScreenSetup.astro';
 
 <div class="screen-stats" data-screen-stats data-module="screen" hidden>
   <section class="card screen-stats__ask" data-ss-ask aria-labelledby="ss-ask-h" hidden>
-    <h2 id="ss-ask-h">Focus and phone</h2>
-    <p class="muted">Turn on Usage access to see phone time next to your focus.</p>
-    <button type="button" class="btn" data-screen-setup-open>Turn on</button>
+    <h2 data-t="grove.focusAndPhone" id="ss-ask-h">Focus and phone</h2>
+    <p data-t="grove.turnOnUsageAccessTo" class="muted">Turn on Usage access to see phone time next to your focus.</p>
+    <button data-t="grove.turnOn" type="button" class="btn" data-screen-setup-open>Turn on</button>
   </section>
 
   <div class="screen-stats__body" data-ss-body hidden>
     <section class="card screen-stats__card" aria-labelledby="ss-chart-h">
       <div class="screen-stats__head">
-        <h2 id="ss-chart-h">Focus and phone</h2>
-        <div class="screen-stats__range" role="group" aria-label="Range">
-          <button type="button" aria-pressed="true" data-ss-range="7">Week</button>
-          <button type="button" aria-pressed="false" data-ss-range="30">Month</button>
+        <h2 data-t="grove.focusAndPhone" id="ss-chart-h">Focus and phone</h2>
+        <div data-t-aria-label="grove.range" class="screen-stats__range" role="group" aria-label="Range">
+          <button data-t="grove.week" type="button" aria-pressed="true" data-ss-range="7">Week</button>
+          <button data-t="grove.month" type="button" aria-pressed="false" data-ss-range="30">Month</button>
         </div>
       </div>
       <div class="screen-stats__totals">
         <div>
-          <span class="screen-stats__key"><span class="screen-stats__swatch screen-stats__swatch--focus"></span>Focus</span>
+          <span class="screen-stats__key"><span class="screen-stats__swatch screen-stats__swatch--focus"></span><span data-t="grove.focus">Focus</span></span>
           <strong data-ss-focus></strong>
         </div>
         <div>
-          <span class="screen-stats__key"><span class="screen-stats__swatch screen-stats__swatch--phone"></span>Phone</span>
+          <span class="screen-stats__key"><span class="screen-stats__swatch screen-stats__swatch--phone"></span><span data-t="grove.phone">Phone</span></span>
           <strong data-ss-phone></strong>
         </div>
       </div>
@@ -38,20 +38,20 @@ import ScreenSetup from './ScreenSetup.astro';
     </section>
 
     <section class="card screen-stats__card" aria-labelledby="ss-apps-h" data-ss-apps-card>
-      <h2 id="ss-apps-h" data-ss-apps-title>Top apps this week</h2>
+      <h2 data-t="grove.topAppsThisWeek" id="ss-apps-h" data-ss-apps-title>Top apps this week</h2>
       <ul class="screen-stats__apps" data-ss-apps></ul>
     </section>
 
     <section class="card screen-stats__card" aria-labelledby="ss-focus-h">
-      <h2 id="ss-focus-h">Phone during focus</h2>
+      <h2 data-t="grove.phoneDuringFocus" id="ss-focus-h">Phone during focus</h2>
       <div class="screen-stats__tiles">
         <div>
           <strong class="screen-stats__leaves" data-ss-clean></strong>
-          <span class="muted" data-ss-clean-sub>sessions with no phone</span>
+          <span data-t="grove.sessionsWithNoPhone" class="muted" data-ss-clean-sub>sessions with no phone</span>
         </div>
         <div>
           <strong data-ss-pickups></strong>
-          <span class="muted" data-ss-pickups-sub>pick-ups</span>
+          <span data-t="grove.pickUps" class="muted" data-ss-pickups-sub>pick-ups</span>
         </div>
       </div>
     </section>
@@ -66,11 +66,12 @@ import ScreenSetup from './ScreenSetup.astro';
   import { getSessions, subscribe } from '../lib/storage';
   import { fromDayKey } from '../lib/dates';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { dateFormat, t, tn, type Key } from '../lib/i18n';
   import { el } from '../lib/dom';
 
-  const weekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
-  const dayMonth = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
-  const longDay = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
+  const weekday = dateFormat({ weekday: 'short' });
+  const dayMonth = dateFormat({ day: 'numeric', month: 'short' });
+  const longDay = dateFormat({ weekday: 'long' });
   /** The chart's top: phone days run long, so it stretches to the biggest day but no less than this. */
   const MIN_SCALE = 240;
 
@@ -109,11 +110,13 @@ import ScreenSetup from './ScreenSetup.astro';
       plot.setAttribute('role', 'img');
       plot.setAttribute(
         'aria-label',
-        `Focus and phone time per day, last ${range} days. ` +
-          days.map((d) => `${dayMonth.format(d.date)}: focus ${formatPhone(d.focus)}, phone ${d.phone === undefined ? 'not known' : formatPhone(d.phone)}`).join('; '),
+        `${t('screen.chartAria', { n: range })} ` +
+          days
+            .map((d) => t('screen.chartDay', { day: dayMonth.format(d.date), focus: formatPhone(d.focus), phone: d.phone === undefined ? t('screen.notKnown') : formatPhone(d.phone) }))
+            .join('; '),
       );
       if (top >= 240) {
-        const rule = el('span', 'screen-stats__rule', '4 h');
+        const rule = el('span', 'screen-stats__rule', t('unit.h', { n: 4 }));
         rule.style.insetBlockEnd = `${(240 / top) * 100}%`;
         plot.append(rule);
       }
@@ -143,18 +146,18 @@ import ScreenSetup from './ScreenSetup.astro';
         const rest = known.filter((d) => !best.includes(d));
         const avg = (xs: typeof known) => xs.reduce((a, d) => a + d.phone!, 0) / xs.length;
         const gap = Math.round(avg(rest) - avg(best));
-        const names = best.map((d) => (range > 7 ? dayMonth.format(d.date) : longDay.format(d.date))).join(' and ');
-        const which = best.length === 1 ? `Your biggest focus day, ${names},` : `Your two biggest focus days, ${names},`;
+        const names = best.map((d) => (range > 7 ? dayMonth.format(d.date) : longDay.format(d.date))).join(t('screen.and'));
+        const which = best.length === 1 ? 'one' : 'two';
         finding.textContent =
           gap >= 15
-            ? `${which} had ${formatMinutes(gap)} less phone time than your other days.`
+            ? t(`screen.find.less.${which}` as Key, { names, time: formatMinutes(gap) })
             : gap <= -15
-              ? `${which} had more phone time than your other days, so the phone isn't what's holding focus back.`
-              : `${which} had about the same phone time as your other days.`;
+              ? t(`screen.find.more.${which}` as Key, { names })
+              : t(`screen.find.same.${which}` as Key, { names });
         finding.hidden = false;
       }
 
-      $('[data-ss-apps-title]').textContent = range > 7 ? 'Top apps this month' : 'Top apps this week';
+      $('[data-ss-apps-title]').textContent = range > 7 ? t('screen.topMonth') : t('screen.topWeek');
       const apps = topApps(phone.map((p) => p.data), 4);
       const max = apps[0]?.min ?? 1;
       $('[data-ss-apps-card]').hidden = apps.length === 0;
@@ -181,10 +184,10 @@ import ScreenSetup from './ScreenSetup.astro';
       const counts = new Map<string, number>();
       for (const s of checked) for (const a of s.apps) counts.set(a.label, (counts.get(a.label) ?? 0) + 1);
       const most = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-      $('[data-ss-clean]').textContent = checked.length ? `${clean} of ${checked.length}` : '–';
-      $('[data-ss-clean-sub]').textContent = checked.length ? `sessions with no phone, ${clean} ${clean === 1 ? 'leaf' : 'leaves'}` : 'no sessions checked yet';
+      $('[data-ss-clean]').textContent = checked.length ? t('chain.nOf', { n: clean, total: checked.length }) : '–';
+      $('[data-ss-clean-sub]').textContent = checked.length ? tn('screen.cleanSub', clean) : t('screen.noneChecked');
       $('[data-ss-pickups]').textContent = String(pickups);
-      $('[data-ss-pickups-sub]').textContent = pickups && most ? `pick-ups, mostly ${most}` : pickups === 1 ? 'pick-up' : 'pick-ups';
+      $('[data-ss-pickups-sub]').textContent = pickups && most ? t('screen.pickupsMostly', { app: most }) : tn('screen.pickups', pickups);
     }
 
     async function load(): Promise<void> {

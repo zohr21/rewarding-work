@@ -12,7 +12,8 @@
  */
 import { getAccount, loadAccount, onAccountChange } from './account/state';
 import { addDays, dayKey, startOfDay, startOfWeek } from './dates';
-import { TIER_NAMES } from './rewards';
+import { tierName } from './rewards';
+import { dateFormat, t } from './i18n';
 import { sprigStage } from './sprig';
 import { getSessions, read, subscribe, write, type FocusSession } from './storage';
 
@@ -90,37 +91,42 @@ export function weekMinutes(sessions: FocusSession[], now = new Date()): number 
   return Math.min(WEEK_CAP_MIN, Math.round(total));
 }
 
+/** "Seed", "Sapling": the stage a league is named after. */
+export function leagueStage(tier: number): string {
+  return tier <= 0 ? t('board.seed') : tierName(Math.min(5, tier) - 1);
+}
+
 /** "Seed league", "Sapling league". */
 export function leagueName(tier: number): string {
-  return `${tier <= 0 ? 'Seed' : TIER_NAMES[Math.min(5, tier) - 1]} league`;
+  return t('board.league', { name: leagueStage(tier) });
 }
 
 /** "8 h 30", "45 min". */
 export function formatMinutes(min: number): string {
-  if (min < 60) return `${min} min`;
-  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}`;
+  if (min < 60) return t('unit.min', { n: min });
+  return t('board.hMm', { h: Math.floor(min / 60), mm: String(min % 60).padStart(2, '0') });
 }
 
 /** "2 d 14 h" until next Monday 00:00. */
 export function resetsIn(now = new Date()): string {
   const next = addDays(startOfWeek(now), 7).getTime();
   const hours = Math.max(1, Math.ceil((next - now.getTime()) / 3_600_000));
-  if (hours < 24) return `${hours} h`;
-  return hours % 24 ? `${Math.floor(hours / 24)} d ${hours % 24} h` : `${hours / 24} d`;
+  if (hours < 24) return t('unit.h', { n: hours });
+  return hours % 24 ? t('board.dH', { d: Math.floor(hours / 24), h: hours % 24 }) : t('board.d', { n: hours / 24 });
 }
 
 /** "Week of 27 Oct". */
 export function weekLabel(now = new Date()): string {
-  return `Week of ${new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(startOfWeek(now))}`;
+  return t('board.weekOf', { date: dateFormat({ day: 'numeric', month: 'short' }).format(startOfWeek(now)) });
 }
 
 const NAME_RE = /^[\p{L}\p{N}._-]{2,20}$/u;
 
 /** Null when fine, otherwise what to fix. */
 export function nicknameProblem(name: string): string | null {
-  if (name.length < 2) return 'At least 2 characters.';
-  if (name.length > 20) return '20 characters at most.';
-  if (!NAME_RE.test(name)) return 'Letters, numbers, dots, dashes and underscores only.';
+  if (name.length < 2) return t('board.err.short');
+  if (name.length > 20) return t('board.err.long');
+  if (!NAME_RE.test(name)) return t('board.err.chars');
   return null;
 }
 
@@ -222,14 +228,14 @@ export async function leaveBoard(): Promise<void> {
 /** Add a friend by their code. Returns a problem to show, or null when added. */
 export async function addFriend(input: string): Promise<string | null> {
   const code = cleanCode(input);
-  if (!code) return 'A code looks like OAK-7Q4K.';
+  if (!code) return t('board.err.codeShape');
   const settings = getBoard();
-  if (code === settings.code) return "That's your own code.";
-  if (settings.friends.length >= MAX_FRIENDS) return `You can have ${MAX_FRIENDS} friends on the board.`;
+  if (code === settings.code) return t('board.err.ownCode');
+  if (settings.friends.length >= MAX_FRIENDS) return t('board.err.maxFriends', { n: MAX_FRIENDS });
   const rt = await loadAccount();
   const uid = await rt.findFriendCode(code);
-  if (!uid) return 'No one has that code. Check it with your friend.';
-  if (settings.friends.includes(uid)) return 'Already one of your friends.';
+  if (!uid) return t('board.err.noCode');
+  if (settings.friends.includes(uid)) return t('board.err.already');
   setBoard({ friends: [...settings.friends, uid] });
   await pushEntry();
   return null;
@@ -260,7 +266,7 @@ function waitForUser(ms = 8000): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
       stop();
-      reject(new Error("Couldn't start a guest account. Check your connection."));
+      reject(new Error(t('board.err.guest')));
     }, ms);
     const stop = onAccountChange((s) => {
       if (!s.user) return;

@@ -13,45 +13,45 @@ import { url } from '../lib/paths';
 <div class="board" data-board data-enabled={ACCOUNTS_ENABLED ? '' : undefined}>
   {
     !ACCOUNTS_ENABLED && (
-      <p class="card muted">The weekly board needs accounts, which aren't set up on this copy of the site.</p>
+      <p data-t="grove.theWeeklyBoardNeedsAccounts" class="card muted">The weekly board needs accounts, which aren't set up on this copy of the site.</p>
     )
   }
 
   <div class="board__guest" data-board-guest hidden>
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
-    <p><strong>You're on as a guest.</strong> Save with email or Google so your rank survives a new phone.</p>
-    <a class="btn btn--small board__guest-save" href={`${url('/account')}#acc-save`}>Save</a>
+    <p><strong data-t="grove.youReOnAsA">You're on as a guest.</strong> <span data-t="grove.guestSave">Save with email or Google so your rank survives a new phone.</span></p>
+    <a data-t="grove.save" class="btn btn--small board__guest-save" href={`${url('/account')}#acc-save`}>Save</a>
   </div>
 
-  <div class="board-seg" role="group" aria-label="Who to compare with">
-    <button type="button" aria-pressed="true" data-board-tab="all">Everyone</button>
-    <button type="button" aria-pressed="false" data-board-tab="friends">Friends</button>
+  <div data-t-aria-label="grove.whoToCompareWith" class="board-seg" role="group" aria-label="Who to compare with">
+    <button data-t="grove.everyone" type="button" aria-pressed="true" data-board-tab="all">Everyone</button>
+    <button data-t="grove.friends" type="button" aria-pressed="false" data-board-tab="friends">Friends</button>
   </div>
 
   <div class="board__view" data-board-view="all">
     <div class="board__league">
       <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path d="M12 22v-7"></path><path d="M12 15c-4 0-6-3-6-6 3 0 6 2 6 6z"></path><path d="M12 13c0-4 2-7 6-7 0 4-2 7-6 7z"></path></svg>
       <div class="board__league-text">
-        <strong data-board-league>Your league</strong>
+        <strong data-t="grove.yourLeague" data-board-league>Your league</strong>
         <span class="muted" data-board-week></span>
       </div>
       <span class="muted board__count" data-board-count></span>
     </div>
 
-    <ol class="board__podium" data-board-podium aria-label="Top three"></ol>
+    <ol data-t-aria-label="grove.topThree" class="board__podium" data-board-podium aria-label="Top three"></ol>
 
     <div class="board__head" data-board-around-head>
-      <h2 class="board__h">Around you</h2>
-      <span class="muted">People at your stage of the grove</span>
+      <h2 data-t="grove.aroundYou" class="board__h">Around you</h2>
+      <span data-t="grove.peopleAtYourStageOf" class="muted">People at your stage of the grove</span>
     </div>
     <ol class="board__list" data-board-around></ol>
     <p class="muted board__empty" data-board-empty hidden></p>
 
     <div class="board__join" data-board-joincard hidden>
-      <h2 class="board__join-title">Your focus is only on this {NATIVE_APP ? 'phone' : 'device'}</h2>
-      <p class="muted">To appear on the board, Grovyn needs somewhere to keep your weekly total. A guest account takes one tap, no email.</p>
-      <button type="button" class="btn" data-board-join-open data-board-join-label>Join as a guest</button>
-      <a class="btn btn--ghost" href={`${url('/account')}#acc-signin`} data-board-signin>Sign in with Google or email</a>
+      <h2 class="board__join-title" data-t={NATIVE_APP ? 'grove.onlyPhone' : 'grove.onlyDevice'}>Your focus is only on this {NATIVE_APP ? 'phone' : 'device'}</h2>
+      <p data-t="grove.toAppearOnTheBoard" class="muted">To appear on the board, Grovyn needs somewhere to keep your weekly total. A guest account takes one tap, no email.</p>
+      <button data-t="grove.joinAsAGuest" type="button" class="btn" data-board-join-open data-board-join-label>Join as a guest</button>
+      <a data-t="grove.signInWithGoogleOr" class="btn btn--ghost" href={`${url('/account')}#acc-signin`} data-board-signin>Sign in with Google or email</a>
     </div>
   </div>
 
@@ -60,33 +60,33 @@ import { url } from '../lib/paths';
       <p class="muted board__friends-count" data-board-friends-count></p>
       <ol class="board__list" data-board-friends></ol>
       <div class="board__invite">
-        <h2 class="board__join-title">Grow with friends</h2>
-        <p class="muted">Share your code. Friends see your nickname, stage and weekly focus, nothing else.</p>
+        <h2 data-t="grove.growWithFriends" class="board__join-title">Grow with friends</h2>
+        <p data-t="grove.shareYourCodeFriendsSee" class="muted">Share your code. Friends see your nickname, stage and weekly focus, nothing else.</p>
         <div class="board__code-row">
           <span class="board__code" data-board-code>…</span>
-          <button type="button" class="btn btn--small" data-board-share>Share</button>
+          <button data-t="grove.share" type="button" class="btn btn--small" data-board-share>Share</button>
         </div>
         <form class="board__add" data-board-add novalidate>
-          <label for="board-add-code" class="board__add-label">Add a friend's code</label>
+          <label data-t="grove.addAFriendSCode" for="board-add-code" class="board__add-label">Add a friend's code</label>
           <div class="board__add-row">
-            <input id="board-add-code" class="input" name="code" placeholder="OAK-7Q4K" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-            <button type="submit" class="btn btn--ghost btn--small">Add</button>
+            <input id="board-add-code" class="input" name="code" placeholder="OAK-7Q4K" translate="no" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+            <button data-t="grove.add" type="submit" class="btn btn--ghost btn--small">Add</button>
           </div>
         </form>
         <p class="board__msg" role="status" data-board-friend-msg></p>
       </div>
     </div>
     <div class="board__join" data-board-friends-off hidden>
-      <h2 class="board__join-title">Join to add friends</h2>
-      <p class="muted">Once you're on the board you get a friend code to share, and can add theirs.</p>
-      <button type="button" class="btn" data-board-join-open>Join the board</button>
+      <h2 data-t="grove.joinToAddFriends" class="board__join-title">Join to add friends</h2>
+      <p data-t="grove.onceYouReOnThe" class="muted">Once you're on the board you get a friend code to share, and can add theirs.</p>
+      <button data-t="grove.joinTheBoard" type="button" class="btn" data-board-join-open>Join the board</button>
     </div>
   </div>
 
   <p class="board__status" role="status" data-board-status></p>
-  <button type="button" class="btn btn--ghost btn--small board__retry" data-board-retry hidden>Try again</button>
+  <button data-t="grove.tryAgain" type="button" class="btn btn--ghost btn--small board__retry" data-board-retry hidden>Try again</button>
   <p class="muted board__note" data-board-note hidden>
-    Up to 4 hours of focus a day counts. <a href={`${url('/account')}#acc-board`}>Your board settings</a>
+    <span data-t="grove.upTo4">Up to 4 hours of focus a day counts.</span> <a data-t="grove.yourBoardSettings" href={`${url('/account')}#acc-board`}>Your board settings</a>
   </p>
 </div>
 
@@ -112,6 +112,9 @@ import { url } from '../lib/paths';
   import { el } from '../lib/dom';
   import { getSessions, subscribe } from '../lib/storage';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { t, tn } from '../lib/i18n';
+
+  const youPrefix = () => `${t('board.you')} · `;
 
   /** A row to draw: a stored entry, you, or where you would be. */
   interface Row {
@@ -146,8 +149,8 @@ import { url } from '../lib/paths';
       const mine: Row = { uid: uid ?? 'you', name: getBoard().name, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous };
       const rows: Row[] = (league ?? []).filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
       const isIn = joined();
-      if (isIn) rows.push({ ...mine, name: `You · ${mine.name}`, you: true });
-      else rows.push({ ...mine, name: "You'd be here", ghost: true });
+      if (isIn) rows.push({ ...mine, name: youPrefix() + mine.name, you: true });
+      else rows.push({ ...mine, name: t('board.youdBeHere'), ghost: true });
       rows.sort((a, b) => b.minutes - a.minutes || Number(!!b.you || !!b.ghost) - Number(!!a.you || !!a.ghost));
       return { rows, me: rows.findIndex((r) => r.you || r.ghost) };
     }
@@ -161,11 +164,11 @@ import { url } from '../lib/paths';
     function rowEl(r: Row, rank: number, extra?: HTMLElement): HTMLLIElement {
       const li = el('li', `board-row${r.you ? ' board-row--you' : ''}${r.ghost ? ' board-row--ghost' : ''}`);
       li.append(el('span', 'board-row__rank', r.ghost ? `${rank}?` : String(rank)));
-      const av = el('span', r.ghost ? 'board-row__av board-row__av--ghost' : avClass(r.name), r.ghost ? '' : r.name.replace('You · ', '').charAt(0).toUpperCase());
+      const av = el('span', r.ghost ? 'board-row__av board-row__av--ghost' : avClass(r.name), r.ghost ? '' : r.name.replace(youPrefix(), '').charAt(0).toUpperCase());
       av.setAttribute('aria-hidden', 'true');
       const name = el('span', 'board-row__name');
       name.append(el('span', 'board-row__nick', r.name));
-      if (r.guest && !r.ghost) name.append(el('span', 'board-row__guest', 'guest'));
+      if (r.guest && !r.ghost) name.append(el('span', 'board-row__guest', t('board.guest')));
       li.append(av, name, el('span', 'board-row__time', formatMinutes(r.minutes)));
       if (extra) li.append(extra);
       return li;
@@ -174,13 +177,13 @@ import { url } from '../lib/paths';
     function renderAll(): void {
       const tier = myTier();
       $('[data-board-league]').textContent = leagueName(tier);
-      $('[data-board-week]').textContent = `${weekLabel()} · resets in ${resetsIn()}`;
+      $('[data-board-week]').textContent = `${weekLabel()} · ${t('board.resetsIn', { time: resetsIn() })}`;
       const podium = $('[data-board-podium]');
       const around = $('[data-board-around]');
       const empty = $('[data-board-empty]');
       $('[data-board-joincard]').hidden = joined() || league === null;
       const user = getAccount().user;
-      $('[data-board-join-label]').textContent = user ? 'Join the board' : 'Join as a guest';
+      $('[data-board-join-label]').textContent = user ? t('board.join') : t('board.joinGuest');
       $('[data-board-signin]').hidden = !!user;
       if (league === null) {
         podium.replaceChildren();
@@ -192,9 +195,9 @@ import { url } from '../lib/paths';
       }
       const { rows, me } = leagueRows();
       const others = rows.length - 1;
-      $('[data-board-count]').textContent = others === 1 ? '1 other' : `${others} others`;
+      $('[data-board-count]').textContent = tn('board.others', others);
       empty.hidden = others > 0;
-      empty.textContent = `Nobody else is in the ${leagueName(tier)} this week yet.${joined() ? '' : ' Be the first.'}`;
+      empty.textContent = t('board.nobody', { league: leagueName(tier) }) + (joined() ? '' : ` ${t('board.beFirst')}`);
 
       // The top three real rows, drawn second–first–third so the winner stands in the middle.
       const onPodium = rows.flatMap((r, i) => (r.ghost ? [] : [i])).slice(0, 3);
@@ -204,7 +207,7 @@ import { url } from '../lib/paths';
           const r = rows[index]!;
           const li = el('li', `board-podium__p board-podium__p--${place + 1}${r.you ? ' board-row--you' : ''}`);
           li.append(el('span', 'board-podium__rank', `#${index + 1}`));
-          const av = el('span', avClass(r.name), r.name.replace('You · ', '').charAt(0).toUpperCase());
+          const av = el('span', avClass(r.name), r.name.replace(youPrefix(), '').charAt(0).toUpperCase());
           av.setAttribute('aria-hidden', 'true');
           li.append(av, el('span', 'board-podium__name', r.name), el('span', 'board-podium__time', formatMinutes(r.minutes)));
           return li;
@@ -237,7 +240,7 @@ import { url } from '../lib/paths';
       }
       const sessions = getSessions();
       const rows: Row[] = friends.filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
-      rows.push({ uid: uid!, name: `You · ${settings.name}`, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true });
+      rows.push({ uid: uid!, name: youPrefix() + settings.name, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true });
       rows.sort((a, b) => b.minutes - a.minutes);
       list.replaceChildren(
         ...rows.map((r, i) => {
@@ -245,7 +248,7 @@ import { url } from '../lib/paths';
           const remove = el('button', 'board-row__remove');
           remove.type = 'button';
           remove.dataset.boardRemove = r.uid;
-          remove.setAttribute('aria-label', `Remove ${r.name} from your friends`);
+          remove.setAttribute('aria-label', t('board.removeFriend', { name: r.name }));
           remove.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>';
           return rowEl(r, i + 1, remove);
         }),
@@ -253,7 +256,7 @@ import { url } from '../lib/paths';
       const n = settings.friends.length;
       const quiet = n - (rows.length - 1);
       $('[data-board-friends-count]').textContent =
-        n === 0 ? 'No friends yet. Share your code below.' : `This week · ${n} ${n === 1 ? 'friend' : 'friends'}${quiet > 0 ? ` · ${quiet} not on the board yet` : ''}`;
+        n === 0 ? t('board.noFriends') : `${t('board.thisWeek')} · ${tn('board.friends', n)}${quiet > 0 ? ` · ${tn('board.quiet', quiet)}` : ''}`;
     }
 
     function render(): void {
@@ -273,7 +276,7 @@ import { url } from '../lib/paths';
     async function load(): Promise<void> {
       if (loading) return;
       loading = true;
-      status(league === null ? 'Loading the board…' : '');
+      status(league === null ? t('board.loading') : '');
       try {
         const tier = myTier();
         const [rows, mine] = await Promise.all([loadLeague(tier), joined() ? loadFriends() : Promise.resolve(null)]);
@@ -283,7 +286,7 @@ import { url } from '../lib/paths';
         status('');
       } catch (err) {
         const code = (err as { code?: string })?.code;
-        status(code === 'permission-denied' ? "The board isn't switched on for this project yet." : `Couldn't load the board. ${friendlyError(err)}`, true);
+        status(code === 'permission-denied' ? t('board.off') : t('board.loadFailed', { error: friendlyError(err) }), true);
       } finally {
         loading = false;
         render();
@@ -329,13 +332,13 @@ import { url } from '../lib/paths';
     async function shareCode(): Promise<void> {
       const code = getBoard().code;
       if (!code) return;
-      const text = `Grow with me on Grovyn. My friend code is ${code}.`;
+      const text = t('board.shareText', { code });
       const msg = $('[data-board-friend-msg]');
       try {
         if (navigator.share) await navigator.share({ text });
         else {
           await navigator.clipboard.writeText(code);
-          msg.textContent = 'Code copied.';
+          msg.textContent = t('board.copied');
         }
       } catch {
         /* closed the share sheet */
@@ -348,10 +351,10 @@ import { url } from '../lib/paths';
         e.preventDefault();
         const input = addForm.querySelector<HTMLInputElement>('input')!;
         const msg = $('[data-board-friend-msg]');
-        msg.textContent = 'Looking for that code…';
+        msg.textContent = t('board.looking');
         addFriend(input.value)
           .then((problem) => {
-            msg.textContent = problem ?? 'Added. They show up here once they focus this week.';
+            msg.textContent = problem ?? t('board.added');
             if (!problem) {
               input.value = '';
               void load();

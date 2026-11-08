@@ -2,17 +2,17 @@
 /** Two stat tiles: focus this week and sessions completed, each with a small graphic. Today has its own tab. */
 ---
 
-<section class="stats" data-progress-stats aria-label="Focus totals">
+<section data-t-aria-label="grove.focusTotals" class="stats" data-progress-stats aria-label="Focus totals">
   <div class="stat">
-    <p class="stat__label">This week</p>
-    <p class="stat__value"><span data-stat="week">0</span> <span class="stat__unit">min</span></p>
-    <p class="stat__sub muted" data-stat="week-sub">Mon–Sun</p>
+    <p data-t="grove.thisWeek" class="stat__label">This week</p>
+    <p class="stat__value"><span data-stat="week">0</span> <span data-t="grove.min" class="stat__unit">min</span></p>
+    <p data-t="grove.monSun" class="stat__sub muted" data-stat="week-sub">Mon–Sun</p>
     <div class="stat__chart" data-stat-week></div>
   </div>
   <div class="stat">
-    <p class="stat__label">Sessions completed</p>
+    <p data-t="grove.sessionsCompleted" class="stat__label">Sessions completed</p>
     <p class="stat__value"><span data-stat="sessions">0</span></p>
-    <p class="stat__sub muted">all time</p>
+    <p data-t="grove.allTime" class="stat__sub muted">all time</p>
     <div class="stat__chart" data-stat-trend></div>
   </div>
 </section>
@@ -22,6 +22,7 @@
   import { dailyMinutes, totals, weeklySums } from '../lib/stats';
   import { miniBars, sparkline } from '../lib/charts';
   import { cleanups, onPage } from '../lib/page';
+  import { locale, t as tr, tn } from '../lib/i18n';
 
   const TREND_WEEKS = 8;
 
@@ -38,17 +39,17 @@
         const sessions = getSessions();
         const now = new Date();
         const t = totals(sessions, now);
-        set('week', t.weekMin.toLocaleString());
-        set('sessions', t.completedSessions.toLocaleString());
-        set('week-sub', `${t.weekSessions} session${t.weekSessions === 1 ? '' : 's'} this week`);
+        set('week', t.weekMin.toLocaleString(locale()));
+        set('sessions', t.completedSessions.toLocaleString(locale()));
+        set('week-sub', tn('stats.weekSessions', t.weekSessions));
 
         // Monday to Sunday; days still to come are stubs.
         const days = dailyMinutes(sessions, ((now.getDay() + 6) % 7) + 1, now).map((d) => d.value);
         const padded = [...days, ...Array<number>(7 - days.length).fill(0)];
-        week.innerHTML = miniBars(padded, days.length - 1, `Focus minutes Monday to today: ${days.join(', ')}`);
+        week.innerHTML = miniBars(padded, days.length - 1, tr('stats.weekAria', { values: days.join(', ') }));
 
         const perWeek = weeklySums(sessions.filter((s) => s.completed), (s) => s.start, () => 1, TREND_WEEKS, now).map((w) => w.value);
-        trend.innerHTML = sparkline(perWeek, `Sessions completed per week, last ${TREND_WEEKS} weeks: ${perWeek.join(', ')}`);
+        trend.innerHTML = sparkline(perWeek, tr('stats.trendAria', { n: TREND_WEEKS, values: perWeek.join(', ') }));
       };
       render();
       c.add(subscribe('sessions', render));

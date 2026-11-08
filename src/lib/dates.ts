@@ -2,6 +2,7 @@
  * Local-calendar date helpers. Days are identified by a local "YYYY-MM-DD" key so a
  * session at 23:30 counts for the day the user experienced it, not the UTC day.
  */
+import { dateFormat } from './i18n';
 
 export type DayKey = string; // YYYY-MM-DD
 
@@ -42,10 +43,17 @@ export function fromDayKey(key: DayKey): Date {
   return new Date(y!, m! - 1, d!);
 }
 
-const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
-const shortFmt = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
-const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+// Made on first use, in the chosen language (it changes only with a reload). Not at load:
+// storage → dates → i18n → storage is a cycle, so nothing from i18n may run before it settles.
+let fmts: { day: Formatter; short: Formatter; month: Formatter } | undefined;
+type Formatter = ReturnType<typeof dateFormat>;
+const formats = () =>
+  (fmts ??= {
+    day: dateFormat({ weekday: 'short', day: 'numeric', month: 'short' }),
+    short: dateFormat({ day: 'numeric', month: 'short' }),
+    month: dateFormat({ month: 'short' }),
+  });
 
-export const formatDay = (d: Date) => dayFmt.format(d);
-export const formatShort = (d: Date) => shortFmt.format(d);
-export const formatMonth = (d: Date) => monthFmt.format(d);
+export const formatDay = (d: Date) => formats().day.format(d);
+export const formatShort = (d: Date) => formats().short.format(d);
+export const formatMonth = (d: Date) => formats().month.format(d);

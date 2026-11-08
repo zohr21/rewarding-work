@@ -6,8 +6,8 @@
 ---
 
 <section class="card donut-card" data-technique-donut aria-labelledby="technique-heading">
-  <h2 id="technique-heading" class="panel-title">Time by technique</h2>
-  <p class="muted donut-card__empty" data-donut-empty hidden>No focus time yet. Run a timer session and it shows up here.</p>
+  <h2 data-t="grove.timeByTechnique" id="technique-heading" class="panel-title">Time by technique</h2>
+  <p data-t="grove.noFocusTimeYetRun" class="muted donut-card__empty" data-donut-empty hidden>No focus time yet. Run a timer session and it shows up here.</p>
   <div class="donut-card__body" data-donut-body>
     <div class="donut-card__chart" data-donut-chart></div>
     <ul class="donut-card__legend" data-donut-legend></ul>
@@ -21,6 +21,7 @@
   import { modeLabel } from '../lib/i18n/labels';
   import { donut, sliceMark, type Slice } from '../lib/charts';
   import { cleanups, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
 
   const OTHER_SLOT = TIMER_MODES.length;
 
@@ -38,7 +39,7 @@
         const rows: (Slice & { name: string })[] = TIMER_MODES.map((mode, slot) => ({ name: modeLabel(mode), value: byMode.get(mode) ?? 0, slot }));
         let other = 0;
         for (const [mode, seconds] of byMode) if (!(TIMER_MODES as readonly string[]).includes(mode as TimerMode)) other += seconds;
-        rows.push({ name: 'Other', value: other, slot: OTHER_SLOT });
+        rows.push({ name: t('donut.other'), value: other, slot: OTHER_SLOT });
         const shown = rows.filter((r) => r.value >= 30);
         const total = shown.reduce((sum, r) => sum + r.value, 0);
 
@@ -56,9 +57,9 @@
         const shares = new Map(shown.map((r, i) => [r.slot, whole[i]!]));
         const pct = (r: Slice) => shares.get(r.slot)!;
         const min = Math.round(total / 60);
-        const big = min >= 60 ? `${Math.floor(min / 60)} h` : `${min} min`;
-        const small = min >= 60 && min % 60 ? `${min % 60} min` : '';
-        chart.innerHTML = donut(shown, big, small, `Focus time by timer mode: ${shown.map((r) => `${r.name} ${pct(r)}%`).join(', ')}`);
+        const big = min >= 60 ? t('unit.h', { n: Math.floor(min / 60) }) : t('unit.min', { n: min });
+        const small = min >= 60 && min % 60 ? t('unit.min', { n: min % 60 }) : '';
+        chart.innerHTML = donut(shown, big, small, t('donut.aria', { values: shown.map((r) => `${r.name} ${pct(r)}%`).join(', ') }));
         legend.replaceChildren(
           ...shown.map((r) => {
             const li = document.createElement('li');

@@ -74,6 +74,9 @@ export function findText(source) {
   function element(el) {
     const name = nameOf(el);
     if (SKIP.has(name)) return;
+    // translate="no": names, codes and file headers that stay as they are in every language.
+    const no = attr(el, 'translate');
+    if (no?.value?.type === 'Literal' && no.value.value === 'no') return;
     const html = /^[a-z]/.test(name);
     const insertAt = el.openingElement.name.end;
     const line = lineOf(el.start);
