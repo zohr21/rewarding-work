@@ -20,10 +20,10 @@ const { tool, timerMode } = Astro.props;
 {
   tool === 'progress' && (
     <section aria-labelledby="tool-progress-heading">
-      <h2 id="tool-progress-heading" class="panel-title">Your focus so far</h2>
+      <h2 id="tool-progress-heading" class="panel-title" data-t="tech.focusSoFar">Your focus so far</h2>
       <ProgressStats />
       <p class="tool-more">
-        <a href={url('/progress')}>See your grove</a>
+        <a href={url('/progress')} data-t="tech.seeGrove">See your grove</a>
       </p>
     </section>
   )

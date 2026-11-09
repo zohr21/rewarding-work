@@ -25,9 +25,9 @@ const Heading = headingLevel;
   </div>
   <Heading class="tcard__title">
     {/* The whole card is clickable via the stretched link. */}
-    <a href={url(`/techniques/${technique.id}`)}>{title}</a>
+    <a href={url(`/techniques/${technique.id}`)} data-t={`tech.${technique.id}.title`}>{title}</a>
   </Heading>
-  <p class="tcard__summary">{summary}</p>
+  <p class="tcard__summary" data-t={`tech.${technique.id}.summary`}>{summary}</p>
   <p class="tcard__meta" data-t="coach.tryIn" data-t-n={time_to_try}>Try it in {time_to_try} min</p>
 </article>
 

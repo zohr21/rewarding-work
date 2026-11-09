@@ -6,7 +6,8 @@ import CategoryBadge from '../../components/CategoryBadge.astro';
 import EvidenceBadge from '../../components/EvidenceBadge.astro';
 import TechniqueCard from '../../components/TechniqueCard.astro';
 import TechniqueTool from '../../components/TechniqueTool.astro';
-import { getTechniques, getRelated, type Technique } from '../../lib/techniques';
+import { getTechniques, getRelated, getTechniqueTexts, type Technique } from '../../lib/techniques';
+import { en } from '../../lib/i18n/en';
 import { EVIDENCE, PROBLEMS } from '../../data/taxonomy';
 import { url } from '../../lib/paths';
 
@@ -26,15 +27,26 @@ interface Props {
 const { technique, related } = Astro.props;
 const { title, summary, category, evidence, time_to_try, problems, tool, timer_mode, limits, evidence_note } = technique.data;
 const { Content } = await render(technique);
+
+// Build-time check: title and summary are shown from the language lists, so en.ts must match.
+const words = en as Record<string, unknown>;
+for (const [field, value] of [['title', title], ['summary', summary]] as const)
+  if (words[`tech.${technique.id}.${field}`] !== value)
+    throw new Error(`en.ts 'tech.${technique.id}.${field}' must be ${JSON.stringify(value)}. Update ru.ts and az.ts too.`);
+
+// The article in the other languages; the page shows the one picked (translatePage).
+const texts = await Promise.all(
+  (await getTechniqueTexts(technique)).map(async ({ lang, entry }) => ({ lang, data: entry.data, Content: (await render(entry)).Content })),
+);
 ---
 
 <BaseLayout title={title} description={summary}>
   <div class="container">
     <FocusTabs />
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <a href={url('/techniques')}>Coach</a>
+    <nav data-t-aria-label="tech.breadcrumb" class="crumbs" aria-label="Breadcrumb">
+      <a href={url('/techniques')} data-t="nav.coach">Coach</a>
       <span aria-hidden="true">/</span>
-      <span aria-current="page">{title}</span>
+      <span aria-current="page" data-t={`tech.${technique.id}.title`}>{title}</span>
     </nav>
 
     <article class="technique">
@@ -42,16 +54,16 @@ const { Content } = await render(technique);
         <div class="technique__badges">
           <CategoryBadge category={category} />
           <EvidenceBadge level={evidence} />
-          <span class="badge time-badge">⏱ {time_to_try} min to try</span>
+          <span class="badge time-badge">⏱ <span data-t="tech.minToTry" data-t-n={time_to_try}>{time_to_try} min to try</span></span>
         </div>
-        <h1>{title}</h1>
-        <p class="technique__summary">{summary}</p>
+        <h1 data-t={`tech.${technique.id}.title`}>{title}</h1>
+        <p class="technique__summary" data-t={`tech.${technique.id}.summary`}>{summary}</p>
         <p class="technique__problems">
-          Helps with:{' '}
+          <span data-t="tech.helpsWith">Helps with:</span>{' '}
           {
             problems.map((p, i) => (
               <>
-                <a href={url(`/problems/${p}`)}>“{PROBLEMS[p].title}”</a>
+                <a href={url(`/problems/${p}`)}><q data-t={`problem.${p}`}>{PROBLEMS[p].title}</q></a>
                 {i < problems.length - 1 ? ', ' : ''}
               </>
             ))
@@ -59,27 +71,49 @@ const { Content } = await render(technique);
         </p>
       </header>
 
-      <div class="prose technique__body">
+      <div class="prose technique__body" data-lang="en">
         <Content />
       </div>
+      {
+        texts.map(({ lang, Content: Body }) => (
+          <div class="prose technique__body" data-lang={lang} lang={lang} hidden>
+            <Body />
+          </div>
+        ))
+      }
 
       {tool && <div class="technique__tool"><TechniqueTool tool={tool} timerMode={timer_mode} /></div>}
 
       <section class="prose technique__section" aria-labelledby="limits-heading">
-        <h2 id="limits-heading">When it does not work</h2>
-        <ul>
+        <h2 id="limits-heading" data-t="tech.whenNot">When it does not work</h2>
+        <ul data-lang="en">
           {limits.map((l) => <li>{l}</li>)}
         </ul>
+        {
+          texts.map(({ lang, data }) => (
+            <ul data-lang={lang} lang={lang} hidden>
+              {data.limits.map((l) => <li>{l}</li>)}
+            </ul>
+          ))
+        }
       </section>
 
       <section class={`technique__section evidence evidence--${EVIDENCE[evidence].key}`} aria-labelledby="evidence-heading">
         <div class="evidence__head">
-          <h2 id="evidence-heading">Evidence</h2>
+          <h2 id="evidence-heading" data-t="tech.evidence">Evidence</h2>
           <EvidenceBadge level={evidence} />
         </div>
-        <p>{evidence_note}</p>
+        <p data-lang="en">{evidence_note}</p>
+        {
+          texts.map(({ lang, data }) => (
+            <p data-lang={lang} lang={lang} hidden>
+              {data.evidence_note}
+            </p>
+          ))
+        }
         <p class="evidence__scale muted">
-          <strong>{EVIDENCE[evidence].label}:</strong>{' '}{EVIDENCE[evidence].description}
+          <strong data-t={`tech.ev.${EVIDENCE[evidence].key}`}>{EVIDENCE[evidence].label}:</strong>{' '}
+          <span data-t={`ev.${EVIDENCE[evidence].key}Desc`}>{EVIDENCE[evidence].description}</span>
         </p>
       </section>
     </article>
@@ -87,7 +121,7 @@ const { Content } = await render(technique);
     {
       related.length > 0 && (
         <section class="related" aria-labelledby="related-heading">
-          <h2 id="related-heading">Related techniques</h2>
+          <h2 id="related-heading" data-t="tech.related">Related techniques</h2>
           <div class="related__grid">
             {related.map((t) => (
               <TechniqueCard technique={t} headingLevel="h3" />

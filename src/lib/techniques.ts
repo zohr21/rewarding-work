@@ -2,6 +2,22 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import type { ProblemSlug } from '../data/taxonomy';
 
 export type Technique = CollectionEntry<'techniques'>;
+export type TechniqueText = CollectionEntry<'techniqueTexts'>;
+
+/** Languages the articles are written in besides English. */
+export const ARTICLE_LANGS = ['ru', 'az'] as const;
+
+/** A technique's article in each other language; the build fails when one is missing or out of step. */
+export async function getTechniqueTexts(t: Technique): Promise<{ lang: (typeof ARTICLE_LANGS)[number]; entry: TechniqueText }[]> {
+  const all = await getCollection('techniqueTexts');
+  return ARTICLE_LANGS.map((lang) => {
+    const entry = all.find((e) => e.id === `${lang}/${t.id}`);
+    if (!entry) throw new Error(`Technique "${t.id}" has no ${lang} text: add src/content/techniques-i18n/${lang}/${t.id}.md`);
+    if (entry.data.limits.length !== t.data.limits.length)
+      throw new Error(`src/content/techniques-i18n/${lang}/${t.id}.md has ${entry.data.limits.length} limits, the English has ${t.data.limits.length}`);
+    return { lang, entry };
+  });
+}
 
 /** All techniques, alphabetically by title. */
 export async function getTechniques(): Promise<Technique[]> {

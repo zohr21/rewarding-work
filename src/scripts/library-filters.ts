@@ -36,7 +36,7 @@ export function initLibraryFilters(): void {
       const match =
         (!category || card.dataset.category === category) &&
         (!problem || (card.dataset.problems ?? '').split(' ').includes(problem)) &&
-        (!q || (card.dataset.title ?? '').includes(q));
+        (!q || `${card.dataset.title ?? ''} ${card.querySelector('a')?.textContent ?? ''}`.toLowerCase().includes(q));
       card.hidden = !match;
       if (match) shown++;
     }

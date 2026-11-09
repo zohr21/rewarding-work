@@ -6,8 +6,12 @@ import { url } from '../lib/paths';
 <BaseLayout title="Page not found">
   <div class="container">
     <header class="page-header">
-      <h1>That page doesn't exist.</h1>
-      <p>No harm done. Try the <a href={url('/techniques')}>technique library</a> or go <a href={url('/')}>home</a>.</p>
+      <h1 data-t="notFound.title">That page doesn't exist.</h1>
+      <p>
+        <span data-t="notFound.try">No harm done. Try the</span>{' '}<a href={url('/techniques')} data-t="notFound.library">technique library</a>{' '}<span
+          data-t="notFound.or">or go</span
+        >{' '}<a href={url('/')} data-t="notFound.home">home</a>.
+      </p>
     </header>
   </div>
 </BaseLayout>

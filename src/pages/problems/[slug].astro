@@ -5,9 +5,17 @@ import TechniqueCard from '../../components/TechniqueCard.astro';
 import { getTechniquesForProblem } from '../../lib/techniques';
 import { PROBLEMS, PROBLEM_SLUGS, type ProblemSlug } from '../../data/taxonomy';
 import { url } from '../../lib/paths';
+import { en } from '../../lib/i18n/en';
 
 export function getStaticPaths() {
   return PROBLEM_SLUGS.map((slug) => ({ params: { slug } }));
+}
+
+// Build-time check: the problem texts are shown from the language lists, so en.ts must match.
+const words = en as Record<string, unknown>;
+for (const p of PROBLEM_SLUGS) {
+  if (words[`problem.${p}`] !== PROBLEMS[p].title) throw new Error(`en.ts 'problem.${p}' must be ${JSON.stringify(PROBLEMS[p].title)}`);
+  if (words[`problem.${p}.explanation`] !== PROBLEMS[p].explanation) throw new Error(`en.ts 'problem.${p}.explanation' must match src/data/taxonomy.ts`);
 }
 
 const slug = Astro.params.slug as ProblemSlug;
@@ -20,31 +28,31 @@ const others = PROBLEM_SLUGS.filter((p) => p !== slug);
   <div class="container">
     <FocusTabs />
     <header class="page-header">
-      <p class="eyebrow">Problem</p>
-      <h1>“{problem.title}”</h1>
+      <p class="eyebrow" data-t="problem.eyebrow">Problem</p>
+      <h1><q data-t={`problem.${slug}`}>{problem.title}</q></h1>
     </header>
 
     <div class="prose">
-      <p class="lead">{problem.explanation}</p>
+      <p class="lead" data-t={`problem.${slug}.explanation`}>{problem.explanation}</p>
     </div>
 
     <section class="matches" aria-labelledby="matches-heading">
-      <h2 id="matches-heading">Techniques that can help ({techniques.length})</h2>
+      <h2 id="matches-heading" data-t="problem.canHelp" data-t-n={techniques.length}>Techniques that can help ({techniques.length})</h2>
       <div class="grid">
         {techniques.map((t) => <TechniqueCard technique={t} headingLevel="h3" />)}
       </div>
       <p class="more">
-        <a href={url(`/techniques?problem=${slug}`)}>See these in the technique library</a>
+        <a href={url(`/techniques?problem=${slug}`)} data-t="problem.seeInLibrary">See these in the technique library</a>
       </p>
     </section>
 
     <nav class="others" aria-labelledby="others-heading">
-      <h2 id="others-heading">Something else?</h2>
+      <h2 id="others-heading" data-t="problem.somethingElse">Something else?</h2>
       <ul>
         {
           others.map((p) => (
             <li>
-              <a href={url(`/problems/${p}`)}>{PROBLEMS[p].title}</a>
+              <a href={url(`/problems/${p}`)} data-t={`problem.${p}`}>{PROBLEMS[p].title}</a>
             </li>
           ))
         }

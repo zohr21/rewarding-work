@@ -149,6 +149,10 @@ const ATTRS = ['aria-label', 'title', 'placeholder', 'alt'] as const;
  */
 export function translatePage(root: ParentNode = document): void {
   document.documentElement.lang = getLang();
+  // Text written out in each language (articles): show the one picked.
+  root.querySelectorAll<HTMLElement>('[data-lang]').forEach((node) => {
+    node.hidden = node.dataset.lang !== getLang();
+  });
   if (getLang() === 'en') return;
   root.querySelectorAll<HTMLElement>('[data-t]').forEach((node) => {
     // data-t-n="5" fills {n} and picks the plural form: <span data-t="x.tryIn" data-t-n="5">Try it in 5 min</span>

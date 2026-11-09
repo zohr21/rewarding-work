@@ -20,9 +20,9 @@ const { title, summary, category, evidence, time_to_try, problems } = technique.
   <div class="trow__text">
     <h2 class="trow__title">
       {/* The whole row is clickable via the stretched link. */}
-      <a href={url(`/techniques/${technique.id}`)}>{title}</a>
+      <a href={url(`/techniques/${technique.id}`)} data-t={`tech.${technique.id}.title`}>{title}</a>
     </h2>
-    <p class="trow__summary">{summary}</p>
+    <p class="trow__summary" data-t={`tech.${technique.id}.summary`}>{summary}</p>
   </div>
   <div class="trow__badges">
     <CategoryBadge category={category} />
