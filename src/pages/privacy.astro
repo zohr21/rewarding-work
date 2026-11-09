@@ -2,18 +2,31 @@
 /**
  * Privacy policy. Keep it true to the code: if a feature starts storing or sending
  * something new, say so here in the same change.
+ *
+ * This English text is the one that applies. Russian and Azerbaijani translations are in
+ * src/components/privacy/; the page carries all three and shows the picked language. When you
+ * change the English, move PRIVACY_UPDATED in src/config/privacy.ts: the build then fails until
+ * the translations say the same and their dates there match.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 import { NATIVE_APP } from '../config/app';
+import { PRIVACY_TRANSLATED, PRIVACY_UPDATED } from '../config/privacy';
+import PrivacyRu from '../components/privacy/PrivacyRu.astro';
+import PrivacyAz from '../components/privacy/PrivacyAz.astro';
 
 const CONTACT = SITE.supportEmail;
-const UPDATED = '7 November 2026';
+const UPDATED = PRIVACY_UPDATED;
+
+// Build-time check: every translation was made from this version of the English.
+for (const [lang, from] of Object.entries(PRIVACY_TRANSLATED))
+  if (from !== UPDATED)
+    throw new Error(`The ${lang} privacy policy was translated from the ${from} version, but the English is ${UPDATED}. Update src/components/privacy/ and src/config/privacy.ts.`);
 ---
 
-<BaseLayout title="Privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
-  <div class="container">
+<BaseLayout title="Privacy" titleKey="footer.privacy" description={`What ${SITE.name} stores, where it goes, and how to delete it.`}>
+  <div class="container" data-lang="en">
     <header class="page-header">
       <h1>Privacy</h1>
       <p>What {SITE.name} stores, where it goes, and how to delete it. Last updated {UPDATED}.</p>
@@ -162,10 +175,25 @@ const UPDATED = '7 November 2026';
       <p>{SITE.name} is made by {SITE.owner}. © {new Date().getFullYear()} {SITE.owner}. All rights reserved.</p>
     </div>
   </div>
+  <div class="container" data-lang="ru" lang="ru" hidden>
+    <PrivacyRu />
+  </div>
+  <div class="container" data-lang="az" lang="az" hidden>
+    <PrivacyAz />
+  </div>
 </BaseLayout>
 
 <style>
-  .privacy {
+  .container :global(.privacy) {
     padding-bottom: var(--space-7);
+  }
+
+  .container :global(.privacy__note) {
+    margin-top: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-2);
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
   }
 </style>

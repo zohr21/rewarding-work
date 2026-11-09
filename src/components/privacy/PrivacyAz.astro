@@ -1,0 +1,165 @@
+---
+/**
+ * The privacy policy in Azerbaijani. A translation of src/pages/privacy.astro, which is the one
+ * that applies; keep the two saying the same (see src/config/privacy.ts).
+ */
+import { SITE } from '../../config/site';
+import { url } from '../../lib/paths';
+import { NATIVE_APP } from '../../config/app';
+
+const CONTACT = SITE.supportEmail;
+const you = NATIVE_APP ? 'Profil' : 'Hesab';
+---
+
+<header class="page-header">
+  <h1>Məxfilik</h1>
+  <p>{SITE.name} nəyi saxlayır, o hara gedir və onu necə silmək olar. Son yenilənmə: 7 noyabr 2026.</p>
+  <p class="privacy__note">
+    Bu, rahatlıq üçün tərcümədir. Əgər nədəsə ingilis versiyası ilə fərqlənirsə, ingilis versiyası qüvvədədir.
+  </p>
+</header>
+
+<div class="prose privacy">
+  <h2>Qısaca</h2>
+  <ul>
+    <li>Tapşırıqların, fokus seansların, görülənlər siyahın, zəncirin və ayarların öz cihazında saxlanılır: Android tətbiqində və ya saytda brauzerində.</li>
+    <li>Onlar cihazını yalnız sən istəsən tərk edir: hesaba girəndə və ya ixracı Google-a göndərəndə.</li>
+    <li>Nə tətbiqdə, nə də saytda reklam, analitika və ya izləmə yoxdur.</li>
+    <li>Android tətbiqində onun telefonundan oxuduqları (sağlamlıq göstəriciləri, telefon vaxtı, bank bildirişləri) telefonunda qalır.</li>
+  </ul>
+
+  <h2>Cihazında nə saxlanılır</h2>
+  <p>
+    Daxil etdiyin hər şey (tapşırıqlar, onların addımları və qeydləri, fokus seansları, görülənlər siyahısı, zəncirin,
+    həmçinin görünüş, səs və taymer ayarların) telefonunda tətbiqin qapalı yaddaşında, saytdan istifadə edəndə isə
+    brauzerinin yerli yaddaşında saxlanılır. Sayt internetsiz işləmək üçün öz səhifələrinin surətini də cihazda saxlayır.
+    Bunların heç biri bizə göndərilmir.
+  </p>
+  <p>
+    Ehtiyat nüsxə saxlamaq və ya hər şeyi silmək üçün: <a href={`${url('/account')}#acc-data`}>{you} → Məlumatların</a>.
+    Tətbiqi silmək və ya onun məlumatlarını (yaxud brauzerdə bu saytın məlumatlarını) təmizləmək də hər şeyi silir.
+  </p>
+
+  <h2>Hesab yaratsan</h2>
+  <p>
+    Hesab məcburi deyil. Hesaba girsən (e-poçt və parol ilə, Google ilə və ya qonaq kimi), məlumatların cihazların
+    arasında sinxronlaşmaq üçün Google Firebase-də də saxlanılır. Onda Firebase-də bunlar olur:
+  </p>
+  <ul>
+    <li>giriş məlumatların: göstərmisənsə, e-poçt ünvanın (parolunu Firebase heşlənmiş şəkildə saxlayır və biz onu heç vaxt görmürük), və ya Google ilə girmisənsə, Google hesabının adı və e-poçtu;</li>
+    <li>yuxarıda sadalanan eyni məlumatlar: tapşırıqlar, seanslar, görülənlər siyahısı, zəncir və ayarlar;</li>
+    <li>«Büdcə» səhifəsinə daxil etdiklərin: hər xərc kateqoriyası ilə, büdcələrin və təkrarlanan etdiyin ödənişlər;</li>
+    <li>həftəlik cədvələ qoşulsan: seçdiyin ləqəb, həftəlik fokus dəqiqələrin, səviyyən və cədvəldə dostlarının kim olduğu.</li>
+  </ul>
+  <p>
+    Hər hesab yalnız öz məlumatlarını oxuya və dəyişə bilər. Hesabını və orada saxlanılan hər şeyi istənilən vaxt
+    <a href={url('/account')}>{you}</a> səhifəsində və ya tətbiqsiz də işləyən{' '}
+    <a href={url('/delete-account')}>Hesabın silinməsi</a> keçidi ilə silə bilərsən. Məlumatların sən silənə qədər
+    hesabda qalır və siləndə Firebase-dən yox olur.
+  </p>
+
+  <h2>Həftəlik cədvəl</h2>
+  <p>
+    Həftəlik cədvəl sən ona qoşulana qədər sönülüdür. Qoşulanda başqaları ləqəbini, bu həftəki fokus dəqiqələrini və
+    səviyyəni görür — seçiminə görə hamı və ya yalnız cədvəldəki dostların. Sənin barəndə başqa heç nə göstərilmir,
+    tapşırıqların və seansların isə orada heç vaxt olmur. Hər həftə bazar ertəsi yenidən başlayır. Cədvəldən çıxanda
+    qeydin silinir. Tətbiqin Google Play versiyasında cədvəl hələ yoxdur.
+  </p>
+
+  <h2>«Google-a göndər»dən istifadə etsən</h2>
+  <p>
+    «Google-a göndər» öz Google Diskində ixrac pəncərəsində işarələdiyin məlumatlarla Google Cədvəl və ya Google Sənəd
+    yaradır. Ondan istifadə edəndə:
+  </p>
+  <ul>
+    <li>Google-un öz pəncərəsində daxil olursan və səndən bir icazə istənilir: fayl yaratmaq və bu saytın yaratdığı faylları açmaq. Sayt Diskindəki başqa heç bir faylı görə, dəyişə və ya silə bilməz;</li>
+    <li>fayl cihazında qurulur və birbaşa Google-a göndərilir. O, bizim heç bir serverimizdən keçmir;</li>
+    <li>Google-un verdiyi giriş yalnız həmin bir ixrac üçün istifadə olunur və saxlanılmır. Faylın surətini saxlamırıq və onu aça bilmirik;</li>
+    <li>fayl sənindir. Onu istədiyin vaxt Google Diskdə sil, saytın girişini isə istənilən vaxt Google hesabında, Təhlükəsizlik → Üçüncü tərəf girişi bölməsində ləğv et.</li>
+  </ul>
+  <p>
+    {SITE.name} xidmətinin Google API-lərindən aldığı məlumatlardan istifadəsi{' '}
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Xidmətləri İstifadəçi Məlumatları Siyasətinə</a>
+    (Google API Services User Data Policy), o cümlədən Məhdud İstifadə (Limited Use) tələblərinə uyğundur.
+  </p>
+
+  <h2>Android tətbiqində sağlamlıq məlumatları</h2>
+  <p>
+    Android tətbiqinin «Sağlamlıq» səhifəsi Health Connect-dən yuxu, addımlar, məşqlər, sakit nəbz, yandırılan kalori və
+    məsafəni oxuya bilər — və yalnız icazə verdiyin növləri. O, fokus vaxtının yanında göstərmək üçün günlük cəmləri oxuyur.
+    Health Connect-ə heç vaxt heç nə yazmır.
+  </p>
+  <ul>
+    <li>göstəricilər telefonunda qalır. Bizə göndərilmir, hesabına köçürülmür və ehtiyat nüsxələrə daxil edilmir;</li>
+    <li>reklam üçün istifadə olunmur və heç kimlə paylaşılmır;</li>
+    <li>icazəni istənilən vaxt Health Connect-də, Tətbiq icazələri bölməsində geri ala bilərsən. Tətbiqdə bütün məlumatları silmək oxunmuş son göstəriciləri də təmizləyir.</li>
+  </ul>
+  <p>
+    Tətbiq bu göstəriciləri son 90 gün üçün saxlayır, köhnələri silinir. Özün daxil etdiyin məşqlər və sağlamlıq
+    göstəriciləri, həmçinin tapıntılara verdiyin «Faydalıdır» / «Mənə aid deyil» cavabları da yalnız bu telefonda saxlanılır.
+  </p>
+  <p>«Büdcə» səhifəsinə daxil etdiklərin, sağlamlıq xərcləri də daxil, brauzerində və ya telefonunda, hesaba girmisənsə, həm də hesabında saxlanılır.</p>
+
+  <h2>Android tətbiqində ekran vaxtı</h2>
+  <p>
+    «Ekran vaxtı»nı yandırsan və Android ayarlarında istifadə statistikasına girişə icazə versən, tətbiq hər tətbiqdən
+    nə qədər istifadə etdiyini — günlər üzrə və fokus seansları zamanı — oxuyur ki, bunu planının yanında göstərsin.
+  </p>
+  <ul>
+    <li>bu məlumat telefonunda qalır. Bizə göndərilmir, hesabına köçürülmür və ehtiyat nüsxələrə daxil edilmir;</li>
+    <li>Android özü təfərrüatları təxminən bir həftə saxlayır; tətbiq öz günlük cəmlərini və son 300 fokus seansını saxlayır;</li>
+    <li>bunu istənilən vaxt Android ayarlarında, istifadə statistikasına giriş bölməsində söndürə bilərsən.</li>
+  </ul>
+
+  <h2>Android tətbiqində bank bildirişləri</h2>
+  <p>
+    «Büdcə» səhifəsində bank bildirişlərini yandırsan və Android ayarlarında bildirişlərə girişə icazə versən, tətbiq
+    seçdiyin bank tətbiqlərindən gələn yeni bildirişlərə baxır — və yalnız onlara. Hər birindən məbləği, mağazanı və vaxtı
+    oxuyur ki, xərci sənin yerinə əlavə etsin və ya əvvəlcə yoxlaman üçün saxlasın.
+  </p>
+  <ul>
+    <li>bütün digər tətbiqlərin bildirişlərinə məhəl qoyulmur və onlar heç vaxt saxlanılmır;</li>
+    <li>bildirişin mətni telefonunda qalır: tətbiq yoxlamanı gözləyən 400-ə qədər bildiriş və oxuduğu son 20 bildirişi saxlayır. Büdcənə — və hesaba girmisənsə, hesabına — yalnız saxladığın xərc düşür;</li>
+    <li>birdəfəlik kodlar buraxılır, uzun kart nömrələri isə gizlədilir;</li>
+    <li>bunu istənilən vaxt «Büdcə» səhifəsində söndürə və ya Android ayarlarında bildirişlərə girişi geri ala bilərsən.</li>
+  </ul>
+  {
+    !NATIVE_APP && (
+      <p>
+        Tətbiqin Google Play-dən yox, əllə quraşdırılan versiyası keçmiş bank SMS-lərini də bir dəfə — sən istəyəndə və
+        yalnız seçdiyin göndərənlərdən — oxuya bilər. O da eyni cür işləyir və hər şeyi eyni cür telefonda saxlayır.
+        Google Play versiyası SMS oxuya bilmir.
+      </p>
+    )
+  }
+
+  <h2>Ehtiyat nüsxələr</h2>
+  <p>
+    Android tətbiqi Android-in öz ehtiyat nüsxəsinə daxil deyil və yeni telefona köçürülmür. Məlumatlarını köçürmək
+    üçün hesaba gir və ya {you} → Məlumatların bölməsində ehtiyat nüsxə faylı saxla. Ehtiyat nüsxə faylında
+    tapşırıqların, seansların, görülənlər siyahın, zəncirin, imtahan planın və ayarların olur. Büdcə, sağlamlıq
+    göstəriciləri, məşqlər və ekran vaxtı qəsdən ona daxil edilmir; Büdcə hesabınla birlikdə köçür.
+  </p>
+
+  <h2>Saytın əlaqə saxladığı digər xidmətlər</h2>
+  <ul>
+    <li><strong>GitHub Pages</strong> saytı yerləşdirir. İstənilən veb-hostinq kimi, brauzerin səhifələri yükləyəndə GitHub IP ünvanını alır.</li>
+    <li><strong>YouTube</strong> — yalnız fon səsi kimi YouTube keçidi seçsən. Pleyer YouTube-un gücləndirilmiş məxfilik ünvanından (youtube-nocookie.com) yüklənir, sonra YouTube video pleyerin adətən aldığı məlumatları alır.</li>
+    <li><strong>Google</strong> — yalnız hesaba girsən, həftəlik cədvələ qoşulsan və ya yuxarıda təsvir olunduğu kimi «Google-a göndər»dən istifadə etsən.</li>
+  </ul>
+
+  <h2>Nə etmirik</h2>
+  <p>Məlumatlarını satmırıq və ya paylaşmırıq, reklam göstərmirik və onlardan sənə geri göstərməkdən başqa heç nə üçün istifadə etmirik.</p>
+
+  <h2>Uşaqlar</h2>
+  <p>{SITE.name} 13 yaşdan kiçik uşaqlar üçün nəzərdə tutulmayıb və onların məlumatlarını bilərəkdən toplamır.</p>
+
+  <h2>Bu siyasətdə dəyişikliklər</h2>
+  <p>{SITE.name} xidmətinin saxladığı və ya göndərdiyi şeylər dəyişsə, bu səhifə də onunla birlikdə dəyişir və yuxarıdakı tarix yenilənir.</p>
+
+  <h2>Suallar</h2>
+  <p>Yaz: <a href={`mailto:${CONTACT}`}>{CONTACT}</a>. Bu ünvana girə bilmədiyin hesabın silinməsi üçün müraciət də göndərə bilərsən.</p>
+
+  <h2>{SITE.name} xidmətini kim hazırlayır</h2>
+  <p>{SITE.name} xidmətini {SITE.owner} hazırlayır. © {new Date().getFullYear()} {SITE.owner}. Bütün hüquqlar qorunur.</p>
+</div>

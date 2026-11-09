@@ -2654,4 +2654,10 @@ export const az: Messages = {
   'footer.evidence': 'Hər texnika sübutlarla nə qədər dəstəkləndiyinə görə işarələnib. Nəyin işlədiyi insandan insana dəyişir; buradakı hər şeyə təcrübə kimi bax.',
   'footer.rights': 'Bütün hüquqlar qorunur.',
   'tech.breadcrumb': 'Naviqasiya yolu',
+
+  // Browser tab titles (BaseLayout titleKey)
+  'title.focusTimer': 'Fokus taymeri',
+  'title.notFound': 'Səhifə tapılmadı',
+  'title.deleteAccount': 'Hesabın silinməsi',
+  'title.welcome': 'Xoş gəldin',
 };

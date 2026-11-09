@@ -2780,6 +2780,12 @@ export const en = {
 
   // src/pages/techniques/[slug].astro (tagged by scripts/i18n/tag.mjs)
   'tech.breadcrumb': 'Breadcrumb',
+
+  // Browser tab titles (BaseLayout titleKey)
+  'title.focusTimer': 'Focus timer',
+  'title.notFound': 'Page not found',
+  'title.deleteAccount': 'Delete your account',
+  'title.welcome': 'Welcome',
 } as const;
 
 export type Key = keyof typeof en;

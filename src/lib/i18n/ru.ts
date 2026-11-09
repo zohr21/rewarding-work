@@ -2652,4 +2652,10 @@ export const ru: Messages = {
   'footer.evidence': 'У каждой техники есть отметка о том, насколько её подтверждают исследования. Что работает, у всех по-разному; относитесь ко всему здесь как к эксперименту.',
   'footer.rights': 'Все права защищены.',
   'tech.breadcrumb': 'Навигационная цепочка',
+
+  // Browser tab titles (BaseLayout titleKey)
+  'title.focusTimer': 'Таймер фокуса',
+  'title.notFound': 'Страница не найдена',
+  'title.deleteAccount': 'Удаление аккаунта',
+  'title.welcome': 'Добро пожаловать',
 };

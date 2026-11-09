@@ -16,12 +16,14 @@ import { url } from '../lib/paths';
 
 interface Props {
   title?: string;
+  /** The title's key in the language lists, so the browser tab follows the picked language. */
+  titleKey?: string;
   description?: string;
   /** A page on its own, with no header, footer or bottom bar (Welcome). */
   bare?: boolean;
 }
 
-const { title, description = SITE.description, bare = false } = Astro.props;
+const { title, titleKey, description = SITE.description, bare = false } = Astro.props;
 const fullTitle = title ? `${title} · ${SITE.name}` : SITE.name;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const swUrl = url('/sw.js');
@@ -38,7 +40,7 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{fullTitle}</title>
+    <title data-t-doc={title ? titleKey : undefined} data-t-doc-suffix={` · ${SITE.name}`}>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={url('/favicon.svg')} />

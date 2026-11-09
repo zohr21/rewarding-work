@@ -69,7 +69,10 @@ for (const file of astro) {
 // 3. English still written straight into markup.
 console.log('\nEnglish left in markup (text / attributes / by hand)');
 const rows = [];
+// Pages written out whole in one language (src/components/privacy/PrivacyRu.astro…) are not English.
+const WRITTEN_IN = /[\\/]privacy[\\/]Privacy(Ru|Az)\.astro$/;
 for (const file of astro) {
+  if (WRITTEN_IN.test(file)) continue;
   let found;
   try {
     found = findText(readFileSync(file, 'utf8'));

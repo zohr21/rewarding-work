@@ -40,7 +40,7 @@ const texts = await Promise.all(
 );
 ---
 
-<BaseLayout title={title} description={summary}>
+<BaseLayout title={title} titleKey={`tech.${technique.id}.title`} description={summary}>
   <div class="container">
     <FocusTabs />
     <nav data-t-aria-label="tech.breadcrumb" class="crumbs" aria-label="Breadcrumb">
