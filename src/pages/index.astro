@@ -13,9 +13,9 @@ import { SITE } from '../config/site';
       !NATIVE_APP && (
         <header class="hero">
           <h1>
-            Make the work feel <span class="hero__accent">worth doing.</span>
+            <span data-t="site.heroStart">Make the work feel</span> <span class="hero__accent" data-t="site.heroAccent">worth doing.</span>
           </h1>
-          <p class="hero__lead">{SITE.tagline}</p>
+          <p class="hero__lead" data-t="site.tagline">{SITE.tagline}</p>
         </header>
       )
     }

@@ -28,4 +28,17 @@ const techniques = defineCollection({
   }),
 });
 
-export const collections = { techniques };
+/**
+ * The same techniques in other languages: `<lang>/<slug>.md` holds the body, the limits and the
+ * evidence note. Title and summary live in the language lists (`tech.<slug>.title`), since cards
+ * on many pages show them. The article page checks every technique has each language.
+ */
+const techniqueTexts = defineCollection({
+  loader: glob({ pattern: '*/*.md', base: './src/content/techniques-i18n' }),
+  schema: z.object({
+    limits: z.array(z.string()).min(1),
+    evidence_note: z.string(),
+  }),
+});
+
+export const collections = { techniques, techniqueTexts };

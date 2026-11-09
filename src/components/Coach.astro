@@ -208,11 +208,11 @@ const ICONS: Record<string, string> = {
     if (!root) return;
     const { info, timer } = JSON.parse(root.querySelector('[data-coach-info]')!.textContent!) as { info: Record<string, Info>; timer: string };
     const $ = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
-    const title = (slug: string) => info[slug]?.title ?? slug;
+    const title = (slug: string) => (info[slug] ? t(`tech.${slug}.title` as Key) : slug);
     const blockerLabel = (id: string) => (BLOCKERS.some((b) => b.id === id) ? t(`coach.blocker.${id}` as Key) : '');
     const evidence = (slug: string) => (info[slug] ? t(`ev.${info[slug].evidence}` as Key) : '');
     const cue = (when: string) => t(`coach.cue.${when}` as Key);
-    const startText = (slug: string) => (START_TEXT[slug] ? t(`coach.startText.${slug}` as Key) : (info[slug]?.summary ?? ''));
+    const startText = (slug: string) => (START_TEXT[slug] ? t(`coach.startText.${slug}` as Key) : info[slug] ? t(`tech.${slug}.summary` as Key) : '');
     const sessionText = (slug: string) => (SESSION_TEXT[slug] ? t(`coach.sessionText.${slug}` as Key) : (info[slug]?.summary ?? ''));
     const helped = (w: { helped: number; tries: number }) => tn('coach.helped', w.tries, { helped: Math.round(w.helped) });
 
@@ -399,8 +399,8 @@ const ICONS: Record<string, string> = {
       const tech = info[slug]!;
       const w = getCoach().worked[slug];
       $('[data-answer-blocker]').textContent = blockerLabel(blocker);
-      $('[data-answer-title]').textContent = tech.title;
-      $('[data-answer-summary]').textContent = tech.summary;
+      $('[data-answer-title]').textContent = title(slug);
+      $('[data-answer-summary]').textContent = t(`tech.${slug}.summary` as Key);
       $('[data-answer-why]').textContent =
         w && w.tries && w.helped / w.tries >= 0.5
           ? t('coach.pickedBecause', { helped: helped(w), evidence: evidence(slug) })
