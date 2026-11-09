@@ -19,7 +19,7 @@ import pkg from '../../package.json';
 const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${SITE.name} ${NATIVE_APP ? `app ${pkg.version}` : 'website'}`)}`;
 ---
 
-<BaseLayout title={NATIVE_APP ? 'You' : 'Account'} description="Your account, your data and how the site looks. Signing in is optional.">
+<BaseLayout title={NATIVE_APP ? 'You' : 'Account'} titleKey={NATIVE_APP ? 'nav.you' : 'you.account'} description="Your account, your data and how the site looks. Signing in is optional.">
   <div class="container account" data-account-page>
     <header class="page-header account__head">
       <div>

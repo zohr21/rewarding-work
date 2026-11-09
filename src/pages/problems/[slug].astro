@@ -24,7 +24,7 @@ const techniques = await getTechniquesForProblem(slug);
 const others = PROBLEM_SLUGS.filter((p) => p !== slug);
 ---
 
-<BaseLayout title={problem.title} description={problem.explanation}>
+<BaseLayout title={problem.title} titleKey={`problem.${slug}`} description={problem.explanation}>
   <div class="container">
     <FocusTabs />
     <header class="page-header">

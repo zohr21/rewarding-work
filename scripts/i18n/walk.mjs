@@ -77,6 +77,8 @@ export function findText(source) {
     // translate="no": names, codes and file headers that stay as they are in every language.
     const no = attr(el, 'translate');
     if (no?.value?.type === 'Literal' && no.value.value === 'no') return;
+    // data-lang: text written out in one language (articles, privacy), shown only in that language.
+    if (attr(el, 'data-lang')) return;
     const html = /^[a-z]/.test(name);
     const insertAt = el.openingElement.name.end;
     const line = lineOf(el.start);

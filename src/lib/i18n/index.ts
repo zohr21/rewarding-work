@@ -164,4 +164,7 @@ export function translatePage(root: ParentNode = document): void {
       if (isKey(key)) node.setAttribute(attr, t(key));
     });
   }
+  // The tab title: <title data-t-doc="key" data-t-doc-suffix=" · Grovyn"> (BaseLayout's titleKey).
+  const title = document.querySelector<HTMLTitleElement>('title[data-t-doc]');
+  if (title && isKey(title.dataset.tDoc)) document.title = `${t(title.dataset.tDoc)}${title.dataset.tDocSuffix ?? ''}`;
 }
