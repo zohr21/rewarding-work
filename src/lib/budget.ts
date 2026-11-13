@@ -15,6 +15,7 @@
 import { newId, read, write } from './storage';
 import { addDays, dayKey, fromDayKey, isDayKey, type DayKey } from './dates';
 import { locale, t, type Key } from './i18n';
+import { deviceRegion, deviceSettings, regionCurrency } from './i18n/region';
 
 export const CATEGORIES = ['food', 'home', 'wellbeing', 'transport', 'fun', 'other'] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -217,6 +218,12 @@ export interface BudgetStore {
   planAt: number;
 }
 
+/** What a budget nobody has set up yet counts in: the device's own currency when Grovyn lists it, else "$". */
+export function defaultCurrency(): string {
+  const { tags, timeZone } = deviceSettings();
+  return regionCurrency(deviceRegion(tags, timeZone)) ?? EMPTY_BUDGET.currency;
+}
+
 export const EMPTY_BUDGET: BudgetStore = {
   v: 2,
   budget: null,
@@ -368,7 +375,7 @@ const pick = <T>(list: unknown, fn: (v: unknown) => T | null): T[] =>
 
 /** Anything stored or synced, made into a store: bad entries dropped, missing parts filled in. */
 export function normaliseBudget(raw: unknown): BudgetStore {
-  if (typeof raw !== 'object' || raw === null) return EMPTY_BUDGET;
+  if (typeof raw !== 'object' || raw === null) return { ...EMPTY_BUDGET, currency: defaultCurrency() };
   const s = raw as Record<string, unknown>;
   const legacy = s.v !== 2;
   const budgets: Partial<Record<Category, number>> = {};

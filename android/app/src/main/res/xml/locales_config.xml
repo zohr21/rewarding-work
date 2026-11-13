@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The languages Grovyn speaks (src/lib/i18n/langs.ts), so Android lists it under
+     Settings > Apps > Grovyn > Language. Keep the two lists the same. -->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android">
+    <locale android:name="en" />
+    <locale android:name="ru" />
+    <locale android:name="az" />
+</locale-config>

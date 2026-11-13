@@ -17,7 +17,7 @@ export const DEFAULT_LANG: Lang = 'en';
  * Grovyn never picks them by itself from the phone's language. Remove one when its
  * translation is complete and reviewed.
  */
-export const BETA_LANGS: readonly Lang[] = ['ru', 'az'];
+export const BETA_LANGS: readonly Lang[] = [];
 
 export function isLang(v: unknown): v is Lang {
   return typeof v === 'string' && LANGS.some((l) => l.id === v);

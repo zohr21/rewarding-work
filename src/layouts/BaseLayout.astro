@@ -12,6 +12,7 @@ import { ClientRouter } from 'astro:transitions';
 import { NATIVE_APP } from '../config/app';
 import { MODULES, SITE } from '../config/site';
 import { SCENES } from '../lib/storage';
+import { BETA_LANGS, LANGS } from '../lib/i18n/langs';
 import { url } from '../lib/paths';
 
 interface Props {
@@ -30,6 +31,8 @@ const swUrl = url('/sw.js');
 const swScope = url('/');
 const sceneIds = SCENES.join('|');
 const moduleIds = MODULES.map((m) => m.id);
+/** Languages Grovyn picks by itself from the device (the same rule as deviceLang in src/lib/i18n/langs.ts). */
+const autoLangs = LANGS.map((l) => l.id).filter((id) => !BETA_LANGS.includes(id));
 const homePath = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
 // Only the app opens on Welcome; the site's home page explains itself.
 const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
@@ -57,7 +60,7 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
       The client-side router resets <html> attributes to the new page's defaults on every
       navigation, so the same function runs again on astro:after-swap.
     -->
-    <script is:inline define:vars={{ sceneIds, moduleIds, homePath, welcomeUrl }}>
+    <script is:inline define:vars={{ sceneIds, moduleIds, homePath, welcomeUrl, autoLangs }}>
       (function () {
         var root = document.documentElement;
         var scenes = new RegExp('^(' + sceneIds + ')$');
@@ -99,9 +102,17 @@ const welcomeUrl = NATIVE_APP ? url('/welcome') : null;
         }
         apply();
         document.addEventListener('astro:after-swap', apply);
-        // A picked language other than English: hide the page until src/scripts/i18n-boot.ts
-        // has swapped its text in, so English never flashes first. Shown anyway after 2 s.
+        // A language other than English, picked or the device's own: hide the page until
+        // src/scripts/i18n-boot.ts has swapped its text in, so English never flashes first.
+        // Shown anyway after 2 s.
         var lang = get('lang');
+        if (typeof lang !== 'string') {
+          var tags = navigator.languages || [navigator.language];
+          for (var i = 0; i < tags.length && typeof lang !== 'string'; i++) {
+            var id = String(tags[i]).toLowerCase().split('-')[0];
+            if (autoLangs.indexOf(id) !== -1) lang = id;
+          }
+        }
         if (typeof lang === 'string' && lang !== 'en') {
           root.lang = lang;
           root.setAttribute('data-i18n-wait', '');
