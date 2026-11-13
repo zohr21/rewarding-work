@@ -710,9 +710,10 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   /*
-    The Android app: the timer is the screen, not a card on it. The dial leads, what
-    you're working on sits right under it, and the main button spans the screen where
-    a thumb reaches. Only the look and the order change; the markup and script don't.
+    The Android app: the timer is the screen, not a card on it. The dial leads and the
+    main button sits right under it, so Start is on screen without scrolling; the rhythm
+    and what you're working on follow. Only the look and the order change; the markup
+    and script don't.
   */
   :global(html[data-app]) .timer {
     gap: var(--space-4);
@@ -722,9 +723,9 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     box-shadow: none;
   }
 
-  /* The rhythm sits under the dial, as a chip. */
+  /* The rhythm sits under the main button, as a chip. */
   :global(html[data-app]) .timer__head {
-    order: 4;
+    order: 6;
     display: grid;
     justify-items: center;
     inline-size: 100%;
@@ -806,7 +807,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   :global(html[data-app]) .timer__message {
-    order: 5;
+    order: 4;
   }
 
   :global(html[data-app]) .timer__message:empty {
@@ -814,28 +815,28 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   }
 
   :global(html[data-app]) .timer__log {
-    order: 5;
+    order: 7;
     inline-size: 100%;
   }
 
   :global(html[data-app]) .timer__label {
-    order: 6;
-  }
-
-  :global(html[data-app]) .timer__task {
-    order: 7;
-  }
-
-  :global(html[data-app]) .timer__controls {
     order: 8;
   }
 
-  :global(html[data-app]) .timer__jot {
+  :global(html[data-app]) .timer__task {
     order: 9;
   }
 
-  :global(html[data-app]) .timer__footer {
+  :global(html[data-app]) .timer__controls {
+    order: 5;
+  }
+
+  :global(html[data-app]) .timer__jot {
     order: 10;
+  }
+
+  :global(html[data-app]) .timer__footer {
+    order: 11;
   }
 
   /* Four equal segments; the chosen one is raised, so green stays the colour of the main button. */
@@ -902,7 +903,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
   /* Your tasks, one tap each: a row that scrolls sideways under the field. */
   .timer__picks {
-    order: 6;
+    order: 8;
     display: flex;
     gap: var(--space-2);
     inline-size: 100%;

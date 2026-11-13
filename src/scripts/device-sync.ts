@@ -1,6 +1,6 @@
 /**
- * Keeps the Android app's home-screen widgets in step with your data, and goes where a
- * notification or widget asked to go when it opened the app. Loaded only in the app
+ * Keeps the Android app's home-screen widgets in step with your data, goes where a
+ * notification or widget asked to go when it opened the app, and answers Android's Back key. Loaded only in the app
  * (AppNav.astro); the native side is src/lib/device.ts.
  */
 import { getChains, getTasks, subscribe } from '../lib/storage';
@@ -39,8 +39,22 @@ async function followRoute(): Promise<void> {
   if (location.pathname + location.search !== target) location.assign(target);
 }
 
+/**
+ * Android's Back key (MainActivity asks before it leaves the page): put away what is open
+ * over the page. A sheet asks its form first, as a tap on its close button does. False
+ * lets Android go back a page, or leave the app from the first one.
+ */
+function handleBack(): boolean {
+  const top = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].at(-1);
+  if (!top) return false;
+  if (top.dispatchEvent(new Event('cancel', { cancelable: true }))) top.close();
+  // A dialog that refuses to close (the Budget lock) must not trap Back; a sheet asking about unsaved changes may.
+  return !top.open || top.matches('dialog.sheet');
+}
+
 export function mountDeviceSync(): () => void {
   const c = cleanups();
+  (window as Window & { grovynBack?: () => boolean }).grovynBack = handleBack;
   sendWidgets();
   c.add(subscribe('tasks', sendWidgets));
   c.add(subscribe('chain', sendWidgets));
