@@ -19,9 +19,10 @@ import { NATIVE_APP } from '../config/app';
       {!NATIVE_APP && <p data-t="budget.whatIsLeftThisMonth">What is left this month, whether you are on pace, and where it goes.</p>}
     </header>
 
-    {NATIVE_APP && <BankImport />}
+    {/* The money first: the plan with what is safe to spend and its Add button, then what the bank sent. */}
     <BudgetView>
       <BudgetPlan />
+      {NATIVE_APP && <BankImport />}
     </BudgetView>
     <p data-t="budget.yourIncomeGoalsExpensesAnd" class="muted budget__note">
       Your income, goals, expenses and budgets are kept on this device, and in your account when you are signed in. They are not part of the
@@ -36,11 +37,4 @@ import { NATIVE_APP } from '../config/app';
     font-size: var(--text-sm);
   }
 
-  .container > :global(.bk) {
-    margin-bottom: var(--space-5);
-  }
-
-  :global(html[data-app]) .container > :global(.bk) {
-    margin-top: var(--space-4);
-  }
 </style>

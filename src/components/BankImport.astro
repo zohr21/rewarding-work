@@ -277,7 +277,8 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
           : t('budget.b.pick');
       $('[data-bk-status]').title = sources.length ? t('budget.b.reading', { list: list(sources) }) : '';
       $('[data-bk-setup]').textContent = store.on ? t('budget.b.settings') : t('budget.b.setUp');
-      card.classList.toggle('bk--quiet', store.on && n > 0 && !store.pending.length && !store.imports.length && (access || state === null));
+      // Not set up yet is one slim row too: an offer, not the first thing on the page.
+      card.classList.toggle('bk--quiet', !store.pending.length && !store.imports.length && (!store.on || (n > 0 && (access || state === null))));
       $('[data-bk-access]').hidden = !store.on || access || state === null;
 
       const review = $('[data-bk-review]');
@@ -598,7 +599,7 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     margin: 0;
   }
 
-  /* On, with nothing to check: a single slim row. */
+  /* Nothing to check (on, or not set up yet): a single slim row. */
   .bk.bk--quiet {
     padding-block: var(--space-3);
   }

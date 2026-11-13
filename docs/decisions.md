@@ -6,6 +6,12 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Budget, money first.** In the app the plan card ("Safe to spend today") comes
+  right under the month; bank alerts moved below it, and are one slim row until they are set
+  up or have something to check. The floating + shows only while the plan card's own
+  "Add expense" button is out of sight, so it no longer covers the plan's figures at the top.
+  Left as it was: the page is still about six screens long.
+
 - **14 Nov · Five tabs and Grove clean-up.** The app's bar is Today · Focus · Grove · (one
   more) · You, never more than five. With Health and Budget both on they share one "Life" tab
   with Health | Budget tabs at the top of each page; with one on, the bar names it. Grove's
