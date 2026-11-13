@@ -45,7 +45,8 @@ onPage('budget-view', () => {
 ≥ 900 px, swipe down to close.
 - Open with any `[data-sheet-open="<id>"]` button; the dialog gets `sheet:open`.
 - A form with unsaved changes listens for the cancelable `sheet:dismiss` and can ask first.
-- Android back does not close a sheet yet.
+- Android Back closes the open sheet or dialog first (`grovynBack` in `src/scripts/device-sync.ts`,
+  called by `MainActivity`), then goes back a page.
 
 ## App vs site
 
