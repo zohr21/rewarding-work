@@ -15,6 +15,7 @@ import { en, type Key, type Plural } from './en';
 import { ru } from './ru';
 import { az } from './az';
 import { DEFAULT_LANG, deviceLang, isLang, type Lang } from './langs';
+import { deviceSettings, englishLocale } from './region';
 
 export { LANGS, BETA_LANGS, type Lang } from './langs';
 export type { Key } from './en';
@@ -43,10 +44,21 @@ export function setLang(lang: Lang | null): void {
   location.reload();
 }
 
-/** The locale for Intl date and number formats: English keeps the device's own formats. */
+let english: { locale: string | undefined } | null = null;
+
+/**
+ * The locale for Intl date and number formats. English follows the device's region
+ * (src/lib/i18n/region.ts): its own formats in the United States, day before month and the
+ * 24-hour clock where the phone is merely left on "English (United States)".
+ */
 export function locale(): string | undefined {
   const lang = getLang();
-  return lang === 'en' ? undefined : lang;
+  if (lang !== 'en') return lang;
+  if (!english) {
+    const { tags, timeZone } = deviceSettings();
+    english = { locale: englishLocale(tags, timeZone) };
+  }
+  return english.locale;
 }
 
 /**

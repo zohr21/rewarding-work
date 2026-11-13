@@ -45,12 +45,12 @@ import ChainToday from './ChainToday.astro';
   <div class="today__pair" data-td-pair hidden>
     <a class="card today__stat" href={`${url('/progress')}#stats`}>
       <span class="today__label" data-t="today.focusToday">Focus today</span>
-      <strong class="today__value" data-td-focus>0 min</strong>
+      <strong class="today__value" data-td-focus data-t="grove.n0Min">0 min</strong>
       <span class="today__chart" data-td-bars></span>
     </a>
     <a class="card today__stat" href={`${url('/progress')}#chains`} data-td-chain-card>
-      <span class="today__label" data-td-chain-label>Chain</span>
-      <strong class="today__value" data-td-chain>None yet</strong>
+      <span class="today__label" data-td-chain-label data-t="today.chain">Chain</span>
+      <strong class="today__value" data-td-chain data-t="today.chainNone">None yet</strong>
       <span class="today__dots" data-td-dots></span>
     </a>
   </div>

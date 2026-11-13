@@ -6,6 +6,14 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Wave 1 languages.** Russian and Azerbaijani are no longer "beta": Grovyn opens in
+  them by itself on a phone set to either. Welcome starts with a language row. English dates
+  follow the region (day before month and the 24-hour clock outside the United States), a new
+  budget starts in the local currency, and Android lists Grovyn's languages in its settings.
+  Not confirmed by the owner: treating "English (US)" outside a US time zone as British-style
+  dates. Still to do: a native read-through of both translations, and the week still starts
+  on Monday everywhere.
+
 - **14 Nov · Repo setup.** `CLAUDE.md`, `npm run verify`, Vitest, a check on every pull
   request, shared `.claude/launch.json` and `.claude/settings.json`. Work moves out of the
   OneDrive folder to a plain clone.

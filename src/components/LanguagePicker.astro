@@ -24,9 +24,13 @@ import { BETA_LANGS, LANGS } from '../lib/i18n';
       ))
     }
   </fieldset>
-  <p class="muted lang-pick__note" data-t="lang.betaNote">
-    Russian and Azerbaijani are new. Parts of Grovyn are still in English while we translate them.
-  </p>
+  {
+    BETA_LANGS.length > 0 && (
+      <p class="muted lang-pick__note" data-t="lang.betaNote">
+        Russian and Azerbaijani are new. Parts of Grovyn are still in English while we translate them.
+      </p>
+    )
+  }
 </div>
 
 <script>
