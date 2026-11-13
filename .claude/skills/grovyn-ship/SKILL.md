@@ -6,8 +6,9 @@ description: Finish a piece of Grovyn work — branch, commit message style, pul
 # Shipping Grovyn work
 
 Repo: `zohr21/rewarding-work`, default branch `main`. Pushing to `main` deploys the site to
-GitHub Pages (`.github/workflows/deploy.yml`). There are **no CI checks** on PRs; the user
-reviews on the phone and merges themselves. Commit, push and open PRs only when the user asks.
+GitHub Pages (`.github/workflows/deploy.yml`). Every PR runs `.github/workflows/check.yml`
+(translation check, tests, type check and site build); run `npm run verify` yourself before
+pushing. The user reviews on the phone and merges themselves. Commit, push and open PRs only when the user asks.
 
 ## Branch
 
@@ -50,6 +51,12 @@ Body sections, short:
 - **Not done / needs you** — e.g. "publish firestore.rules in the Firebase console",
   "install the new APK before adding data", untested paths.
 - End with the attribution line from the session's instructions.
+
+## Decisions log
+
+When the user picks an option or a feature ships, add a dated line to `docs/decisions.md`
+(the repo is public: no canvas links, no personal details). It is what a session on another
+machine reads.
 
 ## Memory note
 

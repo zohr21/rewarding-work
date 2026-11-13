@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm test*)",
+      "Bash(npx astro check*)",
+      "Bash(npx astro build*)",
+      "Bash(npx vitest*)",
+      "Bash(node scripts/*)",
+      "Bash(node .claude/skills/grovyn-phone/phone.mjs *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch --show-current)",
+      "Bash(git fetch*)",
+      "Bash(git switch *)",
+      "Bash(adb devices*)",
+      "Bash(adb mdns services)"
+    ]
+  }
+}

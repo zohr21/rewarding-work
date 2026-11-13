@@ -13,6 +13,8 @@ firestore-debug.log
 *.keystore
 keystore.properties
 
-# Claude Code: skills are shared, the rest is per machine
+# Claude Code: skills, preview servers and shared permissions are in the repo, the rest is per machine
 .claude/*
 !.claude/skills/
+!.claude/launch.json
+!.claude/settings.json

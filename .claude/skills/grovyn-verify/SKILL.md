@@ -46,7 +46,8 @@ normal week, and one odd case (very long title, huge number, an old-format copy)
 
 ## Then
 
-- `npx astro check` (the build fails on type errors).
+- `npm run verify` (type check, translation check, tests). Logic you changed in `src/lib`
+  gets a test in `tests/`.
 - For native or app-only behaviour, also check on the phone (`grovyn-phone`).
 - Clear any temporary stubs or seeded files you added to the repo.
 - Report honestly what was checked where: "checked in dev-app with seeded data, not on the

@@ -85,4 +85,4 @@ onPage('budget-view', () => {
 
 ## Before you finish
 
-`npx astro check` must pass (the build runs it). Then check it with `grovyn-verify`.
+`npm run verify` must pass (type check, translation check, tests). Then check it with `grovyn-verify`.
