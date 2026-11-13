@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "4411"
+      ],
+      "port": 4411
+    },
+    {
+      "name": "dev-app",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "astro",
+        "dev",
+        "--mode",
+        "app",
+        "--port",
+        "4413"
+      ],
+      "port": 4413
+    },
+    {
+      "name": "preview-build",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "astro",
+        "preview",
+        "--port",
+        "4412"
+      ],
+      "port": 4412
+    }
+  ]
+}

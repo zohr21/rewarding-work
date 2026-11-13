@@ -1,0 +1,37 @@
+# Checks every pull request before it is merged: translations, tests, types and the site build.
+# The same checks run locally with `npm run verify` (and `npm run build`).
+name: Check pull request
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Translations (keys that don't exist, or are left over)
+        run: npm run i18n:check
+
+      - name: Tests
+        run: npm test
+
+      # No Firebase or Google variables here: the build works without accounts.
+      - name: Type-check and build the site
+        run: npm run build

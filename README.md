@@ -1,7 +1,8 @@
 # Grovyn
 
-A static site that teaches evidence-aware techniques for making tasks feel rewarding —
-and lets you try each one on the spot. Built with Astro, TypeScript and plain CSS.
+A focus timer, tasks in small steps, and a grove that grows with every minute of focus,
+with evidence-aware techniques you can try on the spot. One codebase builds the website and
+the Android app (Capacitor). Built with Astro, TypeScript and plain CSS.
 No backend of its own: user data lives in the browser's localStorage. Optional accounts
 (email + password, Google, or guest) sync it through Firebase — see [Accounts](#accounts).
 
@@ -12,6 +13,7 @@ Requires Node.js 22.12 or newer (22.19+ recommended).
 ```bash
 npm install
 npm run dev        # http://localhost:4321/rewarding-work/
+npm run verify     # type-check + translation check + tests (also run on every pull request)
 npm run build      # type-check (astro check) + static build into dist/
 npm run preview    # serve the built site
 ```
