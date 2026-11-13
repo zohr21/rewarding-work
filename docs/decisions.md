@@ -6,6 +6,14 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Store screenshots.** Direction A: a caption above the real screen, seven frames
+  per language (`docs/store/en|ru|az/`), made by `scripts/store-shots.mjs`. Frames 1 to 5 show
+  the four-tab app; frame 6 Health and Budget; frame 7 the privacy promise in words. The
+  feature graphic shows Sprig, not a phone. Russian and Azerbaijani listing text is drafted in
+  `docs/play-listing.md`. Not confirmed by the owner: the captions and listing translations.
+  Found on the way: the mascot is "Сприг" in most Russian strings but "Росток" in four, and
+  "Sprig" in most Azerbaijani strings but "Cücərti" in five; pick one in the read-through.
+
 - **14 Nov · Wave 1 languages.** Russian and Azerbaijani are no longer "beta": Grovyn opens in
   them by itself on a phone set to either. Welcome starts with a language row. English dates
   follow the region (day before month and the 24-hour clock outside the United States), a new
