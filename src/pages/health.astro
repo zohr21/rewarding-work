@@ -7,6 +7,7 @@ import HealthGarden from '../components/HealthGarden.astro';
 import HealthMarkers from '../components/HealthMarkers.astro';
 import HealthSpendSummary from '../components/HealthSpendSummary.astro';
 import HealthToday from '../components/HealthToday.astro';
+import LifeTabs from '../components/LifeTabs.astro';
 import Sheet from '../components/Sheet.astro';
 import WorkoutLog from '../components/WorkoutLog.astro';
 import { NATIVE_APP } from '../config/app';
@@ -14,6 +15,7 @@ import { NATIVE_APP } from '../config/app';
 
 <BaseLayout title="Health" titleKey="nav.health" description="Rest, movement and what you put into feeling well, next to your focus.">
   <div class="container">
+    {NATIVE_APP && <LifeTabs />}
     <header class="page-header health__header">
       <h1 data-t="health.health">Health</h1>
     </header>
@@ -55,6 +57,19 @@ import { NATIVE_APP } from '../config/app';
 
   .health__header {
     margin-bottom: var(--space-3);
+  }
+
+  /* Under the Life tabs the tab already says Health. */
+  :global(html[data-app][data-mod-health][data-mod-budget]) .health__header {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  :global(html[data-app][data-mod-health][data-mod-budget]) .health {
+    margin-top: var(--space-4);
   }
 
   .health :global(.body__note) {

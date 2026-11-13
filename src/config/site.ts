@@ -50,6 +50,14 @@ export const FOCUS: NavItem = {
   under: FOCUS_TABS.flatMap((tab) => tab.under ?? [tab.href]),
 };
 
+/** Health and Budget, as the tabs of one "Life" place in the Android app when both are on (LifeTabs.astro). */
+export const LIFE_TABS: NavItem[] = [
+  { label: 'Health', t: 'nav.health', href: '/health' },
+  { label: 'Budget', t: 'nav.budget', href: '/budget' },
+];
+
+export const LIFE: NavItem = { label: 'Life', t: 'nav.life', href: LIFE_TABS[0]!.href, under: LIFE_TABS.map((tab) => tab.href) };
+
 export const NAV: NavItem[] = [
   { label: 'Today', t: 'nav.today', href: '/' },
   FOCUS,

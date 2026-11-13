@@ -1,21 +1,26 @@
 ---
 /**
  * The Android app's bottom bar (BaseLayout shows it only in the app build): Today, Focus,
- * Grove and You, plus Health and Budget while those sections are on (src/lib/profile.ts).
- * The current one is marked with a pill behind its icon. The timer, tasks, exam prep and
- * the techniques all live under Focus, as its tabs (FocusTabs.astro).
+ * Grove and You, and never more than five tabs. With one of Health and Budget on
+ * (src/lib/profile.ts) the bar names it; with both on they share one "Life" tab and
+ * LifeTabs.astro switches between them. The current one is marked with a pill behind its
+ * icon. The timer, tasks, exam prep and the techniques all live under Focus, as its tabs
+ * (FocusTabs.astro).
  */
-import { FOCUS, type NavItem } from '../config/site';
+import { FOCUS, LIFE, type NavItem } from '../config/site';
 import { isCurrent, url } from '../lib/paths';
 
 const current = Astro.url.pathname;
 
-const ITEMS: (NavItem & { icon: string })[] = [
+const HEART = 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z';
+/** `only`: "solo" shows while it is the one optional section on, "life" while both are. */
+const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
   { label: 'Today', t: 'nav.today', href: '/', icon: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1z' },
   { ...FOCUS, icon: 'M12 5a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM12 9v4l2.5 2M9 2h6' },
-  { label: 'Health', t: 'nav.health', href: '/health', module: 'health', icon: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z' },
-  { label: 'Budget', t: 'nav.budget', href: '/budget', module: 'budget', icon: 'M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM3 10h18M16 15h2' },
   { label: 'Grove', t: 'nav.grove', href: '/progress', icon: 'M12 21v-9M12 14c-4 0-6-3-6-6 4 0 6 2 6 6zM12 12c0-4 3-7 7-7 0 4-3 7-7 7z' },
+  { label: 'Health', t: 'nav.health', href: '/health', module: 'health', only: 'solo', icon: HEART },
+  { label: 'Budget', t: 'nav.budget', href: '/budget', module: 'budget', only: 'solo', icon: 'M5 6h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zM3 10h18M16 15h2' },
+  { ...LIFE, only: 'life', icon: HEART },
   { label: 'You', t: 'nav.you', href: '/account', icon: 'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM4 21c1-4 4-6 8-6s7 2 8 6' },
 ];
 ---
@@ -24,8 +29,8 @@ const ITEMS: (NavItem & { icon: string })[] = [
   <ul>
     {
       ITEMS.map((item) => (
-        <li data-module={item.module}>
-          <a href={url(item.href)} aria-current={isCurrent(current, item) ? 'page' : undefined}>
+        <li data-module={item.module} data-nav-only={item.only}>
+          <a href={url(item.href)} data-life-pages={item.only === 'life' ? (item.under ?? []).map((p) => url(p)).join(' ') : undefined} aria-current={isCurrent(current, item) ? 'page' : undefined}>
             <span class="app-nav__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="22" height="22">
                 <path d={item.icon} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -45,6 +50,22 @@ const ITEMS: (NavItem & { icon: string })[] = [
   import { onPage } from '../lib/page';
   onPage('device-sync', mountDeviceSync);
   onPage('bank-sync', mountBankSync);
+
+  // The Life tab opens whichever of its pages was open last, for as long as the app stays open.
+  onPage('life-link', () => {
+    const link = document.querySelector<HTMLAnchorElement>('[data-life-pages]');
+    if (!link) return;
+    const pages = (link.dataset.lifePages ?? '').split(' ').filter(Boolean);
+    const bare = (p: string) => p.replace(/index\.html$/, '').replace(/\/$/, '');
+    const here = pages.find((p) => bare(p) === bare(location.pathname));
+    try {
+      if (here) sessionStorage.setItem('rw-life', here);
+      const last = sessionStorage.getItem('rw-life');
+      if (last && pages.includes(last)) link.href = last;
+    } catch {
+      // No session storage: the tab opens its first page.
+    }
+  });
 </script>
 
 <style is:global>
@@ -55,6 +76,12 @@ const ITEMS: (NavItem & { icon: string })[] = [
 
   html[data-app] body {
     padding-bottom: var(--app-nav-h);
+  }
+
+  /* Health and Budget each have a tab while they are the only one on; together they share Life. */
+  html[data-mod-health][data-mod-budget] .app-nav [data-nav-only='solo'],
+  html:not([data-mod-health][data-mod-budget]) .app-nav [data-nav-only='life'] {
+    display: none;
   }
 
   /* A phone screen has less room for the page's introduction than the site does. */
@@ -107,7 +134,7 @@ const ITEMS: (NavItem & { icon: string })[] = [
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Six tabs on a 360px phone leave about 60px each; longer words (Здоровье) get a
+  /* Five tabs on a 360px phone leave about 70px each; longer words (Здоровье) get a
      slightly smaller size, and anything still too long ends in "…" instead of overlapping. */
   .app-nav a > span:last-child {
     max-inline-size: 100%;

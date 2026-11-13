@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Five tabs and Grove clean-up.** The app's bar is Today · Focus · Grove · (one
+  more) · You, never more than five. With Health and Budget both on they share one "Life" tab
+  with Health | Budget tabs at the top of each page; with one on, the bar names it. Grove's
+  Done is a row under "Next up" instead of a tab, and on a phone Sprig's card is the only box.
+  Not confirmed by the owner: the name "Life" ("Жизнь", "Həyat"), and Health and Budget now
+  coming after Grove in the bar. Screen time has no page of its own, so it is not a Life tab.
+
 - **14 Nov · Store screenshots.** Direction A: a caption above the real screen, seven frames
   per language (`docs/store/en|ru|az/`), made by `scripts/store-shots.mjs`. Frames 1 to 5 show
   the four-tab app; frame 6 Health and Budget; frame 7 the privacy promise in words. The
