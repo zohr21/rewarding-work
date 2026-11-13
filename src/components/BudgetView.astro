@@ -926,6 +926,14 @@ const icon = (d: string, w = 2) =>
       render();
     });
     for (const add of $$('[data-bv-add]')) add.addEventListener('click', () => openExpense(null));
+    // The floating Add button shows only while the plan card's own "Add expense" (BudgetPlan.astro) is
+    // out of sight, so at the top of the page it does not sit on the plan's figures.
+    const inCard = root.querySelector<HTMLElement>('[data-bp-expense]');
+    if (inCard && 'IntersectionObserver' in window) {
+      const seen = new IntersectionObserver((entries) => root.toggleAttribute('data-add-away', !entries.at(-1)!.isIntersecting));
+      seen.observe(inCard);
+      c.add(() => seen.disconnect());
+    } else root.setAttribute('data-add-away', '');
     $('[data-bv-add-repeat]').addEventListener('click', () => openExpense(null, true));
     for (const chip of $$<HTMLButtonElement>('[data-bv-chip]')) chip.addEventListener('click', () => setFilter((chip.dataset.bvChip || null) as Category | null));
     $<HTMLInputElement>('[data-bv-query]').addEventListener('input', (e) => {
@@ -982,6 +990,7 @@ const icon = (d: string, w = 2) =>
 
 <style>
   .bv[data-fresh] .bv__fab,
+  .bv:not([data-add-away]) .bv__fab,
   .bv:not([data-fresh]) .bv__first,
   .bv[data-fresh] .bv__charts,
   .bv[data-fresh] .bv__insights,
@@ -1630,7 +1639,7 @@ const icon = (d: string, w = 2) =>
     min-height: 44px;
   }
 
-  /* The app: a floating Add button above the bottom bar. */
+  /* The app: a floating Add button above the bottom bar, while the plan card's own Add button is out of sight. */
   .bv__fab {
     position: fixed;
     inset-inline-end: var(--space-4);
