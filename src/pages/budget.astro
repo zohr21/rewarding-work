@@ -4,10 +4,13 @@ import BudgetPlan from '../components/BudgetPlan.astro';
 import BudgetView from '../components/BudgetView.astro';
 import BankImport from '../components/BankImport.astro';
 import BudgetLock from '../components/BudgetLock.astro';
+import LifeTabs from '../components/LifeTabs.astro';
 import { NATIVE_APP } from '../config/app';
 ---
 
 <BaseLayout title="Budget" titleKey="nav.budget" description="What you spend, against a monthly budget: what is left, your pace, and where it goes.">
+  {/* Outside the page the lock covers, so Health stays one tap away while Budget is locked. */}
+  {NATIVE_APP && <div class="container"><LifeTabs /></div>}
   <div class="container budget-page">
     <BudgetLock />
     {/* In the app the bottom bar already says Budget: the money comes first. */}

@@ -235,7 +235,7 @@ export const TIPS: Tip[] = [
     area: 'Grove',
     title: 'Count the small wins too',
     text: 'Grove › Done: add things you finished without the timer. Seeing them is part of the reward.',
-    show: { path: '/progress', tab: '[data-grove-tab="done"]', target: '[data-done-form]' },
+    show: { path: '/progress', tab: '[data-grove-open="done"]', target: '[data-done-form]' },
     when: (c) => done(c).length >= 3 && c.done.length === 0,
     because: 'Because your Done list is still empty.',
   },

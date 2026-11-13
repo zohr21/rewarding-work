@@ -32,6 +32,8 @@ import { url } from '../lib/paths';
     <h3 data-t="grove.nextUp" id="tiers-soon-heading" class="tiers__markers">Next up</h3>
     <ul class="tiers__soon-list" data-tiers-soon-list></ul>
   </section>
+  {/* Rows the page adds between "Next up" and all the markers (the grove's Done row). */}
+  <slot />
   <div class="tiers__head" data-tiers-head>
     <h3 data-t="grove.allMarkers" class="tiers__markers">All markers</h3>
     <div data-t-aria-label="grove.whichMarkers" class="tiers__groups" role="group" aria-label="Which markers" data-tiers-groups hidden>
@@ -361,6 +363,20 @@ import { url } from '../lib/paths';
 <style>
   .tiers [hidden] {
     display: none;
+  }
+
+  /* On a phone the page is the card: Sprig's patch is the only box, the lists sit on the page. */
+  @media (max-width: 30rem) {
+    .tiers {
+      padding: 0;
+      border: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .tiers__sprig {
+      margin-top: 0;
+    }
   }
 
   /* Sprig, on its own patch of ground, with what it is and how far to the next stage. */

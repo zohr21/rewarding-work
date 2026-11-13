@@ -159,10 +159,13 @@ for (const a of AREAS) if (words[areaKey(a)] !== a) throw new Error(`Help: en.ts
   }
 
   /** Open a tab first when the thing lives on one. */
+  /** A tab that is selected, or a row whose view is open (the grove's Done row). */
+  const isOpen = (tab: Element | null) => !!tab && (tab.getAttribute('aria-selected') === 'true' || tab.hasAttribute('data-open'));
+
   async function openTab(selector?: string): Promise<void> {
     if (!selector) return;
     const tab = document.querySelector<HTMLElement>(selector);
-    if (tab && tab.getAttribute('aria-selected') !== 'true') {
+    if (tab && !isOpen(tab)) {
       tab.click();
       await wait(300);
     }
@@ -268,7 +271,7 @@ for (const a of AREAS) if (words[areaKey(a)] !== a) throw new Error(`Help: en.ts
       const tour = tourById(askedTour);
       if (tour && tourOn(tour)) later(() => void runTour(tour).then(dots));
     } else if (!timerRunning()) {
-      const selected = tabs.find((t) => document.querySelector(t.tab!)?.getAttribute('aria-selected') === 'true');
+      const selected = tabs.find((t) => isOpen(document.querySelector(t.tab!)));
       const first = page && tourOn(page) && isNew(page) ? page : selected && isNew(selected) ? selected : null;
       if (first) later(() => void runTour(first).then(dots));
     }

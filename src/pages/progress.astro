@@ -14,11 +14,13 @@ import { NATIVE_APP } from '../config/app';
 import { BOARD_ENABLED } from '../config/firebase';
 import { url } from '../lib/paths';
 
-/** The grove's tabs, in order. `hash` is what links use to open one (#stats); the first is the default. */
+/**
+ * The grove's tabs, in order. `hash` is what links use to open one (#stats); the first is the default.
+ * Done is not a tab: it opens from a row on the Grove tab (#done) and counts as part of it.
+ */
 const TABS = [
   { id: 'grove', label: 'Grove' },
   { id: 'stats', label: 'Stats' },
-  { id: 'done', label: 'Done' },
   { id: 'chains', label: 'Chains' },
   ...(BOARD_ENABLED ? [{ id: 'board', label: 'Board' }] : []),
 ];
@@ -50,7 +52,13 @@ const TABS = [
     {/* Panel ids differ from the hashes, so opening #done does not scroll the tabs away. */}
     <div class="progress">
       <section class="grove-panel" role="tabpanel" id="grove-panel-grove" aria-labelledby="grove-tab-grove" data-grove-panel="grove">
-        <RewardTiers />
+        <RewardTiers>
+        <button type="button" class="grove-row" data-grove-open="done">
+          <span data-t="grove.doneThisWeek">Done this week</span>
+          <strong data-grove-done-count>0</strong>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        </RewardTiers>
       </section>
 
       <section class="grove-panel" role="tabpanel" id="grove-panel-stats" aria-labelledby="grove-tab-stats" data-grove-panel="stats" hidden>
@@ -69,6 +77,10 @@ const TABS = [
       </section>
 
       <section class="grove-panel" role="tabpanel" id="grove-panel-done" aria-labelledby="grove-tab-done" data-grove-panel="done" hidden>
+        <button type="button" class="grove-back" data-grove-open="grove">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          <span data-t="grove.backToGrove">Back to Grove</span>
+        </button>
         <DoneList />
       </section>
 
@@ -97,6 +109,8 @@ const TABS = [
 <script>
   import { getDone, getSessions, subscribe } from '../lib/storage';
   import { cleanups, listen, onPage } from '../lib/page';
+  import { startOfWeek } from '../lib/dates';
+  import { locale } from '../lib/i18n';
 
   onPage('progress-history', () => {
     const history = document.querySelector<HTMLElement>('[data-progress-history]');
@@ -123,16 +137,22 @@ const TABS = [
     const tabs = [...bar.querySelectorAll<HTMLButtonElement>('[data-grove-tab]')];
     const panels = [...document.querySelectorAll<HTMLElement>('[data-grove-panel]')];
     const ids = tabs.map((t) => t.dataset.groveTab!);
+    const views = panels.map((p) => p.dataset.grovePanel!);
+    const openers = [...document.querySelectorAll<HTMLButtonElement>('[data-grove-open]')];
+    const doneCount = document.querySelector<HTMLElement>('[data-grove-done-count]');
 
     const fromHash = (): string => {
       const h = location.hash.slice(1);
       const id = ALIASES[h] ?? h;
-      return ids.includes(id) ? id : ids[0]!;
+      return views.includes(id) ? id : ids[0]!;
     };
 
     const show = (id: string, focus = false) => {
+      // A view without a tab of its own (Done) sits under the first tab.
+      const under = ids.includes(id) ? id : ids[0]!;
+      openers.forEach((o) => o.toggleAttribute('data-open', o.dataset.groveOpen === id));
       tabs.forEach((t) => {
-        const on = t.dataset.groveTab === id;
+        const on = t.dataset.groveTab === under;
         t.setAttribute('aria-selected', String(on));
         t.tabIndex = on ? 0 : -1;
         if (on && focus) t.focus();
@@ -150,6 +170,13 @@ const TABS = [
 
     show(fromHash());
     const c = cleanups();
+    openers.forEach((o) => c.add(listen(o, 'click', () => pick(o.dataset.groveOpen!))));
+    const count = () => {
+      const from = startOfWeek(new Date()).getTime();
+      if (doneCount) doneCount.textContent = getDone().filter((d) => d.doneAt >= from).length.toLocaleString(locale());
+    };
+    count();
+    c.add(subscribe('done', count));
     tabs.forEach((t) => {
       const onClick = () => pick(t.dataset.groveTab!);
       t.addEventListener('click', onClick);
@@ -183,6 +210,50 @@ const TABS = [
     justify-content: space-between;
     gap: var(--space-3) var(--space-5);
     padding-block: var(--space-5) var(--space-4);
+  }
+
+  /* A slim row that opens a view without a tab of its own, and the way back from it. */
+  .grove-row,
+  .grove-back {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 48px;
+    border: 0;
+    color: var(--color-text);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .grove-row {
+    inline-size: 100%;
+    margin-block: var(--space-4);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-weight: 600;
+    text-align: start;
+  }
+
+  .grove-row strong {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .grove-row svg,
+  .grove-back svg {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .grove-back {
+    margin-bottom: var(--space-2);
+    padding: 0 var(--space-2) 0 0;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
   }
 
   .grove-bar__title {
