@@ -2,20 +2,49 @@ package app.grovyn;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.WebView;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.core.content.ContextCompat;
+import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
     /** Where a notification or widget asked to go ("timer?task=…", "progress"); the page picks it up. */
     private static String pendingRoute;
 
+    /** The longest the splash waits for the page, so a page that never loads cannot hide the app. */
+    private static final long SPLASH_MAX_MS = 4000;
+
+    /** The first page has something drawn (or failed to load): the splash can go. */
+    private volatile boolean pageShown;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // The splash stays until the page has drawn, so a cold start never shows an empty web view.
+        SplashScreen splash = SplashScreen.installSplashScreen(this);
+        splash.setKeepOnScreenCondition(() -> !pageShown);
+        new Handler(Looper.getMainLooper()).postDelayed(() -> pageShown = true, SPLASH_MAX_MS);
+
         registerPlugin(DevicePlugin.class);
         super.onCreate(savedInstanceState);
+        // Dark behind the page too, for the moments a page is between loads.
+        getBridge().getWebView().setBackgroundColor(ContextCompat.getColor(this, R.color.ic_launcher_background));
+        getBridge().addWebViewListener(new WebViewListener() {
+            @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                pageShown = true;
+            }
+
+            @Override
+            public void onReceivedError(WebView view) {
+                pageShown = true;
+            }
+        });
         keepRoute(getIntent());
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override

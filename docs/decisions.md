@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Splash until the page has drawn.** `MainActivity` installs the splash screen and
+  keeps it until the first page is visible (4 s at most); the splash is the dark ground with
+  the mark, and the web view is dark behind the page. On the emulator the old build showed 3
+  to 4 seconds of blank white on a cold start; the new one shows none. The Play build was
+  walked on the emulator the same day (permissions, Welcome, Timer, five tabs, Grove without
+  the board, Budget order, Back). Not yet seen on a real phone.
+
 - **14 Nov · Budget, money first.** In the app the plan card ("Safe to spend today") comes
   right under the month; bank alerts moved below it, and are one slim row until they are set
   up or have something to check. The floating + shows only while the plan card's own
