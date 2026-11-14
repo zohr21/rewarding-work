@@ -71,6 +71,39 @@ app in Firebase:
 - Google also looks at whether testers actually use the app and send feedback, so ask them
   to open it a few times a week and tell you one thing that confused them.
 
+### Call for testers (Instagram story, LinkedIn)
+
+Short enough for a story. People reply with their Gmail; then they get the invite below.
+
+**English**
+
+> 🌱 Looking for testers for my app Grovyn: a focus timer and tasks in small steps.
+> 1. Send me the Gmail you use on Google Play (Android only)
+> 2. You'll get a link: tap "Become a tester" and install the app
+> 3. Keep it installed for 14 days and open it a few times a week
+> 4. Tell me what was confusing
+> Free, no ads. DM me 🙌
+
+**Azərbaycanca**
+
+> 🌱 Grovyn tətbiqim üçün testçilər axtarıram: fokus taymeri və kiçik addımlarla işlər.
+> 1. Google Play-də istifadə etdiyin Gmail ünvanını mənə göndər (yalnız Android)
+> 2. Sənə link gələcək: «Testçi ol» düyməsinə bas və tətbiqi yüklə
+> 3. 14 gün silmə və həftədə bir neçə dəfə aç
+> 4. Nə anlaşılmaz oldusa, yaz
+> Pulsuz, reklamsız. Mesaj yaz 🙌
+
+**Русский**
+
+> 🌱 Ищу тестировщиков для своего приложения Grovyn: таймер фокуса и задачи маленькими шагами.
+> 1. Пришлите Gmail, с которым вы заходите в Google Play (только Android)
+> 2. Вы получите ссылку: нажмите «Стать тестировщиком» и установите приложение
+> 3. Не удаляйте его 14 дней и открывайте несколько раз в неделю
+> 4. Напишите, что было непонятно
+> Бесплатно, без рекламы. Пишите в личку 🙌
+
+For LinkedIn, add a line before the list, e.g. "I built Grovyn on my own and it's almost on Google Play. Google asks new developers to run a two-week test with real people first."
+
 ### Invite (English)
 
 > Hi! I made a small focus app called Grovyn: a timer, tasks in small steps, and a little
@@ -132,3 +165,6 @@ First test version. Try the timer, break a task into steps, and watch your grove
 |---|---|
 | 14 Nov 2026 | Checklist written; Play bundle builds unsigned, waiting on the upload key. |
 | 14 Nov 2026 | Upload key made (`CN=Grovyn`, valid to 2054). `grovyn-play-0.1.0.aab` built and signed. Upload key SHA-1 `FD:3B:FE:F7:AD:FB:EF:AA:CD:B4:FE:27:BB:CC:E8:86:4D:91:0D:0A` (add to Firebase, step 4). |
+| 14 Nov 2026 | Play Console: app created (`app.grovyn`, Free, 13+). Saved: privacy policy, app access, ads, government, financial features, target audience, content rating (Everyone), Data safety (7 types, none shared; Name/Email/User IDs also marked App functionality), Health apps (Activity and fitness, Sleep management), Advertising ID (No; the bundle has no `AD_ID`), category Productivity, contact email and website. Store listing saved in English, Russian and Azerbaijani (text, icon, each language's feature graphic and 7 screenshots; assets not labelled as AI-made). |
+| 15 Nov 2026 | Closed testing track (Alpha): 178 countries, feedback email `grovyn.support@gmail.com`, email list "Grovyn testers" (first tester: the owner). Release 100 (0.1.0) uploaded with notes in 3 languages; Health Connect permission reasons filled in. 17 changes sent for review. Opt-in link (works after approval): `https://play.google.com/apps/testing/app.grovyn`. Built before the AZ Health rings fix (PR 89), so that fix comes in the next version. |
+| 15 Nov 2026 | Firebase: both SHA-1s added to the `app.grovyn` Android app (Play app signing `D8:FB:45:B0:2D:25:A9:10:78:DF:74:5E:7C:3E:58:AD:95:30:84:51`, upload key `FD:3B:…:0D:0A`). Google sign-in in the Play build not yet tried. |

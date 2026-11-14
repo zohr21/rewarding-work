@@ -150,7 +150,7 @@ read them before publishing. Russian addresses the reader as "вы", Azerbaijani
 
 ### Azərbaycanca
 
-**App name** (30 max): `Grovyn: Fokus taymeri, işlər` (28)
+**App name** (30 max): `Grovyn: Fokus və tapşırıqlar` (28)
 
 **Short description** (80 max):
 

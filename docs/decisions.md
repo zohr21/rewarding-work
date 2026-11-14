@@ -6,6 +6,11 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Play Console set up.** App `app.grovyn`, Free (in-app purchases possible later),
+  audience 13+, category Productivity. Store graphics are not labelled as AI-made. The
+  Azerbaijani store name is «Grovyn: Fokus və tapşırıqlar» («tapşırıqlar», not «işlər»; the
+  longer «Fokus taymeri, tapşırıqlar» is over Play's 30 characters).
+
 - **14 Nov · Closed test prepared.** `docs/closed-test.md` is the step-by-step list (key, Console,
   testers, Firebase SHA-1s, release notes, invites in three languages). The Play bundle builds;
   the owner made the upload key the same day and the signed bundle is built. Store screenshots in all three languages were
