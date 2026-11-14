@@ -48,6 +48,9 @@ const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
   import { mountDeviceSync } from '../scripts/device-sync';
   import { mountBankSync } from '../scripts/bank-sync';
   import { onPage } from '../lib/page';
+  import { startAccount } from '../lib/account/state';
+  import { startBoard } from '../lib/board';
+  import { BOARD_ENABLED } from '../config/firebase';
   onPage('device-sync', mountDeviceSync);
   onPage('bank-sync', mountBankSync);
 
@@ -65,6 +68,13 @@ const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
     } catch {
       // No session storage: the tab opens its first page.
     }
+  });
+
+  // The site's header starts these through AccountButton, which the app doesn't show; without
+  // this the app only synced once You (or the board) was opened.
+  onPage('account-start', () => {
+    startAccount();
+    if (BOARD_ENABLED) startBoard();
   });
 </script>
 

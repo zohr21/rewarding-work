@@ -6,6 +6,12 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Chain kinds sync.** A chain's kind and what you fill in each day (slots, amounts,
+  notes) now go to the account, so the site matches the phone. Still left out of the backup
+  file. Workout-linked chains are only worked out on a device that has workouts.
+- **14 Nov · App syncs from launch.** The app starts account sync (and the board row) on every
+  page, not only once You was opened.
+
 - **14 Nov · Translation choices.** The Coach tab is "Mentor" in both languages (RU «Ментор», was
   «Коуч»). Kept: AZ «fokuslanmaq», and AZ «Sönülü» for "Off" for now. The Life tab is «Rifah»
   ("well-being") in Azerbaijani (was «Həyat», too broad); English "Life" and Russian «Жизнь» stay. So the tab and a Budget category
@@ -47,7 +53,6 @@ canvases are private pages and this repository is public, so their links are not
   Not confirmed by the owner: treating "English (US)" outside a US time zone as British-style
   dates. Still to do: a native read-through of both translations, and the week still starts
   on Monday everywhere.
-
 - **14 Nov · Repo setup.** `CLAUDE.md`, `npm run verify`, Vitest, a check on every pull
   request, shared `.claude/launch.json` and `.claude/settings.json`. Work moves out of the
   OneDrive folder to a plain clone.
