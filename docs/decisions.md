@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Closed test prepared.** `docs/closed-test.md` is the step-by-step list (key, Console,
+  testers, Firebase SHA-1s, release notes, invites in three languages). The Play bundle builds;
+  the owner made the upload key the same day and the signed bundle is built. Store screenshots in all three languages were
+  regenerated: every screen frame now shows the five-tab app (Health and Budget on, one Life
+  tab) with the tab bar in view, and RU/AZ show «Ментор» and «Rifah». The upload key is made
+  with `CN=Grovyn` only, so no personal details sit in the certificate.
+
 - **14 Nov · Chain kinds sync.** A chain's kind and what you fill in each day (slots, amounts,
   notes) now go to the account, so the site matches the phone. Still left out of the backup
   file. Workout-linked chains are only worked out on a device that has workouts.

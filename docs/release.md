@@ -56,3 +56,4 @@ upload (`npm version patch --no-git-tag-version`).
   widgets* says so and opens Android's *Alarms & reminders* screen.
 
 Play Console answers (Data safety, declarations) are in `docs/play-store-readiness.md`.
+The closed test, step by step, is in `docs/closed-test.md`.
