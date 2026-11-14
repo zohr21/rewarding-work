@@ -6,6 +6,12 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **14 Nov · Translation choices.** The Coach tab is "Mentor" in both languages (RU «Ментор», was
+  «Коуч»). Kept: AZ «fokuslanmaq», and AZ «Sönülü» for "Off" for now. The Life tab is «Rifah»
+  ("well-being") in Azerbaijani (was «Həyat», too broad); English "Life" and Russian «Жизнь» stay. So the tab and a Budget category
+  don't share a name, the AZ Wellbeing category is now «Özünə qulluq» (self-care); saved
+  expenses keep their category. The read-through itself is in `docs/translation-review.md`.
+
 - **14 Nov · Splash until the page has drawn.** `MainActivity` installs the splash screen and
   keeps it until the first page is visible (4 s at most); the splash is the dark ground with
   the mark, and the web view is dark behind the page. On the emulator the old build showed 3
