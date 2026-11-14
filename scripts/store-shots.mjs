@@ -180,7 +180,7 @@ const seed = (lang, modules) => `(() => {
   return sessions.length;
 })()`;
 
-/** The app screens, in frame order. The first five show the app as it starts: four tabs, no optional sections. */
+/** The app screens, in frame order. Every frame shows the five-tab bar (Health and Budget on, sharing the Life tab). */
 const SCREENS = [
   ['today', '/'],
   ['timer', '/timer/'],
@@ -192,7 +192,6 @@ const EXTRA = [
   ['health', '/health/'],
   ['budget', '/budget/'],
 ];
-const CORE = { exam: false, health: false, budget: false, screen: false };
 const ALL = { exam: true, health: true, budget: true, screen: false };
 
 // ---- the frames ----
@@ -257,7 +256,7 @@ const featureFrame = (lang, f, sprig) =>
      .sprig { position: absolute; right: 84px; top: 0; bottom: 0; display: grid; place-items: center; }
      .sprig svg { width: 250px; height: auto; filter: drop-shadow(0 30px 50px rgba(0, 0, 0, 0.5)); }`);
 
-const phoneSize = () => send('Emulation.setDeviceMetricsOverride', { width: 360, height: 760, deviceScaleFactor: 3, mobile: true });
+const phoneSize = (height = 760) => send('Emulation.setDeviceMetricsOverride', { width: 360, height, deviceScaleFactor: 3, mobile: true });
 const frameSize = (width, height) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
 
 for (const lang of langs) {
@@ -271,8 +270,11 @@ for (const lang of langs) {
   await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
   await go(`${origin}/rewarding-work/welcome/`);
   let sprig = '';
-  for (const [modules, screens] of [[CORE, SCREENS], [ALL, EXTRA]]) {
-    await evalJs(seed(lang, modules));
+  // A single screen is 360x620 so the whole phone, tab bar included, fits under the caption;
+  // the pair frame's two smaller phones keep 360x760.
+  await evalJs(seed(lang, ALL));
+  for (const [height, screens] of [[620, SCREENS], [760, EXTRA]]) {
+    await phoneSize(height);
     for (const [name, path] of screens) {
       await go(`${origin}/rewarding-work${path}`, 5000);
       await evalJs(`document.querySelector('astro-dev-toolbar')?.remove(); window.scrollTo(0,0); 1`);
