@@ -18,6 +18,7 @@ import {
   type SyncedStore,
 } from '../storage';
 import { mergeBudgetStores, normaliseBudget } from '../budget';
+import { mergeChainDetail, normaliseDetail } from '../chainkinds';
 
 function parse(json: string | null): unknown {
   if (json === null) return undefined;
@@ -63,6 +64,8 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
       if (!isChain(remote)) return localJson;
       return JSON.stringify(mergeChains(local, remote));
     }
+    case 'chain-detail':
+      return JSON.stringify(mergeChainDetail(normaliseDetail(local), normaliseDetail(remote)));
     case 'tasks':
       return JSON.stringify(mergeTaskStores(normaliseTasks(local), normaliseTasks(remote)));
     case 'exam':
