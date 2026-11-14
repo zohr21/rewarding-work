@@ -129,10 +129,10 @@ read them before publishing. Russian addresses the reader as "вы", Azerbaijani
 > • Список сделанного показывает, что вы действительно закончили
 >
 > СМОТРИТЕ, КАК РАСТЁТ
-> • Сприг растёт вместе с общим временем фокуса: семечко, росток, саженец, дерево, роща
+> • Сприг растёт вместе с общим временем фокуса: сеянец, росток, саженец, дерево, роща
 > • Цепочки для ежедневных привычек и статистика за неделю
 >
-> КОУЧ
+> МЕНТОР
 > • Застряли? Выберите, что мешает («Не могу начать», «Постоянно отвлекаюсь», «Слишком много дел»), и получите
 >   подходящую технику с объяснением, на чём она основана
 > • Подготовка к экзамену: учебный план и тренировочные вопросы
@@ -181,12 +181,12 @@ read them before publishing. Russian addresses the reader as "вы", Azerbaijani
 > • Görülənlər siyahısı həqiqətən nəyi bitirdiyini göstərir
 >
 > BÖYÜMƏSİNƏ BAX
-> • Sprig ümumi fokus vaxtınla böyüyür: toxum, cücərti, fidan, ağac, bağ
+> • Sprig ümumi fokus vaxtınla böyüyür: cücərti, zoğ, fidan, ağac, bağ
 > • Gündəlik vərdişlər üçün zəncirlər və həftəlik statistika
 >
 > MENTOR
 > • İlişmisən? Nəyin mane olduğunu seç («Başlaya bilmirəm», «Diqqətim dağılır», «Çox iş var») və nəyə əsaslandığı
->   ilə birlikdə uyğun texnika al
+>   ilə birlikdə uyğun texnika tap
 > • İmtahana hazırlıq: bir imtahan üçün dərs planı və məşq sualları
 >
 > ƏLAVƏ BÖLMƏLƏR (yalnız istədiyini yandır)
