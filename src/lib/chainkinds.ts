@@ -10,8 +10,11 @@
  * The chain itself (store `chain`) still keeps only the days that count, so streaks, tiers
  * and account sync work as before. What you fill in on each day is kept here.
  *
- * This store stays on this device: prayers and workouts are personal, so it is not synced
- * and not in the backup file. Another device shows the same chains as plain ticks.
+ * This store syncs to your account when you're signed in (so the site shows the same kind
+ * and slots as the phone), but stays out of the backup file. Setups and day entries carry
+ * `at`, when they were last changed, so the newer change wins when two devices meet
+ * (mergeChainDetail). Workouts don't sync, so a chain linked to a workout type is only
+ * worked out on a device that has workouts; elsewhere it shows the days the chain has.
  */
 import { getChains, getSessions, read, setChainDay, write, type ChainEntry, type FocusSession } from './storage';
 import { addDays, dayKey, isDayKey, startOfDay, type DayKey } from './dates';
@@ -34,6 +37,10 @@ export interface ChainSetup {
   countAt?: number;
   /** linked: where the day is read from. */
   source?: LinkSource;
+  /** When this setup was last changed (epoch ms); the newer one wins in a merge. */
+  at?: number;
+  /** Set when the chain was deleted: day entries changed before this are gone. */
+  since?: number;
 }
 
 /** One slot of a parts chain: 0 not yet, 1 on time, 2 later. Later still counts. */
@@ -45,9 +52,11 @@ export interface DayEntry {
   /** parts: one state per slot, in the order of ChainSetup.parts. */
   parts?: PartState[];
   note?: string;
+  /** When this day was last changed (epoch ms). An entry with only `at` is a cleared day. */
+  at?: number;
 }
 
-interface Store {
+export interface ChainDetail {
   setups: Record<string, ChainSetup>;
   log: Record<string, Record<DayKey, DayEntry>>;
 }
@@ -99,9 +108,23 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const num = (v: unknown, max: number): number | undefined =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v * 100) / 100 : undefined;
 const text = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+const stamp = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : undefined);
+
+/** `at` and `since` kept on a cleaned setup. */
+function times(v: Record<string, unknown>): Pick<ChainSetup, 'at' | 'since'> {
+  const at = stamp(v.at);
+  const since = stamp(v.since);
+  return { ...(at ? { at } : {}), ...(since ? { since } : {}) };
+}
 
 function cleanSetup(v: unknown): ChainSetup | undefined {
-  if (!isObj(v) || typeof v.kind !== 'string' || !KIND_IDS.includes(v.kind)) return undefined;
+  if (!isObj(v)) return undefined;
+  const kept = cleanKind(v);
+  return kept && { ...kept, ...times(v) };
+}
+
+function cleanKind(v: Record<string, unknown>): ChainSetup | undefined {
+  if (typeof v.kind !== 'string' || !KIND_IDS.includes(v.kind)) return undefined;
   const kind = v.kind as ChainKind;
   if (kind === 'amount') return { kind, goal: num(v.goal, 100_000) || 1, unit: text(v.unit, 20) };
   if (kind === 'parts') {
@@ -126,12 +149,17 @@ function cleanEntry(v: unknown): DayEntry | undefined {
     e.parts = v.parts.slice(0, MAX_PARTS).map((p) => (p === 1 || p === 2 ? p : 0));
   const note = text(v.note, 200);
   if (note) e.note = note;
+  const at = stamp(v.at);
+  if (at) e.at = at;
   return Object.keys(e).length ? e : undefined;
 }
 
-function getStore(): Store {
-  const raw = read<unknown>('chain-detail', null);
-  const out: Store = { setups: {}, log: {} };
+/** Whether an entry holds anything besides when it was changed. */
+const filled = (e: DayEntry | undefined): e is DayEntry => !!e && (e.n !== undefined || e.parts !== undefined || e.note !== undefined);
+
+/** Any stored value as a clean ChainDetail; garbage reads as empty. */
+export function normaliseDetail(raw: unknown): ChainDetail {
+  const out: ChainDetail = { setups: {}, log: {} };
   if (!isObj(raw)) return out;
   if (isObj(raw.setups))
     for (const [id, s] of Object.entries(raw.setups)) {
@@ -151,34 +179,42 @@ function getStore(): Store {
   return out;
 }
 
+function getStore(): ChainDetail {
+  return normaliseDetail(read<unknown>('chain-detail', null));
+}
+
 export function getSetup(id: string): ChainSetup {
   return getStore().setups[id] ?? { kind: 'tick' };
 }
 
 export function saveSetup(id: string, setup: ChainSetup): void {
   const s = getStore();
-  const clean = cleanSetup(setup);
-  if (!clean || clean.kind === 'tick') delete s.setups[id];
-  else s.setups[id] = clean;
-  write<Store>('chain-detail', s);
+  const old = s.setups[id];
+  const { at: _at, since: _since, ...clean } = cleanSetup(setup) ?? { kind: 'tick' };
+  const since = old?.since;
+  // A chain turned back into a tick keeps a small record, so the change reaches other devices.
+  if (clean.kind === 'tick' && !old) delete s.setups[id];
+  else s.setups[id] = { ...clean, at: Date.now(), ...(since ? { since } : {}) };
+  write<ChainDetail>('chain-detail', s);
   recount(id);
 }
 
 export function getEntry(id: string, key: DayKey): DayEntry {
-  return getStore().log[id]?.[key] ?? {};
+  const e = getStore().log[id]?.[key];
+  return filled(e) ? e : {};
 }
 
 /** Saves a day and marks or unmarks it on the chain. Returns whether the day now counts. */
 export function saveEntry(id: string, key: DayKey, entry: DayEntry): boolean {
   const s = getStore();
-  const clean = cleanEntry(entry);
+  const clean = cleanEntry({ ...entry, at: undefined });
   const days = { ...(s.log[id] ?? {}) };
-  if (clean) days[key] = clean;
-  else delete days[key];
+  // A cleared day keeps only when it was cleared, so the clearing reaches other devices.
+  if (clean || days[key]) days[key] = { ...(clean ?? {}), at: Date.now() };
   const oldest = dayKey(addDays(startOfDay(new Date()), -KEEP_DAYS));
   for (const k of Object.keys(days)) if (k < oldest) delete days[k];
   s.log[id] = days;
-  write<Store>('chain-detail', s);
+  write<ChainDetail>('chain-detail', s);
   const counted = dayOf(s.setups[id] ?? { kind: 'tick' }, clean ?? {}, key).counted;
   setChainDay(key, id, counted);
   return counted;
@@ -194,13 +230,46 @@ export function togglePart(id: string, key: DayKey, part: number): boolean {
   return saveEntry(id, key, { ...entry, parts });
 }
 
-/** Forget a deleted chain's kind and entries; its id may be used again for a new chain. */
+/**
+ * Forget a deleted chain's kind and entries; its id may be used again for a new chain.
+ * What is left is a tick with `since`, so other devices drop their copy too.
+ */
 export function removeDetail(id: string): void {
   const s = getStore();
   if (!s.setups[id] && !s.log[id]) return;
-  delete s.setups[id];
+  const now = Date.now();
+  s.setups[id] = { kind: 'tick', at: now, since: now };
   delete s.log[id];
-  write<Store>('chain-detail', s);
+  write<ChainDetail>('chain-detail', s);
+}
+
+const newer = <T extends { at?: number }>(mine: T | undefined, theirs: T | undefined): T | undefined =>
+  !mine ? theirs : !theirs ? mine : (theirs.at ?? 0) > (mine.at ?? 0) ? theirs : mine;
+
+/**
+ * Combine this device's chain details with the account's: per chain setup and per day,
+ * the newer change wins (this device's on a tie). Day entries older than a chain's
+ * deletion (`since`) are dropped.
+ */
+export function mergeChainDetail(local: ChainDetail, remote: ChainDetail): ChainDetail {
+  const out: ChainDetail = { setups: {}, log: {} };
+  for (const id of new Set([...Object.keys(local.setups), ...Object.keys(remote.setups)])) {
+    const setup = newer(local.setups[id], remote.setups[id])!;
+    const since = Math.max(local.setups[id]?.since ?? 0, remote.setups[id]?.since ?? 0);
+    out.setups[id] = since ? { ...setup, since } : setup;
+  }
+  for (const id of new Set([...Object.keys(local.log), ...Object.keys(remote.log)])) {
+    const since = out.setups[id]?.since ?? 0;
+    const mine = local.log[id] ?? {};
+    const theirs = remote.log[id] ?? {};
+    const days: Record<DayKey, DayEntry> = {};
+    for (const key of new Set([...Object.keys(mine), ...Object.keys(theirs)])) {
+      const e = newer(mine[key], theirs[key]);
+      if (e && (e.at ?? 0) >= since) days[key] = e;
+    }
+    if (Object.keys(days).length) out.log[id] = days;
+  }
+  return out;
 }
 
 // ---------- What a day shows ----------
@@ -221,11 +290,20 @@ export interface DayView {
 export interface LinkData {
   focus: Map<DayKey, number>;
   workouts: Map<DayKey, Workout[]>;
+  /**
+   * Whether this device keeps workouts at all. They don't sync, so a device without them
+   * (the site, when workouts are logged on the phone) can't tell a workout day and leaves
+   * workout-linked days as the chain has them.
+   */
+  workoutsHere: boolean;
 }
 
 export function linkData(sessions: FocusSession[] = getSessions(), workouts: Workout[] = getWorkouts()): LinkData {
-  return { focus: minutesByDay(sessions), workouts: workoutsByDay(workouts) };
+  return { focus: minutesByDay(sessions), workouts: workoutsByDay(workouts), workoutsHere: workouts.length > 0 || read<unknown>('workouts', null) !== null };
 }
+
+/** Whether this device can work out a linked chain's days itself. */
+const readsHere = (setup: ChainSetup, data: LinkData) => setup.source === 'focus' || data.workoutsHere;
 
 const usesKm = (source: LinkSource | undefined) => !!source && source !== 'focus' && WORKOUT_TYPES.find((t) => t.id === source)!.distance;
 
@@ -263,6 +341,10 @@ export function dayOf(setup: ChainSetup, entry: DayEntry, key: DayKey, data?: Li
     const need = setup.countAt ?? total;
     return { counted: done >= need, partial: done > 0 && done < need, short: `${done}/${total}`, long: t('chain.nOf', { n: done, total }), share: total ? done / total : 0 };
   }
+  if (setup.kind === 'linked' && !readsHere(setup, data ?? (data = linkData()))) {
+    // Workouts live on another device: show what the chain has.
+    return { counted: marked, partial: false, short: '', long: marked ? t('chain.done') : t('chain.nothingYet'), share: marked ? 1 : 0 };
+  }
   if (setup.kind === 'linked') {
     const value = linkedValue(setup, key, data ?? linkData());
     const goal = setup.goal ?? 0;
@@ -287,6 +369,7 @@ function recount(id: string, data?: LinkData): void {
   const ch = getChains().find((c) => c.id === id);
   const setup = getSetup(id);
   if (!ch || setup.kind === 'tick') return;
+  if (setup.kind === 'linked' && !readsHere(setup, (data ??= linkData()))) return;
   const now = startOfDay(new Date());
   for (let i = 0; i < EDIT_DAYS; i++) {
     const key = dayKey(addDays(now, -i));
