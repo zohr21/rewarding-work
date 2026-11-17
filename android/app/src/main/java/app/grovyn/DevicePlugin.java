@@ -87,6 +87,7 @@ public class DevicePlugin extends Plugin {
     @Override
     protected void handleOnResume() {
         foreground = true;
+        BankListener.rebind(getContext());
     }
 
     @Override
