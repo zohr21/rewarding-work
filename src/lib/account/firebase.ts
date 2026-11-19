@@ -48,18 +48,21 @@ import {
   getDoc,
   getDocs,
   getFirestore,
+  increment,
   limit,
   onSnapshot,
   query,
+  serverTimestamp,
   setDoc,
   where,
+  writeBatch,
   type DocumentData,
   type Firestore,
 } from 'firebase/firestore';
 import { NATIVE_APP } from '../../config/app';
 import { t } from '../i18n';
 import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
-import { getBoard, weekKey, type BoardEntry } from '../board';
+import { getBoard, weekKey, type BoardEntry, type ReportReason } from '../board';
 import { googleIdToken } from '../device';
 import {
   SYNCED_AT_FIRST,
@@ -511,6 +514,8 @@ function toEntry(uid: string, d: DocumentData): BoardEntry | null {
     visibility: d.visibility === 'friends' ? 'friends' : 'all',
     friends: Array.isArray(d.friends) ? d.friends : [],
     updatedAt: typeof d.updatedAt === 'number' ? d.updatedAt : 0,
+    reports: typeof d.reports === 'number' ? d.reports : 0,
+    hidden: d.hidden === true,
   };
 }
 
@@ -533,11 +538,42 @@ export async function boardEntries(week: string, uids: string[]): Promise<BoardE
   return rows.filter((e): e is BoardEntry => e !== null);
 }
 
-export async function saveBoardEntry(week: string, entry: BoardEntry): Promise<void> {
+/**
+ * Write your row for the week. Reports on it stay (only others can add them) until the
+ * nickname changes, when they start again from 0. Returns the reports it has.
+ */
+export async function saveBoardEntry(week: string, entry: BoardEntry): Promise<number> {
   const uid = auth.currentUser?.uid;
   if (!uid || uid !== entry.uid) throw new Error('Not signed in.');
+  const ref = entryRef(week, uid);
+  const before = await getDoc(ref).catch(() => null);
+  const old = before?.exists() ? before.data() : null;
+  const reports = old && old.name === entry.name && typeof old.reports === 'number' ? old.reports : 0;
   const { uid: _uid, ...data } = entry;
-  await setDoc(entryRef(week, uid), data);
+  await setDoc(ref, { ...data, reports });
+  return reports;
+}
+
+/**
+ * Report someone's nickname for this week: a report for the owner to review, and one more
+ * on their row, in one write. The rules let each person do this once per row per week.
+ */
+export async function reportBoardEntry(week: string, target: string, name: string, reason: ReportReason): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in.');
+  const report = { reporter: uid, target, week, name, reason, at: serverTimestamp() };
+  const reportRef = doc(db, 'reports', `${uid}_${target}_${week}`);
+  const batch = writeBatch(db);
+  batch.set(reportRef, report);
+  batch.update(entryRef(week, target), { reports: increment(1) });
+  try {
+    await batch.commit();
+  } catch (err) {
+    // Their row may be gone (they left the board): the report still reaches the owner.
+    const code = (err as { code?: string })?.code;
+    if (code !== 'not-found' && code !== 'permission-denied') throw err;
+    await setDoc(reportRef, report);
+  }
 }
 
 export async function removeBoardEntries(weeks: string[]): Promise<void> {

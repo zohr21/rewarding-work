@@ -147,6 +147,20 @@ First test version. Try the timer, break a task into steps, and watch your grove
 </az-AZ>
 ```
 
+Version 0.1.2 (the weekly board):
+
+```
+<en-US>
+New: the weekly board. Join under a nickname (Grove › Board) and compare focus minutes with people at your stage, or just with friends. Tap any name to block or report it. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: недельная доска. Присоединяйтесь под ником («Роща» › «Доска») и сравнивайте минуты фокуса с людьми на вашей стадии или только с друзьями. Нажмите на любое имя, чтобы заблокировать или пожаловаться. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus dəqiqələrini öz mərhələndəki insanlarla və ya yalnız dostlarla müqayisə et. Bloklamaq və ya şikayət etmək üçün istənilən ada toxun. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 ## 7. During the 14 days (both)
 
 - Keep a short log below: who joined, what they said, and what changed.
@@ -168,3 +182,4 @@ First test version. Try the timer, break a task into steps, and watch your grove
 | 14 Nov 2026 | Play Console: app created (`app.grovyn`, Free, 13+). Saved: privacy policy, app access, ads, government, financial features, target audience, content rating (Everyone), Data safety (7 types, none shared; Name/Email/User IDs also marked App functionality), Health apps (Activity and fitness, Sleep management), Advertising ID (No; the bundle has no `AD_ID`), category Productivity, contact email and website. Store listing saved in English, Russian and Azerbaijani (text, icon, each language's feature graphic and 7 screenshots; assets not labelled as AI-made). |
 | 15 Nov 2026 | Closed testing track (Alpha): 178 countries, feedback email `grovyn.support@gmail.com`, email list "Grovyn testers" (first tester: the owner). Release 100 (0.1.0) uploaded with notes in 3 languages; Health Connect permission reasons filled in. 17 changes sent for review. Opt-in link (works after approval): `https://play.google.com/apps/testing/app.grovyn`. Built before the AZ Health rings fix (PR 89), so that fix comes in the next version. |
 | 15 Nov 2026 | Firebase: both SHA-1s added to the `app.grovyn` Android app (Play app signing `D8:FB:45:B0:2D:25:A9:10:78:DF:74:5E:7C:3E:58:AD:95:30:84:51`, upload key `FD:3B:…:0D:0A`). Google sign-in in the Play build not yet tried. |
+| 19 Nov 2026 | Weekly board with report and block. Firestore rules published. Release 102 (0.1.2) uploaded to Alpha. New content rating questionnaire: users interact = Yes, block = Yes, report = Yes, no chat, not friends-only. Ratings unchanged (Everyone, ClassInd L) plus "Users Interact". Both sent for review. |

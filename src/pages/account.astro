@@ -242,6 +242,20 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                   <span class="row__main"><span data-t="you.friendCode">My friend code</span><small data-t="you.shareItOrAddFriends">Share it or add friends in Grove › Board › Friends</small></span>
                   <span class="row__value board-code" data-board-code></span>
                 </div>
+                <details class="row-more" data-board-blocked hidden>
+                  <summary class="row">
+                    <RowIcon name="shield" />
+                    <span class="row__main">
+                      <span data-t="you.blockedPeople">Blocked people</span>
+                      <small data-t="you.blockedSub">You don't see them, and they aren't told.</small>
+                    </span>
+                    <span class="row__value" data-board-blocked-count></span>
+                    <RowIcon chevron />
+                  </summary>
+                  <div class="row-more__body">
+                    <ul class="board-blocked" data-board-blocked-list></ul>
+                  </div>
+                </details>
                 <p class="account__msg row-note" role="status" data-board-msg></p>
               </div>
             </section>
@@ -605,10 +619,25 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
 <script>
   import { getAccount, onAccountChange } from '../lib/account/state';
   import { friendlyError } from '../lib/account/errors';
-  import { formatMinutes, getBoard, leaveBoard, leagueName, loadLeague, myTier, nicknameProblem, pushEntry, setBoard, weekMinutes, type Visibility } from '../lib/board';
+  import {
+    formatMinutes,
+    getBoard,
+    leaveBoard,
+    leagueName,
+    loadLeague,
+    myTier,
+    nicknameProblem,
+    pushEntry,
+    setBoard,
+    unblockPerson,
+    weekMinutes,
+    type Blocked,
+    type Visibility,
+  } from '../lib/board';
+  import { el } from '../lib/dom';
   import { getSessions, subscribe } from '../lib/storage';
   import { cleanups, listen, onPage } from '../lib/page';
-  import { t } from '../lib/i18n';
+  import { dateFormat, t } from '../lib/i18n';
 
   onPage('account-board', () => {
     const found = document.querySelector<HTMLElement>('[data-board-card]');
@@ -634,6 +663,7 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
           ? t('you.board.onAll')
           : t('you.board.onFriends');
       card.querySelectorAll<HTMLElement>('[data-board-on]').forEach((n) => (n.hidden = !on));
+      renderBlocked(settings.blocked);
       if (!on) return;
       const sessions = getSessions();
       $('[data-board-rank]').textContent = rank === null || settings.visibility === 'friends' ? '#–' : `#${rank}`;
@@ -643,6 +673,36 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       $('[data-board-code]').textContent = settings.code || '…';
       card.querySelectorAll<HTMLInputElement>('[data-board-vis]').forEach((r) => (r.checked = r.value === settings.visibility));
     }
+
+    /** The people you blocked on the board, each with Unblock. Shown whenever there are any. */
+    function renderBlocked(blocked: Blocked[]): void {
+      $('[data-board-blocked]').hidden = blocked.length === 0;
+      $('[data-board-blocked-count]').textContent = String(blocked.length);
+      const day = dateFormat({ day: 'numeric', month: 'short' });
+      $('[data-board-blocked-list]').replaceChildren(
+        ...blocked.map((b) => {
+          const li = el('li', 'board-blocked__item');
+          const text = el('span', 'board-blocked__text');
+          text.append(el('span', 'board-blocked__name', b.name || t('board.hiddenName')));
+          if (b.at) text.append(el('small', '', t('you.blockedOn', { date: day.format(b.at) })));
+          const undo = el('button', 'btn btn--ghost btn--small', t('you.unblock'));
+          undo.type = 'button';
+          undo.dataset.boardUnblock = b.uid;
+          undo.setAttribute('aria-label', t('you.unblockName', { name: b.name || t('board.hiddenName') }));
+          li.append(text, undo);
+          return li;
+        }),
+      );
+    }
+
+    c.add(
+      listen(card, 'click', (e) => {
+        const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-board-unblock]');
+        if (!btn) return;
+        unblockPerson(btn.dataset.boardUnblock!);
+        msg.textContent = t('you.unblocked');
+      }),
+    );
 
     async function lookUpRank(): Promise<void> {
       if (!joined()) return;
@@ -1417,6 +1477,38 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
   }
 
   /* ---------- Weekly board ---------- */
+  .board-blocked {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  :global(.board-blocked__item) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  :global(.board-blocked__text) {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  :global(.board-blocked__name) {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+  }
+
+  :global(.board-blocked__text small) {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+
   .board-rank {
     flex: none;
     min-width: 36px;

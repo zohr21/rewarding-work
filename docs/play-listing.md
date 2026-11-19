@@ -65,7 +65,7 @@ because Play wants every sensitive permission to serve a feature the listing pro
 
 One folder per listing language: `docs/store/en/`, `docs/store/ru/`, `docs/store/az/`. Regenerate with
 `node scripts/store-shots.mjs` while the Play preview runs (see the script's header). It seeds sample data in each
-language and captures the Play version, so there is no weekly board in them. Captions and sample data live in `COPY`
+language and captures the Play version (no SMS import). Captions and sample data live in `COPY`
 at the top of the script; a new language is one more entry there.
 
 | Asset | File | Spec |

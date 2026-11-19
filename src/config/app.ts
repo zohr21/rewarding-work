@@ -7,7 +7,6 @@ export const NATIVE_APP = String(import.meta.env.PUBLIC_NATIVE_APP) === 'true';
 
 /**
  * True in the Google Play version of the app (`npm run apk:play`, `npm run release`).
- * It leaves out the weekly board for now: public nicknames would need reporting and
- * blocking under Play's user-generated content policy.
+ * It leaves out SMS import (no READ_SMS permission).
  */
 export const PLAY_STORE = String(import.meta.env.PUBLIC_PLAY_STORE) === 'true';

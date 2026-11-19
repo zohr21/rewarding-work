@@ -1,0 +1,353 @@
+---
+/**
+ * The sheet a tap on someone's board row opens (BoardPanel.astro): who they are, then
+ * Remove friend, Block, or Report nickname. Report asks for a reason and can block at the
+ * same time; Block says what it does first. Google Play asks for both in any app where
+ * people post something others see (here, only nicknames).
+ *
+ * Opened by [data-sheet-open="board-person"] with data-uid, data-name, data-minutes,
+ * data-friend and data-hidden. Fires `board:changed` once someone is blocked or reported.
+ */
+import Sheet from './Sheet.astro';
+import { NATIVE_APP } from '../config/app';
+---
+
+<Sheet id="board-person" labelledby="board-person-h">
+  <div class="bp" data-bp>
+    <section class="bp__view" data-bp-view="person">
+      <div class="bp__who">
+        <span class="board-row__av bp__av" data-bp-av aria-hidden="true"></span>
+        <div class="bp__who-text">
+          <h2 id="board-person-h" class="bp__title" data-bp-name></h2>
+          <span class="muted bp__sub" data-bp-sub></span>
+        </div>
+      </div>
+      <p data-t="grove.bpAllTheySee" class="muted bp__note">This is all anyone sees on the board: a nickname, a stage and focus minutes.</p>
+      <div class="bp__actions">
+        <button type="button" class="btn btn--ghost" data-bp-unfriend hidden>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c0-4 3-7 7-7s7 3 7 7"></path><path d="M16 11h6"></path></svg>
+          <span data-t="grove.bpRemoveFriend">Remove friend</span>
+        </button>
+        <button type="button" class="btn btn--ghost" data-bp-go="block">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m5.6 5.6 12.8 12.8"></path></svg>
+          <span data-bp-block-label></span>
+        </button>
+        <button type="button" class="btn btn--ghost bp__report" data-bp-go="report" data-bp-report-btn>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 21V4"></path><path d="M5 4h11l-2 4 2 4H5"></path></svg>
+          <span data-t="grove.bpReport">Report nickname</span>
+        </button>
+      </div>
+    </section>
+
+    <form class="bp__view" data-bp-view="report" data-bp-report novalidate hidden>
+      <div class="bp__head">
+        <h2 class="bp__title" data-bp-report-title></h2>
+        <p data-t="grove.bpReportLead" class="muted bp__sub">What's wrong with this nickname? They won't know who reported it.</p>
+      </div>
+      <fieldset class="bp__reasons">
+        <legend data-t="grove.bpReason" class="visually-hidden">Reason</legend>
+        <label class="bp__reason"><input type="radio" name="reason" value="hate" /> <span data-t="board.reason.hate">Hateful or offensive</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="sexual" /> <span data-t="board.reason.sexual">Sexual</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="bullying" /> <span data-t="board.reason.bullying">Bullying or harassment</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="impersonation" /> <span data-t="board.reason.impersonation">Pretends to be someone</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="personal" /> <span data-t="board.reason.personal">Someone's personal info</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="spam" /> <span data-t="board.reason.spam">Spam or ads</span></label>
+        <label class="bp__reason"><input type="radio" name="reason" value="other" /> <span data-t="board.reason.other">Something else</span></label>
+      </fieldset>
+      <label class="bp__also">
+        <input type="checkbox" name="block" checked />
+        <span data-t="grove.bpAlsoBlock">Also block them</span>
+      </label>
+      <p class="account__msg bp__msg" role="status" data-bp-msg></p>
+      <button data-t="grove.bpSend" type="submit" class="btn" data-bp-send disabled>Send report</button>
+    </form>
+
+    <section class="bp__view bp__done" data-bp-view="sent" hidden>
+      <span class="bp__check" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26"><path d="m5 12 5 5 9-10"></path></svg>
+      </span>
+      <h2 data-t="grove.bpThanks" class="bp__title">Thanks for telling us</h2>
+      <p class="muted bp__sub" data-bp-sent-text></p>
+      <button data-t="grove.done" type="button" class="btn btn--ghost" data-sheet-close>Done</button>
+    </section>
+
+    <section class="bp__view" data-bp-view="block" hidden>
+      <h2 class="bp__title" data-bp-block-title></h2>
+      <ul class="bp__list">
+        <li data-t="grove.bpBlock1">You won't see them on the board, in any league.</li>
+        <li data-t="grove.bpBlock2">If they're your friend, they're removed, and no longer see you when you show to friends only.</li>
+        <li data-t={NATIVE_APP ? 'grove.bpBlock3You' : 'grove.bpBlock3Account'}>They aren't told. Unblock any time in {NATIVE_APP ? 'You' : 'Account'} › Weekly board.</li>
+      </ul>
+      <button data-t="grove.bpBlockGo" type="button" class="btn" data-bp-block>Block</button>
+      <button data-t="grove.cancel" type="button" class="btn btn--ghost" data-sheet-close>Cancel</button>
+    </section>
+  </div>
+</Sheet>
+
+<script>
+  import { blockPerson, formatMinutes, getBoard, removeFriend, reportPerson, setBoard, unblockPerson, pushEntry, type ReportReason } from '../lib/board';
+  import { friendlyError } from '../lib/account/errors';
+  import { offerUndo } from '../lib/undo';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
+
+  type View = 'person' | 'report' | 'sent' | 'block';
+
+  onPage('board-person', () => {
+    const dialog = document.querySelector<HTMLDialogElement>('[data-sheet="board-person"]');
+    if (!dialog) return;
+    const sheet: HTMLDialogElement = dialog;
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => sheet.querySelector<T>(sel)!;
+    const c = cleanups();
+    const form = $<HTMLFormElement>('[data-bp-report]');
+    const send = $<HTMLButtonElement>('[data-bp-send]');
+    const msg = $('[data-bp-msg]');
+
+    let who = { uid: '', name: '', minutes: 0, friend: false, hidden: false };
+
+    function show(view: View): void {
+      sheet.querySelectorAll<HTMLElement>('[data-bp-view]').forEach((v) => (v.hidden = v.dataset.bpView !== view));
+      const title = sheet.querySelector<HTMLElement>(`[data-bp-view="${view}"] .bp__title`);
+      if (title) {
+        title.id = 'board-person-h';
+        sheet.querySelectorAll('.bp__title').forEach((h) => h !== title && h.removeAttribute('id'));
+      }
+    }
+
+    function avClass(name: string): string {
+      let h = 0;
+      for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return `board-row__av bp__av board-row__av--${h % 4}`;
+    }
+
+    c.add(
+      listen(sheet, 'sheet:open', (e) => {
+        const d = (e as CustomEvent<Record<string, string | undefined>>).detail;
+        who = { uid: d.uid ?? '', name: d.name ?? '', minutes: Number(d.minutes) || 0, friend: d.friend === '1', hidden: d.hidden === '1' };
+        const av = $('[data-bp-av]');
+        av.className = who.hidden ? 'board-row__av bp__av board-row__av--hidden' : avClass(who.name);
+        av.textContent = who.hidden ? '?' : who.name.charAt(0).toUpperCase();
+        $('[data-bp-name]').textContent = who.name;
+        $('[data-bp-sub]').textContent = t('grove.bpSub', { time: formatMinutes(who.minutes) });
+        $('[data-bp-unfriend]').hidden = !who.friend;
+        // A hidden name is already dealt with; you can still block them.
+        $('[data-bp-report-btn]').hidden = who.hidden;
+        $('[data-bp-block-label]').textContent = t('grove.bpBlockName', { name: who.name });
+        $('[data-bp-block-title]').textContent = t('grove.bpBlockQ', { name: who.name });
+        $('[data-bp-report-title]').textContent = t('grove.bpReportName', { name: who.name });
+        form.reset();
+        send.disabled = true;
+        msg.textContent = '';
+        show('person');
+      }),
+    );
+
+    c.add(
+      listen(sheet, 'click', (e) => {
+        const el = e.target as HTMLElement;
+        const go = el.closest<HTMLElement>('[data-bp-go]');
+        if (go) show(go.dataset.bpGo as View);
+        else if (el.closest('[data-bp-block]')) block();
+        else if (el.closest('[data-bp-unfriend]')) unfriend();
+      }),
+    );
+
+    c.add(listen(form, 'change', () => (send.disabled = !new FormData(form).get('reason'))));
+
+    /** Block now, with a few seconds to undo (it puts back a friend too). */
+    function block(): void {
+      const { uid, name, friend } = who;
+      sheet.close();
+      void blockPerson(uid, name).then(changed);
+      offerUndo({
+        message: t('grove.bpBlocked', { name }),
+        commit: () => {},
+        undo: () => {
+          unblockPerson(uid);
+          if (friend && !getBoard().friends.includes(uid)) {
+            setBoard({ friends: [...getBoard().friends, uid] });
+            void pushEntry().catch(() => {});
+          }
+          changed();
+        },
+      });
+    }
+
+    function unfriend(): void {
+      const { uid } = who;
+      sheet.close();
+      void removeFriend(uid).then(changed, () => {});
+    }
+
+    c.add(
+      listen(form, 'submit', (e) => {
+        e.preventDefault();
+        const data = new FormData(form);
+        const reason = data.get('reason') as ReportReason | null;
+        if (!reason) return;
+        const alsoBlock = data.get('block') === 'on';
+        const { uid, name } = who;
+        send.disabled = true;
+        msg.textContent = t('grove.bpSending');
+        reportPerson(uid, name, reason)
+          .then(async () => {
+            if (alsoBlock) await blockPerson(uid, name);
+            msg.textContent = '';
+            $('[data-bp-sent-text]').textContent = alsoBlock ? t('grove.bpSentBlocked', { name }) : t('grove.bpSent');
+            show('sent');
+            changed();
+          })
+          .catch((err: unknown) => {
+            msg.textContent = friendlyError(err);
+            send.disabled = false;
+          });
+      }),
+    );
+
+    return c.run;
+  });
+
+  function changed(): void {
+    document.dispatchEvent(new CustomEvent('board:changed'));
+  }
+</script>
+
+<style>
+  .bp [hidden] {
+    display: none !important;
+  }
+
+  .bp__view {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .bp__who {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+  }
+
+  .bp__who-text,
+  .bp__head {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  :global(.board-row__av.bp__av) {
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+  }
+
+  .bp__title {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--text-lg);
+  }
+
+  .bp__sub,
+  .bp__note {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bp__actions {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bp__actions .btn {
+    justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .bp__actions svg,
+  .bp__check svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .bp__report {
+    color: var(--color-danger);
+  }
+
+  .bp__reasons {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .bp__reason {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 46px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--well-bg);
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .bp__reason:has(input:checked) {
+    border-color: var(--color-focus);
+    background: color-mix(in srgb, var(--color-focus) 14%, var(--color-surface-solid));
+  }
+
+  .bp__reason input,
+  .bp__also input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--color-focus);
+  }
+
+  .bp__also {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+
+  .bp__msg:empty {
+    display: none;
+  }
+
+  .bp__done {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .bp__check {
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--color-focus);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--color-focus) 14%, var(--color-surface-solid));
+    color: var(--color-focus);
+  }
+
+  .bp__done .btn {
+    justify-self: stretch;
+  }
+
+  .bp__list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 1.2em;
+    font-size: var(--text-sm);
+  }
+</style>
