@@ -1,0 +1,255 @@
+---
+/**
+ * What's new on the board, opened from the "N new" row on Board › Friends: friend requests
+ * (Accept / Decline) and new followers (Follow back / Remove). The same sheet lists all your
+ * followers from the "Followers · N" row. Opening it clears the dot ([data-board-dot]).
+ *
+ * Opened by [data-sheet-open="board-inbox"] with data-mode "new" or "followers". Fires
+ * `board:changed` after an answer, so the board reloads.
+ */
+import Sheet from './Sheet.astro';
+---
+
+<Sheet id="board-inbox" labelledby="board-inbox-h">
+  <div class="bi" data-bi>
+    <h2 id="board-inbox-h" class="bi__title" data-bi-title></h2>
+    <p class="muted bi__empty" data-bi-empty hidden></p>
+    <ul class="bi__list" data-bi-list></ul>
+    <p class="account__msg" role="status" data-bi-msg></p>
+    <p data-t="grove.biNotTold" class="muted bi__note">They aren't told when you decline or remove them. To block someone, tap their name.</p>
+  </div>
+</Sheet>
+
+<script>
+  import {
+    acceptFriend,
+    askFriend,
+    declineFriend,
+    followPerson,
+    getBoard,
+    getSocial,
+    inbox,
+    isAsked,
+    markInboxSeen,
+    removeFollower,
+    withoutBlocked,
+    type Person,
+  } from '../lib/board';
+  import { friendlyError } from '../lib/account/errors';
+  import { el } from '../lib/dom';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
+
+  type Mode = 'new' | 'followers';
+  type Kind = 'request' | 'follow';
+
+  onPage('board-inbox', () => {
+    const found = document.querySelector<HTMLDialogElement>('[data-sheet="board-inbox"]');
+    if (!found) return;
+    const sheet: HTMLDialogElement = found;
+    const $ = <T extends HTMLElement = HTMLElement>(sel: string) => sheet.querySelector<T>(sel)!;
+    const c = cleanups();
+    let mode: Mode = 'new';
+    /** What was new when the sheet opened, so answered items don't jump away mid-tap. */
+    let shown: { kind: Kind; p: Person }[] = [];
+
+    function avClass(name: string): string {
+      let h = 0;
+      for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      return `board-row__av board-row__av--${h % 4}`;
+    }
+
+    function button(label: string, action: string, uid: string, ghost: boolean): HTMLButtonElement {
+      const b = el('button', ghost ? 'btn btn--ghost btn--small' : 'btn btn--small', label);
+      b.type = 'button';
+      b.dataset.biAct = action;
+      b.dataset.uid = uid;
+      return b;
+    }
+
+    function itemEl(kind: Kind, p: Person): HTMLLIElement {
+      const settings = getBoard();
+      const li = el('li', 'bi__item');
+      const who = el('button', 'bi__who');
+      who.type = 'button';
+      // Their name opens the person sheet: follow, add friend, block, report.
+      Object.assign(who.dataset, { sheetOpen: 'board-person', uid: p.uid, name: p.name, minutes: '' });
+      const av = el('span', avClass(p.name), p.name.charAt(0).toUpperCase());
+      av.setAttribute('aria-hidden', 'true');
+      const text = el('span', 'bi__text');
+      text.append(el('strong', '', p.name), el('span', 'muted', kind === 'request' ? t('grove.biWantsFriends') : t('grove.biFollowsYou')));
+      who.append(av, text);
+      const actions = el('div', 'bi__actions');
+      if (kind === 'request') {
+        actions.append(button(t('grove.biAccept'), 'accept', p.uid, false), button(t('grove.biDecline'), 'decline', p.uid, true));
+      } else {
+        const friend = settings.friends.includes(p.uid);
+        const following = settings.following.includes(p.uid);
+        if (friend) actions.append(el('span', 'muted bi__state', t('grove.biFriends')));
+        else if (!following) actions.append(button(t('grove.biFollowBack'), 'follow', p.uid, false));
+        else if (isAsked(p.uid)) actions.append(el('span', 'muted bi__state', t('grove.biAsked')));
+        else actions.append(button(t('grove.biAddFriend'), 'ask', p.uid, false));
+        actions.append(button(t('grove.biRemove'), 'remove', p.uid, true));
+      }
+      li.append(who, actions);
+      return li;
+    }
+
+    function collect(): { kind: Kind; p: Person }[] {
+      if (mode === 'followers') {
+        const all = withoutBlocked(getSocial()?.followers ?? []).sort((a, b) => b.at - a.at);
+        return all.map((p) => ({ kind: 'follow' as const, p }));
+      }
+      const { requests, follows } = inbox();
+      return [...requests.map((p) => ({ kind: 'request' as const, p })), ...follows.map((p) => ({ kind: 'follow' as const, p }))];
+    }
+
+    function render(): void {
+      const social = getSocial();
+      const followers = new Set(social?.followers.map((p) => p.uid));
+      const requests = new Set(social?.incoming.map((l) => l.uid));
+      // Keep what was shown, minus anyone who was answered or removed.
+      const items = shown.filter(({ kind, p }) => (kind === 'request' ? requests.has(p.uid) : followers.has(p.uid)));
+      $('[data-bi-title]').textContent = mode === 'new' ? t('grove.biNew') : t('grove.biFollowers');
+      $('[data-bi-list]').replaceChildren(...items.map(({ kind, p }) => itemEl(kind, p)));
+      const empty = $('[data-bi-empty]');
+      empty.hidden = items.length > 0;
+      empty.textContent = mode === 'new' ? t('grove.biNothingNew') : t('grove.biNoFollowers');
+    }
+
+    c.add(
+      listen(sheet, 'sheet:open', (e) => {
+        const d = (e as CustomEvent<Record<string, string | undefined>>).detail;
+        mode = d.mode === 'followers' ? 'followers' : 'new';
+        shown = collect();
+        $('[data-bi-msg]').textContent = '';
+        render();
+        markInboxSeen();
+      }),
+    );
+
+    c.add(
+      listen(sheet, 'click', (e) => {
+        // A tap on someone's name opens their sheet in place of this one (Sheet.astro).
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-bi-act]');
+        if (!b) return;
+        const uid = b.dataset.uid ?? '';
+        const msg = $('[data-bi-msg]');
+        const act = b.dataset.biAct;
+        const run =
+          act === 'accept'
+            ? acceptFriend(uid)
+            : act === 'decline'
+              ? declineFriend(uid)
+              : act === 'follow'
+                ? followPerson(uid)
+                : act === 'ask'
+                  ? askFriend(uid)
+                  : removeFollower(uid);
+        b.disabled = true;
+        msg.textContent = '';
+        run
+          .then(() => {
+            render();
+            document.dispatchEvent(new CustomEvent('board:changed'));
+          })
+          .catch((err: unknown) => {
+            b.disabled = false;
+            msg.textContent = friendlyError(err);
+          });
+      }),
+    );
+
+    c.add(listen(document, 'board:social', () => sheet.open && render()));
+    return c.run;
+  });
+</script>
+
+<style>
+  .bi {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .bi [hidden] {
+    display: none !important;
+  }
+
+  .bi__title {
+    margin: 0;
+    font-size: var(--text-lg);
+  }
+
+  .bi__empty,
+  .bi__note {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bi__note {
+    font-size: var(--text-xs);
+  }
+
+  .bi__list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bi__item {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+  }
+
+  .bi__who {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .bi__text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .bi__text .muted {
+    font-size: var(--text-sm);
+  }
+
+  .bi__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .bi__actions .btn {
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .bi__state {
+    font-size: var(--text-sm);
+    text-align: center;
+  }
+
+  .account__msg:empty {
+    display: none;
+  }
+</style>

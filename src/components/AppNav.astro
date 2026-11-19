@@ -35,6 +35,7 @@ const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
               <svg viewBox="0 0 24 24" width="22" height="22">
                 <path d={item.icon} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
+              {item.href === '/progress' && <span class="app-nav__dot" data-board-dot hidden />}
             </span>
             <span data-t={item.t}>{item.label}</span>
           </a>
@@ -160,6 +161,7 @@ const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
   }
 
   .app-nav__icon {
+    position: relative;
     display: grid;
     place-items: center;
     inline-size: 3.75rem;
@@ -180,5 +182,21 @@ const ITEMS: (NavItem & { icon: string; only?: 'solo' | 'life' })[] = [
   .app-nav a[aria-current='page'] .app-nav__icon {
     background: var(--color-accent-soft);
     color: var(--color-accent);
+  }
+
+  /* New followers or a friend request on the board (src/lib/board.ts paintDots). */
+  .app-nav__dot {
+    position: absolute;
+    inset-block-start: 2px;
+    inset-inline-end: 14px;
+    width: 9px;
+    height: 9px;
+    border: 2px solid var(--color-bg);
+    border-radius: 50%;
+    background: var(--color-accent);
+  }
+
+  .app-nav__dot[hidden] {
+    display: none;
   }
 </style>

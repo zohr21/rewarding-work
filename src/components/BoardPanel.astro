@@ -1,12 +1,14 @@
 ---
 /**
  * Grove › Board: this week's league, the top three, and the people around you; or you
- * and your friends. Anyone can look; joining is BoardJoin.astro. Firebase is only loaded
- * the first time the tab is shown. Tapping someone's row opens BoardPerson.astro (block,
- * report, remove friend).
+ * your friends and the people you follow. Anyone can look; joining is BoardJoin.astro.
+ * Firebase is only loaded the first time the tab is shown. Tapping someone's row opens
+ * BoardPerson.astro (follow, add friend, block, report); new followers and friend requests
+ * open BoardInbox.astro.
  */
 import BoardJoin from './BoardJoin.astro';
 import BoardPerson from './BoardPerson.astro';
+import BoardInbox from './BoardInbox.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { SITE } from '../config/site';
@@ -40,7 +42,7 @@ import { url } from '../lib/paths';
 
   <div data-t-aria-label="grove.whoToCompareWith" class="board-seg" role="group" aria-label="Who to compare with">
     <button data-t="grove.everyone" type="button" aria-pressed="true" data-board-tab="all">Everyone</button>
-    <button data-t="grove.friends" type="button" aria-pressed="false" data-board-tab="friends">Friends</button>
+    <button type="button" aria-pressed="false" data-board-tab="friends"><span data-t="grove.friends">Friends</span><span class="board-dot" data-board-dot hidden></span></button>
   </div>
 
   <div class="board__view" data-board-view="all">
@@ -61,7 +63,7 @@ import { url } from '../lib/paths';
     </div>
     <ol class="board__list" data-board-around></ol>
     <p class="muted board__empty" data-board-empty hidden></p>
-    <p data-t="grove.tapToReport" class="muted board__note" data-board-tap-hint hidden>Tap a name to block or report it.</p>
+    <p data-t="grove.tapToReport" class="muted board__note" data-board-tap-hint hidden>Tap a name to follow, add as a friend, block or report.</p>
 
     <div class="board__join" data-board-joincard hidden>
       <h2 class="board__join-title" data-t={NATIVE_APP ? 'grove.onlyPhone' : 'grove.onlyDevice'}>Your focus is only on this {NATIVE_APP ? 'phone' : 'device'}</h2>
@@ -72,22 +74,49 @@ import { url } from '../lib/paths';
   </div>
 
   <div class="board__view" data-board-view="friends" hidden>
-    <div data-board-friends-on>
-      <p class="muted board__friends-count" data-board-friends-count></p>
+    <div class="board__friends" data-board-friends-on>
+      <button type="button" class="board-inbox" data-board-inbox data-sheet-open="board-inbox" data-mode="new" hidden>
+        <span class="board-inbox__n" data-board-inbox-n></span>
+        <span class="board-inbox__text">
+          <strong data-board-inbox-title></strong>
+          <span data-board-inbox-line></span>
+        </span>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+      </button>
+
+      <div class="board__head">
+        <h2 data-t="grove.friends" class="board__h">Friends</h2>
+        <span data-t="grove.friendsSub" class="muted">You see each other</span>
+      </div>
       <ol class="board__list" data-board-friends></ol>
+      <p class="muted board__friends-count" data-board-friends-count></p>
+
+      <div class="board__head">
+        <h2 data-t="grove.following" class="board__h">Following</h2>
+        <span data-t="grove.followingSub" class="muted">They don't have to follow back</span>
+      </div>
+      <ol class="board__list" data-board-following></ol>
+      <p class="muted board__friends-count" data-board-following-count></p>
+
+      <button type="button" class="board-followers" data-board-followers data-sheet-open="board-inbox" data-mode="followers" hidden>
+        <span data-board-followers-label></span>
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>
+      </button>
+
       <div class="board__invite">
         <h2 data-t="grove.growWithFriends" class="board__join-title">Grow with friends</h2>
-        <p data-t="grove.shareYourCodeFriendsSee" class="muted">Share your code. Friends see your nickname, stage and weekly focus, nothing else.</p>
+        <p data-t="grove.shareYourCodeFriends2" class="muted">Share your code. Friends see your nickname, stage and weekly focus, nothing else, and you see theirs.</p>
         <div class="board__code-row">
           <span class="board__code" data-board-code>…</span>
           <button data-t="grove.share" type="button" class="btn btn--small" data-board-share>Share</button>
         </div>
         <form class="board__add" data-board-add novalidate>
-          <label data-t="grove.addAFriendSCode" for="board-add-code" class="board__add-label">Add a friend's code</label>
+          <label data-t="grove.addFriendByCode" for="board-add-code" class="board__add-label">Add a friend by code</label>
           <div class="board__add-row">
             <input id="board-add-code" class="input" name="code" placeholder="OAK-7Q4K" translate="no" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-            <button data-t="grove.add" type="submit" class="btn btn--ghost btn--small">Add</button>
+            <button data-t="grove.sendRequest" type="submit" class="btn btn--ghost btn--small">Send request</button>
           </div>
+          <span data-t="grove.theyAccept" class="muted board__add-hint">They get a request and tap Accept.</span>
         </form>
         <p class="board__msg" role="status" data-board-friend-msg></p>
       </div>
@@ -108,14 +137,19 @@ import { url } from '../lib/paths';
 
 {ACCOUNTS_ENABLED && <BoardJoin />}
 {ACCOUNTS_ENABLED && <BoardPerson />}
+{ACCOUNTS_ENABLED && <BoardInbox />}
 
 <script>
   import { getAccount, onAccountChange } from '../lib/account/state';
   import {
-    addFriend,
+    askFriendByCode,
     formatMinutes,
     getBoard,
+    getSocial,
+    inbox,
+    isAsked,
     isHidden,
+    refreshSocial,
     leagueName,
     loadFriends,
     loadLeague,
@@ -312,12 +346,49 @@ import { url } from '../lib/paths';
         .map((e) => toRow(e, true));
       rows.push({ uid: uid!, name: myName(), minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true, hidden: myNameHidden() });
       rows.sort((a, b) => b.minutes - a.minutes);
-      // Removing a friend is in the sheet a row opens, with block and report.
+      // Follow, unfriend, block and report are in the sheet a row opens.
       list.replaceChildren(...rows.map((r, i) => rowEl(r, i + 1)));
       const n = settings.friends.length;
       const quiet = n - (rows.length - 1);
-      $('[data-board-friends-count]').textContent =
-        n === 0 ? t('board.noFriends') : `${t('board.thisWeek')} · ${tn('board.friends', n)}${quiet > 0 ? ` · ${tn('board.quiet', quiet)}` : ''}`;
+      const waiting = getSocial()?.outgoing.filter((l) => isAsked(l.uid)).length ?? 0;
+      const parts = n === 0 ? [t('board.noFriends2')] : [t('board.thisWeek'), tn('board.friends', n), ...(quiet > 0 ? [tn('board.quiet', quiet)] : [])];
+      if (waiting > 0) parts.push(tn('board.waiting', waiting));
+      $('[data-board-friends-count]').textContent = parts.join(' · ');
+
+      // People you follow (friends are listed above already).
+      const followIds = new Set(settings.following.filter((f) => !friendIds.has(f)));
+      const followRows: Row[] = withoutBlocked(friends)
+        .filter((e) => followIds.has(e.uid))
+        .map((e) => toRow(e));
+      followRows.sort((a, b) => b.minutes - a.minutes);
+      $('[data-board-following]').replaceChildren(...followRows.map((r, i) => rowEl(r, i + 1)));
+      const notShown = followIds.size - followRows.length;
+      $('[data-board-following-count]').textContent =
+        followIds.size === 0 ? t('board.noFollowing') : notShown > 0 ? tn('board.quiet', notShown) : '';
+
+      renderInbox();
+    }
+
+    /** "2 new · birch42 followed you · quiet.willow wants to be friends", and Followers · N. */
+    function renderInbox(): void {
+      const social = getSocial();
+      const { requests, follows } = inbox();
+      const n = requests.length + follows.length;
+      const row = $('[data-board-inbox]');
+      row.hidden = n === 0;
+      if (n > 0) {
+        $('[data-board-inbox-n]').textContent = String(n);
+        $('[data-board-inbox-title]').textContent = tn('board.newN', n);
+        const parts: string[] = [];
+        if (follows.length === 1) parts.push(t('board.followedYou', { name: follows[0]!.name }));
+        else if (follows.length > 1) parts.push(tn('board.newFollowers', follows.length));
+        if (requests.length === 1) parts.push(t('board.wantsFriends', { name: requests[0]!.name }));
+        else if (requests.length > 1) parts.push(tn('board.newRequests', requests.length));
+        $('[data-board-inbox-line]').textContent = parts.join(' · ');
+      }
+      const followers = $('[data-board-followers]');
+      followers.hidden = !social;
+      if (social) $('[data-board-followers-label]').textContent = tn('board.followersN', social.followers.length);
     }
 
     function render(): void {
@@ -341,10 +412,11 @@ import { url } from '../lib/paths';
       status(league === null ? t('board.loading') : '');
       try {
         const tier = myTier();
-        const [rows, mine] = await Promise.all([loadLeague(tier), joined() ? loadFriends() : Promise.resolve(null)]);
+        // Followers and requests first: an accepted request changes who your friends are.
+        const [rows] = await Promise.all([loadLeague(tier), joined() ? refreshSocial(true).catch(() => {}) : null]);
         league = rows;
         leagueTier = tier;
-        friends = mine;
+        friends = joined() ? await loadFriends() : null;
         status('');
       } catch (err) {
         const code = (err as { code?: string })?.code;
@@ -408,10 +480,10 @@ import { url } from '../lib/paths';
         const input = addForm.querySelector<HTMLInputElement>('input')!;
         const msg = $('[data-board-friend-msg]');
         msg.textContent = t('board.looking');
-        addFriend(input.value)
-          .then((problem) => {
-            msg.textContent = problem ?? t('board.added');
-            if (!problem) {
+        askFriendByCode(input.value)
+          .then(({ ok, message }) => {
+            msg.textContent = message;
+            if (ok) {
               input.value = '';
               void load();
             }
@@ -421,6 +493,7 @@ import { url } from '../lib/paths';
     );
 
     c.add(listen(document, 'board:changed', () => void load()));
+    c.add(listen(document, 'board:social', () => renderInbox()));
     // A finished session moves you on the board at once; a new stage means a new league.
     c.add(subscribe('sessions', () => (started && myTier() !== leagueTier ? void load() : render())));
     c.add(subscribe('board', render));
@@ -808,6 +881,97 @@ import { url } from '../lib/paths';
   .board__hidden-mail {
     justify-self: center;
     padding: var(--space-2);
+    font-size: var(--text-xs);
+  }
+  .board__friends {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  /* "Something new" (BoardInbox.astro): green, since it's yours to act on. */
+  .board-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-inline-start: 6px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    vertical-align: middle;
+  }
+
+  .board-inbox {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 56px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-solid));
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .board-inbox__n {
+    display: grid;
+    place-items: center;
+    min-width: 26px;
+    height: 26px;
+    padding-inline: 6px;
+    border-radius: 13px;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-size: var(--text-xs);
+    font-weight: 800;
+  }
+
+  .board-inbox__text {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .board-inbox__text span {
+    overflow: hidden;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .board-inbox svg,
+  .board-followers svg {
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .board-followers {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-1);
+    border: 0;
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .board-followers span {
+    flex: 1;
+  }
+
+  .board__add-hint {
     font-size: var(--text-xs);
   }
 </style>

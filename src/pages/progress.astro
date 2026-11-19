@@ -43,6 +43,7 @@ const TABS = [
               data-grove-tab={tab.id}
             >
               <span data-t={`grove.tab.${tab.id}`}>{tab.label}</span>
+              {tab.id === 'board' && <span class="grove-tabs__dot" data-board-dot hidden />}
             </button>
           ))
         }
@@ -381,5 +382,19 @@ const TABS = [
     .progress__pair {
       grid-template-columns: 1fr 1fr;
     }
+  }
+
+  .grove-tabs__dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-inline-start: 4px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    vertical-align: super;
+  }
+
+  .grove-tabs__dot[hidden] {
+    display: none;
   }
 </style>
