@@ -6,7 +6,7 @@ time. One Astro 7 + TypeScript + plain CSS codebase builds two things:
 - the **website** (GitHub Pages, base path `/rewarding-work/`, deployed on every push to `main`);
 - the **Android app** (Capacitor 8, base `/`, `NATIVE_APP` true). Two flavors install side by
   side: `full` (`app.grovyn.full`, the one the owner uses daily) and `play` (`app.grovyn`, for
-  Google Play: no SMS import, no weekly board).
+  Google Play: no SMS import).
 
 No backend of its own. Data lives in `localStorage` (`rw:v1:<store>`); an optional Firebase
 account syncs some stores. No ads, no analytics.
@@ -62,7 +62,7 @@ before building), **grovyn-ship** (branch, commit, PR).
 - **The dark palette is written twice** in `tokens.css` (auto and dark). Edit both.
 - **Glow green is for actions and earned things, sun gold for rewards only.** Tap targets
   are at least 44 px. Copy is plain, short and kind: no guilt, no "browser" inside the app.
-- **Play build** (`PUBLIC_PLAY_STORE`): no `READ_SMS`, no weekly board. A sensitive permission
+- **Play build** (`PUBLIC_PLAY_STORE`): no `READ_SMS`. The weekly board is in it, so keep report and block working (`board.ts`). A sensitive permission
   needs a disclosure in the app before Android's own screen, and a line in the privacy policy.
 - Commit, push and open pull requests only when asked. One feature per `claude/<name>` branch
   from `main`. Stage files by name.

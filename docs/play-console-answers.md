@@ -27,10 +27,10 @@ workouts and manual health entries, findings, the coach plan, the Budget lock.
 |---|---|---|---|---|
 | Personal info → **Email address** | Yes | Optional (accounts are optional) | Account management | Email/password or Google sign-in (Firebase Auth) |
 | Personal info → **Name** | Yes | Optional | Account management | Google sign-in passes the account name |
-| Personal info → **User IDs** | Yes | Optional | Account management, App functionality | Firebase uid; weekly board is off in the Play version |
+| Personal info → **User IDs** | Yes | Optional | Account management, App functionality | Firebase uid; also on weekly board rows and in nickname reports (reporter and reported) |
 | Financial info → **Purchase history** | Yes | Optional | App functionality | Budget expenses sync to the account when signed in |
 | Financial info → **Other financial info** | Yes | Optional | App functionality | Budgets, repeating bills |
-| App activity → **Other user-generated content** | Yes | Optional | App functionality | Tasks, notes, exam plan, done list, chains |
+| App activity → **Other user-generated content** | Yes | Optional | App functionality | Tasks, notes, exam plan, done list, chains; the weekly board nickname, which others see |
 | App activity → **App interactions** | Yes | Optional | App functionality | Focus sessions (time and length), settings |
 
 Not collected: location, contacts, messages, photos, files, audio, calendar, web history, device IDs, health and
@@ -62,7 +62,7 @@ Not requested: any `WRITE_*` permission, and background reads.
 |---|---|
 | **Financial features** | Personal budgeting / expense tracking only. No loans, payments, banking, crypto or trading. |
 | **Ads** | No ads. |
-| **Content rating** | Questionnaire: no violence, sex, gambling or user-to-user chat in the Play version. Expect Everyone / PEGI 3. |
+| **Content rating** | Questionnaire: no violence, sex or gambling. From 0.1.2 the weekly board is in: answer **Yes** to "users can interact or exchange content" (others see a nickname they chose; no chat, no photos, no messages). Moderation: board rules agreed at join, report and block in the app, reports reviewed in the Firebase console, a name hidden after 3 reports. Expect Everyone / PEGI 3 with "Users Interact". |
 | **Target audience** | 13+ (or 18+). Not for children: Health Connect apps may not target children. |
 | **News app** | No. |
 | **Government app** | No. |

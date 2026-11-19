@@ -24,6 +24,11 @@ service cloud.firestore {
     // everyone can be read by anyone, so the board can be seen before joining; a
     // "Friends only" row by its owner and the friends it lists. Minutes are capped at
     // 4 hours a day, as the app counts them.
+    //
+    // `reports` counts the different people who reported the nickname: only someone else
+    // can add one (once, with a report of their own in the same write), and the owner can
+    // only put it back to 0 by changing the nickname. 3 or more, or `hidden`, and the app
+    // shows "hidden name".
     match /boards/{week}/entries/{uid} {
       allow read: if (request.auth != null && request.auth.uid == uid)
         || resource.data.visibility == 'all'
@@ -31,10 +36,30 @@ service cloud.firestore {
 
       allow delete: if request.auth != null && request.auth.uid == uid;
 
-      allow create, update: if request.auth != null
-        && request.auth.uid == uid
-        && week.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && request.resource.data.keys().hasOnly(['name', 'minutes', 'tier', 'guest', 'visibility', 'friends', 'updatedAt'])
+      allow create: if isOwner() && validRow()
+        && request.resource.data.get('reports', 0) == 0;
+
+      allow update: if isOwner() && validRow()
+        && (request.resource.data.get('reports', 0) == resource.data.get('reports', 0)
+          || (request.resource.data.name != resource.data.name && request.resource.data.get('reports', 0) == 0));
+
+      // Someone reporting this row.
+      allow update: if request.auth != null
+        && request.auth.uid != uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reports'])
+        && request.resource.data.reports == resource.data.get('reports', 0) + 1
+        && !exists(/databases/$(database)/documents/reports/$(request.auth.uid + '_' + uid + '_' + week))
+        && existsAfter(/databases/$(database)/documents/reports/$(request.auth.uid + '_' + uid + '_' + week));
+
+      function isOwner() {
+        return request.auth != null && request.auth.uid == uid;
+      }
+
+      function validRow() {
+        return week.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.keys().hasOnly(['name', 'minutes', 'tier', 'guest', 'visibility', 'friends', 'updatedAt', 'reports', 'hidden'])
+        && request.resource.data.get('reports', 0) is int
+        && request.resource.data.get('hidden', false) is bool
         && request.resource.data.name is string
         && request.resource.data.name.size() >= 2
         && request.resource.data.name.size() <= 20
@@ -49,6 +74,25 @@ service cloud.firestore {
         && request.resource.data.friends is list
         && request.resource.data.friends.size() <= 30
         && request.resource.data.updatedAt is number;
+      }
+    }
+
+    // Reports of a nickname, for the owner to review in the Firebase console. Anyone signed
+    // in (guests too) can send one per row per week; nobody can read, change or delete them
+    // from the app. The id is reporter_target_week, so a second report is refused.
+    match /reports/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['reporter', 'target', 'week', 'name', 'reason', 'at'])
+        && request.resource.data.reporter == request.auth.uid
+        && request.resource.data.target is string
+        && request.resource.data.target != request.auth.uid
+        && request.resource.data.week is string
+        && request.resource.data.week.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && id == request.auth.uid + '_' + request.resource.data.target + '_' + request.resource.data.week
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.reason in ['hate', 'sexual', 'bullying', 'impersonation', 'personal', 'spam', 'other']
+        && request.resource.data.at == request.time;
     }
 
     // Friend codes: anyone signed in can look one up; you can only claim a free code for

@@ -2,11 +2,14 @@
 /**
  * Grove › Board: this week's league, the top three, and the people around you; or you
  * and your friends. Anyone can look; joining is BoardJoin.astro. Firebase is only loaded
- * the first time the tab is shown.
+ * the first time the tab is shown. Tapping someone's row opens BoardPerson.astro (block,
+ * report, remove friend).
  */
 import BoardJoin from './BoardJoin.astro';
+import BoardPerson from './BoardPerson.astro';
 import { ACCOUNTS_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
+import { SITE } from '../config/site';
 import { url } from '../lib/paths';
 ---
 
@@ -21,6 +24,18 @@ import { url } from '../lib/paths';
     <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
     <p><strong data-t="grove.youReOnAsA">You're on as a guest.</strong> <span data-t="grove.guestSave">Save with email or Google so your rank survives a new phone.</span></p>
     <a data-t="grove.save" class="btn btn--small board__guest-save" href={`${url('/account')}#acc-save`}>Save</a>
+  </div>
+
+  <div class="board__hidden" role="status" data-board-hidden hidden>
+    <div class="board__hidden-text">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 5.1A10 10 0 0 1 12 5c5 0 9 5 9 7a8 8 0 0 1-2.2 3.4"></path><path d="M6.6 6.6C4.3 8 3 10.4 3 12c0 2 4 7 9 7a9 9 0 0 0 4.4-1.2"></path></svg>
+      <p>
+        <strong data-t="grove.hiddenTitle">Your nickname is hidden for now</strong>
+        <span data-t="grove.hiddenText">A few people reported it. Your minutes still count; others see “hidden name” until you pick a new one.</span>
+      </p>
+    </div>
+    <button data-t="grove.pickNewNickname" type="button" class="btn" data-board-rename>Pick a new nickname</button>
+    <a data-t="grove.hiddenMistake" class="board__hidden-mail" href={`mailto:${SITE.supportEmail}?subject=Grovyn%20board%20nickname`}>Think it's a mistake? Tell us</a>
   </div>
 
   <div data-t-aria-label="grove.whoToCompareWith" class="board-seg" role="group" aria-label="Who to compare with">
@@ -46,6 +61,7 @@ import { url } from '../lib/paths';
     </div>
     <ol class="board__list" data-board-around></ol>
     <p class="muted board__empty" data-board-empty hidden></p>
+    <p data-t="grove.tapToReport" class="muted board__note" data-board-tap-hint hidden>Tap a name to block or report it.</p>
 
     <div class="board__join" data-board-joincard hidden>
       <h2 class="board__join-title" data-t={NATIVE_APP ? 'grove.onlyPhone' : 'grove.onlyDevice'}>Your focus is only on this {NATIVE_APP ? 'phone' : 'device'}</h2>
@@ -91,6 +107,7 @@ import { url } from '../lib/paths';
 </div>
 
 {ACCOUNTS_ENABLED && <BoardJoin />}
+{ACCOUNTS_ENABLED && <BoardPerson />}
 
 <script>
   import { getAccount, onAccountChange } from '../lib/account/state';
@@ -98,14 +115,16 @@ import { url } from '../lib/paths';
     addFriend,
     formatMinutes,
     getBoard,
+    isHidden,
     leagueName,
     loadFriends,
     loadLeague,
+    myNameHidden,
     myTier,
-    removeFriend,
     resetsIn,
     weekLabel,
     weekMinutes,
+    withoutBlocked,
     type BoardEntry,
   } from '../lib/board';
   import { friendlyError } from '../lib/account/errors';
@@ -124,6 +143,38 @@ import { url } from '../lib/paths';
     guest: boolean;
     you?: boolean;
     ghost?: boolean;
+    /** Reported by enough people: shown as "hidden name". */
+    hidden?: boolean;
+    /** One of the friends you added. */
+    friend?: boolean;
+  }
+
+  function toRow(e: BoardEntry, friend = false): Row {
+    const hidden = isHidden(e);
+    return { uid: e.uid, name: hidden ? t('board.hiddenName') : e.name, minutes: e.minutes, guest: e.guest, hidden, friend };
+  }
+
+  /** Your own row's name: "You · misty.fern", or "You · hidden name". */
+  function myName(): string {
+    return youPrefix() + (myNameHidden() ? t('board.hiddenName') : getBoard().name);
+  }
+
+  /** Someone else's row (or podium place) opens their sheet: block, report, remove friend. */
+  function addHit(li: HTMLElement, r: Row): void {
+    if (r.you || r.ghost) return;
+    li.classList.add('board-tap');
+    const hit = el('button', 'board-tap__hit');
+    hit.type = 'button';
+    hit.setAttribute('aria-label', t('board.optionsFor', { name: r.name, time: formatMinutes(r.minutes) }));
+    Object.assign(hit.dataset, {
+      sheetOpen: 'board-person',
+      uid: r.uid,
+      name: r.name,
+      minutes: String(r.minutes),
+      friend: r.friend ? '1' : '',
+      hidden: r.hidden ? '1' : '',
+    });
+    li.append(hit);
   }
 
   onPage('board', () => {
@@ -147,9 +198,12 @@ import { url } from '../lib/paths';
       const sessions = getSessions();
       const uid = getAccount().user?.uid;
       const mine: Row = { uid: uid ?? 'you', name: getBoard().name, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous };
-      const rows: Row[] = (league ?? []).filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
+      const friendIds = new Set(getBoard().friends);
+      const rows: Row[] = withoutBlocked(league ?? [])
+        .filter((e) => e.uid !== uid)
+        .map((e) => toRow(e, friendIds.has(e.uid)));
       const isIn = joined();
-      if (isIn) rows.push({ ...mine, name: youPrefix() + mine.name, you: true });
+      if (isIn) rows.push({ ...mine, name: myName(), you: true, hidden: myNameHidden() });
       else rows.push({ ...mine, name: t('board.youdBeHere'), ghost: true });
       rows.sort((a, b) => b.minutes - a.minutes || Number(!!b.you || !!b.ghost) - Number(!!a.you || !!a.ghost));
       return { rows, me: rows.findIndex((r) => r.you || r.ghost) };
@@ -161,16 +215,28 @@ import { url } from '../lib/paths';
       return `board-row__av board-row__av--${h % 4}`;
     }
 
-    function rowEl(r: Row, rank: number, extra?: HTMLElement): HTMLLIElement {
-      const li = el('li', `board-row${r.you ? ' board-row--you' : ''}${r.ghost ? ' board-row--ghost' : ''}`);
-      li.append(el('span', 'board-row__rank', r.ghost ? `${rank}?` : String(rank)));
-      const av = el('span', r.ghost ? 'board-row__av board-row__av--ghost' : avClass(r.name), r.ghost ? '' : r.name.replace(youPrefix(), '').charAt(0).toUpperCase());
+    /** The round letter before a name; "?" for a hidden one. */
+    function avatar(r: Row): HTMLElement {
+      const av = r.ghost
+        ? el('span', 'board-row__av board-row__av--ghost', '')
+        : r.hidden
+          ? el('span', 'board-row__av board-row__av--hidden', '?')
+          : el('span', avClass(r.name), r.name.replace(youPrefix(), '').charAt(0).toUpperCase());
       av.setAttribute('aria-hidden', 'true');
+      return av;
+    }
+
+    function rowEl(r: Row, rank: number): HTMLLIElement {
+      const li = el('li', `board-row${r.you ? ' board-row--you' : ''}${r.ghost ? ' board-row--ghost' : ''}${r.hidden ? ' board-row--hidden' : ''}`);
+      li.append(el('span', 'board-row__rank', r.ghost ? `${rank}?` : String(rank)));
       const name = el('span', 'board-row__name');
       name.append(el('span', 'board-row__nick', r.name));
       if (r.guest && !r.ghost) name.append(el('span', 'board-row__guest', t('board.guest')));
-      li.append(av, name, el('span', 'board-row__time', formatMinutes(r.minutes)));
-      if (extra) li.append(extra);
+      li.append(avatar(r), name, el('span', 'board-row__time', formatMinutes(r.minutes)));
+      if (!r.you && !r.ghost) {
+        li.insertAdjacentHTML('beforeend', '<svg class="board-tap__more" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg>');
+      }
+      addHit(li, r);
       return li;
     }
 
@@ -190,11 +256,13 @@ import { url } from '../lib/paths';
         around.replaceChildren();
         $('[data-board-count]').textContent = '';
         $('[data-board-around-head]').hidden = true;
+        $('[data-board-tap-hint]').hidden = true;
         empty.hidden = true;
         return;
       }
       const { rows, me } = leagueRows();
       const others = rows.length - 1;
+      $('[data-board-tap-hint]').hidden = others === 0;
       $('[data-board-count]').textContent = tn('board.others', others);
       empty.hidden = others > 0;
       empty.textContent = t('board.nobody', { league: leagueName(tier) }) + (joined() ? '' : ` ${t('board.beFirst')}`);
@@ -207,9 +275,8 @@ import { url } from '../lib/paths';
           const r = rows[index]!;
           const li = el('li', `board-podium__p board-podium__p--${place + 1}${r.you ? ' board-row--you' : ''}`);
           li.append(el('span', 'board-podium__rank', `#${index + 1}`));
-          const av = el('span', avClass(r.name), r.name.replace(youPrefix(), '').charAt(0).toUpperCase());
-          av.setAttribute('aria-hidden', 'true');
-          li.append(av, el('span', 'board-podium__name', r.name), el('span', 'board-podium__time', formatMinutes(r.minutes)));
+          li.append(avatar(r), el('span', 'board-podium__name', r.name), el('span', 'board-podium__time', formatMinutes(r.minutes)));
+          addHit(li, r);
           return li;
         }),
       );
@@ -239,20 +306,14 @@ import { url } from '../lib/paths';
         return;
       }
       const sessions = getSessions();
-      const rows: Row[] = friends.filter((e) => e.uid !== uid).map((e) => ({ uid: e.uid, name: e.name, minutes: e.minutes, guest: e.guest }));
-      rows.push({ uid: uid!, name: youPrefix() + settings.name, minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true });
+      const friendIds = new Set(settings.friends);
+      const rows: Row[] = withoutBlocked(friends)
+        .filter((e) => e.uid !== uid && friendIds.has(e.uid))
+        .map((e) => toRow(e, true));
+      rows.push({ uid: uid!, name: myName(), minutes: weekMinutes(sessions), guest: !!getAccount().user?.isAnonymous, you: true, hidden: myNameHidden() });
       rows.sort((a, b) => b.minutes - a.minutes);
-      list.replaceChildren(
-        ...rows.map((r, i) => {
-          if (r.you) return rowEl(r, i + 1);
-          const remove = el('button', 'board-row__remove');
-          remove.type = 'button';
-          remove.dataset.boardRemove = r.uid;
-          remove.setAttribute('aria-label', t('board.removeFriend', { name: r.name }));
-          remove.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>';
-          return rowEl(r, i + 1, remove);
-        }),
-      );
+      // Removing a friend is in the sheet a row opens, with block and report.
+      list.replaceChildren(...rows.map((r, i) => rowEl(r, i + 1)));
       const n = settings.friends.length;
       const quiet = n - (rows.length - 1);
       $('[data-board-friends-count]').textContent =
@@ -264,6 +325,7 @@ import { url } from '../lib/paths';
       root.querySelectorAll<HTMLElement>('[data-board-view]').forEach((v) => (v.hidden = v.dataset.boardView !== tab));
       $('[data-board-guest]').hidden = !(joined() && getAccount().user?.isAnonymous);
       $('[data-board-note]').hidden = !joined();
+      $('[data-board-hidden]').hidden = !(joined() && myNameHidden());
       renderAll();
       renderFriends();
     }
@@ -318,13 +380,7 @@ import { url } from '../lib/paths';
           return;
         }
         if (t.closest('[data-board-retry]')) void load();
-        const rm = t.closest<HTMLButtonElement>('[data-board-remove]');
-        if (rm) {
-          const uid = rm.dataset.boardRemove!;
-          friends = (friends ?? []).filter((f) => f.uid !== uid);
-          render();
-          void removeFriend(uid).catch((err: unknown) => ($('[data-board-friend-msg]').textContent = friendlyError(err)));
-        }
+        if (t.closest('[data-board-rename]')) document.dispatchEvent(new CustomEvent('board:join'));
         if (t.closest('[data-board-share]')) void shareCode();
       }),
     );
@@ -670,24 +726,88 @@ import { url } from '../lib/paths';
     font-size: var(--text-xs);
   }
 
-  :global(.board-row__remove) {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 36px;
-    height: 36px;
-    margin-right: -8px;
+  /* Someone else's row or podium place: the whole of it is one button that opens their sheet. */
+  :global(.board-tap) {
+    position: relative;
+  }
+
+  :global(.board-tap__hit) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
     border: 0;
-    border-radius: 10px;
+    border-radius: inherit;
     background: transparent;
-    color: var(--color-text-muted);
     cursor: pointer;
   }
 
-  :global(.board-row__remove svg) {
+  :global(.board-tap:hover) {
+    border-color: var(--color-border-strong);
+  }
+
+  :global(.board-tap__hit:focus-visible) {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  :global(.board-tap__more) {
+    flex: none;
+    margin-right: -4px;
     fill: none;
-    stroke: currentColor;
+    stroke: var(--color-text-muted);
     stroke-width: 2;
     stroke-linecap: round;
+    opacity: 0.7;
+  }
+
+  :global(.board-row--hidden .board-row__nick),
+  :global(.board-podium__p .board-row__av--hidden + .board-podium__name) {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+
+  :global(.board-row__av--hidden) {
+    background: var(--well-bg);
+    color: var(--color-text-muted);
+  }
+
+  .board__hidden {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+    border-radius: var(--radius-lg);
+    background: var(--surface-grad);
+    box-shadow: var(--shadow-card);
+  }
+
+  .board__hidden-text {
+    display: flex;
+    gap: var(--space-3);
+    align-items: flex-start;
+  }
+
+  .board__hidden-text svg {
+    flex: none;
+    margin-top: 2px;
+    fill: none;
+    stroke: var(--color-danger);
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .board__hidden-text p {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .board__hidden-mail {
+    justify-self: center;
+    padding: var(--space-2);
+    font-size: var(--text-xs);
   }
 </style>

@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **18 Nov · Board safety, so the board ships on Play.** Picked "tap a row → small sheet"
+  (over a ⋯ button or long-press): Block (with Undo, unblock in You › Weekly board) and Report
+  nickname (7 reasons, "also block" ticked). Join asks to agree to four board rules. A name
+  reported by 3 different people shows as "hidden name" until its owner picks another; a
+  short word, link and phone-number filter runs at join. The board is now in the Play build.
+  The 3-reports number and the filter were my proposals, built as drawn.
+
 - **14 Nov · Play Console set up.** App `app.grovyn`, Free (in-app purchases possible later),
   audience 13+, category Productivity. Store graphics are not labelled as AI-made. The
   Azerbaijani store name is «Grovyn: Fokus və tapşırıqlar» («tapşırıqlar», not «işlər»; the

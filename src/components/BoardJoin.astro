@@ -5,6 +5,7 @@
  * guest account first. Fires `board:changed` on the document once joined.
  */
 import { NATIVE_APP } from '../config/app';
+import { url } from '../lib/paths';
 ---
 
 <dialog class="board-join" data-board-join aria-labelledby="board-join-title">
@@ -44,6 +45,21 @@ import { NATIVE_APP } from '../config/app';
       </li>
     </ul>
 
+    <section class="board-join__rules" aria-labelledby="board-rules-h">
+      <h3 data-t="grove.boardRules" id="board-rules-h" class="board-join__rules-title">Board rules</h3>
+      <ul>
+        <li data-t="grove.rule1">No hateful, sexual or bullying names.</li>
+        <li data-t="grove.rule2">No real names, phone numbers or links: yours or anyone's.</li>
+        <li data-t="grove.rule3">Don't pretend to be someone else.</li>
+        <li data-t="grove.rule4">Anyone can report a name. A name that breaks the rules is hidden, and you're asked for a new one.</li>
+      </ul>
+      <a data-t="grove.rulesMore" href={`${url('/privacy')}#board`}>Full rules and privacy</a>
+    </section>
+    <label class="board-join__agree">
+      <input type="checkbox" name="agree" data-board-agree />
+      <span data-t="grove.iFollowRules">I'll follow the board rules</span>
+    </label>
+
     <p class="account__msg board-join__msg" role="status" data-board-join-msg></p>
     <div class="board-join__go">
       <button data-t="grove.join" type="submit" class="btn" data-board-join-submit>Join</button>
@@ -72,6 +88,7 @@ import { NATIVE_APP } from '../config/app';
     const submit = form.querySelector<HTMLButtonElement>('[data-board-join-submit]')!;
     const av = form.querySelector<HTMLElement>('[data-board-preview-av]')!;
     const name = form.querySelector<HTMLElement>('[data-board-preview-name]')!;
+    const agree = form.querySelector<HTMLInputElement>('[data-board-agree]')!;
 
     const preview = () => {
       const nick = input.value.trim() || 'your.name';
@@ -85,7 +102,10 @@ import { NATIVE_APP } from '../config/app';
       form.querySelector<HTMLElement>('[data-board-preview-league]')!.textContent = leagueStage(myTier(sessions));
       form.querySelector<HTMLElement>('[data-board-preview-time]')!.textContent = formatMinutes(weekMinutes(sessions));
       const picks = nicknameIdeas();
-      input.value = getBoard().name || picks[0]!;
+      const settings = getBoard();
+      // A name that was hidden after reports isn't offered again.
+      input.value = (settings.name !== settings.hiddenName && settings.name) || picks[0]!;
+      agree.checked = settings.agreedAt > 0;
       ideas.replaceChildren(
         ...picks.map((idea) => {
           const b = el('button', 'board-join__idea', idea);
@@ -98,7 +118,7 @@ import { NATIVE_APP } from '../config/app';
         }),
       );
       msg.textContent = '';
-      submit.disabled = false;
+      submit.disabled = !agree.checked;
       preview();
       dialog.showModal();
     };
@@ -112,6 +132,8 @@ import { NATIVE_APP } from '../config/app';
     );
     c.add(listen(document, 'board:join', open));
     c.add(listen(input, 'input', preview));
+    // Joining needs the rules agreed to (Google Play asks for this before anyone posts).
+    c.add(listen(agree, 'change', () => (submit.disabled = !agree.checked)));
     // Tapping the dimmed page around the sheet closes it.
     c.add(listen(dialog, 'click', (e) => e.target === dialog && dialog.close()));
 
@@ -119,6 +141,11 @@ import { NATIVE_APP } from '../config/app';
       listen(form, 'submit', (e) => {
         e.preventDefault();
         const nick = input.value.trim();
+        if (!agree.checked) {
+          msg.textContent = t('board.err.agree');
+          agree.focus();
+          return;
+        }
         const problem = nicknameProblem(nick);
         if (problem) {
           msg.textContent = problem;
@@ -270,6 +297,53 @@ import { NATIVE_APP } from '../config/app';
 
   .board-join__msg:empty {
     display: none;
+  }
+
+  .board-join__rules {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    font-size: var(--text-sm);
+  }
+
+  .board-join__rules-title {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+
+  .board-join__rules ul {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding-left: 1.2em;
+  }
+
+  .board-join__rules a {
+    justify-self: start;
+    font-size: var(--text-xs);
+  }
+
+  .board-join__agree {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .board-join__agree input {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    accent-color: var(--color-focus);
   }
 
   .board-join__go {
