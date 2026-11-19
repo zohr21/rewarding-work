@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **20 Nov · Follow vs. friends on the board.** Follow is one way, no asking; the other person
+  sees "X followed you" and can follow back or remove them. Add friend goes both ways: a
+  request, then Accept. What's new shows as one slim "N new" row on Board › Friends and a dot
+  on the Grove tab (option A, picked over a bell or a phone notification). Old one-way
+  friends became people you follow. My proposals, built as drawn: Accept is required, and
+  followers don't see a Friends-only row.
+
 - **18 Nov · Board safety, so the board ships on Play.** Picked "tap a row → small sheet"
   (over a ⋯ button or long-press): Block (with Undo, unblock in You › Weekly board) and Report
   nickname (7 reasons, "also block" ticked). Join asks to agree to four board rules. A name

@@ -1,12 +1,14 @@
 ---
 /**
  * The sheet a tap on someone's board row opens (BoardPanel.astro): who they are, then
- * Remove friend, Block, or Report nickname. Report asks for a reason and can block at the
+ * Follow, Add friend, Remove friend, Block, or Report nickname. Report asks for a reason and can block at the
  * same time; Block says what it does first. Google Play asks for both in any app where
  * people post something others see (here, only nicknames).
  *
- * Opened by [data-sheet-open="board-person"] with data-uid, data-name, data-minutes,
- * data-friend and data-hidden. Fires `board:changed` once someone is blocked or reported.
+ * Follow and Add friend sit on top (BoardInbox.astro shows the other side of both).
+ *
+ * Opened by [data-sheet-open="board-person"] with data-uid, data-name, data-minutes (empty
+ * when unknown) and data-hidden. Fires `board:changed` once someone is blocked or reported.
  */
 import Sheet from './Sheet.astro';
 import { NATIVE_APP } from '../config/app';
@@ -22,6 +24,18 @@ import { NATIVE_APP } from '../config/app';
           <span class="muted bp__sub" data-bp-sub></span>
         </div>
       </div>
+      <div class="bp__pair">
+        <button type="button" class="btn" data-bp-follow>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+          <span data-bp-follow-label></span>
+        </button>
+        <button type="button" class="btn btn--ghost" data-bp-friend>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"></path><path d="M18 8v6"></path><path d="M15 11h6"></path></svg>
+          <span data-bp-friend-label></span>
+        </button>
+      </div>
+      <p data-t="grove.bpFollowNote" class="muted bp__note">Follow: you see their week, and they get a notice. Add friend: they're asked first, then you see each other.</p>
+      <p class="account__msg bp__msg" role="status" data-bp-pmsg></p>
       <p data-t="grove.bpAllTheySee" class="muted bp__note">This is all anyone sees on the board: a nickname, a stage and focus minutes.</p>
       <div class="bp__actions">
         <button type="button" class="btn btn--ghost" data-bp-unfriend hidden>
@@ -85,7 +99,28 @@ import { NATIVE_APP } from '../config/app';
 </Sheet>
 
 <script>
-  import { blockPerson, formatMinutes, getBoard, removeFriend, reportPerson, setBoard, unblockPerson, pushEntry, type ReportReason } from '../lib/board';
+  import {
+    acceptFriend,
+    askedMe,
+    askFriend,
+    blockPerson,
+    cancelAsk,
+    followPerson,
+    formatMinutes,
+    getBoard,
+    getSocial,
+    isAsked,
+    isFollowing,
+    isFriend,
+    removeFriend,
+    reportPerson,
+    setBoard,
+    unblockPerson,
+    unfollowPerson,
+    pushEntry,
+    type ReportReason,
+  } from '../lib/board';
+  import { getAccount } from '../lib/account/state';
   import { friendlyError } from '../lib/account/errors';
   import { offerUndo } from '../lib/undo';
   import { cleanups, listen, onPage } from '../lib/page';
@@ -103,7 +138,7 @@ import { NATIVE_APP } from '../config/app';
     const send = $<HTMLButtonElement>('[data-bp-send]');
     const msg = $('[data-bp-msg]');
 
-    let who = { uid: '', name: '', minutes: 0, friend: false, hidden: false };
+    let who = { uid: '', name: '', minutes: 0, timed: false, hidden: false };
 
     function show(view: View): void {
       sheet.querySelectorAll<HTMLElement>('[data-bp-view]').forEach((v) => (v.hidden = v.dataset.bpView !== view));
@@ -123,13 +158,13 @@ import { NATIVE_APP } from '../config/app';
     c.add(
       listen(sheet, 'sheet:open', (e) => {
         const d = (e as CustomEvent<Record<string, string | undefined>>).detail;
-        who = { uid: d.uid ?? '', name: d.name ?? '', minutes: Number(d.minutes) || 0, friend: d.friend === '1', hidden: d.hidden === '1' };
+        who = { uid: d.uid ?? '', name: d.name ?? '', minutes: Number(d.minutes) || 0, timed: !!d.minutes, hidden: d.hidden === '1' };
         const av = $('[data-bp-av]');
         av.className = who.hidden ? 'board-row__av bp__av board-row__av--hidden' : avClass(who.name);
         av.textContent = who.hidden ? '?' : who.name.charAt(0).toUpperCase();
         $('[data-bp-name]').textContent = who.name;
-        $('[data-bp-sub]').textContent = t('grove.bpSub', { time: formatMinutes(who.minutes) });
-        $('[data-bp-unfriend]').hidden = !who.friend;
+        $('[data-bp-pmsg]').textContent = '';
+        paintPerson();
         // A hidden name is already dealt with; you can still block them.
         $('[data-bp-report-btn]').hidden = who.hidden;
         $('[data-bp-block-label]').textContent = t('grove.bpBlockName', { name: who.name });
@@ -142,6 +177,57 @@ import { NATIVE_APP } from '../config/app';
       }),
     );
 
+    /** Follow and friend buttons, and the line under the name, as things stand now. */
+    function paintPerson(): void {
+      const { uid } = who;
+      const following = isFollowing(uid);
+      const friend = isFriend(uid);
+      const followsMe = !!getSocial()?.followers.some((p) => p.uid === uid);
+      const sub = [who.timed ? t('grove.bpSub', { time: formatMinutes(who.minutes) }) : '', friend ? t('grove.bpFriend') : followsMe ? t('grove.bpFollowsYou') : ''];
+      $('[data-bp-sub]').textContent = sub.filter(Boolean).join(' · ');
+      const follow = $<HTMLButtonElement>('[data-bp-follow]');
+      follow.className = following ? 'btn btn--ghost' : 'btn';
+      $('[data-bp-follow-label]').textContent = following ? t('grove.bpUnfollow') : followsMe ? t('grove.bpFollowBack') : t('grove.bpFollow');
+      const ask = $<HTMLButtonElement>('[data-bp-friend]');
+      ask.hidden = friend;
+      ask.className = askedMe(uid) ? 'btn' : 'btn btn--ghost';
+      $('[data-bp-friend-label]').textContent = askedMe(uid) ? t('grove.bpAccept') : isAsked(uid) ? t('grove.bpCancelAsk') : t('grove.bpAddFriend');
+      $('[data-bp-unfriend]').hidden = !friend;
+    }
+
+    /** Follow / unfollow, or ask / accept / take back a friend request. Joins the board first if needed. */
+    function act(kind: 'follow' | 'friend'): void {
+      const { uid } = who;
+      if (!getBoard().joined || !getAccount().user) {
+        sheet.close();
+        document.dispatchEvent(new CustomEvent('board:join'));
+        return;
+      }
+      const msg = $('[data-bp-pmsg]');
+      msg.textContent = '';
+      let run: Promise<unknown>;
+      let done = '';
+      if (kind === 'follow') {
+        const was = isFollowing(uid);
+        run = was ? unfollowPerson(uid) : followPerson(uid);
+        done = was ? '' : t('grove.bpFollowed', { name: who.name });
+      } else if (askedMe(uid)) {
+        run = acceptFriend(uid);
+        done = t('board.nowFriendsWith', { name: who.name });
+      } else if (isAsked(uid)) {
+        run = cancelAsk(uid);
+      } else {
+        run = askFriend(uid).then((r) => (done = r === 'friends' ? t('board.nowFriendsWith', { name: who.name }) : t('board.requestSent')));
+      }
+      run
+        .then(() => {
+          msg.textContent = done;
+          paintPerson();
+          changed();
+        })
+        .catch((err: unknown) => (msg.textContent = friendlyError(err)));
+    }
+
     c.add(
       listen(sheet, 'click', (e) => {
         const el = e.target as HTMLElement;
@@ -149,14 +235,18 @@ import { NATIVE_APP } from '../config/app';
         if (go) show(go.dataset.bpGo as View);
         else if (el.closest('[data-bp-block]')) block();
         else if (el.closest('[data-bp-unfriend]')) unfriend();
+        else if (el.closest('[data-bp-follow]')) act('follow');
+        else if (el.closest('[data-bp-friend]')) act('friend');
       }),
     );
 
     c.add(listen(form, 'change', () => (send.disabled = !new FormData(form).get('reason'))));
 
-    /** Block now, with a few seconds to undo (it puts back a friend too). */
+    /** Block now, with a few seconds to undo (it puts back a friend and a follow too). */
     function block(): void {
-      const { uid, name, friend } = who;
+      const { uid, name } = who;
+      const friend = isFriend(uid);
+      const following = isFollowing(uid);
       sheet.close();
       void blockPerson(uid, name).then(changed);
       offerUndo({
@@ -168,6 +258,7 @@ import { NATIVE_APP } from '../config/app';
             setBoard({ friends: [...getBoard().friends, uid] });
             void pushEntry().catch(() => {});
           }
+          if (following) void followPerson(uid).catch(() => {});
           changed();
         },
       });
@@ -251,6 +342,31 @@ import { NATIVE_APP } from '../config/app';
   .bp__note {
     margin: 0;
     font-size: var(--text-sm);
+  }
+
+  .bp__pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .bp__pair:has(> [hidden]) {
+    grid-template-columns: 1fr;
+  }
+
+  .bp__pair .btn {
+    justify-content: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-3);
+    white-space: nowrap;
+  }
+
+  .bp__pair svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 
   .bp__actions {

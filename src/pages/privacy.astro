@@ -61,7 +61,7 @@ for (const [lang, from] of Object.entries(PRIVACY_TRANSLATED))
         <li>your sign-in details: your email address if you gave one (your password is stored by Firebase in hashed form and is never visible to us), or your Google account's name and email if you signed in with Google;</li>
         <li>the same data listed above: tasks, sessions, done list, chain and settings;</li>
         <li>what you enter on the Budget page: each expense with its category, your budgets, and the bills you set to repeat;</li>
-        <li>if you join the weekly board: the nickname you chose, your focus minutes for the week, your tier, and who your friends on the board are.</li>
+        <li>if you join the weekly board: the nickname you chose, your focus minutes for the week, your tier, who you follow, who your friends on the board are, and friend requests you sent or got.</li>
       </ul>
       <p>
         Each account can read and write only its own data. You can delete your account, and everything stored in it, at
@@ -76,6 +76,13 @@ for (const [lang, from] of Object.entries(PRIVACY_TRANSLATED))
         for this week and your tier: everyone, or only your friends on the board, as you choose. Nothing else about you is
         shown, and your tasks and sessions are never on it. Each week starts fresh on Monday. Leaving the board removes
         your entry.
+      </p>
+      <p>
+        <strong>Following and friends.</strong> You can follow someone on the board: they see your nickname and that you
+        follow them, and can remove you. You can also ask someone to be friends; you are friends once they accept, and
+        friends can see each other's entry even when it shows to friends only. For this we keep, with both accounts,
+        who follows whom and the friend requests between you, with the nickname of the person who sent them. Leaving
+        the board stops this; deleting your account deletes them.
       </p>
       <p>
         <strong>Board rules.</strong> When you join you agree not to use a nickname that is hateful, sexual or bullying,

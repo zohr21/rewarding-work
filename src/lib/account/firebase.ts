@@ -54,6 +54,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -62,7 +63,7 @@ import {
 import { NATIVE_APP } from '../../config/app';
 import { t } from '../i18n';
 import { FIREBASE_CONFIG, GOOGLE_SIGNIN_CLIENT_ID, USE_EMULATOR } from '../../config/firebase';
-import { getBoard, weekKey, type BoardEntry, type ReportReason } from '../board';
+import { getBoard, weekKey, type BoardEntry, type LinkState, type ReportReason, type Social } from '../board';
 import { googleIdToken } from '../device';
 import {
   SYNCED_AT_FIRST,
@@ -302,6 +303,7 @@ async function deleteCloudData(uid: string): Promise<void> {
   await Promise.all([
     ...[...weeks].map((week) => deleteDoc(entryRef(week, uid)).catch(() => {})),
     releaseFriendCode(getBoard().code, uid),
+    removeSocial(uid).catch(() => {}),
   ]);
 }
 
@@ -597,6 +599,109 @@ export async function findFriendCode(code: string): Promise<string | null> {
   const d = await getDoc(codeRef(code));
   const uid = d.exists() ? d.get('uid') : null;
   return typeof uid === 'string' ? uid : null;
+}
+
+// ---------- Follows and friend requests ----------
+//
+// follows/{follower}_{target}: one person follows another (no asking). Both can read it;
+// either can delete it (unfollow, or remove a follower).
+// links/{from}_{to}: a friend request ('ask'), accepted by the other side ('yes'), or the
+// end of a friendship ('end'). Each side keeps its own friends list in the `board` store and
+// acts on these when the app checks (src/lib/board.ts).
+
+const followRef = (follower: string, target: string) => doc(db, 'follows', `${follower}_${target}`);
+const linkRef = (from: string, to: string) => doc(db, 'links', `${from}_${to}`);
+
+function millis(v: unknown): number {
+  return v && typeof (v as { toMillis?: unknown }).toMillis === 'function' ? (v as { toMillis(): number }).toMillis() : 0;
+}
+
+function asState(v: unknown): LinkState | null {
+  return v === 'ask' || v === 'yes' || v === 'end' ? v : null;
+}
+
+/** Everything about you: who follows you, whom you follow, and friend requests both ways. */
+export async function loadSocial(): Promise<Social> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in.');
+  const [followers, following, incoming, outgoing] = await Promise.all([
+    getDocs(query(collection(db, 'follows'), where('target', '==', uid), limit(500))),
+    getDocs(query(collection(db, 'follows'), where('follower', '==', uid), limit(500))),
+    getDocs(query(collection(db, 'links'), where('to', '==', uid), limit(200))),
+    getDocs(query(collection(db, 'links'), where('from', '==', uid), limit(200))),
+  ]);
+  const people = (snap: typeof followers, key: string) =>
+    snap.docs.flatMap((d) => {
+      const data = d.data();
+      const who = data[key];
+      return typeof who === 'string' ? [{ uid: who, name: typeof data.name === 'string' ? data.name : '', at: millis(data.at) }] : [];
+    });
+  const links = (snap: typeof incoming, key: string) =>
+    snap.docs.flatMap((d) => {
+      const data = d.data();
+      const who = data[key];
+      const state = asState(data.state);
+      return typeof who === 'string' && state ? [{ uid: who, name: typeof data.name === 'string' ? data.name : '', at: millis(data.at), state }] : [];
+    });
+  return {
+    followers: people(followers, 'follower'),
+    following: people(following, 'target').map((p) => p.uid),
+    incoming: links(incoming, 'from'),
+    outgoing: links(outgoing, 'to'),
+  };
+}
+
+export async function follow(target: string, name: string): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in.');
+  await setDoc(followRef(uid, target), { follower: uid, target, name, at: serverTimestamp() });
+}
+
+/** Stop following them (`theirs` false), or stop them following you (`theirs` true). */
+export async function unfollow(other: string, theirs = false): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await deleteDoc(theirs ? followRef(other, uid) : followRef(uid, other));
+}
+
+/** Ask to be friends, or say the friendship is over. */
+export async function sendLink(to: string, name: string, state: 'ask' | 'end'): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in.');
+  await setDoc(linkRef(uid, to), { from: uid, to, name, state, at: serverTimestamp() });
+}
+
+/** Accept their request. */
+export async function acceptLink(from: string): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error('Not signed in.');
+  await updateDoc(linkRef(from, uid), { state: 'yes' });
+}
+
+/** Remove a request or notice between you and them, in either direction. */
+export async function dropLink(other: string, mine: boolean): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  await deleteDoc(mine ? linkRef(uid, other) : linkRef(other, uid));
+}
+
+/** Everything between you and them: follows and requests both ways (after a block). */
+export async function cutTies(other: string): Promise<void> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const refs = [followRef(uid, other), followRef(other, uid), linkRef(uid, other), linkRef(other, uid)];
+  await Promise.all(refs.map((r) => deleteDoc(r).catch(() => {})));
+}
+
+/** Every follow and request that names you (when the account is deleted). */
+async function removeSocial(uid: string): Promise<void> {
+  const snaps = await Promise.all([
+    getDocs(query(collection(db, 'follows'), where('target', '==', uid))),
+    getDocs(query(collection(db, 'follows'), where('follower', '==', uid))),
+    getDocs(query(collection(db, 'links'), where('to', '==', uid))),
+    getDocs(query(collection(db, 'links'), where('from', '==', uid))),
+  ]);
+  await Promise.all(snaps.flatMap((s) => s.docs.map((d) => deleteDoc(d.ref).catch(() => {}))));
 }
 
 async function releaseFriendCode(code: string, uid: string): Promise<void> {

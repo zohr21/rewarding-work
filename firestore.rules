@@ -5,7 +5,7 @@ rules_version = '2';
 //
 // Each signed-in person (including guests) can read and write only their own
 // documents: users/{uid}/stores/{store}. The weekly board (src/lib/board.ts) adds
-// boards/{week}/entries/{uid} and codes/{code}. Everything else is denied.
+// boards/{week}/entries/{uid}, codes/{code}, reports, follows and links. Everything else is denied.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/stores/{store} {
@@ -93,6 +93,51 @@ service cloud.firestore {
         && request.resource.data.name.size() <= 20
         && request.resource.data.reason in ['hate', 'sexual', 'bullying', 'impersonation', 'personal', 'spam', 'other']
         && request.resource.data.at == request.time;
+    }
+
+    // Following someone: one way, no asking. The id is follower_target. Both people can read
+    // it (the target sees "X followed you") and either can delete it (unfollow, or remove a
+    // follower). Only the follower writes it, under the nickname they have on the board.
+    match /follows/{id} {
+      allow read, delete: if request.auth != null
+        && (resource.data.follower == request.auth.uid || resource.data.target == request.auth.uid);
+
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['follower', 'target', 'name', 'at'])
+        && request.resource.data.follower == request.auth.uid
+        && request.resource.data.target is string
+        && request.resource.data.target != request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.target
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.at == request.time;
+    }
+
+    // Friends go both ways. The id is from_to. `from` asks ('ask') or ends the friendship
+    // ('end'); `to` can only turn an 'ask' into 'yes'. Each side then keeps the other in its
+    // own friends list. Both can read and delete it.
+    match /links/{id} {
+      allow read, delete: if request.auth != null
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['from', 'to', 'name', 'state', 'at'])
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid
+        && id == request.auth.uid + '_' + request.resource.data.to
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2
+        && request.resource.data.name.size() <= 20
+        && request.resource.data.state in ['ask', 'end']
+        && request.resource.data.at == request.time;
+
+      allow update: if request.auth != null
+        && resource.data.to == request.auth.uid
+        && resource.data.state == 'ask'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state'])
+        && request.resource.data.state == 'yes';
     }
 
     // Friend codes: anyone signed in can look one up; you can only claim a free code for

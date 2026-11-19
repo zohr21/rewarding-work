@@ -27,7 +27,7 @@ workouts and manual health entries, findings, the coach plan, the Budget lock.
 |---|---|---|---|---|
 | Personal info → **Email address** | Yes | Optional (accounts are optional) | Account management | Email/password or Google sign-in (Firebase Auth) |
 | Personal info → **Name** | Yes | Optional | Account management | Google sign-in passes the account name |
-| Personal info → **User IDs** | Yes | Optional | Account management, App functionality | Firebase uid; also on weekly board rows and in nickname reports (reporter and reported) |
+| Personal info → **User IDs** | Yes | Optional | Account management, App functionality | Firebase uid; also on weekly board rows, follows and friend requests, and in nickname reports (reporter and reported) |
 | Financial info → **Purchase history** | Yes | Optional | App functionality | Budget expenses sync to the account when signed in |
 | Financial info → **Other financial info** | Yes | Optional | App functionality | Budgets, repeating bills |
 | App activity → **Other user-generated content** | Yes | Optional | App functionality | Tasks, notes, exam plan, done list, chains; the weekly board nickname, which others see |

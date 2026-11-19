@@ -8,7 +8,13 @@
  *
  * Your settings are the `board` store (synced with your account). Each week's entry is
  * boards/{week}/entries/{uid} in Firestore, written from this device (src/lib/account/firebase.ts).
- * Friends are people whose code you added; with "Friends only" only they see you.
+ *
+ * Two ways to keep up with someone:
+ * - Follow: one way, no asking (follows/{you_them}). They see "X followed you" and can follow
+ *   back, or remove you. You see their row while it shows to everyone.
+ * - Friends: both ways. You ask (links/{you_them}), they accept, and each keeps the other in
+ *   their own `friends`; with "Friends only" only friends see you.
+ * Before November 2026 "friends" were one-way adds; those move to Following (see normaliseBoard).
  *
  * Safety (Google Play's user-generated content policy): you agree to the board rules when you
  * join, can report a nickname (reports/{id}, read only in the Firebase console) and block
@@ -41,8 +47,14 @@ export interface BoardSettings {
   visibility: Visibility;
   /** Your friend code, e.g. OAK-7Q4K. Empty until you join. */
   code: string;
-  /** Account ids of the people whose code you added. */
+  /** Friends: both of you agreed. They can see your row when it shows to friends only. */
   friends: string[];
+  /** People you follow (one way). */
+  following: string[];
+  /** Your follows are in the account (false: kept from before follows existed, not sent yet). */
+  followsSent: boolean;
+  /** When you last looked at what's new (followers), to show the dot. */
+  seenAt: number;
   /** People you blocked, newest first. */
   blocked: Blocked[];
   /** A nickname of yours that others reported; it stays hidden until you pick another. */
@@ -71,10 +83,51 @@ export interface BoardEntry {
 export const DAILY_CAP_MIN = 240;
 export const WEEK_CAP_MIN = 7 * DAILY_CAP_MIN;
 export const MAX_FRIENDS = 30;
+export const MAX_FOLLOWING = 100;
 export const MAX_BLOCKED = 200;
 export const REPORTS_TO_HIDE = 3;
 
-const EMPTY: BoardSettings = { joined: false, name: '', visibility: 'all', code: '', friends: [], blocked: [], hiddenName: '', agreedAt: 0 };
+export type LinkState = 'ask' | 'yes' | 'end';
+
+/** Someone who follows you, or asked to be friends. */
+export interface Person {
+  uid: string;
+  /** Their nickname when they followed or asked. */
+  name: string;
+  at: number;
+}
+
+export interface Link extends Person {
+  state: LinkState;
+}
+
+/** What the account knows about the people around you (src/lib/account/firebase.ts loadSocial). */
+export interface Social {
+  followers: Person[];
+  following: string[];
+  /** Requests to you ('ask'), or someone ending a friendship ('end'). */
+  incoming: Link[];
+  /** Your requests: waiting ('ask') or accepted ('yes'). */
+  outgoing: Link[];
+}
+
+const EMPTY: BoardSettings = {
+  joined: false,
+  name: '',
+  visibility: 'all',
+  code: '',
+  friends: [],
+  following: [],
+  followsSent: false,
+  seenAt: 0,
+  blocked: [],
+  hiddenName: '',
+  agreedAt: 0,
+};
+
+function ids(v: unknown, max: number): string[] {
+  return Array.isArray(v) ? [...new Set(v.filter((f): f is string => typeof f === 'string' && f.length > 0))].slice(0, max) : [];
+}
 
 function normaliseBlocked(v: unknown): Blocked[] {
   if (!Array.isArray(v)) return [];
@@ -88,15 +141,22 @@ function normaliseBlocked(v: unknown): Blocked[] {
   return out.slice(0, MAX_BLOCKED);
 }
 
-function normalise(v: unknown): BoardSettings {
+/** Settings as stored (any version) → the current shape. */
+export function normaliseBoard(v: unknown): BoardSettings {
   if (typeof v !== 'object' || v === null) return EMPTY;
   const o = v as Record<string, unknown>;
+  // Settings from before follows had one-way "friends": those become people you follow.
+  const before = !Array.isArray(o.following);
+  const friends = ids(o.friends, MAX_FRIENDS);
   return {
     joined: o.joined === true,
     name: typeof o.name === 'string' ? o.name : '',
     visibility: o.visibility === 'friends' ? 'friends' : 'all',
     code: typeof o.code === 'string' ? o.code : '',
-    friends: Array.isArray(o.friends) ? o.friends.filter((f): f is string => typeof f === 'string').slice(0, MAX_FRIENDS) : [],
+    friends: before ? [] : friends,
+    following: before ? friends : ids(o.following, MAX_FOLLOWING),
+    followsSent: o.followsSent === true,
+    seenAt: typeof o.seenAt === 'number' ? o.seenAt : 0,
     // Added in November 2026 for the Play version; older settings have none of these.
     blocked: normaliseBlocked(o.blocked),
     hiddenName: typeof o.hiddenName === 'string' ? o.hiddenName : '',
@@ -105,7 +165,7 @@ function normalise(v: unknown): BoardSettings {
 }
 
 export function getBoard(): BoardSettings {
-  return normalise(read<unknown>('board', null));
+  return normaliseBoard(read<unknown>('board', null));
 }
 
 export function setBoard(patch: Partial<BoardSettings>): BoardSettings {
@@ -301,36 +361,242 @@ export async function joinBoard(name: string): Promise<void> {
   await waitForUser();
   setBoard({ joined: true, name, agreedAt: Date.now() });
   await pushEntry();
+  void refreshSocial(true).catch(() => {});
 }
 
 /** Leave: your rows for this week and last are removed. */
 export async function leaveBoard(): Promise<void> {
   setBoard({ joined: false });
+  social = null;
+  paintDots();
   if (!getAccount().user) return;
   const rt = await loadAccount();
   const now = new Date();
   await rt.removeBoardEntries([weekKey(now), weekKey(addDays(startOfDay(now), -7))]);
 }
 
-/** Add a friend by their code. Returns a problem to show, or null when added. */
-export async function addFriend(input: string): Promise<string | null> {
-  const code = cleanCode(input);
-  if (!code) return t('board.err.codeShape');
-  const settings = getBoard();
-  if (code === settings.code) return t('board.err.ownCode');
-  if (settings.friends.length >= MAX_FRIENDS) return t('board.err.maxFriends', { n: MAX_FRIENDS });
-  const rt = await loadAccount();
-  const uid = await rt.findFriendCode(code);
-  if (!uid) return t('board.err.noCode');
-  if (settings.friends.includes(uid)) return t('board.err.already');
-  setBoard({ friends: [...settings.friends, uid] });
-  await pushEntry();
-  return null;
+// ---------- Following and friends ----------
+
+let social: Social | null = null;
+let socialAt = 0;
+let refreshing: Promise<void> | null = null;
+
+/** The last thing the account said, or null before it has been asked (or when you're not on the board). */
+export function getSocial(): Social | null {
+  return social;
 }
 
-export async function removeFriend(uid: string): Promise<void> {
-  setBoard({ friends: getBoard().friends.filter((f) => f !== uid) });
+export function isFollowing(uid: string, settings = getBoard()): boolean {
+  return settings.following.includes(uid);
+}
+
+export function isFriend(uid: string, settings = getBoard()): boolean {
+  return settings.friends.includes(uid);
+}
+
+/** You asked them to be friends and they haven't answered. */
+export function isAsked(uid: string): boolean {
+  return !!social?.outgoing.some((l) => l.uid === uid && l.state === 'ask');
+}
+
+/** They asked you to be friends. */
+export function askedMe(uid: string): boolean {
+  return !!social?.incoming.some((l) => l.uid === uid && l.state === 'ask');
+}
+
+/** What's new: friend requests to answer, and followers since you last looked. */
+export function inbox(s: Social | null = social, settings = getBoard()): { requests: Person[]; follows: Person[] } {
+  if (!s || !settings.joined) return { requests: [], follows: [] };
+  const requests = withoutBlocked(s.incoming.filter((l) => l.state === 'ask' && !settings.friends.includes(l.uid)), settings);
+  const follows = withoutBlocked(s.followers.filter((p) => p.at > settings.seenAt), settings);
+  return { requests: requests.sort((a, b) => b.at - a.at), follows: follows.sort((a, b) => b.at - a.at) };
+}
+
+export function inboxCount(): number {
+  const { requests, follows } = inbox();
+  return requests.length + follows.length;
+}
+
+/** Followers seen: the dot goes (requests stay until answered). */
+export function markInboxSeen(): void {
+  if (!social) return;
+  const newest = Math.max(0, ...social.followers.map((p) => p.at));
+  if (newest > getBoard().seenAt) setBoard({ seenAt: newest });
+  paintDots();
+}
+
+/** Show or hide every "something new on the board" dot on the page ([data-board-dot]). */
+export function paintDots(): void {
+  if (typeof document === 'undefined') return;
+  const n = inboxCount();
+  document.querySelectorAll<HTMLElement>('[data-board-dot]').forEach((dot) => (dot.hidden = n === 0));
+  document.dispatchEvent(new CustomEvent('board:social'));
+}
+
+/**
+ * Ask the account what changed: new followers, requests, answers to yours. Acts on answers
+ * (a yes adds them to your friends; an 'end' removes them) and clears anything a blocked
+ * person left. At most once a minute unless `force`.
+ */
+export async function refreshSocial(force = false): Promise<void> {
+  const settings = getBoard();
+  const uid = getAccount().user?.uid;
+  if (!settings.joined || !uid) {
+    social = null;
+    paintDots();
+    return;
+  }
+  if (refreshing) return refreshing;
+  if (!force && social && Date.now() - socialAt < 60_000) return;
+  refreshing = (async () => {
+    const rt = await loadAccount();
+    const s = await rt.loadSocial();
+    const blocked = new Set(settings.blocked.map((b) => b.uid));
+    const work: Promise<unknown>[] = [];
+    let friends = settings.friends.filter((f) => !blocked.has(f));
+    for (const p of [...s.followers, ...s.incoming]) if (blocked.has(p.uid)) work.push(rt.cutTies(p.uid));
+    for (const l of s.outgoing) {
+      if (l.state !== 'yes') continue;
+      if (!blocked.has(l.uid) && !friends.includes(l.uid) && friends.length < MAX_FRIENDS) friends.push(l.uid);
+      work.push(rt.dropLink(l.uid, true));
+    }
+    for (const l of s.incoming) {
+      if (l.state === 'end') {
+        friends = friends.filter((f) => f !== l.uid);
+        work.push(rt.dropLink(l.uid, false));
+      } else if (l.state === 'ask' && friends.includes(l.uid)) {
+        // Already friends on this side (you both asked): just say yes.
+        work.push(rt.acceptLink(l.uid));
+      }
+    }
+    // Follows kept from before go to the account once; after that the account is right
+    // (someone may have removed you as a follower).
+    let following: string[];
+    if (!settings.followsSent) {
+      const keep = settings.following.filter((f) => !blocked.has(f));
+      keep.filter((f) => !s.following.includes(f)).forEach((f) => work.push(rt.follow(f, settings.name)));
+      following = [...new Set([...keep, ...s.following])];
+    } else {
+      following = s.following.filter((f) => !blocked.has(f));
+    }
+    await Promise.all(work.map((p) => p.catch(() => {})));
+    const friendsChanged = friends.join() !== settings.friends.join();
+    setBoard({ friends, following: following.slice(0, MAX_FOLLOWING), followsSent: true });
+    if (friendsChanged) await pushEntry().catch(() => {});
+    social = {
+      followers: s.followers.filter((p) => !blocked.has(p.uid)),
+      following,
+      incoming: s.incoming.filter((l) => l.state === 'ask' && !blocked.has(l.uid)),
+      outgoing: s.outgoing.filter((l) => l.state === 'ask'),
+    };
+    socialAt = Date.now();
+  })().finally(() => {
+    refreshing = null;
+    paintDots();
+  });
+  return refreshing;
+}
+
+async function onBoardAccount(): Promise<Awaited<ReturnType<typeof loadAccount>>> {
+  if (!getBoard().joined || !getAccount().user) throw new Error(t('board.err.joinFirst'));
+  return loadAccount();
+}
+
+export async function followPerson(uid: string): Promise<void> {
+  const settings = getBoard();
+  if (isFollowing(uid, settings)) return;
+  if (settings.following.length >= MAX_FOLLOWING) throw new Error(t('board.err.maxFollowing', { n: MAX_FOLLOWING }));
+  const rt = await onBoardAccount();
+  await rt.follow(uid, settings.name);
+  setBoard({ following: [...getBoard().following, uid] });
+  if (social) social.following = [...social.following, uid];
+  paintDots();
+}
+
+export async function unfollowPerson(uid: string): Promise<void> {
+  setBoard({ following: getBoard().following.filter((f) => f !== uid) });
+  if (social) social.following = social.following.filter((f) => f !== uid);
+  paintDots();
+  const rt = await onBoardAccount();
+  await rt.unfollow(uid);
+}
+
+/** Stop them following you. They aren't told. */
+export async function removeFollower(uid: string): Promise<void> {
+  const rt = await onBoardAccount();
+  await rt.unfollow(uid, true);
+  if (social) social.followers = social.followers.filter((p) => p.uid !== uid);
+  paintDots();
+}
+
+/** Ask to be friends. If they already asked you, you're friends straight away. */
+export async function askFriend(uid: string): Promise<'sent' | 'friends'> {
+  const settings = getBoard();
+  if (isFriend(uid, settings)) return 'friends';
+  if (settings.friends.length >= MAX_FRIENDS) throw new Error(t('board.err.maxFriends', { n: MAX_FRIENDS }));
+  const rt = await onBoardAccount();
+  if (askedMe(uid)) {
+    await acceptFriend(uid);
+    return 'friends';
+  }
+  await rt.sendLink(uid, settings.name, 'ask');
+  if (social && !isAsked(uid)) social.outgoing = [...social.outgoing, { uid, name: '', at: Date.now(), state: 'ask' }];
+  paintDots();
+  return 'sent';
+}
+
+/** Ask someone to be friends by their code. Returns what to say. */
+export async function askFriendByCode(input: string): Promise<{ ok: boolean; message: string }> {
+  const code = cleanCode(input);
+  if (!code) return { ok: false, message: t('board.err.codeShape') };
+  const settings = getBoard();
+  if (code === settings.code) return { ok: false, message: t('board.err.ownCode') };
+  const rt = await onBoardAccount();
+  const uid = await rt.findFriendCode(code);
+  if (!uid) return { ok: false, message: t('board.err.noCode') };
+  if (isFriend(uid, settings)) return { ok: false, message: t('board.err.already') };
+  if (isBlocked(uid, settings)) return { ok: false, message: t('board.err.blockedThem') };
+  if (isAsked(uid)) return { ok: false, message: t('board.err.askedAlready') };
+  const result = await askFriend(uid);
+  return { ok: true, message: result === 'friends' ? t('board.nowFriends') : t('board.requestSent') };
+}
+
+export async function acceptFriend(uid: string): Promise<void> {
+  const settings = getBoard();
+  if (!isFriend(uid, settings)) {
+    if (settings.friends.length >= MAX_FRIENDS) throw new Error(t('board.err.maxFriends', { n: MAX_FRIENDS }));
+    setBoard({ friends: [...settings.friends, uid] });
+  }
+  const rt = await onBoardAccount();
+  await rt.acceptLink(uid);
+  if (social) social.incoming = social.incoming.filter((l) => l.uid !== uid);
+  paintDots();
   await pushEntry();
+}
+
+/** Say no to a request. They aren't told. */
+export async function declineFriend(uid: string): Promise<void> {
+  const rt = await onBoardAccount();
+  await rt.dropLink(uid, false);
+  if (social) social.incoming = social.incoming.filter((l) => l.uid !== uid);
+  paintDots();
+}
+
+/** No longer friends, on both sides (their app removes you when it next checks). */
+export async function removeFriend(uid: string): Promise<void> {
+  const settings = getBoard();
+  setBoard({ friends: settings.friends.filter((f) => f !== uid) });
+  await pushEntry();
+  const rt = await onBoardAccount();
+  await rt.sendLink(uid, settings.name, 'end');
+}
+
+/** Take back a request they haven't answered. */
+export async function cancelAsk(uid: string): Promise<void> {
+  const rt = await onBoardAccount();
+  await rt.dropLink(uid, true);
+  if (social) social.outgoing = social.outgoing.filter((l) => l.uid !== uid);
+  paintDots();
 }
 
 // ---------- Blocking and reporting ----------
@@ -346,15 +612,27 @@ export function withoutBlocked<T extends { uid: string }>(rows: T[], settings = 
   return rows.filter((r) => !out.has(r.uid));
 }
 
-/** Block someone: gone from your board, and from your friends, so they no longer see a Friends-only row. */
+/**
+ * Block someone: gone from your board, your friends and the people you follow, so they no
+ * longer see a Friends-only row; their follow and any request between you are removed.
+ */
 export async function blockPerson(uid: string, name: string): Promise<void> {
   const settings = getBoard();
   if (isBlocked(uid, settings)) return;
   setBoard({
     blocked: [{ uid, name, at: Date.now() }, ...settings.blocked].slice(0, MAX_BLOCKED),
     friends: settings.friends.filter((f) => f !== uid),
+    following: settings.following.filter((f) => f !== uid),
   });
+  if (social) {
+    social.followers = social.followers.filter((p) => p.uid !== uid);
+    social.following = social.following.filter((f) => f !== uid);
+    social.incoming = social.incoming.filter((l) => l.uid !== uid);
+    social.outgoing = social.outgoing.filter((l) => l.uid !== uid);
+  }
+  paintDots();
   if (settings.friends.includes(uid)) await pushEntry();
+  if (getAccount().user) await (await loadAccount()).cutTies(uid).catch(() => {});
 }
 
 export function unblockPerson(uid: string): void {
@@ -376,12 +654,14 @@ export async function loadLeague(tier: number): Promise<BoardEntry[]> {
   return rows.sort((a, b) => b.minutes - a.minutes || a.updatedAt - b.updatedAt);
 }
 
-/** You and your friends who have a row this week, most minutes first. */
+/** You, your friends and the people you follow who have a row you can see this week, most minutes first. */
 export async function loadFriends(): Promise<BoardEntry[]> {
   const uid = getAccount().user?.uid;
   if (!uid) return [];
   const rt = await loadAccount();
-  const rows = withoutBlocked(await rt.boardEntries(weekKey(), [uid, ...getBoard().friends]));
+  const settings = getBoard();
+  const people = [...new Set([uid, ...settings.friends, ...settings.following])];
+  const rows = withoutBlocked(await rt.boardEntries(weekKey(), people));
   return rows.sort((a, b) => b.minutes - a.minutes || a.updatedAt - b.updatedAt);
 }
 
@@ -407,6 +687,8 @@ let started = false;
  * you sign in on a device where you had joined.
  */
 export function startBoard(): void {
+  // Each page draws its own nav, so its dot is set again on every page.
+  paintDots();
   if (started) return;
   started = true;
   let timer = 0;
@@ -418,7 +700,17 @@ export function startBoard(): void {
   let lastUid: string | null = null;
   onAccountChange((s) => {
     const uid = s.user?.uid ?? null;
-    if (uid && uid !== lastUid && getBoard().joined) schedule();
+    if (uid !== lastUid) {
+      social = null;
+      if (uid && getBoard().joined) {
+        schedule();
+        void refreshSocial(true).catch(() => {});
+      } else paintDots();
+    }
     lastUid = uid;
+  });
+  // Coming back to the app (or the tab) checks for new followers and requests.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void refreshSocial().catch(() => {});
   });
 }
