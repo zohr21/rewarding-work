@@ -221,6 +221,8 @@ import { url } from '../lib/paths';
     let tab: 'all' | 'friends' = 'all';
     let league: BoardEntry[] | null = null;
     let friends: BoardEntry[] | null = null;
+    /** The friend list `friends` was loaded for, so a friend added later gets loaded too. */
+    let friendsFor = '';
     let leagueTier = -1;
     let loading = false;
     let started = false;
@@ -416,6 +418,7 @@ import { url } from '../lib/paths';
         const [rows] = await Promise.all([loadLeague(tier), joined() ? refreshSocial(true).catch(() => {}) : null]);
         league = rows;
         leagueTier = tier;
+        friendsFor = getBoard().friends.join();
         friends = joined() ? await loadFriends() : null;
         status('');
       } catch (err) {
@@ -449,6 +452,8 @@ import { url } from '../lib/paths';
         if (tabBtn) {
           tab = tabBtn.dataset.boardTab === 'friends' ? 'friends' : 'all';
           render();
+          // Someone may have accepted your request since (at most one check a minute).
+          if (tab === 'friends' && joined()) void refreshSocial().catch(() => {});
           return;
         }
         if (t.closest('[data-board-retry]')) void load();
@@ -493,7 +498,24 @@ import { url } from '../lib/paths';
     );
 
     c.add(listen(document, 'board:changed', () => void load()));
-    c.add(listen(document, 'board:social', () => renderInbox()));
+    // A check can add a friend (they accepted): load their entry, or the list can't show them.
+    async function reloadFriends(): Promise<void> {
+      const ids = getBoard().friends.join();
+      if (!started || loading || ids === friendsFor || !joined()) return;
+      friendsFor = ids;
+      try {
+        friends = await loadFriends();
+      } catch {
+        /* the next load tries again */
+      }
+      render();
+    }
+    c.add(
+      listen(document, 'board:social', () => {
+        renderInbox();
+        void reloadFriends();
+      }),
+    );
     // A finished session moves you on the board at once; a new stage means a new league.
     c.add(subscribe('sessions', () => (started && myTier() !== leagueTier ? void load() : render())));
     c.add(subscribe('board', render));
