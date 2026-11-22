@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.3 (follow and friends):
+
+```
+<en-US>
+On the board you can now Follow someone (they see that you follow them) or Add friend: they tap Accept and you see each other. New requests and followers show as "new" on Board › Friends, with a dot on Grove. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+В таблице теперь можно «Подписаться» на человека (он видит, что вы подписаны) или «Добавить в друзья»: он нажимает «Принять», и вы видите друг друга. Новые запросы и подписчики видны в «Доска» › «Друзья», а на «Роще» появляется точка. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Lövhədə indi kimisə «İzlə» (o, izlədiyini görür) və ya «Dost əlavə et»: o «Qəbul et»ə toxunur və bir-birinizi görürsünüz. Yeni sorğular və izləyənlər «Lövhə» › «Dostlar» bölməsində görünür, «Bağ»da isə nöqtə yanır. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 ## 7. During the 14 days (both)
 
 - Keep a short log below: who joined, what they said, and what changed.
