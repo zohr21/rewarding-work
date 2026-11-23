@@ -29,6 +29,8 @@ onPage('account-page', () => {
   const pageMsg = $('[data-page-msg]');
   const runtime = loadAccount();
   runtime.catch(() => say(pageMsg, t('you.msg.loadFailed'), true));
+  // Google's script, fetched now so a click on "Continue with Google" opens its window at once.
+  runtime.then((m) => m.prepareGoogle()).catch(() => {});
 
   function say(el: HTMLElement, text: string, error = false): void {
     el.textContent = text;

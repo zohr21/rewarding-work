@@ -6,6 +6,11 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **24 Nov · Google sign-in on the site uses Google's own window.** Firebase's pop-up failed
+  with "The sign-in window was closed before finishing" in Chrome with third-party cookies
+  blocked. The site now gets a token from Google Identity Services with the Firebase
+  project's web client and hands it to Firebase; the pop-up stays as the fallback when no
+  client id is set.
 - **24 Nov · Undo inside sheets.** The shared Undo toast moves into whichever sheet or dialog
   is open, so it can be tapped there. "Your areas" dropped its own inline Undo bar and uses
   the shared toast like every other removal.
