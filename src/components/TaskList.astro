@@ -80,24 +80,24 @@ const TABS = [
         <button data-t="tasks.moveToNext" type="button" class="btn btn--ghost btn--small" data-tl-carry-move>Move to Next</button>
       </div>
     </div>
-    <ul class="tasks__items" data-tl-today></ul>
+    <ul class="tasks__items tasks__rows" data-tl-today></ul>
     <p class="muted tasks__hint" data-tl-today-hint></p>
   </section>
 
   <section class="tasks__section" data-list="next" aria-labelledby="tl-next-head">
     <h3 data-t="tasks.next" class="tasks__heading tasks__heading--next" id="tl-next-head" data-tl-next-head>Next</h3>
-    <ul class="tasks__items" data-tl-next></ul>
+    <ul class="tasks__items tasks__rows" data-tl-next></ul>
     <p data-t="tasks.nothingHereAddATask" class="muted tasks__hint" data-tl-next-empty>Nothing here. Add a task above, or break one down below.</p>
   </section>
 
   <details class="disclosure tasks__section tasks__someday" data-list="someday" data-tl-someday-wrap hidden>
     <summary data-t="tasks.someday" class="tasks__heading tasks__heading--someday" data-tl-someday-head>Someday</summary>
-    <ul class="tasks__items" data-tl-someday></ul>
+    <ul class="tasks__items tasks__rows" data-tl-someday></ul>
   </details>
 
   <details class="disclosure tasks__finished" data-list="finished" data-tl-finished-wrap hidden>
     <summary data-t="tasks.finished" data-tl-finished-summary>Finished</summary>
-    <ul class="tasks__items" data-tl-finished></ul>
+    <ul class="tasks__items tasks__rows" data-tl-finished></ul>
   </details>
   <p class="muted tasks__hint" data-tl-view-empty hidden></p>
   <div class="tasks__examples" data-tl-examples hidden>
@@ -126,21 +126,19 @@ const TABS = [
     listLabel,
     listOf,
     moveTask,
-    moveToTop,
     plannedFor,
     reopenTask,
     taskName,
     todayTasks,
     TODAY_SOFT_MAX,
   } from '../lib/tasks';
-  import { currentStep, liveTaskId, stepBar } from '../lib/parts';
-  import { AREA_PRESETS, AREA_STARTERS, areaName, areaOf, areasAnswered, getAreas, parseAreaTag, setTaskArea, setUpAreas, type AreaPreset } from '../lib/areas';
+  import { currentStep, liveTaskId } from '../lib/parts';
+  import { AREA_PRESETS, AREA_STARTERS, areaName, areaOf, areasAnswered, getAreas, parseAreaTag, setUpAreas, type AreaPreset } from '../lib/areas';
   import { getTaskStore, type TaskArea } from '../lib/storage';
-  import { dayLabel, longDay, parseWhen, repeatLabel, todayKeyOf, whenLabel } from '../lib/when';
+  import { dayLabel, parseWhen, todayKeyOf, whenLabel } from '../lib/when';
   import { celebrate } from '../lib/appearance';
-  import { ring } from '../lib/charts';
   import { offerUndo } from '../lib/undo';
-  import { cleanups, onPage } from '../lib/page';
+  import { cleanups, listen, onPage } from '../lib/page';
   import { dateFormat, t, tn } from '../lib/i18n';
 
   const dayFmt = dateFormat({ day: 'numeric', month: 'short' });
@@ -148,8 +146,10 @@ const TABS = [
   const MOVABLE: TaskList[] = ['today', 'next', 'someday'];
   const X_SVG =
     '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-  const CLOCK_SVG =
-    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l3 2M9 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  const TICK_SVG = '<svg viewBox="0 0 26 26" width="26" height="26" aria-hidden="true"><circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="2"/></svg>';
+  const TICKED_SVG =
+    '<svg viewBox="0 0 26 26" width="26" height="26" aria-hidden="true"><circle cx="13" cy="13" r="12" fill="var(--color-accent)"/><path d="M8 13.5l3.2 3.2L18 10" fill="none" stroke="var(--color-on-accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>';
   /** The list the tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
   let appView = 'today';
   /** The area chip picked ('all' for every area); kept for the visit like the list. */
@@ -198,8 +198,6 @@ const TABS = [
       const parsed = $<HTMLElement>('[data-tl-parsed]');
       // The steps sheet (tasks.astro): a bottom sheet on a phone, a side panel on a wide screen.
       const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-steps"]');
-      // The When sheet (tasks.astro): a task's day and repeat.
-      const whenSheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-when"]');
 
       function showView(view: string): void {
         if (!tabs) return;
@@ -261,13 +259,6 @@ const TABS = [
         return row;
       }
 
-      function badge(text: string, cls = ''): HTMLSpanElement {
-        const b = document.createElement('span');
-        b.className = `badge task__badge ${cls}`;
-        b.textContent = text;
-        return b;
-      }
-
       /** A list heading: its name, then how many it holds (quieter). */
       function setHead(el: HTMLElement, label: string, count: string): void {
         el.replaceChildren(label);
@@ -278,22 +269,6 @@ const TABS = [
         el.append(c);
       }
 
-      /** Focus time as a bar, relative to the open task with the most. */
-      function focusBar(seconds: number, max: number): HTMLDivElement {
-        const row = document.createElement('div');
-        row.className = 'task__focus';
-        row.setAttribute('aria-hidden', 'true');
-        row.innerHTML = CLOCK_SVG;
-        const meter = document.createElement('span');
-        meter.className = 'task__meter';
-        const fill = document.createElement('span');
-        fill.style.inlineSize = `${Math.max(6, Math.round((seconds / max) * 100))}%`;
-        meter.append(fill);
-        row.append(meter);
-        return row;
-      }
-
-      /** Delete with Undo (src/lib/undo.ts): hidden now, removed for real once the offer ends. */
       /** Take a task off the list with Undo: `message` on the toast, `said` for the screen reader. */
       function remove(task: Task, message: string, said: string): void {
         const name = taskName(task);
@@ -313,55 +288,6 @@ const TABS = [
           },
         });
         announce(said);
-      }
-
-      function moveSelect(task: Task): HTMLSelectElement {
-        const name = taskName(task);
-        const sel = document.createElement('select');
-        sel.className = 'input tasks__list-select';
-        sel.setAttribute('aria-label', t('tasks.listFor', { name }));
-        for (const list of MOVABLE) {
-          const o = document.createElement('option');
-          o.value = list;
-          o.textContent = listLabel(list);
-          o.selected = listOf(task) === list;
-          sel.append(o);
-        }
-        sel.addEventListener('change', () => {
-          const list = sel.value as TaskList;
-          moveTask(task.id, list);
-          announce(t('tasks.movedTo', { name, list: listLabel(list) }));
-          if (list === 'someday') somedayWrap.open = true;
-        });
-        return sel;
-      }
-
-      /** The task's area, picked right on the row (also on its steps sheet). */
-      function areaSelect(task: Task): HTMLSelectElement {
-        const name = taskName(task);
-        const now = areaOf(task, areas);
-        const sel = document.createElement('select');
-        sel.className = 'input tasks__list-select tasks__area-select';
-        sel.setAttribute('aria-label', t('areas.areaFor', { name }));
-        if (now) sel.style.setProperty('--ac', `var(--area-${now.color})`);
-        else sel.classList.add('is-empty');
-        const none = document.createElement('option');
-        none.value = '';
-        none.textContent = t('areas.none');
-        sel.append(none);
-        for (const a of getAreas(areas)) {
-          const o = document.createElement('option');
-          o.value = a.id;
-          o.textContent = areaName(a);
-          o.selected = now?.id === a.id;
-          sel.append(o);
-        }
-        sel.addEventListener('change', () => {
-          setTaskArea(task.id, sel.value || null);
-          const picked = getAreas(areas).find((a) => a.id === sel.value);
-          announce(picked ? t('areas.movedTo', { name, area: areaName(picked) }) : t('areas.clearedSaid', { name }));
-        });
-        return sel;
       }
 
       /** An Inbox thought: sort it into a list, file it in the current task's notes, or clear it. */
@@ -416,120 +342,113 @@ const TABS = [
       /** Areas as the last render saw them. */
       let areas: TaskArea[] = [];
 
-      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, maxFocus: number, liveId: string | null, firstUp = false): HTMLLIElement {
-        const live = task.id === liveId && task.status === 'active';
+      /**
+       * One slim row per task: a tick to finish (or reopen), the name and one info line, and
+       * ▶ to focus on it. Tapping the name opens the task's sheet with everything else.
+       */
+      function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, liveId: string | null, firstUp = false): HTMLLIElement {
+        const active = task.status === 'active';
+        const live = task.id === liveId && active;
         const li = document.createElement('li');
-        li.className = `task${firstUp ? ' task--first' : ''}${task.id === currentId ? ' is-current' : ''}${task.status === 'done' ? ' is-done' : ''}${live ? ' is-live' : ''}`;
+        li.className = `task task--row${firstUp ? ' task--first' : ''}${task.id === currentId ? ' is-current' : ''}${active ? '' : ' is-done'}${live ? ' is-live' : ''}`;
         const name = taskName(task);
 
-        const body = document.createElement('div');
-        body.className = 'task__body';
-        const title = document.createElement('p');
-        title.className = 'task__title';
-        title.textContent = name;
-        if (firstUp) title.append(' ', badge(t('tasks.firstUp'), 'task__badge--first'));
-        if (task.id === currentId) title.append(' ', badge(t('tasks.current')));
-        if (task.status === 'active' && isDueToday(task) && !isCarriedOver(task)) title.append(' ', badge(t('when.dueToday'), 'task__badge--due'));
-        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(t('tasks.fromDay', { day: weekdayFmt.format(plannedFor(task)!) }), 'task__badge--old'));
-        const meta = document.createElement('p');
-        meta.className = 'task__meta muted';
-        const parts: string[] = [];
-        const n = task.steps.length;
-        const stepsDone = task.steps.filter((s) => s.done).length;
-        const active = task.status === 'active';
-        if (n) parts.push(tn('tasks.stepsOf', n, { done: stepsDone }));
-        else if (active) parts.push(t('tasks.noSteps'));
-        const seconds = focus.get(task.id) ?? 0;
-        if (seconds >= 60) parts.push(t('tasks.focused', { time: formatFocus(seconds) }));
-        parts.push(task.status === 'done' && task.doneAt ? t('tasks.finishedOn', { date: dayFmt.format(task.doneAt) }) : t('tasks.addedOn', { date: dayFmt.format(task.createdAt) }));
-        meta.textContent = parts.join(' · ');
-        const area = areaOf(task, areas);
-        if (area) meta.prepend(areaTag(area), ' · ');
-        body.append(title, meta);
-        // The step you're on, under the title: green and turning while a session runs on it.
-        const nowStep = active ? currentStep(task.steps) : undefined;
-        if (nowStep) {
-          const now = document.createElement('p');
-          now.className = `task__now${live ? ' is-live' : ''}`;
-          now.textContent = t(live ? 'tasks.now' : 'tasks.nextStep', { step: nowStep.text });
-          body.append(now);
-        }
-
-        const actions = document.createElement('div');
-        actions.className = 'task__actions';
-        if (active && sheet) {
-          // One small button; the steps open in the sheet over the list, which keeps its room.
-          const steps = button(n ? t('tasks.stepsButton', { done: stepsDone, n }) : t('tasks.addSteps'), () => {
-            prepareSheet(task);
-            // A task with no steps yet goes straight to typing the first one.
-            if (!n) window.setTimeout(() => sheet.querySelector<HTMLInputElement>('[data-bd-step]')?.focus(), 60);
-          });
-          steps.dataset.sheetOpen = 'task-steps';
-          steps.setAttribute('aria-haspopup', 'dialog');
-          steps.setAttribute('aria-label', n ? t('tasks.stepsLabel', { name, done: stepsDone, n }) : t('tasks.addStepsTo', { name }));
-          actions.append(steps);
-        }
-        if (active && whenSheet) {
-          // When it's for: "When" until a day or repeat is set, then "Fri · ↻ weekly".
-          const set = !!(task.due || task.repeat);
-          const when = button(whenLabel(task), () => {}, `btn btn--ghost btn--small task__when${set ? ' is-set' : ''}`);
-          when.dataset.sheetOpen = 'task-when';
-          when.dataset.whenTask = task.id;
-          when.setAttribute('aria-haspopup', 'dialog');
-          const said = [task.due ? longDay(task.due) : '', task.repeat ? repeatLabel(task.repeat) : ''].filter(Boolean).join(', ');
-          when.setAttribute('aria-label', said ? t('when.whenForSet', { name, when: said }) : t('when.whenFor', { name }));
-          actions.append(when);
-        }
-        if (active) {
-          if (listOf(task) === 'today' && !firstUp) {
-            actions.append(
-              button(t('tasks.doFirst'), () => {
-                moveToTop(task.id, getTasks());
-                announce(t('tasks.isFirstUp', { name }));
-              }),
-            );
-          }
-          const focusLink = document.createElement('a');
-          focusLink.className = 'btn btn--ghost btn--small task__go';
-          focusLink.href = `${timerUrl}?task=${encodeURIComponent(task.id)}${nowStep ? `&step=${encodeURIComponent(nowStep.id)}` : ''}`;
-          focusLink.textContent = t('tasks.focus');
-          focusLink.setAttribute('aria-label', t('tasks.focusOn', { name }));
-          const done = button(t('tasks.done'), () => {
-            celebrate(done); // before finishing: the list re-renders and the button goes away
+        const tick = document.createElement('button');
+        tick.type = 'button';
+        tick.className = 'task__tick';
+        tick.innerHTML = active ? TICK_SVG : TICKED_SVG;
+        tick.setAttribute('aria-label', active ? t('tasks.finishTask', { name }) : t('tasks.reopenTask', { name }));
+        tick.addEventListener('click', () => {
+          if (active) {
+            celebrate(tick); // before finishing: the list re-renders and the row moves to Done
             finishTask(task.id);
             announce(t('tasks.finishedSaid', { name }));
-          });
-          actions.append(focusLink, done);
-        } else {
-          actions.append(
-            button(t('tasks.reopen'), () => {
-              reopenTask(task.id);
-              announce(t('tasks.reopenedSaid', { name }));
-            }),
-          );
+          } else {
+            reopenTask(task.id);
+            announce(t('tasks.reopenedSaid', { name }));
+          }
+        });
+
+        const open = document.createElement('button');
+        open.type = 'button';
+        open.className = 'task__open';
+        open.dataset.sheetOpen = 'task-steps';
+        open.setAttribute('aria-haspopup', 'dialog');
+        const n = task.steps.length;
+        const stepsDone = task.steps.filter((s) => s.done).length;
+        open.addEventListener('click', () => {
+          prepareSheet(task);
+          // A task with no steps yet goes straight to typing the first one.
+          if (active && !n && sheet) window.setTimeout(() => sheet.querySelector<HTMLInputElement>('[data-bd-step]')?.focus(), 60);
+        });
+        const title = document.createElement('span');
+        title.className = 'task__title';
+        title.textContent = name;
+
+        // The info line: area · first up / day · steps · focus, each only when it says something.
+        const meta = document.createElement('span');
+        meta.className = 'task__meta';
+        const bit = (text: string, cls = '') => {
+          const s = document.createElement('span');
+          if (cls) s.className = cls;
+          s.textContent = text;
+          return s;
+        };
+        const bits: HTMLElement[] = [];
+        const area = areaOf(task, areas);
+        if (area) bits.push(areaTag(area));
+        if (active) {
+          if (firstUp) bits.push(bit(t('tasks.firstUp'), 'task__first'));
+          if (task.id === currentId && !firstUp) bits.push(bit(t('tasks.current')));
+          if (isCarriedOver(task)) bits.push(bit(t('tasks.fromDay', { day: weekdayFmt.format(plannedFor(task)!) }), 'task__due'));
+          else if (isDueToday(task)) bits.push(bit(t('when.dueToday'), 'task__due'));
+          else if (task.due || task.repeat) bits.push(bit(whenLabel(task)));
+          if (n) bits.push(bit(tn('tasks.stepsOf', n, { done: stepsDone })));
         }
-        const del = iconButton(t('tasks.delete', { name }), () => {
+        const seconds = focus.get(task.id) ?? 0;
+        if (seconds >= 60) bits.push(bit(formatFocus(seconds)));
+        if (!active && task.doneAt) bits.push(bit(t('tasks.finishedOn', { date: dayFmt.format(task.doneAt) })));
+        bits.forEach((b, i) => meta.append(...(i ? [' · ', b] : [b])));
+        open.append(title);
+        if (bits.length) open.append(meta);
+        // The first-up task shows the step it's on: green while a session runs on it.
+        const nowStep = active ? currentStep(task.steps) : undefined;
+        if (nowStep && (firstUp || live)) {
+          const now = document.createElement('span');
+          now.className = `task__now${live ? ' is-live' : ''}`;
+          now.textContent = t(live ? 'tasks.now' : 'tasks.nextStep', { step: nowStep.text });
+          open.append(now);
+        }
+        li.append(tick, open);
+
+        if (active) {
+          const go = document.createElement('a');
+          go.className = 'task__go';
+          go.href = `${timerUrl}?task=${encodeURIComponent(task.id)}${nowStep ? `&step=${encodeURIComponent(nowStep.id)}` : ''}`;
+          go.innerHTML = PLAY_SVG;
+          go.setAttribute('aria-label', t('tasks.focusOn', { name }));
+          go.title = t('tasks.focus');
+          li.append(go);
+        }
+        return li;
+      }
+
+      // The sheet's Delete (TaskPlan.astro): hidden now, with Undo, like any delete.
+      c.add(
+        listen(document, 'task:remove', (e) => {
+          const task = getTasks().find((x) => x.id === (e as CustomEvent<{ id: string }>).detail.id);
+          if (!task) return;
+          const name = taskName(task);
+          const seconds = focusByTask(getSessions()).get(task.id) ?? 0;
           const time = formatFocus(seconds);
-          const withFocus = active && seconds > 0;
+          const withFocus = task.status === 'active' && seconds > 0;
           remove(
             task,
             withFocus ? t('tasks.deletedMsgFocus', { name, time }) : t('tasks.deletedMsg', { name }),
             withFocus ? t('tasks.deletedSaidFocus', { name, time }) : t('tasks.deletedSaid', { name }),
           );
-        });
-        const side = active ? [...(getAreas(areas).length ? [areaSelect(task)] : []), moveSelect(task), del] : [del];
-
-        // The same numbers as the meta line, drawn: a ring, a segment per step, a focus bar.
-        const graphs = document.createElement('div');
-        graphs.className = 'task__graphs';
-        if (active && n) graphs.append(stepBar(task, live));
-        if (active && seconds >= 60) graphs.append(focusBar(seconds, maxFocus));
-
-        li.append(active ? ring(stepsDone, n, listOf(task) === 'today' ? 56 : 44) : ring(1, 1, 32), head(body, ...side));
-        if (graphs.childElementCount) li.append(graphs);
-        li.append(actions);
-        return li;
-      }
+        }),
+      );
 
       /** One chip of the area row. */
       function areaChip(id: string, label: string, n: number, area?: TaskArea): HTMLButtonElement {
@@ -619,9 +538,8 @@ const TABS = [
         const open = tasks.filter((t) => t.status === 'active');
         const on = (list: TaskList) => open.filter((t) => listOf(t) === list);
         const finished = tasks.filter((t) => t.status === 'done').sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
-        const maxFocus = Math.max(1, ...open.map((t) => focus.get(t.id) ?? 0));
         const liveId = liveTaskId();
-        const row = (t: Task, firstUp = false) => renderTask(t, currentId, focus, maxFocus, liveId, firstUp);
+        const row = (t: Task, firstUp = false) => renderTask(t, currentId, focus, liveId, firstUp);
 
         const inbox = on('inbox').sort((a, b) => a.createdAt - b.createdAt);
         inboxWrap.hidden = inbox.length === 0;
@@ -764,11 +682,6 @@ const TABS = [
         showView(appView);
       }
 
-      // Rings fill once on arrival (global.css); later re-renders show the new state at once.
-      root.classList.add('is-entering');
-      const entered = window.setTimeout(() => root.classList.remove('is-entering'), 700);
-      c.add(() => window.clearTimeout(entered));
-
       render();
       c.add(subscribe('tasks', render));
       c.add(subscribe('sessions', render));
@@ -885,16 +798,6 @@ const TABS = [
     color: var(--color-text);
   }
 
-  /* The When button: quiet while empty, plain text colour once a day or repeat is set. */
-  .tasks :global(.task__when) {
-    color: var(--color-text-muted);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .tasks :global(.task__when.is-set) {
-    color: var(--color-text);
-  }
-
   .tasks :global(.task__area) {
     display: inline-flex;
     align-items: center;
@@ -1003,28 +906,9 @@ const TABS = [
     font-size: var(--text-sm);
   }
 
-  /* The area picker on a row: the area's colour on its left edge; quieter while it has none. */
-  .tasks :global(.tasks__area-select) {
-    border-inline-start: 4px solid var(--ac, var(--color-border));
-  }
-
-  .tasks :global(.tasks__area-select.is-empty) {
-    color: var(--color-text-muted);
-  }
-
   .tasks__form .tasks__list-select {
     flex: none;
     min-height: 44px;
-  }
-
-  .tasks :global(.task__badge.task__badge--first) {
-    background: var(--color-accent);
-    color: var(--color-on-accent);
-  }
-
-  .tasks :global(.task__badge.task__badge--old) {
-    background: var(--color-surface-2);
-    color: var(--color-text-muted);
   }
 
   .tasks__finished {
@@ -1081,45 +965,8 @@ const TABS = [
   }
 
   .tasks :global(.task--jot .task__head),
-  .tasks :global(.task__graphs),
   .tasks :global(.task__actions) {
     grid-column: 1 / -1;
-  }
-
-  .tasks :global(.task__graphs) {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .tasks :global(.task__graphs .segs) {
-    flex: 1;
-  }
-
-  .tasks :global(.task__focus) {
-    flex: 0 1 38%;
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--color-text-muted);
-  }
-
-  .tasks :global(.task__graphs .task__focus:only-child) {
-    flex-basis: 100%;
-  }
-
-  .tasks :global(.task__meter) {
-    flex: 1;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--heat-0);
-  }
-
-  .tasks :global(.task__meter > span) {
-    display: block;
-    height: 100%;
-    border-radius: 3px;
-    background: var(--heat-2);
   }
 
   .tasks :global(.task__head) {
@@ -1159,12 +1006,6 @@ const TABS = [
     text-decoration-thickness: 1.5px;
   }
 
-  .tasks :global(.task__badge) {
-    vertical-align: middle;
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
-  }
-
   .tasks :global(.task__meta) {
     font-size: var(--text-xs);
   }
@@ -1173,6 +1014,132 @@ const TABS = [
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  /* Today, Next, Someday, Done: one quiet panel, a slim row per task (64 px). */
+  .tasks :global(.tasks__rows) {
+    gap: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    overflow: hidden;
+  }
+
+  .tasks :global(.tasks__rows:empty) {
+    display: none;
+  }
+
+  .tasks :global(.task--row) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: 64px;
+    padding: 0 var(--space-1);
+    border: 0;
+    border-top: 1px solid var(--color-border);
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .tasks :global(.task--row:first-child) {
+    border-top: 0;
+  }
+
+  .tasks :global(.task--row.task--first) {
+    background: color-mix(in srgb, var(--color-accent-soft) 55%, transparent);
+  }
+
+  .tasks :global(.task--row.is-live) {
+    box-shadow: inset 3px 0 0 var(--glow);
+  }
+
+  .tasks :global(.task__tick),
+  .tasks :global(.task__go) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    inline-size: 44px;
+    block-size: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 14px;
+    background: none;
+    cursor: pointer;
+  }
+
+  .tasks :global(.task__tick) {
+    color: var(--color-border-strong, var(--color-text-muted));
+  }
+
+  .tasks :global(.task__tick:hover) {
+    color: var(--color-accent);
+  }
+
+  .tasks :global(.task__go) {
+    color: var(--color-accent);
+  }
+
+  .tasks :global(.task__go:hover) {
+    background: var(--color-accent-soft);
+  }
+
+  /* The name and info line: one button that opens the task's sheet. */
+  .tasks :global(.task__open) {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+    align-self: stretch;
+    align-content: center;
+    padding: var(--space-2) var(--space-1);
+    border: 0;
+    border-radius: var(--radius-sm, 8px);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .tasks :global(.task--row .task__title) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow-wrap: normal;
+  }
+
+  .tasks :global(.task--row.task--first .task__title) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .tasks :global(.task--row .task__meta) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--color-text-muted);
+  }
+
+  .tasks :global(.task--row .task__area) {
+    margin: 0;
+  }
+
+  .tasks :global(.task__first) {
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .tasks :global(.task__due) {
+    color: var(--color-warn, var(--color-accent));
+    font-weight: 600;
+  }
+
+  .tasks :global(.task--row.is-done .task__meta) {
+    opacity: 0.75;
   }
 
   /* One list at a time, chosen from a row of tabs. The script sets data-view. */
@@ -1298,16 +1265,6 @@ const TABS = [
   .tasks[data-view] :global(.task__actions .btn) {
     flex: 1 1 auto;
     min-height: 44px;
-  }
-
-  .tasks[data-view] :global(.task__go) {
-    --btn-edge: var(--accent-edge);
-    background: var(--accent-grad);
-    border-color: transparent;
-    color: var(--color-on-accent);
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.45),
-      0 var(--btn-depth) 0 var(--btn-edge);
   }
 
   .tasks[data-view] :global(.tasks__list-select) {

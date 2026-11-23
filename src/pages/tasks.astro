@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import FocusTabs from '../components/FocusTabs.astro';
 import TaskGlance from '../components/TaskGlance.astro';
 import TaskList from '../components/TaskList.astro';
+import TaskPlan from '../components/TaskPlan.astro';
 import BreakdownTool from '../components/BreakdownTool.astro';
 import Sheet from '../components/Sheet.astro';
 import AreaPicker from '../components/AreaPicker.astro';
@@ -42,7 +43,8 @@ const breakdown = {
     <TaskList />
     {/* A task's steps open over the list from its Steps button (TaskList.astro), so the list keeps its room. */}
     <Sheet id="task-steps" labelledby="bd-heading">
-      <BreakdownTool {...breakdown}><AreaPicker slot="after-title" /></BreakdownTool>
+      <BreakdownTool {...breakdown}><Fragment slot="after-title"><AreaPicker /><TaskPlan /></Fragment></BreakdownTool>
+      <TaskPlan part="delete" />
       <div class="task-steps__foot">
         <a data-t="tasks.startFocusing" class="btn" href={url('/timer')} data-task-steps-focus data-sheet-close>Start focusing</a>
       </div>

@@ -6,6 +6,10 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **24 Nov · Compact task list.** Picked option A: one slim row per task (tick to finish, name,
+  one info line, play to focus), about 64 px; the ring, step and focus bars, dropdowns and the
+  button row are gone. Tapping a row opens the task sheet, which now also holds its list, When,
+  Do first and Delete (with Undo).
 - **24 Nov · Due dates and repeats on tasks.** Picked option A: a small "When" button on each
   open task row opens a sheet with day chips (Today, Tomorrow, This weekend, Next week, a date)
   and repeat chips (every day, weekdays, every week, every month). Picked over setting it inside

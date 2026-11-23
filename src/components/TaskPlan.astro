@@ -1,0 +1,178 @@
+---
+/**
+ * Where the current task sits, on its sheet (tasks.astro): its list (Today, Next, Someday),
+ * when it's for (opens the When sheet), "Do first" on Today, and Delete. The task rows keep
+ * only a tick and ▶ Focus, so these live here. Delete asks the task list to remove it, so
+ * it hides at once and offers Undo like a delete always has.
+ *
+ * Used twice on the sheet: the plan under the title, and `part="delete"` at the bottom.
+ */
+interface Props {
+  part?: 'plan' | 'delete';
+}
+const { part = 'plan' } = Astro.props;
+---
+
+{
+  part === 'delete' ? (
+    <div class="task-plan task-plan--delete" data-tp-delete-wrap hidden>
+      <button type="button" class="btn btn--ghost btn--small task-plan__delete" data-sheet-close data-tp-delete>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span data-t="tasks.deleteTask">Delete task</span>
+      </button>
+    </div>
+  ) : (
+    <div class="task-plan" data-task-plan hidden>
+      <div class="task-plan__row">
+        <p data-t="tasks.listLabel" class="task-plan__label" id="task-plan-list">List</p>
+        <div class="task-plan__chips" role="group" aria-labelledby="task-plan-list" data-tp-lists></div>
+      </div>
+      <div class="task-plan__row">
+        <p data-t="when.when" class="task-plan__label">When</p>
+        <div class="task-plan__chips">
+          <button type="button" class="task-plan__chip task-plan__when" data-sheet-open="task-when" aria-haspopup="dialog" data-tp-when></button>
+          <button data-t="tasks.doFirst" type="button" class="task-plan__chip" data-tp-first hidden>Do first</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  import { getCurrentTask, getTasks, subscribe, type TaskList } from '../lib/storage';
+  import { listLabel, listOf, moveTask, moveToTop, taskName, todayTasks } from '../lib/tasks';
+  import { longDay, repeatLabel, whenLabel } from '../lib/when';
+  import { cleanups, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
+
+  const LISTS: TaskList[] = ['today', 'next', 'someday'];
+
+  onPage('task-plan', () => {
+    const root = document.querySelector<HTMLElement>('[data-task-plan]');
+    if (!root) return;
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const lists = $<HTMLElement>('[data-tp-lists]');
+    const when = $<HTMLButtonElement>('[data-tp-when]');
+    const first = $<HTMLButtonElement>('[data-tp-first]');
+    const delWrap = document.querySelector<HTMLElement>('[data-tp-delete-wrap]');
+    const del = delWrap?.querySelector<HTMLButtonElement>('[data-tp-delete]');
+    const c = cleanups();
+
+    function render(): void {
+      const task = getCurrentTask();
+      // Delete is there for finished tasks too; the plan only while it's open.
+      if (delWrap) delWrap.hidden = !task || listOf(task) === 'inbox';
+      if (task && del) del.setAttribute('aria-label', t('tasks.delete', { name: taskName(task) }));
+      root!.hidden = !task || task.status !== 'active' || listOf(task) === 'inbox';
+      if (!task || root!.hidden) return;
+      const name = taskName(task);
+      const list = listOf(task);
+      lists.replaceChildren(
+        ...LISTS.map((id) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'task-plan__chip';
+          b.dataset.tpList = id;
+          b.setAttribute('aria-pressed', String(list === id));
+          b.textContent = listLabel(id);
+          return b;
+        }),
+      );
+      const set = !!(task.due || task.repeat);
+      when.textContent = set ? whenLabel(task) : t('when.pickDay');
+      when.classList.toggle('is-set', set);
+      when.dataset.whenTask = task.id;
+      const said = [task.due ? longDay(task.due) : '', task.repeat ? repeatLabel(task.repeat) : ''].filter(Boolean).join(', ');
+      when.setAttribute('aria-label', said ? t('when.whenForSet', { name, when: said }) : t('when.whenFor', { name }));
+      first.hidden = list !== 'today' || todayTasks(getTasks().filter((x) => x.status === 'active'))[0]?.id === task.id;
+    }
+
+    lists.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-tp-list]');
+      const task = getCurrentTask();
+      if (!b || !task) return;
+      moveTask(task.id, b.dataset.tpList as TaskList);
+    });
+    first.addEventListener('click', () => {
+      const task = getCurrentTask();
+      if (task) moveToTop(task.id, getTasks());
+    });
+    del?.addEventListener('click', () => {
+      const task = getCurrentTask();
+      // The task list (TaskList.astro) hides it, offers Undo and deletes it once that ends.
+      if (task) document.dispatchEvent(new CustomEvent('task:remove', { detail: { id: task.id } }));
+    });
+
+    render();
+    c.add(subscribe('tasks', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .task-plan {
+    display: grid;
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  .task-plan[hidden],
+  .task-plan [hidden] {
+    display: none;
+  }
+
+  .task-plan__row {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .task-plan__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .task-plan__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .task-plan :global(.task-plan__chip) {
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .task-plan :global(.task-plan__chip[aria-pressed='true']) {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+
+  .task-plan__when.is-set {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .task-plan--delete {
+    margin-top: var(--space-5);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .task-plan__delete {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    color: var(--color-danger, var(--color-text-muted));
+  }
+</style>
