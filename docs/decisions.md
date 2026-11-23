@@ -6,14 +6,29 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **24 Nov · Due dates and repeats on tasks.** Picked option A: a small "When" button on each
+  open task row opens a sheet with day chips (Today, Tomorrow, This weekend, Next week, a date)
+  and repeat chips (every day, weekdays, every week, every month). Picked over setting it inside
+  the Steps sheet (B, hard to find, as the area picker was) and a "Coming up" fold (C). On its
+  day a task shows on Today by itself with a "For today" tag; once the day passes it gets the
+  usual "Still for today?" Keep / Move to Next note, never red or "overdue". Finishing a
+  repeating task adds the next copy (steps unticked) for the next day of the repeat. Quick add
+  reads `tomorrow`, `fri`, `every week`… in English, Russian and Azerbaijani. My defaults (the
+  owner didn't answer these canvas questions): repeats count from the day it was for, not the
+  day it was finished; a repeat with no day counts from the day it's finished; a lone "weekly"
+  or "daily" is a repeat only at the end of the text; "sun"/"sat" alone stay in the title.
+  Not built yet: search, reminders.
+
 - **24 Nov · Google sign-in on the site uses Google's own window.** Firebase's pop-up failed
   with "The sign-in window was closed before finishing" in Chrome with third-party cookies
   blocked. The site now gets a token from Google Identity Services with the Firebase
   project's web client and hands it to Firebase; the pop-up stays as the fallback when no
   client id is set.
+
 - **24 Nov · Undo inside sheets.** The shared Undo toast moves into whichever sheet or dialog
   is open, so it can be tapped there. "Your areas" dropped its own inline Undo bar and uses
   the shared toast like every other removal.
+
 - **23 Nov · Task areas (Work, Life, Study).** Picked option A: one area per task, a chip row
   above every list to filter, picked over free #tags (B) or switching the whole app into an
   "area mode" (C, maybe later on top of A). Lists still say *when*, areas say *which part of

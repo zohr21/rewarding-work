@@ -7,6 +7,7 @@ import BreakdownTool from '../components/BreakdownTool.astro';
 import Sheet from '../components/Sheet.astro';
 import AreaPicker from '../components/AreaPicker.astro';
 import AreaManager from '../components/AreaManager.astro';
+import WhenPicker from '../components/WhenPicker.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
@@ -45,6 +46,10 @@ const breakdown = {
       <div class="task-steps__foot">
         <a data-t="tasks.startFocusing" class="btn" href={url('/timer')} data-task-steps-focus data-sheet-close>Start focusing</a>
       </div>
+    </Sheet>
+    {/* Opened from a task row's When button (TaskList.astro). */}
+    <Sheet id="task-when" title="When" titleKey="when.when">
+      <WhenPicker />
     </Sheet>
     {/* Opened from the area chips' "Edit" (TaskList.astro). */}
     <Sheet id="task-areas" title="Your areas" titleKey="areas.yourAreas">

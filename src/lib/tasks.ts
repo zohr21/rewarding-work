@@ -19,8 +19,10 @@ import {
   type Task,
   type TaskList,
   type TaskLogEntry,
+  type TaskRepeat,
 } from './storage';
 import { startOfDay } from './dates';
+import { dueStart, isDue, nextDue, todayKeyOf } from './when';
 import { t } from './i18n';
 import { hoursMinutes } from './i18n/units';
 
@@ -85,15 +87,56 @@ export function setStepDone(taskId: string, stepId: string, done: boolean): void
   else removeDoneBySource(step.id);
 }
 
-export function finishTask(id: string): void {
-  const task = updateTask(id, () => ({ status: 'done', doneAt: Date.now() }));
+/**
+ * Finish a task. A repeating one adds its next copy first: same title, area, notes and steps
+ * (unticked), for the next day of the repeat. It waits in its list until that day.
+ */
+export function finishTask(id: string, now = Date.now()): void {
+  const old = getTask(id);
+  if (!old || old.status === 'done') return;
+  let repeatedAs: string | undefined;
+  if (old.repeat) {
+    const today = todayKeyOf(now);
+    const next = createTask(old.title, { makeCurrent: false, area: old.area, list: listOf(old) === 'someday' ? 'someday' : undefined });
+    updateTask(next.id, () => ({
+      steps: old.steps.map((s) => ({ id: newId('st'), text: s.text, done: false })),
+      notes: old.notes,
+      due: nextDue(old.due && old.due <= today ? old.due : today, old.repeat!, today),
+      repeat: old.repeat,
+    }));
+    repeatedAs = next.id;
+  }
+  const task = updateTask(id, () => ({ status: 'done', doneAt: now, ...(repeatedAs ? { repeat: undefined, repeatedAs } : {}) }));
   if (task) addDone(t('tasks.finishedDone', { task: taskName(task) }), { source: taskSource(id), taskId: id });
 }
 
 export function reopenTask(id: string): void {
-  if (!getTask(id)) return;
-  updateTask(id, () => ({ status: 'active', doneAt: undefined }));
+  const task = getTask(id);
+  if (!task) return;
+  // Reopening a repeating task takes back the copy finishing it added, if it's still untouched.
+  const copy = task.repeatedAs ? getTask(task.repeatedAs) : null;
+  const untouched = copy && copy.status === 'active' && !copy.steps.some((s) => s.done) && !copy.log?.length;
+  if (copy && untouched) deleteTask(copy.id);
+  updateTask(id, () => ({
+    status: 'active',
+    doneAt: undefined,
+    repeatedAs: undefined,
+    ...(task.repeatedAs && (untouched || !copy) ? { repeat: copy?.repeat } : {}),
+  }));
   removeDoneBySource(taskSource(id));
+}
+
+/**
+ * Set or clear when a task is for. A day still to come takes it off Today (it comes back on
+ * the day); a day that has come puts it there.
+ */
+export function setWhen(id: string, when: { due?: string; repeat?: TaskRepeat }, now = Date.now()): void {
+  updateTask(id, (task) => {
+    const patch: Partial<Task> = { due: when.due, repeat: when.repeat };
+    if (task.due === when.due && task.repeat === when.repeat) return {};
+    if (when.due && when.due > todayKeyOf(now) && task.list === 'today') Object.assign(patch, { list: undefined, todayAt: undefined, todayOrder: undefined });
+    return patch;
+  });
 }
 
 /** Focus seconds per task id. */
@@ -144,20 +187,29 @@ export const listLabel = (list: TaskList): string => t(`list.${list}`);
 /** Today works best short; past this the list nudges you to move some on. */
 export const TODAY_SOFT_MAX = 3;
 
-export const listOf = (task: Pick<Task, 'list'>): TaskList => task.list ?? 'next';
+/** The list a task shows on. A task whose day has come is on Today, whatever list it waited in. */
+export const listOf = (task: Pick<Task, 'list' | 'due'>, now = Date.now()): TaskList =>
+  task.list !== 'inbox' && isDue(task, now) ? 'today' : (task.list ?? 'next');
+
+/** When it came onto Today: put there by hand, or the start of its day. */
+const onTodayAt = (t: Task): number | undefined => (t.list === 'today' ? t.todayAt : t.due ? dueStart(t.due) : t.todayAt);
 
 export function moveTask(id: string, list: TaskList): void {
   updateTask(id, (t) => {
-    if (listOf(t) === list) return {};
-    return { list: list === 'next' ? undefined : list, todayAt: list === 'today' ? Date.now() : undefined, todayOrder: undefined };
+    const now = Date.now();
+    if (listOf(t, now) === list) return {};
+    const patch: Partial<Task> = { list: list === 'next' ? undefined : list, todayAt: list === 'today' ? now : undefined, todayOrder: undefined };
+    // Moved off Today after its day came: that day is dealt with, so it doesn't come straight back.
+    if (list !== 'today' && isDue(t, now)) patch.due = undefined;
+    return patch;
   });
 }
 
-const todayKey = (t: Task) => t.todayOrder ?? t.todayAt ?? t.createdAt;
+const todayKey = (t: Task) => t.todayOrder ?? onTodayAt(t) ?? t.createdAt;
 
 /** Open tasks on Today, first up first. */
-export function todayTasks(tasks: Task[]): Task[] {
-  return tasks.filter((t) => t.status === 'active' && listOf(t) === 'today').sort((a, b) => todayKey(a) - todayKey(b));
+export function todayTasks(tasks: Task[], now = Date.now()): Task[] {
+  return tasks.filter((t) => t.status === 'active' && listOf(t, now) === 'today').sort((a, b) => todayKey(a) - todayKey(b));
 }
 
 /** Put a Today task first. */
@@ -170,14 +222,21 @@ export function moveToTop(id: string, tasks: Task[]): void {
 /** Keep tasks carried over from an earlier day on Today, in the same places. */
 export function keepForToday(tasks: Task[], now = Date.now()): void {
   for (const t of todayTasks(tasks)) {
-    if (isCarriedOver(t, now)) updateTask(t.id, () => ({ todayAt: now, todayOrder: todayKey(t) }));
+    if (isCarriedOver(t, now)) updateTask(t.id, () => ({ list: 'today', todayAt: now, todayOrder: todayKey(t) }));
   }
 }
 
+/** When the task was planned for, if it's on Today: put there by hand, or its day. */
+export const plannedFor = (task: Task): number | undefined => onTodayAt(task);
+
 /** On Today since before today (planned for an earlier day and not finished). */
 export function isCarriedOver(task: Task, now = Date.now()): boolean {
-  return listOf(task) === 'today' && task.todayAt !== undefined && task.todayAt < startOfDay(now).getTime();
+  const at = onTodayAt(task);
+  return listOf(task, now) === 'today' && at !== undefined && at < startOfDay(now).getTime();
 }
+
+/** On Today because today is its day. */
+export const isDueToday = (task: Pick<Task, 'due'>, now = Date.now()): boolean => task.due === todayKeyOf(now);
 
 // ---------- Scratchpad ----------
 

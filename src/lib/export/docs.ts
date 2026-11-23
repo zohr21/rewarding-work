@@ -9,7 +9,7 @@
 import { addDays, dayKey, formatShort, startOfDay, startOfWeek } from '../dates';
 import { allProgress, chainInput, TIER_NAMES } from '../rewards';
 import { chainStats, minutesByDay } from '../stats';
-import { focusByTask, formatFocus, isCarriedOver, taskName, todayTasks } from '../tasks';
+import { focusByTask, formatFocus, isCarriedOver, plannedFor, taskName, todayTasks } from '../tasks';
 import type { ExportData } from './collect';
 
 type Json = Record<string, unknown>;
@@ -131,7 +131,7 @@ export function buildDoc(data: ExportData): DocBuild {
           const n = t.steps.length;
           const bits = [n ? `${t.steps.filter((s) => s.done).length} of ${plural(n, 'step')}` : 'no steps yet'];
           if (i === 0) bits.push('first up');
-          if (isCarriedOver(t, now.getTime())) bits.push(`carried over from ${weekdayFmt.format(t.todayAt)}`);
+          if (isCarriedOver(t, now.getTime())) bits.push(`carried over from ${weekdayFmt.format(plannedFor(t)!)}`);
           return `${taskName(t)} · ${bits.join(' · ')}`;
         }),
         'BULLET_CHECKBOX',
