@@ -1,0 +1,209 @@
+---
+/**
+ * When a task is for (src/lib/when.ts): a day and a repeat, picked in the `task-when` sheet
+ * (tasks.astro) that a task row's When button opens. Each tap saves at once.
+ */
+---
+
+<div class="when-pick" data-when-pick>
+  <p class="muted when-pick__task" data-when-task-name></p>
+  <p data-t="when.day" class="when-pick__label" id="when-day-label">Day</p>
+  <div class="when-pick__chips" role="group" aria-labelledby="when-day-label" data-when-days>
+    <button data-t="when.today" type="button" class="when-pick__chip" data-when-day="today">Today</button>
+    <button data-t="when.tomorrow" type="button" class="when-pick__chip" data-when-day="tomorrow">Tomorrow</button>
+    <button data-t="when.weekend" type="button" class="when-pick__chip" data-when-day="weekend">This weekend</button>
+    <button data-t="when.nextWeek" type="button" class="when-pick__chip" data-when-day="nextWeek">Next week</button>
+    <label class="when-pick__chip when-pick__date" data-when-date-wrap>
+      <span data-t="when.pickDate" data-when-date-text>Pick a date</span>
+      <input data-t-aria-label="when.pickDate" type="date" aria-label="Pick a date" data-when-date />
+    </label>
+  </div>
+
+  <p data-t="when.repeats" class="when-pick__label" id="when-repeat-label">Repeat</p>
+  <div class="when-pick__chips" role="group" aria-labelledby="when-repeat-label" data-when-repeats>
+    <button data-t="when.noRepeat" type="button" class="when-pick__chip" data-when-repeat="">Doesn't repeat</button>
+    <button data-t="when.repeat.day" type="button" class="when-pick__chip" data-when-repeat="day">every day</button>
+    <button data-t="when.repeat.weekdays" type="button" class="when-pick__chip" data-when-repeat="weekdays">on weekdays</button>
+    <button data-t="when.repeat.week" type="button" class="when-pick__chip" data-when-repeat="week">every week</button>
+    <button data-t="when.repeat.month" type="button" class="when-pick__chip" data-when-repeat="month">every month</button>
+  </div>
+
+  <p class="when-pick__preview" data-when-preview aria-live="polite"></p>
+
+  <div class="when-pick__actions">
+    <button data-t="when.done" type="button" class="btn" data-sheet-close>Done</button>
+    <button data-t="when.clear" type="button" class="btn btn--ghost" data-when-clear>Clear</button>
+  </div>
+</div>
+
+<script>
+  import { getTask, subscribe, type TaskRepeat } from '../lib/storage';
+  import { setWhen, taskName } from '../lib/tasks';
+  import { dayLabel, longDay, quickDay, repeatLabel, todayKeyOf, type QuickDay } from '../lib/when';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
+
+  onPage('when-pick', () => {
+    const root = document.querySelector<HTMLElement>('[data-when-pick]');
+    const dialog = root?.closest<HTMLDialogElement>('dialog');
+    if (!root || !dialog) return;
+    const c = cleanups();
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const name = $<HTMLElement>('[data-when-task-name]');
+    const days = $<HTMLElement>('[data-when-days]');
+    const repeats = $<HTMLElement>('[data-when-repeats]');
+    const date = $<HTMLInputElement>('[data-when-date]');
+    const dateWrap = $<HTMLElement>('[data-when-date-wrap]');
+    const dateText = $<HTMLElement>('[data-when-date-text]');
+    const preview = $<HTMLElement>('[data-when-preview]');
+    let taskId: string | null = null;
+    const capital = (s: string) => s.charAt(0).toLocaleUpperCase() + s.slice(1);
+
+    function render(): void {
+      const task = taskId ? getTask(taskId) : null;
+      if (!task) return;
+      name.textContent = taskName(task);
+      const now = Date.now();
+      let quick = false;
+      days.querySelectorAll<HTMLElement>('[data-when-day]').forEach((b) => {
+        const on = !!task.due && !quick && quickDay(b.dataset.whenDay as QuickDay, now) === task.due;
+        quick ||= on;
+        b.setAttribute('aria-pressed', String(on));
+      });
+      // A day none of the quick picks gives shows on the date chip itself.
+      const other = !!task.due && !quick;
+      dateWrap.classList.toggle('is-on', other);
+      dateText.textContent = other ? dayLabel(task.due!, now) : t('when.pickDate');
+      date.value = task.due ?? '';
+      date.min = todayKeyOf(now);
+      repeats.querySelectorAll<HTMLElement>('[data-when-repeat]').forEach((b) => {
+        const r = b.dataset.whenRepeat as TaskRepeat | '';
+        b.setAttribute('aria-pressed', String((task.repeat ?? '') === r));
+        // The labels are lower case for use inside a sentence; as chips they start with a capital.
+        if (r) b.textContent = capital(repeatLabel(r));
+      });
+
+      const day = task.due ? (task.due === todayKeyOf(now) ? t('when.today').toLowerCase() : longDay(task.due)) : '';
+      const rep = task.repeat ? repeatLabel(task.repeat) : '';
+      preview.textContent =
+        day && rep ? t('when.previewBoth', { day, repeat: rep })
+        : day ? t('when.previewDay', { day })
+        : rep ? t('when.previewRepeat', { repeat: rep })
+        : t('when.previewNone');
+    }
+
+    function save(change: { due?: string | null; repeat?: TaskRepeat | null }): void {
+      const task = taskId ? getTask(taskId) : null;
+      if (!task) return;
+      setWhen(task.id, {
+        due: change.due === undefined ? task.due : (change.due ?? undefined),
+        repeat: change.repeat === undefined ? task.repeat : (change.repeat ?? undefined),
+      });
+    }
+
+    c.add(
+      listen(dialog, 'sheet:open', (e) => {
+        taskId = (e as CustomEvent<Record<string, string>>).detail.whenTask ?? null;
+        render();
+      }),
+    );
+    days.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-when-day]');
+      if (!b) return;
+      const day = quickDay(b.dataset.whenDay as QuickDay);
+      // A second tap on the picked day takes the day off.
+      save({ due: b.getAttribute('aria-pressed') === 'true' ? null : day });
+    });
+    date.addEventListener('change', () => save({ due: date.value || null }));
+    repeats.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-when-repeat]');
+      if (!b) return;
+      save({ repeat: (b.dataset.whenRepeat || null) as TaskRepeat | null });
+    });
+    $<HTMLButtonElement>('[data-when-clear]').addEventListener('click', () => save({ due: null, repeat: null }));
+
+    c.add(subscribe('tasks', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .when-pick {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .when-pick__task {
+    margin-top: calc(-1 * var(--space-2));
+    font-size: var(--text-sm);
+  }
+
+  .when-pick__label {
+    margin-top: var(--space-3);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .when-pick__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .when-pick__chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .when-pick__chip[aria-pressed='true'],
+  .when-pick__date.is-on {
+    border-color: var(--color-text);
+    color: var(--color-text);
+    background: var(--well-bg);
+  }
+
+  /* The native date picker covers the chip, so a tap anywhere on it opens the calendar. */
+  .when-pick__date input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    inline-size: 100%;
+    cursor: pointer;
+  }
+
+  .when-pick__date:focus-within {
+    outline: 2px solid var(--color-focus, var(--glow));
+    outline-offset: 2px;
+  }
+
+  .when-pick__preview {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md, 12px);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    font-size: var(--text-sm);
+  }
+
+  .when-pick__actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .when-pick__actions .btn {
+    min-height: 48px;
+    flex: 1;
+  }
+</style>

@@ -800,6 +800,10 @@ export const LOG_TEXT_MAX = 200;
 export const TASK_LISTS = ['inbox', 'today', 'next', 'someday'] as const;
 export type TaskList = (typeof TASK_LISTS)[number];
 
+/** How a task comes back once finished (src/lib/when.ts). */
+export const TASK_REPEATS = ['day', 'weekdays', 'week', 'month'] as const;
+export type TaskRepeat = (typeof TASK_REPEATS)[number];
+
 export interface Task {
   id: string;
   title: string;
@@ -810,6 +814,12 @@ export interface Task {
   todayAt?: number;
   /** Position on Today, lowest first ("first up"); falls back to `todayAt`. */
   todayOrder?: number;
+  /** The day it's for (local "YYYY-MM-DD"): on that day it shows on Today by itself. */
+  due?: string;
+  /** Finishing it adds the next copy, for the next day this gives. */
+  repeat?: TaskRepeat;
+  /** On a finished repeating task: the id of the copy that finishing it added. */
+  repeatedAs?: string;
   steps: TaskStep[];
   /** Free-form notes. */
   notes?: string;
@@ -922,10 +932,23 @@ export function isTaskStore(v: unknown): v is TaskStore {
   );
 }
 
+/** A task with a malformed date or repeat keeps everything else: only those are dropped. */
+function cleanWhen(task: Task): Task {
+  const badDue = task.due !== undefined && !isDayKey(task.due);
+  const badRepeat = task.repeat !== undefined && !(TASK_REPEATS as readonly unknown[]).includes(task.repeat);
+  const badNext = task.repeatedAs !== undefined && typeof task.repeatedAs !== 'string';
+  if (!badDue && !badRepeat && !badNext) return task;
+  const out = { ...task };
+  if (badDue) delete out.due;
+  if (badRepeat) delete out.repeat;
+  if (badNext) delete out.repeatedAs;
+  return out;
+}
+
 /** Tolerant: malformed tasks are dropped, not the whole store. */
 export function normaliseTasks(v: unknown): TaskStore {
   if (!isTaskStore(v)) return EMPTY_TASKS;
-  const store: TaskStore = { items: v.items.filter(isTask), current: v.current, currentAt: v.currentAt };
+  const store: TaskStore = { items: v.items.filter(isTask).map(cleanWhen), current: v.current, currentAt: v.currentAt };
   const areas = Array.isArray(v.areas) ? v.areas.filter(isTaskArea) : [];
   if (areas.length) store.areas = areas;
   if (typeof v.areasAt === 'number') store.areasAt = v.areasAt;
@@ -983,11 +1006,13 @@ export function setCurrentTask(id: string | null): void {
 
 export function createTask(
   title: string,
-  { makeCurrent = true, list, area }: { makeCurrent?: boolean; list?: TaskList; area?: string } = {},
+  { makeCurrent = true, list, area, due, repeat }: { makeCurrent?: boolean; list?: TaskList; area?: string; due?: string; repeat?: TaskRepeat } = {},
 ): Task {
   const now = Date.now();
   const task: Task = { id: newId('t'), title: cleanTitle(title), steps: [], status: 'active', createdAt: now, updatedAt: now };
   if (area) task.area = area;
+  if (due) task.due = due;
+  if (repeat) task.repeat = repeat;
   if (list && list !== 'next') task.list = list;
   if (list === 'today') task.todayAt = now;
   const store = getTaskStore();

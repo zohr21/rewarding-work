@@ -120,12 +120,14 @@ const TABS = [
     focusByTask,
     formatFocus,
     isCarriedOver,
+    isDueToday,
     jotToNotes,
     keepForToday,
     listLabel,
     listOf,
     moveTask,
     moveToTop,
+    plannedFor,
     reopenTask,
     taskName,
     todayTasks,
@@ -134,6 +136,7 @@ const TABS = [
   import { currentStep, liveTaskId, stepBar } from '../lib/parts';
   import { AREA_PRESETS, AREA_STARTERS, areaName, areaOf, areasAnswered, getAreas, parseAreaTag, setTaskArea, setUpAreas, type AreaPreset } from '../lib/areas';
   import { getTaskStore, type TaskArea } from '../lib/storage';
+  import { dayLabel, longDay, parseWhen, repeatLabel, todayKeyOf, whenLabel } from '../lib/when';
   import { celebrate } from '../lib/appearance';
   import { ring } from '../lib/charts';
   import { offerUndo } from '../lib/undo';
@@ -195,6 +198,8 @@ const TABS = [
       const parsed = $<HTMLElement>('[data-tl-parsed]');
       // The steps sheet (tasks.astro): a bottom sheet on a phone, a side panel on a wide screen.
       const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-steps"]');
+      // The When sheet (tasks.astro): a task's day and repeat.
+      const whenSheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-when"]');
 
       function showView(view: string): void {
         if (!tabs) return;
@@ -424,7 +429,8 @@ const TABS = [
         title.textContent = name;
         if (firstUp) title.append(' ', badge(t('tasks.firstUp'), 'task__badge--first'));
         if (task.id === currentId) title.append(' ', badge(t('tasks.current')));
-        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(t('tasks.fromDay', { day: weekdayFmt.format(task.todayAt!) }), 'task__badge--old'));
+        if (task.status === 'active' && isDueToday(task) && !isCarriedOver(task)) title.append(' ', badge(t('when.dueToday'), 'task__badge--due'));
+        if (task.status === 'active' && isCarriedOver(task)) title.append(' ', badge(t('tasks.fromDay', { day: weekdayFmt.format(plannedFor(task)!) }), 'task__badge--old'));
         const meta = document.createElement('p');
         meta.className = 'task__meta muted';
         const parts: string[] = [];
@@ -462,6 +468,17 @@ const TABS = [
           steps.setAttribute('aria-haspopup', 'dialog');
           steps.setAttribute('aria-label', n ? t('tasks.stepsLabel', { name, done: stepsDone, n }) : t('tasks.addStepsTo', { name }));
           actions.append(steps);
+        }
+        if (active && whenSheet) {
+          // When it's for: "When" until a day or repeat is set, then "Fri · ↻ weekly".
+          const set = !!(task.due || task.repeat);
+          const when = button(whenLabel(task), () => {}, `btn btn--ghost btn--small task__when${set ? ' is-set' : ''}`);
+          when.dataset.sheetOpen = 'task-when';
+          when.dataset.whenTask = task.id;
+          when.setAttribute('aria-haspopup', 'dialog');
+          const said = [task.due ? longDay(task.due) : '', task.repeat ? repeatLabel(task.repeat) : ''].filter(Boolean).join(', ');
+          when.setAttribute('aria-label', said ? t('when.whenForSet', { name, when: said }) : t('when.whenFor', { name }));
+          actions.append(when);
         }
         if (active) {
           if (listOf(task) === 'today' && !firstUp) {
@@ -569,14 +586,22 @@ const TABS = [
         }
       }
 
-      /** What the add field will do with an area: from a #tag, or from the picked chip. */
+      /** What the add field will do: an area from a #tag or the picked chip, a day or repeat from its words. */
       function showParsed(): void {
-        const { area } = parseAreaTag(input.value, areas);
+        const { area, title } = parseAreaTag(input.value, areas);
+        const when = parseWhen(title);
         const picked = areaFilter !== 'all' ? getAreas(areas).find((a) => a.id === areaFilter) : undefined;
         const to = area ?? (input.value.trim() ? picked : undefined);
-        parsed.hidden = !to;
+        const dated = !!(when.due || when.repeat);
+        parsed.hidden = !to && !dated;
         parsed.replaceChildren();
         if (to) parsed.append(t('areas.addsTo'), ' ', areaTag(to));
+        if (dated) {
+          const tag = document.createElement('span');
+          tag.className = 'task__when-tag';
+          tag.textContent = whenLabel(when);
+          parsed.append(to ? ' · ' : `${t('when.addsFor')} `, tag);
+        }
       }
 
       function render(): void {
@@ -674,17 +699,22 @@ const TABS = [
         if (!text) return;
         // Becomes the current task only if the breakdown has nothing open to show.
         const current = getCurrentTask();
-        const list = newList.value as TaskList;
+        const picked = newList.value as TaskList;
         // "#study" picks the area; otherwise a task added while a chip is picked joins that area.
-        const { title, area } = parseAreaTag(text, areas);
+        const tagged = parseAreaTag(text, areas);
+        // "tomorrow", "fri", "every week"… set its day and repeat.
+        const { title, due, repeat } = parseWhen(tagged.title);
+        const area = tagged.area;
         if (!title) return;
+        // A day still to come waits in Next, not on Today.
+        const list = due && due > todayKeyOf() && picked === 'today' ? 'next' : picked;
         const areaId = area?.id ?? (areaFilter !== 'all' ? areaFilter : undefined);
         // A task added to another area than the one shown would vanish from view: show them all.
         if (areaFilter !== 'all' && areaId !== areaFilter) areaFilter = 'all';
-        createTask(title, { makeCurrent: !current || current.status === 'done', list, area: areaId });
+        createTask(title, { makeCurrent: !current || current.status === 'done', list, area: areaId, due, repeat });
         input.value = '';
         input.focus();
-        announce(t('tasks.addedTo', { list: listLabel(list), text: title }));
+        announce(due ? t('when.addedFor', { day: dayLabel(due), text: title }) : t('tasks.addedTo', { list: listLabel(list), text: title }));
       });
       input.addEventListener('input', showParsed);
 
@@ -848,6 +878,21 @@ const TABS = [
   .tasks__parsed {
     margin-top: var(--space-2);
     font-size: var(--text-sm);
+  }
+
+  .tasks :global(.task__when-tag) {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  /* The When button: quiet while empty, plain text colour once a day or repeat is set. */
+  .tasks :global(.task__when) {
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tasks :global(.task__when.is-set) {
+    color: var(--color-text);
   }
 
   .tasks :global(.task__area) {
