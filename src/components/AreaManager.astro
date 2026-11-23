@@ -10,11 +10,6 @@ import { AREA_NAME_MAX } from '../lib/areas';
 <div class="areas" data-area-manager>
   <p data-t="areas.manageHint" class="muted areas__hint">Each task sits in one area. Removing an area keeps its tasks; they just have no area.</p>
   <ul class="areas__list" data-am-list></ul>
-  {/* Undo lives in the sheet: the page's own Undo toast sits under an open sheet. */}
-  <div class="areas__undo" role="status" data-am-undo hidden>
-    <span data-am-undo-text></span>
-    <button data-t="undo.btn" type="button" class="btn btn--ghost btn--small" data-am-undo-btn>Undo</button>
-  </div>
   <p class="muted areas__empty" data-am-empty data-t="areas.noneYet" hidden>No areas yet. Add a ready-made one or name your own.</p>
 
   <div class="areas__presets" data-am-presets></div>
@@ -45,6 +40,7 @@ import { AREA_NAME_MAX } from '../lib/areas';
     setAreaColor,
   } from '../lib/areas';
   import { cleanups, onPage } from '../lib/page';
+  import { offerUndo } from '../lib/undo';
   import { t, tn } from '../lib/i18n';
 
   const ARROW = (d: string) =>
@@ -64,10 +60,6 @@ import { AREA_NAME_MAX } from '../lib/areas';
     const input = $<HTMLInputElement>('[data-am-input]');
     const full = $<HTMLElement>('[data-am-full]');
     const live = $<HTMLElement>('[data-am-live]');
-    const undoBar = $<HTMLElement>('[data-am-undo]');
-    const undoText = $<HTMLElement>('[data-am-undo-text]');
-    /** The last removal, until Undo, another removal, or the sheet closes. */
-    let removed: { id: string; name: string; taskIds: string[] } | null = null;
     const c = cleanups();
 
     const announce = (text: string) => {
@@ -141,25 +133,17 @@ import { AREA_NAME_MAX } from '../lib/areas';
       const name = areaName(area);
       const taskIds = getTasks().filter((task) => task.area === area.id).map((task) => task.id);
       removeArea(area.id, getTasks());
-      removed = { id: area.id, name, taskIds };
-      undoText.textContent = t('areas.removedMsg', { name });
-      undoBar.hidden = false;
       announce(t('areas.removedMsg', { name }));
+      // Removed at once (a restore is stamped newer, so sync keeps it); Undo puts it back.
+      offerUndo({
+        message: t('areas.removedMsg', { name }),
+        commit: () => {},
+        undo: () => {
+          restoreArea(area.id, taskIds);
+          announce(t('areas.restoredSaid', { name }));
+        },
+      });
     }
-
-    const clearUndo = () => {
-      removed = null;
-      undoBar.hidden = true;
-    };
-    $<HTMLButtonElement>('[data-am-undo-btn]').addEventListener('click', () => {
-      if (!removed) return;
-      restoreArea(removed.id, removed.taskIds);
-      announce(t('areas.restoredSaid', { name: removed.name }));
-      clearUndo();
-    });
-    const dialog = root.closest('dialog');
-    dialog?.addEventListener('close', clearUndo);
-    c.add(() => dialog?.removeEventListener('close', clearUndo));
 
     function render(): void {
       // Typing a name: don't rebuild the field under the cursor.
@@ -306,17 +290,6 @@ import { AREA_NAME_MAX } from '../lib/areas';
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
-  }
-
-  .areas__undo {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-md);
-    background: var(--well-bg);
-    font-size: var(--text-sm);
   }
 
   .areas__add {
