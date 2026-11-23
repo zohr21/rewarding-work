@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProgressStats from '../components/ProgressStats.astro';
 import FocusTrend from '../components/FocusTrend.astro';
+import AreaFocus from '../components/AreaFocus.astro';
 import Heatmap from '../components/Heatmap.astro';
 import TechniqueDonut from '../components/TechniqueDonut.astro';
 import DoneWeeks from '../components/DoneWeeks.astro';
@@ -69,6 +70,7 @@ const TABS = [
         <div class="progress__history" data-progress-history>
           <ProgressStats />
           <FocusTrend />
+          <AreaFocus />
           <Heatmap />
           <div class="progress__pair progress__pair--even">
             <TechniqueDonut />

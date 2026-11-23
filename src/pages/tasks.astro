@@ -5,6 +5,8 @@ import TaskGlance from '../components/TaskGlance.astro';
 import TaskList from '../components/TaskList.astro';
 import BreakdownTool from '../components/BreakdownTool.astro';
 import Sheet from '../components/Sheet.astro';
+import AreaPicker from '../components/AreaPicker.astro';
+import AreaManager from '../components/AreaManager.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 
@@ -39,10 +41,14 @@ const breakdown = {
     <TaskList />
     {/* A task's steps open over the list from its Steps button (TaskList.astro), so the list keeps its room. */}
     <Sheet id="task-steps" labelledby="bd-heading">
-      <BreakdownTool {...breakdown} />
+      <BreakdownTool {...breakdown}><AreaPicker slot="after-title" /></BreakdownTool>
       <div class="task-steps__foot">
         <a data-t="tasks.startFocusing" class="btn" href={url('/timer')} data-task-steps-focus data-sheet-close>Start focusing</a>
       </div>
+    </Sheet>
+    {/* Opened from the area chips' "Edit" (TaskList.astro). */}
+    <Sheet id="task-areas" title="Your areas" titleKey="areas.yourAreas">
+      <AreaManager />
     </Sheet>
     <TaskGlance />
   </div>

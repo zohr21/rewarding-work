@@ -1,0 +1,145 @@
+---
+/**
+ * Focus time this week split by task area (src/lib/areas.ts): one bar in the areas' colours,
+ * then a line per area with its time and share. Shown only once you have areas.
+ */
+---
+
+<section class="card area-focus" data-area-focus hidden aria-labelledby="area-focus-heading">
+  <div class="area-focus__head">
+    <h2 data-t="areas.focusByArea" id="area-focus-heading" class="panel-title">Focus by area</h2>
+    <span data-t="areas.thisWeek" class="muted">This week</span>
+  </div>
+  <p data-t="areas.noFocusYet" class="muted" data-af-empty hidden>No focus time this week yet. Time on a task counts towards its area.</p>
+  <div class="area-focus__bar" aria-hidden="true" data-af-bar></div>
+  <ul class="area-focus__legend" data-af-legend></ul>
+</section>
+
+<script>
+  import { getSessions, getTaskStore, subscribe } from '../lib/storage';
+  import { areaName, focusByArea, getAreas } from '../lib/areas';
+  import { formatFocus } from '../lib/tasks';
+  import { startOfWeek } from '../lib/dates';
+  import { cleanups, onPage } from '../lib/page';
+  import { locale, t } from '../lib/i18n';
+
+  onPage('area-focus', () => {
+    const root = document.querySelector<HTMLElement>('[data-area-focus]');
+    if (!root) return;
+    const empty = root.querySelector<HTMLElement>('[data-af-empty]')!;
+    const bar = root.querySelector<HTMLElement>('[data-af-bar]')!;
+    const legend = root.querySelector<HTMLElement>('[data-af-legend]')!;
+    const c = cleanups();
+
+    function render(): void {
+      const store = getTaskStore();
+      const all = store.areas ?? [];
+      const areas = getAreas(all);
+      root!.hidden = areas.length === 0;
+      if (root!.hidden) return;
+      const by = focusByArea(getSessions(), store.items, all, startOfWeek(Date.now()).getTime());
+      const rows = [
+        ...areas.map((a) => ({ name: areaName(a), color: `var(--area-${a.color})`, seconds: by.get(a.id) ?? 0 })),
+        { name: t('areas.noArea'), color: 'var(--color-text-muted)', seconds: by.get('') ?? 0 },
+      ].filter((r) => r.seconds >= 60);
+      const total = rows.reduce((sum, r) => sum + r.seconds, 0);
+      empty.hidden = total > 0;
+      bar.hidden = legend.hidden = total === 0;
+      const pct = new Intl.NumberFormat(locale(), { style: 'percent', maximumFractionDigits: 0 });
+      bar.replaceChildren(
+        ...rows.map((r) => {
+          const s = document.createElement('span');
+          s.style.flexGrow = String(r.seconds);
+          s.style.background = r.color;
+          return s;
+        }),
+      );
+      legend.replaceChildren(
+        ...rows.map((r) => {
+          const li = document.createElement('li');
+          li.style.setProperty('--ac', r.color);
+          const name = document.createElement('span');
+          name.className = 'area-focus__name';
+          name.textContent = r.name;
+          const time = document.createElement('strong');
+          time.textContent = formatFocus(r.seconds);
+          const share = document.createElement('span');
+          share.className = 'muted area-focus__pct';
+          share.textContent = pct.format(r.seconds / total);
+          li.append(name, time, share);
+          return li;
+        }),
+      );
+    }
+
+    render();
+    c.add(subscribe('sessions', render));
+    c.add(subscribe('tasks', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .area-focus {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .area-focus[hidden],
+  .area-focus [hidden] {
+    display: none;
+  }
+
+  .area-focus__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .area-focus__bar {
+    display: flex;
+    gap: 2px;
+    block-size: 14px;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .area-focus__bar :global(span) {
+    flex-basis: 0;
+  }
+
+  .area-focus__legend {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .area-focus__legend :global(li) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .area-focus__legend :global(li::before) {
+    content: '';
+    inline-size: 10px;
+    block-size: 10px;
+    border-radius: 50%;
+    background: var(--ac);
+    flex: none;
+  }
+
+  .area-focus__legend :global(.area-focus__name) {
+    flex: 1;
+  }
+
+  .area-focus__legend :global(.area-focus__pct) {
+    inline-size: 3.5em;
+    text-align: end;
+    font-size: var(--text-sm);
+  }
+</style>

@@ -1,0 +1,331 @@
+---
+/**
+ * Your areas (src/lib/areas.ts), inside the "task-areas" sheet on the tasks page: rename,
+ * recolour, reorder and remove them, add a ready-made one back or one of your own.
+ * Removing keeps the tasks (they get no area) and offers Undo.
+ */
+import { AREA_NAME_MAX } from '../lib/areas';
+---
+
+<div class="areas" data-area-manager>
+  <p data-t="areas.manageHint" class="muted areas__hint">Each task sits in one area. Removing an area keeps its tasks; they just have no area.</p>
+  <ul class="areas__list" data-am-list></ul>
+  {/* Undo lives in the sheet: the page's own Undo toast sits under an open sheet. */}
+  <div class="areas__undo" role="status" data-am-undo hidden>
+    <span data-am-undo-text></span>
+    <button data-t="undo.btn" type="button" class="btn btn--ghost btn--small" data-am-undo-btn>Undo</button>
+  </div>
+  <p class="muted areas__empty" data-am-empty data-t="areas.noneYet" hidden>No areas yet. Add a ready-made one or name your own.</p>
+
+  <div class="areas__presets" data-am-presets></div>
+
+  <form class="areas__add" data-am-form>
+    <label data-t="areas.newArea" for="am-new" class="visually-hidden">New area</label>
+    <input data-t-placeholder="areas.namePlaceholder" id="am-new" class="input" type="text" maxlength={AREA_NAME_MAX} autocomplete="off" placeholder="Name an area, e.g. Family" data-am-input />
+    <button data-t="tasks.add" type="submit" class="btn">Add</button>
+  </form>
+  <p class="muted areas__hint" data-am-full hidden></p>
+  <p class="visually-hidden" aria-live="polite" data-am-live></p>
+</div>
+
+<script>
+  import { AREA_COLORS, getTaskStore, getTasks, subscribe, type TaskArea } from '../lib/storage';
+  import {
+    AREA_PRESETS,
+    AREAS_MAX,
+    addPresetArea,
+    areaName,
+    areaOf,
+    createArea,
+    getAreas,
+    moveArea,
+    removeArea,
+    renameArea,
+    restoreArea,
+    setAreaColor,
+  } from '../lib/areas';
+  import { cleanups, onPage } from '../lib/page';
+  import { t, tn } from '../lib/i18n';
+
+  const ARROW = (d: string) =>
+    `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const UP = ARROW('M6 15l6-6 6 6');
+  const DOWN = ARROW('M6 9l6 6 6-6');
+  const X = ARROW('M6 6l12 12M18 6L6 18');
+
+  onPage('area-manager', () => {
+    const root = document.querySelector<HTMLElement>('[data-area-manager]');
+    if (!root) return;
+    const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const list = $<HTMLUListElement>('[data-am-list]');
+    const empty = $<HTMLElement>('[data-am-empty]');
+    const presets = $<HTMLElement>('[data-am-presets]');
+    const form = $<HTMLFormElement>('[data-am-form]');
+    const input = $<HTMLInputElement>('[data-am-input]');
+    const full = $<HTMLElement>('[data-am-full]');
+    const live = $<HTMLElement>('[data-am-live]');
+    const undoBar = $<HTMLElement>('[data-am-undo]');
+    const undoText = $<HTMLElement>('[data-am-undo-text]');
+    /** The last removal, until Undo, another removal, or the sheet closes. */
+    let removed: { id: string; name: string; taskIds: string[] } | null = null;
+    const c = cleanups();
+
+    const announce = (text: string) => {
+      live.textContent = '';
+      window.setTimeout(() => (live.textContent = text), 50);
+    };
+
+    function iconButton(html: string, label: string, onClick: () => void, disabled = false): HTMLButtonElement {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'icon-btn areas__icon';
+      b.innerHTML = html;
+      b.setAttribute('aria-label', label);
+      b.title = label;
+      b.disabled = disabled;
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
+    function row(area: TaskArea, i: number, n: number, openCount: number): HTMLLIElement {
+      const name = areaName(area);
+      const li = document.createElement('li');
+      li.className = 'areas__row';
+      li.style.setProperty('--ac', `var(--area-${area.color})`);
+
+      const top = document.createElement('div');
+      top.className = 'areas__top';
+      const field = document.createElement('input');
+      field.className = 'input areas__name';
+      field.value = name;
+      field.maxLength = 24;
+      field.dataset.amName = area.id;
+      field.setAttribute('aria-label', t('areas.nameOf', { name }));
+      field.addEventListener('change', () => {
+        renameArea(area.id, field.value);
+        announce(t('areas.renamedSaid', { name: field.value.trim() || name }));
+      });
+      field.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') field.blur();
+      });
+      const count = document.createElement('span');
+      count.className = 'muted areas__count';
+      count.textContent = tn('areas.openCount', openCount);
+      top.append(
+        field,
+        iconButton(UP, t('areas.moveUp', { name }), () => moveArea(area.id, -1), i === 0),
+        iconButton(DOWN, t('areas.moveDown', { name }), () => moveArea(area.id, 1), i === n - 1),
+        iconButton(X, t('areas.remove', { name }), () => remove(area)),
+      );
+
+      const colors = document.createElement('div');
+      colors.className = 'areas__colors';
+      colors.setAttribute('role', 'group');
+      colors.setAttribute('aria-label', t('areas.colourOf', { name }));
+      for (const color of AREA_COLORS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'areas__swatch';
+        b.style.setProperty('--sw', `var(--area-${color})`);
+        b.setAttribute('aria-pressed', String(area.color === color));
+        b.setAttribute('aria-label', t(`areas.colour.${color}`));
+        b.addEventListener('click', () => setAreaColor(area.id, color));
+        colors.append(b);
+      }
+      colors.append(count);
+      li.append(top, colors);
+      return li;
+    }
+
+    function remove(area: TaskArea): void {
+      const name = areaName(area);
+      const taskIds = getTasks().filter((task) => task.area === area.id).map((task) => task.id);
+      removeArea(area.id, getTasks());
+      removed = { id: area.id, name, taskIds };
+      undoText.textContent = t('areas.removedMsg', { name });
+      undoBar.hidden = false;
+      announce(t('areas.removedMsg', { name }));
+    }
+
+    const clearUndo = () => {
+      removed = null;
+      undoBar.hidden = true;
+    };
+    $<HTMLButtonElement>('[data-am-undo-btn]').addEventListener('click', () => {
+      if (!removed) return;
+      restoreArea(removed.id, removed.taskIds);
+      announce(t('areas.restoredSaid', { name: removed.name }));
+      clearUndo();
+    });
+    const dialog = root.closest('dialog');
+    dialog?.addEventListener('close', clearUndo);
+    c.add(() => dialog?.removeEventListener('close', clearUndo));
+
+    function render(): void {
+      // Typing a name: don't rebuild the field under the cursor.
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement && list.contains(active)) return;
+      const all = getTaskStore().areas ?? [];
+      const areas = getAreas(all);
+      const open = getTasks().filter((task) => task.status === 'active');
+      list.replaceChildren(...areas.map((a, i) => row(a, i, areas.length, open.filter((task) => areaOf(task, all)?.id === a.id).length)));
+      empty.hidden = areas.length > 0;
+      const room = areas.length < AREAS_MAX;
+      form.hidden = !room;
+      full.hidden = room;
+      full.textContent = t('areas.full', { n: AREAS_MAX });
+      const unused = room ? AREA_PRESETS.filter((id) => !areas.some((a) => a.id === id)) : [];
+      presets.hidden = unused.length === 0;
+      presets.replaceChildren(
+        ...unused.map((id) => {
+          const preset = areaOf({ area: id }, [])!;
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'areas__preset';
+          b.style.setProperty('--ac', `var(--area-${preset.color})`);
+          b.textContent = `+ ${areaName(preset)}`;
+          b.setAttribute('aria-label', t('areas.addNamed', { name: areaName(preset) }));
+          b.addEventListener('click', () => {
+            addPresetArea(id);
+            announce(t('areas.addedSaid', { name: areaName(preset) }));
+          });
+          return b;
+        }),
+      );
+    }
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const area = createArea(input.value);
+      if (!area) return;
+      input.value = '';
+      announce(t('areas.addedSaid', { name: areaName(area) }));
+    });
+    // A rename left pending while typing shows once the field lets go.
+    list.addEventListener('focusout', () => window.setTimeout(render, 0));
+
+    render();
+    c.add(subscribe('tasks', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .areas {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .areas__hint {
+    font-size: var(--text-sm);
+  }
+
+  .areas__list {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .areas [hidden] {
+    display: none;
+  }
+
+  .areas :global(.areas__row) {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    box-shadow: inset 0 0 0 1px var(--color-border), 0 2px 0 var(--edge);
+    border-inline-start: 4px solid var(--ac);
+  }
+
+  .areas :global(.areas__top) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .areas :global(.areas__name) {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .areas :global(.areas__icon) {
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+
+  .areas :global(.areas__icon:disabled) {
+    opacity: 0.35;
+  }
+
+  .areas :global(.areas__colors) {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
+  .areas :global(.areas__swatch) {
+    /* 44 px to tap, a 30 px dot to see */
+    inline-size: 44px;
+    block-size: 44px;
+    border-radius: 50%;
+    border: 0;
+    background: radial-gradient(circle, var(--sw) 14px, transparent 15px);
+    cursor: pointer;
+  }
+
+  .areas :global(.areas__swatch[aria-pressed='true']) {
+    background: radial-gradient(circle, var(--sw) 12px, transparent 13px, transparent 16px, var(--color-text) 17px, var(--color-text) 19px, transparent 20px);
+  }
+
+  .areas :global(.areas__count) {
+    margin-inline-start: auto;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+  }
+
+  .areas__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .areas :global(.areas__preset) {
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    border: 1px dashed var(--ac);
+    background: transparent;
+    color: var(--ac);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .areas__undo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    font-size: var(--text-sm);
+  }
+
+  .areas__add {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .areas__add .input {
+    flex: 1;
+    min-width: 0;
+  }
+</style>

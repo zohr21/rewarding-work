@@ -39,6 +39,19 @@ const TABS = [
     }
   </div>
 
+  {/* Areas (src/lib/areas.ts): a chip per area filters every list; "Edit" opens the areas sheet (tasks.astro). */}
+  <div data-t-aria-label="areas.areas" class="tasks__areas" role="group" aria-label="Areas" data-tl-areas hidden></div>
+
+  <section class="tasks__setup" data-tl-setup hidden aria-labelledby="tl-setup-head">
+    <h3 data-t="areas.setupTitle" class="tasks__setup-title" id="tl-setup-head">Group your tasks?</h3>
+    <p data-t="areas.setupText" class="muted">Pick the parts of your life your tasks belong to. Change them any time.</p>
+    <div class="tasks__setup-picks" data-tl-setup-picks></div>
+    <div class="tasks__setup-actions">
+      <button data-t="areas.notNow" type="button" class="btn btn--ghost btn--small" data-tl-setup-skip>Not now</button>
+      <button type="button" class="btn btn--small" data-tl-setup-use></button>
+    </div>
+  </section>
+
   <form class="tasks__form" data-tl-form>
     <label data-t="tasks.newTask" for="tl-new" class="visually-hidden">New task</label>
     <input data-t-placeholder="tasks.addATask" id="tl-new" class="input" type="text" maxlength="120" autocomplete="off" placeholder="Add a task…" data-tl-input />
@@ -50,6 +63,7 @@ const TABS = [
     </select>
     <button data-t="tasks.add" type="submit" class="btn">Add</button>
   </form>
+  <p class="muted tasks__parsed" data-tl-parsed hidden></p>
 
   <section class="tasks__section tasks__inbox" data-list="inbox" data-tl-inbox-wrap hidden aria-labelledby="tl-inbox-head">
     <h3 data-t="tasks.inbox" class="tasks__heading tasks__heading--inbox" id="tl-inbox-head" data-tl-inbox-head>Inbox</h3>
@@ -118,6 +132,8 @@ const TABS = [
     TODAY_SOFT_MAX,
   } from '../lib/tasks';
   import { currentStep, liveTaskId, stepBar } from '../lib/parts';
+  import { AREA_PRESETS, AREA_STARTERS, areaName, areaOf, areasAnswered, getAreas, parseAreaTag, setTaskArea, setUpAreas, type AreaPreset } from '../lib/areas';
+  import { getTaskStore, type TaskArea } from '../lib/storage';
   import { celebrate } from '../lib/appearance';
   import { ring } from '../lib/charts';
   import { offerUndo } from '../lib/undo';
@@ -133,6 +149,10 @@ const TABS = [
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="13" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 9v4l3 2M9 3h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
   /** The list the tabs are showing; kept for the visit, so coming back to Tasks lands where you were. */
   let appView = 'today';
+  /** The area chip picked ('all' for every area); kept for the visit like the list. */
+  let areaFilter = 'all';
+  /** Picks on the first-run question, before "Use these". */
+  const setupPicks = new Set<AreaPreset>(AREA_STARTERS);
   const VIEW_EMPTY: Record<string, string> = {
     inbox: t('tasks.emptyInbox'),
     someday: t('tasks.emptySomeday'),
@@ -168,6 +188,11 @@ const TABS = [
       const tabs = root.querySelector<HTMLElement>('[data-tl-tabs]');
       const viewEmpty = $<HTMLElement>('[data-tl-view-empty]');
       const examples = $<HTMLElement>('[data-tl-examples]');
+      const areaRow = $<HTMLElement>('[data-tl-areas]');
+      const setup = $<HTMLElement>('[data-tl-setup]');
+      const setupPicksEl = $<HTMLElement>('[data-tl-setup-picks]');
+      const setupUse = $<HTMLButtonElement>('[data-tl-setup-use]');
+      const parsed = $<HTMLElement>('[data-tl-parsed]');
       // The steps sheet (tasks.astro): a bottom sheet on a phone, a side panel on a wide screen.
       const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="task-steps"]');
 
@@ -306,6 +331,34 @@ const TABS = [
         return sel;
       }
 
+      /** The task's area, picked right on the row (also on its steps sheet). */
+      function areaSelect(task: Task): HTMLSelectElement {
+        const name = taskName(task);
+        const now = areaOf(task, areas);
+        const sel = document.createElement('select');
+        sel.className = 'input tasks__list-select tasks__area-select';
+        sel.setAttribute('aria-label', t('areas.areaFor', { name }));
+        if (now) sel.style.setProperty('--ac', `var(--area-${now.color})`);
+        else sel.classList.add('is-empty');
+        const none = document.createElement('option');
+        none.value = '';
+        none.textContent = t('areas.none');
+        sel.append(none);
+        for (const a of getAreas(areas)) {
+          const o = document.createElement('option');
+          o.value = a.id;
+          o.textContent = areaName(a);
+          o.selected = now?.id === a.id;
+          sel.append(o);
+        }
+        sel.addEventListener('change', () => {
+          setTaskArea(task.id, sel.value || null);
+          const picked = getAreas(areas).find((a) => a.id === sel.value);
+          announce(picked ? t('areas.movedTo', { name, area: areaName(picked) }) : t('areas.clearedSaid', { name }));
+        });
+        return sel;
+      }
+
       /** An Inbox thought: sort it into a list, file it in the current task's notes, or clear it. */
       function renderJot(task: Task, current: Task | null): HTMLLIElement {
         const li = document.createElement('li');
@@ -346,6 +399,18 @@ const TABS = [
         return li;
       }
 
+      /** The area's dot and name, in its colour. */
+      function areaTag(area: TaskArea): HTMLSpanElement {
+        const tag = document.createElement('span');
+        tag.className = 'task__area';
+        tag.style.setProperty('--ac', `var(--area-${area.color})`);
+        tag.textContent = areaName(area);
+        return tag;
+      }
+
+      /** Areas as the last render saw them. */
+      let areas: TaskArea[] = [];
+
       function renderTask(task: Task, currentId: string | null, focus: Map<string, number>, maxFocus: number, liveId: string | null, firstUp = false): HTMLLIElement {
         const live = task.id === liveId && task.status === 'active';
         const li = document.createElement('li');
@@ -372,6 +437,8 @@ const TABS = [
         if (seconds >= 60) parts.push(t('tasks.focused', { time: formatFocus(seconds) }));
         parts.push(task.status === 'done' && task.doneAt ? t('tasks.finishedOn', { date: dayFmt.format(task.doneAt) }) : t('tasks.addedOn', { date: dayFmt.format(task.createdAt) }));
         meta.textContent = parts.join(' · ');
+        const area = areaOf(task, areas);
+        if (area) meta.prepend(areaTag(area), ' · ');
         body.append(title, meta);
         // The step you're on, under the title: green and turning while a session runs on it.
         const nowStep = active ? currentStep(task.steps) : undefined;
@@ -433,7 +500,7 @@ const TABS = [
             withFocus ? t('tasks.deletedSaidFocus', { name, time }) : t('tasks.deletedSaid', { name }),
           );
         });
-        const side = active ? [moveSelect(task), del] : [del];
+        const side = active ? [...(getAreas(areas).length ? [areaSelect(task)] : []), moveSelect(task), del] : [del];
 
         // The same numbers as the meta line, drawn: a ring, a segment per step, a focus bar.
         const graphs = document.createElement('div');
@@ -447,8 +514,80 @@ const TABS = [
         return li;
       }
 
+      /** One chip of the area row. */
+      function areaChip(id: string, label: string, n: number, area?: TaskArea): HTMLButtonElement {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `tasks__chip${area ? ' tasks__chip--area' : ''}`;
+        b.dataset.tlArea = id;
+        b.setAttribute('aria-pressed', String(areaFilter === id));
+        if (area) b.style.setProperty('--ac', `var(--area-${area.color})`);
+        b.append(label);
+        if (n) {
+          const c = document.createElement('span');
+          c.className = 'tasks__chip-count';
+          c.textContent = String(n);
+          b.append(c);
+        }
+        return b;
+      }
+
+      function renderAreas(all: Task[], open: Task[]): void {
+        const live = getAreas(areas);
+        // The Inbox holds unsorted thoughts, so it has no areas to filter.
+        areaRow.hidden = !areasAnswered() || appView === 'inbox';
+        const inView = appView === 'finished' ? all.filter((t) => t.status === 'done') : open.filter((t) => listOf(t) === appView);
+        const count = (id: string) => inView.filter((t) => areaOf(t, areas)?.id === id).length;
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'tasks__chip tasks__chip--edit';
+        edit.dataset.sheetOpen = 'task-areas';
+        edit.setAttribute('aria-haspopup', 'dialog');
+        edit.textContent = live.length ? t('areas.edit') : t('areas.addAreas');
+        if (live.length) edit.setAttribute('aria-label', t('areas.editLabel'));
+        areaRow.replaceChildren(
+          ...(live.length ? [areaChip('all', t('areas.all'), inView.length), ...live.map((a) => areaChip(a.id, areaName(a), count(a.id), a))] : []),
+          edit,
+        );
+
+        setup.hidden = areasAnswered() || all.length === 0;
+        if (!setup.hidden) {
+          setupPicksEl.replaceChildren(
+            ...AREA_PRESETS.map((id) => {
+              const preset = areaOf({ area: id }, [])!;
+              const b = document.createElement('button');
+              b.type = 'button';
+              b.className = 'tasks__chip tasks__chip--area';
+              b.style.setProperty('--ac', `var(--area-${preset.color})`);
+              b.dataset.tlSetupPick = id;
+              b.setAttribute('aria-pressed', String(setupPicks.has(id)));
+              b.textContent = areaName(preset);
+              return b;
+            }),
+          );
+          setupUse.textContent = setupPicks.size ? tn('areas.useThese', setupPicks.size) : t('areas.notNow');
+        }
+      }
+
+      /** What the add field will do with an area: from a #tag, or from the picked chip. */
+      function showParsed(): void {
+        const { area } = parseAreaTag(input.value, areas);
+        const picked = areaFilter !== 'all' ? getAreas(areas).find((a) => a.id === areaFilter) : undefined;
+        const to = area ?? (input.value.trim() ? picked : undefined);
+        parsed.hidden = !to;
+        parsed.replaceChildren();
+        if (to) parsed.append(t('areas.addsTo'), ' ', areaTag(to));
+      }
+
       function render(): void {
-        const tasks = getTasks().filter((t) => !removing.has(t.id));
+        areas = getTaskStore().areas ?? [];
+        if (areaFilter !== 'all' && !getAreas(areas).some((a) => a.id === areaFilter)) areaFilter = 'all';
+        const inArea = (t: Task) => areaFilter === 'all' || areaOf(t, areas)?.id === areaFilter;
+        const allTasks = getTasks().filter((t) => !removing.has(t.id));
+        renderAreas(allTasks, allTasks.filter((t) => t.status === 'active'));
+        showParsed();
+        // Inbox thoughts have no area yet, so they always show.
+        const tasks = allTasks.filter((t) => (t.status === 'active' && listOf(t) === 'inbox') || inArea(t));
         const current = getCurrentTask();
         const currentId = current?.id ?? null;
         const focus = focusByTask(getSessions());
@@ -472,7 +611,7 @@ const TABS = [
           ? t('tasks.tooMany', { n: today.length })
           : t('tasks.planHint');
         // Someone with no tasks at all gets a few to start from, in place of the hint.
-        examples.hidden = tasks.length > 0;
+        examples.hidden = allTasks.length > 0;
         if (!examples.hidden) todayHint.hidden = true;
         const carried = today.filter((t) => isCarriedOver(t));
         carry.hidden = carried.length === 0;
@@ -508,7 +647,14 @@ const TABS = [
             b.querySelector('[data-tl-tab-count]')!.textContent = n && id !== 'finished' ? String(n) : '';
           });
           if (appView === 'inbox' && !inbox.length) showView('today');
-          const message = counts[appView] ? undefined : VIEW_EMPTY[appView];
+          let message = counts[appView] ? undefined : VIEW_EMPTY[appView];
+          // An area picked and nothing of it here: say so, instead of the list's usual hint.
+          const picked = areaFilter !== 'all' ? getAreas(areas).find((a) => a.id === areaFilter) : undefined;
+          if (picked && !counts[appView] && appView !== 'inbox') {
+            message = t('areas.emptyFiltered', { area: areaName(picked) });
+            nextEmpty.hidden = true;
+            todayHint.hidden = true;
+          }
           viewEmpty.hidden = !message;
           viewEmpty.textContent = message ?? '';
         }
@@ -529,10 +675,41 @@ const TABS = [
         // Becomes the current task only if the breakdown has nothing open to show.
         const current = getCurrentTask();
         const list = newList.value as TaskList;
-        createTask(text, { makeCurrent: !current || current.status === 'done', list });
+        // "#study" picks the area; otherwise a task added while a chip is picked joins that area.
+        const { title, area } = parseAreaTag(text, areas);
+        if (!title) return;
+        const areaId = area?.id ?? (areaFilter !== 'all' ? areaFilter : undefined);
+        // A task added to another area than the one shown would vanish from view: show them all.
+        if (areaFilter !== 'all' && areaId !== areaFilter) areaFilter = 'all';
+        createTask(title, { makeCurrent: !current || current.status === 'done', list, area: areaId });
         input.value = '';
         input.focus();
-        announce(t('tasks.addedTo', { list: listLabel(list), text }));
+        announce(t('tasks.addedTo', { list: listLabel(list), text: title }));
+      });
+      input.addEventListener('input', showParsed);
+
+      areaRow.addEventListener('click', (e) => {
+        const chip = (e.target as HTMLElement).closest<HTMLElement>('[data-tl-area]');
+        if (!chip) return;
+        areaFilter = chip.dataset.tlArea!;
+        render();
+      });
+      setupPicksEl.addEventListener('click', (e) => {
+        const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-tl-setup-pick]');
+        if (!pick) return;
+        const id = pick.dataset.tlSetupPick as AreaPreset;
+        if (setupPicks.has(id)) setupPicks.delete(id);
+        else setupPicks.add(id);
+        render();
+      });
+      setupUse.addEventListener('click', () => {
+        const picks = AREA_PRESETS.filter((id) => setupPicks.has(id));
+        setUpAreas(picks);
+        announce(picks.length ? t('areas.setUpSaid', { names: picks.map((id) => t(`taskArea.${id}`)).join(', ') }) : t('areas.skippedSaid'));
+      });
+      $<HTMLButtonElement>('[data-tl-setup-skip]').addEventListener('click', () => {
+        setUpAreas([]);
+        announce(t('areas.skippedSaid'));
       });
 
       // Carried over from an earlier day: keep them (in the same order) or move them on.
@@ -572,6 +749,115 @@ const TABS = [
 </script>
 
 <style>
+  /* Area chips: a quiet pill each; the picked one fills with the area's colour. */
+  .tasks__areas,
+  .tasks__setup-picks {
+    display: flex;
+    gap: var(--space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-bottom: var(--space-3);
+    padding-block: 2px;
+  }
+
+  .tasks__setup-picks {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .tasks__areas[hidden],
+  .tasks__setup[hidden],
+  .tasks__parsed[hidden] {
+    display: none;
+  }
+
+  .tasks :global(.tasks__chip) {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .tasks :global(.tasks__chip--area::before),
+  .tasks :global(.task__area::before) {
+    content: '';
+    inline-size: 9px;
+    block-size: 9px;
+    border-radius: 50%;
+    background: var(--ac);
+    flex: none;
+  }
+
+  .tasks :global(.tasks__chip[aria-pressed='true']) {
+    background: var(--color-text);
+    border-color: var(--color-text);
+    color: var(--color-bg);
+  }
+
+  .tasks :global(.tasks__chip--area[aria-pressed='true']) {
+    background: color-mix(in srgb, var(--ac) 18%, transparent);
+    border-color: var(--ac);
+    color: var(--ac);
+  }
+
+  .tasks :global(.tasks__chip-count) {
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.75;
+  }
+
+  .tasks :global(.tasks__chip--edit) {
+    border-style: dashed;
+  }
+
+  .tasks__setup {
+    display: grid;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+  }
+
+  .tasks__setup-title {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+  }
+
+  .tasks__setup-picks {
+    margin: var(--space-1) 0 0;
+  }
+
+  .tasks__setup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-2);
+  }
+
+  .tasks__parsed {
+    margin-top: var(--space-2);
+    font-size: var(--text-sm);
+  }
+
+  .tasks :global(.task__area) {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ac);
+    font-weight: 600;
+  }
+
   .tasks__form {
     display: flex;
     gap: var(--space-2);
@@ -670,6 +956,15 @@ const TABS = [
     min-height: 36px;
     padding-block: 0;
     font-size: var(--text-sm);
+  }
+
+  /* The area picker on a row: the area's colour on its left edge; quieter while it has none. */
+  .tasks :global(.tasks__area-select) {
+    border-inline-start: 4px solid var(--ac, var(--color-border));
+  }
+
+  .tasks :global(.tasks__area-select.is-empty) {
+    color: var(--color-text-muted);
   }
 
   .tasks__form .tasks__list-select {
