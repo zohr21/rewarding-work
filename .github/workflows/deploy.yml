@@ -55,6 +55,10 @@ jobs:
           PUBLIC_FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
           # Optional "Send to Google" (see README). An OAuth client id is public too.
           PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          # Google sign-in on the site through Google's own window (src/lib/account/google-web.ts):
+          # the Firebase project's web client id, with this site's origin authorized for it.
+          # Without it the site falls back to Firebase's pop-up.
+          PUBLIC_FIREBASE_GOOGLE_CLIENT_ID: ${{ vars.FIREBASE_GOOGLE_CLIENT_ID }}
 
       - uses: actions/upload-pages-artifact@v4
         with:

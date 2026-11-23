@@ -6,6 +6,11 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **24 Nov · Google sign-in on the site uses Google's own window.** Firebase's pop-up failed
+  with "The sign-in window was closed before finishing" in Chrome with third-party cookies
+  blocked. The site now gets a token from Google Identity Services with the Firebase
+  project's web client and hands it to Firebase; the pop-up stays as the fallback when no
+  client id is set.
 - **23 Nov · Task areas (Work, Life, Study).** Picked option A: one area per task, a chip row
   above every list to filter, picked over free #tags (B) or switching the whole app into an
   "area mode" (C, maybe later on top of A). Lists still say *when*, areas say *which part of

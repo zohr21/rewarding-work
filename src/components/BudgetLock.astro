@@ -328,6 +328,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
         $('[data-bl-forgot-local]').hidden = account;
         $<HTMLFormElement>('[data-bl-confirm-password]').hidden = !(account && user!.providers.includes('password'));
         $('[data-bl-confirm-google]').hidden = !(account && user!.providers.includes('google.com'));
+        if (account && user!.providers.includes('google.com')) void loadAccount().then((m) => m.prepareGoogle()).catch(() => {});
         setText('[data-bl-forgot-error]', '');
       }),
     );

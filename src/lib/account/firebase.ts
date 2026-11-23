@@ -77,6 +77,7 @@ import {
   type SyncedStore,
 } from '../storage';
 import { errorCode, friendlyError } from './errors';
+import { googleWebCredential, prepareGoogleWeb } from './google-web';
 import { mergeJson } from './merge';
 import { getAccount, setAccount, type AccountUser } from './state';
 
@@ -317,18 +318,31 @@ function clearLocal(): void {
 
 /**
  * Google's sign-in window can't open inside the Android app, so there the phone's own
- * account picker is asked for the credential instead (src/lib/device.ts).
+ * account picker is asked for the credential instead (src/lib/device.ts). On the website
+ * Google's own window is used (./google-web.ts), because Firebase's pop-up breaks in
+ * browsers that block third-party cookies. Without a client id the site keeps Firebase's pop-up.
  */
-async function appGoogleCredential(): Promise<AuthCredential> {
+const WEB_GIS = !NATIVE_APP && GOOGLE_SIGNIN_CLIENT_ID.length > 0;
+
+async function googleCredential(): Promise<AuthCredential> {
   if (!GOOGLE_SIGNIN_CLIENT_ID) throw new Error(t('err.googleNotInApp'));
-  return GoogleAuthProvider.credential(await googleIdToken(GOOGLE_SIGNIN_CLIENT_ID));
+  if (NATIVE_APP) return GoogleAuthProvider.credential(await googleIdToken(GOOGLE_SIGNIN_CLIENT_ID));
+  return googleWebCredential(GOOGLE_SIGNIN_CLIENT_ID);
+}
+
+/** True where the credential is fetched first and then handed to Firebase (the app, and the site with a client id). */
+const CREDENTIAL_FIRST = NATIVE_APP || WEB_GIS;
+
+/** Fetch Google's script early on pages that offer Google, so the click opens the window at once. */
+export function prepareGoogle(): void {
+  if (WEB_GIS) prepareGoogleWeb();
 }
 
 const google = {
-  signIn: async () => (NATIVE_APP ? signInWithCredential(auth, await appGoogleCredential()) : signInWithPopup(auth, new GoogleAuthProvider())),
-  link: async (user: User) => (NATIVE_APP ? linkWithCredential(user, await appGoogleCredential()) : linkWithPopup(user, new GoogleAuthProvider())),
+  signIn: async () => (CREDENTIAL_FIRST ? signInWithCredential(auth, await googleCredential()) : signInWithPopup(auth, new GoogleAuthProvider())),
+  link: async (user: User) => (CREDENTIAL_FIRST ? linkWithCredential(user, await googleCredential()) : linkWithPopup(user, new GoogleAuthProvider())),
   reauthenticate: async (user: User) =>
-    NATIVE_APP ? reauthenticateWithCredential(user, await appGoogleCredential()) : reauthenticateWithPopup(user, new GoogleAuthProvider()),
+    CREDENTIAL_FIRST ? reauthenticateWithCredential(user, await googleCredential()) : reauthenticateWithPopup(user, new GoogleAuthProvider()),
 };
 
 /**
@@ -375,8 +389,8 @@ export async function continueWithGoogle(): Promise<void> {
     return;
   }
   // Guest: keep the same account and just attach Google to it…
-  // In the app the credential is in hand before linking, and is still good if linking is refused.
-  const picked = NATIVE_APP ? await appGoogleCredential() : null;
+  // Where the credential is fetched first, it is in hand before linking and still good if linking is refused.
+  const picked = CREDENTIAL_FIRST ? await googleCredential() : null;
   try {
     await (picked ? linkWithCredential(user, picked) : google.link(user));
     await user.reload();
