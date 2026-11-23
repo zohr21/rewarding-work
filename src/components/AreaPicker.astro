@@ -1,0 +1,119 @@
+---
+/**
+ * The area of the current task (src/lib/areas.ts), as a row of chips on the task's sheet:
+ * one tap puts it in Work, Life, Study… or in no area. Hidden while there are no areas.
+ */
+---
+
+<div class="area-pick" data-area-pick hidden>
+  <p data-t="areas.area" class="area-pick__label" id="area-pick-label">Area</p>
+  <div class="area-pick__chips" role="group" aria-labelledby="area-pick-label" data-area-pick-chips></div>
+</div>
+
+<script>
+  import { getCurrentTask, getTaskStore, subscribe } from '../lib/storage';
+  import { areaName, areaOf, getAreas, setTaskArea } from '../lib/areas';
+  import { cleanups, onPage } from '../lib/page';
+  import { t } from '../lib/i18n';
+
+  onPage('area-pick', () => {
+    const root = document.querySelector<HTMLElement>('[data-area-pick]');
+    const chips = root?.querySelector<HTMLElement>('[data-area-pick-chips]');
+    if (!root || !chips) return;
+    const c = cleanups();
+
+    function chip(id: string, label: string, pressed: boolean, color?: string): HTMLButtonElement {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `area-pick__chip${color ? ' area-pick__chip--area' : ''}`;
+      b.dataset.areaPick = id;
+      b.setAttribute('aria-pressed', String(pressed));
+      if (color) b.style.setProperty('--ac', `var(--area-${color})`);
+      b.textContent = label;
+      return b;
+    }
+
+    function render(): void {
+      const task = getCurrentTask();
+      const all = getTaskStore().areas ?? [];
+      const live = getAreas(all);
+      root!.hidden = !task || live.length === 0;
+      if (root!.hidden || !task) return;
+      const now = areaOf(task, all)?.id ?? '';
+      chips!.replaceChildren(
+        ...live.map((a) => chip(a.id, areaName(a), a.id === now, a.color)),
+        chip('', t('areas.none'), now === ''),
+      );
+    }
+
+    chips.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>('[data-area-pick]');
+      const task = getCurrentTask();
+      if (!b || !task) return;
+      setTaskArea(task.id, b.dataset.areaPick || null);
+    });
+
+    render();
+    c.add(subscribe('tasks', render));
+    return c.run;
+  });
+</script>
+
+<style>
+  .area-pick {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+  }
+
+  .area-pick[hidden] {
+    display: none;
+  }
+
+  .area-pick__label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .area-pick__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .area-pick :global(.area-pick__chip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .area-pick :global(.area-pick__chip--area::before) {
+    content: '';
+    inline-size: 9px;
+    block-size: 9px;
+    border-radius: 50%;
+    background: var(--ac);
+  }
+
+  .area-pick :global(.area-pick__chip[aria-pressed='true']) {
+    border-color: var(--color-text);
+    color: var(--color-text);
+    background: var(--well-bg);
+  }
+
+  .area-pick :global(.area-pick__chip--area[aria-pressed='true']) {
+    background: color-mix(in srgb, var(--ac) 18%, transparent);
+    border-color: var(--ac);
+    color: var(--ac);
+  }
+</style>

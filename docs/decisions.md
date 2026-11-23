@@ -6,6 +6,16 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **23 Nov · Task areas (Work, Life, Study).** Picked option A: one area per task, a chip row
+  above every list to filter, picked over free #tags (B) or switching the whole app into an
+  "area mode" (C, maybe later on top of A). Lists still say *when*, areas say *which part of
+  life*. Added once by a "Group your tasks?" card (Work, Life, Study picked; Health, Home
+  offered; can skip), set on the task's sheet or with `#study` when adding, managed in a
+  "Your areas" sheet (rename, colour, order, up to 6; removing keeps the tasks). Grove › Stats
+  gets "Focus by area" for the week. My proposals, built as drawn: ready-made areas keep fixed
+  ids so old app builds can't lose them, and the website keeps the chip row instead of the
+  left rail on the canvas. Not built yet: due dates, repeats, search, reminders.
+
 - **20 Nov · Follow vs. friends on the board.** Follow is one way, no asking; the other person
   sees "X followed you" and can follow back or remove them. Add friend goes both ways: a
   request, then Accept. What's new shows as one slim "N new" row on Board › Friends and a dot

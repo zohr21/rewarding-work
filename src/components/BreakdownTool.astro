@@ -33,6 +33,7 @@ const {
 
   <label data-t="tasks.theBigTask" class="bd__label" for="bd-task">The big task</label>
   <input data-t-placeholder="tasks.eGWriteTheProject" id="bd-task" class="input" type="text" maxlength="120" autocomplete="off" placeholder="e.g. Write the project report" data-bd-task />
+  <slot name="after-title" />
 
   <form class="bd__add" data-bd-form>
     <label data-t="tasks.addAStep" class="bd__label" for="bd-step">Add a step</label>

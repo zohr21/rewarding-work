@@ -804,6 +804,8 @@ export interface Task {
   id: string;
   title: string;
   list?: TaskList;
+  /** The area it belongs to (Work, Life, Study…): a `TaskArea` id. None counts as "No area". */
+  area?: string;
   /** When the task was put on Today (epoch ms): shows when it was planned for an earlier day. */
   todayAt?: number;
   /** Position on Today, lowest first ("first up"); falls back to `todayAt`. */
@@ -826,8 +828,34 @@ export interface Task {
   deletedAt?: number;
 }
 
+/** The colours an area can have (tokens `--area-<colour>` in tokens.css). */
+export const AREA_COLORS = ['blue', 'pink', 'violet', 'orange', 'teal'] as const;
+export type AreaColor = (typeof AREA_COLORS)[number];
+
+/**
+ * A part of life tasks are grouped by. The ready-made ones keep fixed ids (`work`, `life`,
+ * `study`, `health`, `home`) and no `name` until renamed, so they show in the chosen language,
+ * and a task still finds its area if an older app build drops this list.
+ */
+export interface TaskArea {
+  id: string;
+  /** Set when the user named or renamed it. */
+  name?: string;
+  color: AreaColor;
+  /** Place in the chip row, lowest first. */
+  order: number;
+  /** Bumped on every change; account sync keeps the newer copy. */
+  updatedAt: number;
+  /** Set when removed: kept as a marker so the removal reaches other devices. */
+  deletedAt?: number;
+}
+
 export interface TaskStore {
   items: Task[];
+  /** Areas, including removal markers. Absent in stores from before areas. */
+  areas?: TaskArea[];
+  /** When the "Group your tasks?" question was answered (or skipped). */
+  areasAt?: number;
   /** The task the breakdown tool shows. */
   current: string | null;
   /** When `current` was last changed (for account sync). */
@@ -851,11 +879,25 @@ export function isTaskLogEntry(v: unknown): v is TaskLogEntry {
   );
 }
 
+export function isTaskArea(v: unknown): v is TaskArea {
+  return (
+    isObj(v) &&
+    typeof v.id === 'string' &&
+    v.id.length > 0 &&
+    (v.name === undefined || typeof v.name === 'string') &&
+    (AREA_COLORS as readonly unknown[]).includes(v.color) &&
+    typeof v.order === 'number' &&
+    typeof v.updatedAt === 'number' &&
+    (v.deletedAt === undefined || typeof v.deletedAt === 'number')
+  );
+}
+
 export function isTask(v: unknown): v is Task {
   return (
     isObj(v) &&
     typeof v.id === 'string' &&
     typeof v.title === 'string' &&
+    (v.area === undefined || typeof v.area === 'string') &&
     Array.isArray(v.steps) &&
     v.steps.every(isTaskStep) &&
     (v.notes === undefined || typeof v.notes === 'string') &&
@@ -883,7 +925,11 @@ export function isTaskStore(v: unknown): v is TaskStore {
 /** Tolerant: malformed tasks are dropped, not the whole store. */
 export function normaliseTasks(v: unknown): TaskStore {
   if (!isTaskStore(v)) return EMPTY_TASKS;
-  return { items: v.items.filter(isTask), current: v.current, currentAt: v.currentAt };
+  const store: TaskStore = { items: v.items.filter(isTask), current: v.current, currentAt: v.currentAt };
+  const areas = Array.isArray(v.areas) ? v.areas.filter(isTaskArea) : [];
+  if (areas.length) store.areas = areas;
+  if (typeof v.areasAt === 'number') store.areasAt = v.areasAt;
+  return store;
 }
 
 /** Everything stored, including deletion markers (for sync and backups). */
@@ -910,7 +956,16 @@ export function getCurrentTask(): Task | null {
 
 function writeTasks(store: TaskStore): void {
   const cutoff = Date.now() - TOMBSTONE_MS;
-  write('tasks', { ...store, items: store.items.filter((t) => t.deletedAt === undefined || t.deletedAt > cutoff) });
+  const kept = (x: { deletedAt?: number }) => x.deletedAt === undefined || x.deletedAt > cutoff;
+  const next: TaskStore = { ...store, items: store.items.filter(kept) };
+  if (store.areas) next.areas = store.areas.filter(kept);
+  write('tasks', next);
+}
+
+/** Replace the areas (with their removal markers); `answered` also records the first-run question as answered. */
+export function writeAreas(areas: TaskArea[], { answered = false } = {}): void {
+  const store = getTaskStore();
+  writeTasks({ ...store, areas, ...(answered ? { areasAt: Math.max(Date.now(), (store.areasAt ?? 0) + 1) } : {}) });
 }
 
 const cleanTitle = (title: string) => title.trim().slice(0, 120);
@@ -926,13 +981,18 @@ export function setCurrentTask(id: string | null): void {
   writeTasks({ ...store, current: id, currentAt: Math.max(Date.now(), store.currentAt + 1) });
 }
 
-export function createTask(title: string, { makeCurrent = true, list }: { makeCurrent?: boolean; list?: TaskList } = {}): Task {
+export function createTask(
+  title: string,
+  { makeCurrent = true, list, area }: { makeCurrent?: boolean; list?: TaskList; area?: string } = {},
+): Task {
   const now = Date.now();
   const task: Task = { id: newId('t'), title: cleanTitle(title), steps: [], status: 'active', createdAt: now, updatedAt: now };
+  if (area) task.area = area;
   if (list && list !== 'next') task.list = list;
   if (list === 'today') task.todayAt = now;
   const store = getTaskStore();
   writeTasks({
+    ...store,
     items: [...store.items, task],
     current: makeCurrent ? task.id : store.current,
     currentAt: makeCurrent ? Math.max(now, store.currentAt + 1) : store.currentAt,
@@ -962,6 +1022,7 @@ export function deleteTask(id: string): void {
   // stay in the grove. A finished one keeps it: that work was done.
   if (old.status !== 'done') removeTaskSessions([id]);
   writeTasks({
+    ...store,
     items: store.items.map((t) => (t.id === id ? marker : t)),
     current: store.current === id ? null : store.current,
     currentAt: store.current === id ? Math.max(now, store.currentAt + 1) : store.currentAt,
@@ -982,11 +1043,21 @@ export function mergeTaskStores(a: TaskStore, b: TaskStore): TaskStore {
     }
   }
   const newer = b.currentAt > a.currentAt ? b : a;
-  return {
+  const merged: TaskStore = {
     items: [...byId.values()].sort((x, y) => x.createdAt - y.createdAt),
     current: newer.current,
     currentAt: newer.currentAt,
   };
+  // Areas the same way as tasks: per id, the newer change wins.
+  const areas = new Map((a.areas ?? []).map((x) => [x.id, x]));
+  for (const x of b.areas ?? []) {
+    const mine = areas.get(x.id);
+    if (!mine || x.updatedAt > mine.updatedAt || (x.updatedAt === mine.updatedAt && x.deletedAt !== undefined)) areas.set(x.id, x);
+  }
+  if (areas.size) merged.areas = [...areas.values()];
+  const areasAt = Math.max(a.areasAt ?? 0, b.areasAt ?? 0);
+  if (areasAt) merged.areasAt = areasAt;
+  return merged;
 }
 
 // ---------- Exam prep ----------
@@ -1217,7 +1288,7 @@ function migrateBreakdown(): void {
   const task = isBreakdown(legacy) ? breakdownToTask(legacy) : null;
   const store = getTaskStore();
   if (task && !store.items.some((t) => t.id === task.id)) {
-    writeTasks({ items: [...store.items, task], current: store.current ?? task.id, currentAt: store.currentAt || 1 });
+    writeTasks({ ...store, items: [...store.items, task], current: store.current ?? task.id, currentAt: store.currentAt || 1 });
   }
   remove('breakdown');
   // Make sure both changes reach your account even though the sync code isn't listening yet.
