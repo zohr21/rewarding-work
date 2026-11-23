@@ -6,6 +6,9 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **24 Nov · Undo inside sheets.** The shared Undo toast moves into whichever sheet or dialog
+  is open, so it can be tapped there. "Your areas" dropped its own inline Undo bar and uses
+  the shared toast like every other removal.
 - **23 Nov · Task areas (Work, Life, Study).** Picked option A: one area per task, a chip row
   above every list to filter, picked over free #tags (B) or switching the whole app into an
   "area mode" (C, maybe later on top of A). Lists still say *when*, areas say *which part of

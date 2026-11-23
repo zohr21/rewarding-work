@@ -2,6 +2,9 @@
 /**
  * "Removed … · Undo" toast for src/lib/undo.ts, on every page. One offer at a time:
  * a new removal makes the previous one final. Leaving or closing the page makes it final too.
+ *
+ * While a sheet or other modal dialog is open, the rest of the page is inert, so the toast
+ * moves inside that dialog (and back when it closes) to stay tappable.
  */
 ---
 
@@ -38,6 +41,34 @@
     const text = root.querySelector<HTMLElement>('[data-undo-text]')!;
     const btn = root.querySelector<HTMLButtonElement>('[data-undo-btn]')!;
 
+    // Where the toast goes back to when no modal dialog is open.
+    const anchor = document.createComment('undo-toast');
+    /** The modal dialog on top, if any (sheets replace each other, so the last one open). */
+    const topModal = (): HTMLDialogElement | null => {
+      const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')].filter((d) => {
+        try {
+          return d.matches(':modal');
+        } catch {
+          return true;
+        }
+      });
+      return open.at(-1) ?? null;
+    };
+    const place = () => {
+      const dialog = topModal();
+      if (dialog) {
+        if (root.parentElement === dialog) return;
+        if (!anchor.isConnected) root.before(anchor);
+        dialog.append(root);
+      } else if (anchor.isConnected) {
+        anchor.replaceWith(root);
+      }
+    };
+    // Dialogs open and close by their `open` attribute.
+    const watch = new MutationObserver(place);
+    watch.observe(document.body, { subtree: true, attributeFilter: ['open'] });
+    place();
+
     const hide = () => {
       card.hidden = true;
     };
@@ -54,6 +85,7 @@
       finish();
       current = u;
       text.textContent = u.message;
+      place();
       card.hidden = false;
       start(SHOW_MS);
     });
@@ -85,6 +117,9 @@
     card.addEventListener('focusout', release);
     document.addEventListener('keydown', onKey);
     return () => {
+      watch.disconnect();
+      // Back in its own place before the page swaps, so `transition:persist` finds it.
+      if (anchor.isConnected) anchor.replaceWith(root);
       btn.removeEventListener('click', onUndo);
       card.removeEventListener('pointerenter', hold);
       card.removeEventListener('pointerleave', release);
