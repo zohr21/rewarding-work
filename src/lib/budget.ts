@@ -175,6 +175,8 @@ export interface Goal {
   createdAt: number;
   /** Goals are changed in place; the newer copy wins between devices. */
   updatedAt: number;
+  /** When the goal was first seen reached (epoch ms), so it is celebrated once. */
+  reachedAt?: number;
   deletedAt?: number;
 }
 
@@ -186,8 +188,11 @@ export type SaveWhere = 'card' | 'cash';
  * are always above 0. Since 2026-11 there are two more:
  * - `type: 'move'`, half of a move between card and cash: one entry below 0 where the money
  *   left, one above 0 where it went, so the total stays the same;
- * - `type: 'out'`, money taken out of savings (below 0), which goes back to what is safe to spend.
- * An older app drops the entries below 0 when it reads them, so it shows a little more saved.
+ * - `type: 'out'`, money taken out of savings (below 0), which goes back to what is safe to spend;
+ * - `type: 'had'`, savings you already had before (above 0): in the total and its goal, but not
+ *   taken from the month's income, so what is safe to spend stays the same.
+ * An older app drops the entries below 0 when it reads them, so it shows a little more saved,
+ * and reads `had` as money put in that month.
  */
 export interface SaveEntry {
   id: string;
@@ -196,7 +201,7 @@ export interface SaveEntry {
   amount: number;
   createdAt: number;
   where?: 'cash';
-  type?: 'move' | 'out';
+  type?: 'move' | 'out' | 'had';
   deletedAt?: number;
 }
 
@@ -204,6 +209,10 @@ export interface Plan {
   split: Split;
   /** Only the categories changed from DEFAULT_TAGS. */
   tags: Partial<Record<Category, CategoryTag>>;
+  /** Autopilot (2026-11). The month-end sweep asks unless this is set. */
+  sweepOff?: true;
+  /** Round-ups are on from this day: each payment's cents up to the next whole amount count as savings. */
+  roundUpFrom?: DayKey;
 }
 
 export const DEFAULT_PLAN: Plan = { split: [50, 30, 20], tags: {} };
@@ -351,6 +360,7 @@ function readGoal(v: unknown): Goal | null {
   if (!r || typeof r.name !== 'string' || !amountOk(r.target, r.removed) || typeof r.monthly !== 'number' || r.monthly < 0 || typeof r.createdAt !== 'number') return null;
   const goal: Goal = { id: r.id, name: r.name, target: r.target as number, monthly: r.monthly, createdAt: r.createdAt, updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : r.createdAt };
   if (isMonthKey(r.by)) goal.by = r.by;
+  if (typeof r.reachedAt === 'number') goal.reachedAt = r.reachedAt;
   if (r.removed) goal.deletedAt = r.deletedAt as number;
   return goal;
 }
@@ -358,7 +368,7 @@ function readGoal(v: unknown): Goal | null {
 function readSave(v: unknown): SaveEntry | null {
   const r = record(v);
   if (!r) return null;
-  const type = r.type === 'move' || r.type === 'out' ? r.type : undefined;
+  const type = r.type === 'move' || r.type === 'out' || r.type === 'had' ? r.type : undefined;
   // Moves and take-outs may be below 0; take-outs always are.
   const signed = typeof r.amount === 'number' && (type === 'move' ? isAmount(Math.abs(r.amount)) : type === 'out' ? isAmount(-r.amount) : isAmount(r.amount));
   if (typeof r.goalId !== 'string' || !isDayKey(r.day) || !(signed || (r.removed && r.amount === 0)) || typeof r.createdAt !== 'number') return null;
@@ -379,7 +389,10 @@ function readPlan(v: unknown): Plan {
     (p.split as number[]).reduce((a, b) => a + b, 0) === 100;
   const tags: Partial<Record<Category, CategoryTag>> = {};
   if (typeof p.tags === 'object' && p.tags !== null) for (const [key, value] of Object.entries(p.tags)) if (isCategory(key) && isTag(value)) tags[key] = value;
-  return { split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
+  const plan: Plan = { split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
+  if (p.sweepOff === true) plan.sweepOff = true;
+  if (isDayKey(p.roundUpFrom)) plan.roundUpFrom = p.roundUpFrom;
+  return plan;
 }
 
 /** Newest day first, and within a day the one added last. */
@@ -439,7 +452,8 @@ export function getBudget(): BudgetStore {
   };
 }
 
-function writeStore(store: BudgetStore): void {
+function writeStore(next: BudgetStore): void {
+  const store = withRoundUps(next);
   const cutoff = Date.now() - MARKER_MS;
   const keep = (x: { deletedAt?: number }) => x.deletedAt === undefined || x.deletedAt > cutoff;
   write('health', {
@@ -779,6 +793,8 @@ export function saveGoal(input: GoalInput, id?: string): Goal | null {
   const now = Date.now();
   const goal: Goal = { id: old?.id ?? newId('g'), name, target, monthly: Math.max(0, round(input.monthly) || 0), createdAt: old?.createdAt ?? now, updatedAt: now };
   if (input.by && isMonthKey(input.by)) goal.by = input.by;
+  // Raising the target past what is saved makes it a goal to reach again.
+  if (old?.reachedAt && savedFor(store.saves, goal.id) >= target) goal.reachedAt = old.reachedAt;
   writeStore({ ...store, goals: [...store.goals.filter((g) => g.id !== goal.id), goal] });
   return goal;
 }
@@ -794,12 +810,13 @@ export function removeGoal(id: string): void {
   });
 }
 
-/** Puts money towards a goal ("" for savings with no goal). */
-export function addSave(goalId: string, amount: number, where: SaveWhere = 'card', day: DayKey = dayKey(new Date())): SaveEntry | null {
+/** Puts money towards a goal ("" for savings with no goal). `had`: savings you already had, which this month's income did not pay for. */
+export function addSave(goalId: string, amount: number, where: SaveWhere = 'card', day: DayKey = dayKey(new Date()), had = false): SaveEntry | null {
   const value = round(amount);
   if (!isAmount(value)) return null;
   const save: SaveEntry = { id: newId('s'), goalId, day, amount: value, createdAt: Date.now() };
   if (where === 'cash') save.where = 'cash';
+  if (had) save.type = 'had';
   const store = getStore();
   writeStore({ ...store, saves: [save, ...store.saves] });
   return save;
@@ -901,7 +918,110 @@ export function takeOut(goalId: string, amount: number, from: SaveWhere, day: Da
 export function setPlan(plan: Plan): void {
   const tags: Partial<Record<Category, CategoryTag>> = {};
   for (const c of CATEGORIES) if (plan.tags[c] && plan.tags[c] !== DEFAULT_TAGS[c]) tags[c] = plan.tags[c];
-  writeStore({ ...getStore(), plan: { split: [...plan.split] as Split, tags }, planAt: Date.now() });
+  const next: Plan = { split: [...plan.split] as Split, tags };
+  if (plan.sweepOff) next.sweepOff = true;
+  if (plan.roundUpFrom && isDayKey(plan.roundUpFrom)) next.roundUpFrom = plan.roundUpFrom;
+  writeStore({ ...getStore(), plan: next, planAt: Date.now() });
+}
+
+/** Turns the autopilot parts on or off. Round-ups count from the day they are turned on. */
+export function setAutopilot(change: { sweep?: boolean; roundUps?: boolean }, today: DayKey = dayKey(new Date())): void {
+  const plan = { ...getStore().plan };
+  if (change.sweep !== undefined) {
+    if (change.sweep) delete plan.sweepOff;
+    else plan.sweepOff = true;
+  }
+  if (change.roundUps !== undefined) {
+    if (!change.roundUps) delete plan.roundUpFrom;
+    else if (!plan.roundUpFrom) plan.roundUpFrom = today;
+  }
+  setPlan(plan);
+}
+
+/** The first goal still short of its target (savings with no goal when there is none). */
+function firstOpenGoal(store: BudgetStore): string {
+  return store.goals.find((g) => g.deletedAt === undefined && savedFor(store.saves, g.id) < g.target)?.id ?? '';
+}
+
+const lastDay = (month: MonthKey): DayKey => `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
+
+export interface SweepOffer {
+  month: MonthKey;
+  /** What was left of last month, in whole units. */
+  amount: number;
+  goalId: string;
+}
+
+/**
+ * At the start of a month: what was left of the month before, offered for savings once.
+ * Answered (saved or kept) when an entry `sweep-<month>` exists, live or as a removal marker.
+ */
+export function sweepOffer(today: DayKey = dayKey(new Date())): SweepOffer | null {
+  const store = getStore();
+  if (store.plan.sweepOff) return null;
+  const month = shiftMonth(monthOf(today), -1);
+  if (store.saves.some((x) => x.id === `sweep-${month}`)) return null;
+  const p = monthPlan(store, month, today);
+  const amount = Math.floor(p.free);
+  if (!p.received || amount < 1) return null;
+  return { month, amount, goalId: firstOpenGoal(store) };
+}
+
+/** Saves last month's rest (`amount` null: keeps it, and stops asking for that month). */
+export function answerSweep(offer: SweepOffer, amount: number | null): SaveEntry | null {
+  const store = getStore();
+  const id = `sweep-${offer.month}`;
+  if (store.saves.some((x) => x.id === id)) return null;
+  const day = lastDay(offer.month);
+  const value = amount === null ? 0 : round(amount);
+  const x: SaveEntry = { id, goalId: offer.goalId, day, amount: value, createdAt: Date.now() };
+  if (amount === null || !isAmount(value)) x.deletedAt = Date.now();
+  writeStore({ ...store, saves: [x, ...store.saves] });
+  return x.deletedAt === undefined ? x : null;
+}
+
+/** Round-ups put in savings in `month`. */
+export function roundUpsIn(saves: SaveEntry[], month: MonthKey): number {
+  return round(saves.filter((x) => live(x) && x.id.startsWith('ru-') && monthOf(x.day) === month).reduce((a, x) => a + x.amount, 0));
+}
+
+/**
+ * Keeps round-ups in step with the payments, on every write: each payment on or after
+ * `roundUpFrom` gets `ru-<its id>` (the cents up to the next whole amount, as savings), and a
+ * round-up whose payment was removed or changed is removed with it.
+ */
+function withRoundUps(store: BudgetStore): BudgetStore {
+  const from = store.plan.roundUpFrom;
+  const liveSpends = new Map(store.entries.filter((e) => e.deletedAt === undefined).map((e) => [e.id, e]));
+  const now = Date.now();
+  let changed = false;
+  const saves = store.saves.map((x) => {
+    if (!x.id.startsWith('ru-') || !live(x) || liveSpends.has(x.id.slice(3))) return x;
+    changed = true;
+    return { ...x, amount: 0, deletedAt: now };
+  });
+  if (from) {
+    const known = new Set(saves.map((x) => x.id));
+    const goalId = firstOpenGoal(store);
+    for (const e of liveSpends.values()) {
+      const id = `ru-${e.id}`;
+      const cents = round(Math.ceil(e.amount) - e.amount);
+      if (e.day < from || known.has(id) || !isAmount(cents)) continue;
+      saves.unshift({ id, goalId, day: e.day, amount: cents, createdAt: now });
+      changed = true;
+    }
+  }
+  return changed ? { ...store, saves } : store;
+}
+
+/** Marks a goal as reached, once. True when it was newly reached. */
+export function markReached(id: string): boolean {
+  const store = getStore();
+  const goal = store.goals.find((g) => g.id === id && g.deletedAt === undefined);
+  if (!goal || goal.reachedAt || savedFor(store.saves, id) < goal.target) return false;
+  const now = Date.now();
+  writeStore({ ...store, goals: store.goals.map((g) => (g.id === id ? { ...g, reachedAt: now, updatedAt: now } : g)) });
+  return true;
 }
 
 export const categoryTag = (plan: Plan, c: Category): CategoryTag => plan.tags[c] ?? DEFAULT_TAGS[c];

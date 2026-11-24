@@ -6,6 +6,17 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **25 Nov · Savings autopilot (option C).** In the Savings sheet: "Sweep what is left" (on
+  by default) offers last month's rest on Budget at the start of a month, once (Save / Keep it),
+  to the first goal not yet reached; "Round up payments" (off by default) counts each payment's
+  cents up to the next whole amount as savings, from the day it is turned on, and the round-up
+  goes when its payment is changed or removed. Grovyn never moves bank money, so the note says
+  to move it once a month. A goal reaching its target is celebrated once, gets a sun leaf, and
+  Budget says for a week where savings go next. My choices, not confirmed: sweep on by default,
+  whole units only, round-ups to the next whole amount; no reward in the grove itself.
+- **25 Nov · Savings you already had.** Put in has "I already had this": savings from before
+  (e.g. cash kept at home) count in the total, the card/cash split and their goal, but not as
+  this month's savings, so what is safe to spend stays the same.
 - **25 Nov · Savings on card and in cash.** Cash taken out to keep as savings was counted twice
   (once kept back as savings, again as spending). Picked option A, a savings pot: the Goals tile
   is now Savings (total, card and cash), and its sheet has Put in · Take out · Card ⇄ cash above

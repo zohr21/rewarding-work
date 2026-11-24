@@ -103,6 +103,20 @@ describe('savings on card and in cash', () => {
     addSave('', 50, 'cash', DAY);
     expect(savingsWhere(getBudget().saves)).toEqual({ total: 350, card: 300, cash: 50 });
   });
+
+  it('savings you already had count in the total and the goal, not against this month', () => {
+    const goal = saveGoal({ name: 'Emergency fund', target: 5000, monthly: 0 })!;
+    const before = monthPlan(getBudget(), MONTH, TODAY);
+    addSave(goal.id, 2000, 'cash', DAY, true);
+    const s = getBudget();
+    const p = monthPlan(s, MONTH, TODAY);
+    expect(p.free).toBe(before.free);
+    expect(p.saved).toBe(before.saved);
+    expect(savedFor(s.saves, goal.id)).toBe(2000);
+    expect(savingsWhere(s.saves)).toEqual({ total: 2300, card: 300, cash: 2000 });
+    // Money you already had can then be moved or taken out like any other.
+    expect(canTakeOut(s.saves, goal.id, 'cash')).toBe(2000);
+  });
 });
 
 describe('reading savings', () => {
@@ -124,9 +138,12 @@ describe('reading savings', () => {
         { ...base, id: 'd', amount: 10, type: 'out' },
         { ...base, id: 'e', amount: -5 },
         { ...base, id: 'f', amount: 5, where: 'pocket' },
+        { ...base, id: 'g', amount: 900, type: 'had' },
+        { ...base, id: 'h', amount: -9, type: 'had' },
       ],
     });
-    expect(s.saves.map((x) => x.id).sort()).toEqual(['a', 'b', 'c', 'f']);
+    expect(s.saves.map((x) => x.id).sort()).toEqual(['a', 'b', 'c', 'f', 'g']);
+    expect(s.saves.find((x) => x.id === 'g')?.type).toBe('had');
     expect(s.saves.find((x) => x.id === 'f')?.where).toBeUndefined();
   });
 });

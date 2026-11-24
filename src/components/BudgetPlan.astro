@@ -33,6 +33,14 @@ const TAGS = [
       <p class="muted bp__line" data-bp-line></p>
       <p class="bp__saved" data-bp-saved></p>
     </div>
+    <p class="bp-reached" data-bp-reached hidden><span class="bp-leaf" aria-hidden="true"></span><span data-bp-reached-text></span></p>
+    <div class="bp-sweep" data-bp-sweep hidden>
+      <p class="bp-sweep__text"><strong data-bp-sweep-title></strong><span class="muted" data-bp-sweep-line></span></p>
+      <div class="bp-sweep__actions">
+        <button type="button" class="btn" data-bp-sweep-save></button>
+        <button data-t="budget.ap.keepIt" type="button" class="btn btn--ghost" data-bp-sweep-keep>Keep it</button>
+      </div>
+    </div>
     <ul class="bp__bars" role="list" data-bp-bars></ul>
     <p class="bp__unsorted" data-bp-unsorted hidden></p>
     <div class="bp__actions">
@@ -116,6 +124,13 @@ const TAGS = [
       <label class="bp-seg__opt"><input type="radio" name="bp-s-where" value="card" class="visually-hidden" checked /><span data-t="budget.s.onCard">On card</span></label>
       <label class="bp-seg__opt"><input type="radio" name="bp-s-where" value="cash" class="visually-hidden" /><span data-t="budget.s.inCash">In cash</span></label>
     </fieldset>
+    <label class="bp-auto__row">
+      <span class="bp-auto__text">
+        <strong data-t="budget.s.hadIt">I already had this</strong>
+        <span data-t="budget.s.hadItWhy" class="muted">Savings from before, not from this month's money. Safe to spend stays the same.</span>
+      </span>
+      <input type="checkbox" data-bp-s-had />
+    </label>
     <button data-t="budget.putAside" type="submit" class="btn">Put aside</button>
   </form>
   <form class="bp-form bp-put" data-bp-o-form hidden>
@@ -185,6 +200,24 @@ const TAGS = [
     </div>
   </form>
   <button data-t="budget.newGoal" type="button" class="btn btn--ghost bp-form__save" data-bp-g-new>New goal</button>
+  <h3 data-t="budget.ap.title" class="bp-sub">Autopilot</h3>
+  <div class="bp-auto">
+    <label class="bp-auto__row">
+      <span class="bp-auto__text">
+        <strong data-t="budget.ap.sweep">Sweep what is left</strong>
+        <span data-t="budget.ap.sweepWhy" class="muted">At the start of each month, asks whether to put last month's rest in savings</span>
+      </span>
+      <input type="checkbox" role="switch" data-bp-ap-sweep />
+    </label>
+    <label class="bp-auto__row">
+      <span class="bp-auto__text">
+        <strong data-t="budget.ap.roundUps">Round up payments</strong>
+        <span class="muted" data-bp-ap-round-why></span>
+      </span>
+      <input type="checkbox" role="switch" data-bp-ap-round />
+    </label>
+    <p data-t="budget.ap.bankNote" class="muted bp-hint">Grovyn never moves money in your bank. Move the round-ups to savings there once a month.</p>
+  </div>
 </Sheet>
 
 <Sheet id="plan" title="Your plan" titleKey="budget.yourPlan">
@@ -260,6 +293,12 @@ const TAGS = [
     saveGoal,
     savedFor,
     savingsWhere,
+    answerSweep,
+    markReached,
+    roundUpsIn,
+    setAutopilot,
+    sweepOffer,
+    type SweepOffer,
     canTakeOut,
     moveSavings,
     takeOut,
@@ -277,6 +316,7 @@ const TAGS = [
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { offerUndo } from '../lib/undo';
+  import { celebrate } from '../lib/appearance';
   import { dateFormat, t, tn } from '../lib/i18n';
 
   const monthName = dateFormat({ month: 'long' });
@@ -418,6 +458,7 @@ const TAGS = [
       renderIncome();
       renderGoals();
       renderPot();
+      renderAutopilot();
       renderPlan();
       renderCalendar();
     }
@@ -539,7 +580,10 @@ const TAGS = [
           const saved = savedFor(s.saves, g.id);
           const li = el('li', 'bp-goal');
           const head = el('span', 'bp-goal__head');
-          head.append(el('strong', '', g.name), el('span', 'muted', `${whole(saved, sign)} / ${whole(g.target, sign)}`));
+          const name = el('strong', 'bp-goal__name', g.name);
+          // Reached: a sun leaf, the reward colour.
+          if (saved >= g.target) name.prepend(el('span', 'bp-leaf'));
+          head.append(name, el('span', 'muted', `${whole(saved, sign)} / ${whole(g.target, sign)}`));
           const track = el('span', 'bp__track');
           const fill = el('i');
           fill.style.width = `${Math.min(100, (saved / g.target) * 100)}%`;
@@ -655,9 +699,11 @@ const TAGS = [
         e.preventDefault();
         const amount = $<HTMLInputElement>('[data-bp-s-amount]');
         const where = ($<HTMLInputElement>('input[name="bp-s-where"]:checked')?.value ?? 'card') as SaveWhere;
-        const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value), where);
+        const had = $<HTMLInputElement>('[data-bp-s-had]');
+        const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value), where, today(), had.checked);
         if (!save) return;
         amount.value = '';
+        had.checked = false;
         setMode(null);
         announce(t('budget.p.putAsideDone', { amount: formatMoney(save.amount, getBudget().currency) }));
       }),
@@ -738,6 +784,66 @@ const TAGS = [
         announce(t(to === 'cash' ? 'budget.s.movedToCash' : 'budget.s.movedToCard', { amount: formatMoney(value, getBudget().currency) }));
       }),
     );
+
+    // ---- Autopilot: the month-end sweep, round-ups, a goal reached ----
+    let offer: SweepOffer | null = null;
+
+    function renderAutopilot(): void {
+      const s = store();
+      const sign = s.currency;
+      const current = month === monthOf(today());
+
+      // Last month's rest, offered once at the start of the month.
+      offer = current ? sweepOffer(today()) : null;
+      $('[data-bp-sweep]').hidden = !offer;
+      if (offer) {
+        const goal = s.goals.find((g) => g.id === offer!.goalId);
+        setText('[data-bp-sweep-title]', t('budget.ap.ended', { month: monthName.format(fromDayKey(`${offer.month}-01`)), amount: whole(offer.amount, sign) }));
+        setText('[data-bp-sweep-line]', goal ? t('budget.ap.toGoal', { name: goal.name }) : t('budget.ap.toSavings'));
+        setText('[data-bp-sweep-save]', t('budget.ap.save', { amount: whole(offer.amount, sign) }));
+      }
+
+      // A goal that reached its target: celebrated once, then noted for a week.
+      for (const g of s.goals) {
+        if (!g.reachedAt && savedFor(s.saves, g.id) >= g.target && markReached(g.id)) {
+          celebrate($('[data-bp-reached]'));
+          announce(t('budget.ap.reached', { name: g.name }));
+        }
+      }
+      const fresh = s.goals.filter((g) => g.reachedAt && Date.now() - g.reachedAt < 7 * 86_400_000).sort((a, b) => b.reachedAt! - a.reachedAt!)[0];
+      $('[data-bp-reached]').hidden = !fresh || !current;
+      if (fresh) {
+        const next = s.goals.find((g) => g.id !== fresh.id && savedFor(s.saves, g.id) < g.target);
+        setText('[data-bp-reached-text]', `${t('budget.ap.reached', { name: fresh.name })} ${next ? t('budget.ap.nowTo', { name: next.name }) : t('budget.ap.nowToSavings')}`);
+      }
+
+      // The switches in the Savings sheet.
+      $<HTMLInputElement>('[data-bp-ap-sweep]').checked = !s.plan.sweepOff;
+      $<HTMLInputElement>('[data-bp-ap-round]').checked = !!s.plan.roundUpFrom;
+      const rounded = roundUpsIn(s.saves, monthOf(today()));
+      setText(
+        '[data-bp-ap-round-why]',
+        t('budget.ap.roundWhy', { from: formatMoney(24.3, sign), to: formatMoney(25, sign), cents: formatMoney(0.7, sign) }) +
+          (s.plan.roundUpFrom ? ` ${t('budget.ap.roundThisMonth', { amount: formatMoney(rounded, sign) })}` : ''),
+      );
+    }
+
+    c.add(
+      listen($('[data-bp-sweep-save]'), 'click', (e) => {
+        if (!offer) return;
+        const x = answerSweep(offer, offer.amount);
+        if (!x) return;
+        celebrate(e.currentTarget as Element);
+        announce(t('budget.p.putAsideDone', { amount: formatMoney(x.amount, getBudget().currency) }));
+      }),
+    );
+    c.add(
+      listen($('[data-bp-sweep-keep]'), 'click', () => {
+        if (offer) answerSweep(offer, null);
+      }),
+    );
+    c.add(listen($('[data-bp-ap-sweep]'), 'change', (e) => setAutopilot({ sweep: (e.target as HTMLInputElement).checked })));
+    c.add(listen($('[data-bp-ap-round]'), 'change', (e) => setAutopilot({ roundUps: (e.target as HTMLInputElement).checked })));
 
     // ---- The plan: split and tags, saved as you change them ----
     function renderPlan(): void {
@@ -1293,6 +1399,83 @@ const TAGS = [
   .bp-hint {
     margin: 0;
     font-size: var(--text-sm);
+  }
+
+  /* ---- Autopilot ---- */
+  /* A sun leaf: gold is for rewards only, here a goal reached. */
+  .bp-leaf {
+    display: inline-block;
+    inline-size: 11px;
+    block-size: 15px;
+    margin-inline-end: 6px;
+    border-radius: 0 100% 0 100%;
+    background: var(--tier-3);
+    box-shadow: inset 0 0 0 1px var(--tier-3-edge);
+    transform: rotate(-20deg);
+    vertical-align: -1px;
+    flex: none;
+  }
+
+  .bp-reached {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .bp-sweep {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-2);
+  }
+
+  .bp-sweep__text {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bp-sweep__actions {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--space-2);
+  }
+
+  .bp-auto {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bp-auto__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 52px;
+    cursor: pointer;
+  }
+
+  .bp-auto__text {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    font-size: var(--text-sm);
+  }
+
+  .bp-auto__text span {
+    font-size: var(--text-xs);
+  }
+
+  .bp-auto__row input {
+    inline-size: 22px;
+    block-size: 22px;
+    flex: none;
+    accent-color: var(--color-accent);
   }
 
   .bp-splits {
