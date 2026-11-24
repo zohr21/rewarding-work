@@ -190,6 +190,7 @@ const icon = (d: string, w = 2) =>
         <input type="checkbox" data-bv-x-repeat />
         <span data-t="budget.repeatEveryMonthOnThis">Repeat every month on this day</span>
       </label>
+      <button data-t="budget.v.wasSavings" type="button" class="btn btn--ghost bv-dialog__saved" data-bv-x-saved hidden>This was savings, not spending</button>
       <div class="bv-dialog__actions">
         <button data-t="budget.delete" type="button" class="btn btn--ghost bv-dialog__delete" data-bv-x-delete hidden>Delete</button>
         <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bv-cancel>Cancel</button>
@@ -271,6 +272,7 @@ const icon = (d: string, w = 2) =>
     paceLine,
     removeRepeat,
     removeSpend,
+    spendToSavings,
     runningTotals,
     setBudgets,
     shiftMonth,
@@ -816,6 +818,8 @@ const icon = (d: string, w = 2) =>
       xRepeat.checked = repeat;
       $('[data-bv-x-repeat-field]').hidden = !!entry;
       $('[data-bv-x-delete]').hidden = !entry;
+      // A bill that repeats is never cash kept aside.
+      $('[data-bv-x-saved]').hidden = !entry || !!entry.repeatId;
       updateDialog();
       xDialog.showModal();
       xAmount.focus();
@@ -851,6 +855,27 @@ const icon = (d: string, w = 2) =>
       }
       editing = null;
       render();
+    });
+
+    // Cash taken out to keep (added as spending by mistake): it leaves the expenses and goes to savings.
+    $('[data-bv-x-saved]').addEventListener('click', () => {
+      const entry = editing;
+      xDialog.close();
+      editing = null;
+      if (!entry) return;
+      removing.add(entry.id);
+      render();
+      offerUndo({
+        message: t('budget.v.movedToSavings', { what: entry.what, amount: formatMoney(entry.amount, getBudget().currency) }),
+        commit: () => {
+          removing.delete(entry.id);
+          spendToSavings(entry.id);
+        },
+        undo: () => {
+          removing.delete(entry.id);
+          render();
+        },
+      });
     });
 
     $('[data-bv-x-delete]').addEventListener('click', () => {
@@ -1939,6 +1964,13 @@ const icon = (d: string, w = 2) =>
   .bv-dialog__delete {
     margin-inline-end: auto;
     color: var(--color-danger);
+  }
+
+  .bv-dialog__saved {
+    justify-self: stretch;
+    width: 100%;
+    color: var(--cat-structure);
+    white-space: normal;
   }
 
   /* The Android app: dialogs come up from the bottom, like its other sheets. */

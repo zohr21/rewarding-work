@@ -40,7 +40,7 @@ const TAGS = [
       <button data-t="budget.income" type="button" class="btn btn--ghost" data-sheet-open="income">Income</button>
     </div>
     <div class="bp__tiles">
-      <button type="button" class="bp__tile" data-sheet-open="goals"><span data-t="budget.goals" class="muted">Goals</span><strong data-bp-goals></strong></button>
+      <button type="button" class="bp__tile" data-sheet-open="goals"><span data-t="budget.p.savings" class="muted">Savings</span><strong data-bp-goals></strong></button>
       <button type="button" class="bp__tile" data-sheet-open="plan"><span data-t="budget.plan" class="muted">Plan</span><strong data-bp-split></strong></button>
       <button type="button" class="bp__tile" data-sheet-open="budget-cal"><span data-t="budget.noSpendDays" class="muted">No-spend days</span><strong data-bp-nospend></strong></button>
     </div>
@@ -85,7 +85,76 @@ const TAGS = [
   <ul class="bp-list" role="list" data-bp-ir-list></ul>
 </Sheet>
 
-<Sheet id="goals" title="Savings goals" titleKey="budget.savingsGoals">
+<Sheet id="goals" title="Savings" titleKey="budget.p.savings">
+  <div class="bp-pot">
+    <p class="bp-pot__total" data-bp-pot-total></p>
+    <span class="bp__track bp-pot__track" aria-hidden="true"><i class="bp-pot__card" data-bp-pot-card></i><i class="bp-pot__cash" data-bp-pot-cash></i></span>
+    <p class="bp-pot__where">
+      <span><i class="bp-pot__dot bp-pot__card" aria-hidden="true"></i><span data-bp-pot-card-text></span></span>
+      <span><i class="bp-pot__dot bp-pot__cash" aria-hidden="true"></i><span data-bp-pot-cash-text></span></span>
+    </p>
+    <div class="bp-pot__actions" role="group" data-t-aria-label="budget.p.savings" aria-label="Savings">
+      <button data-t="budget.s.putIn" type="button" class="btn" data-bp-mode="in" aria-pressed="false">Put in</button>
+      <button data-t="budget.s.takeOut" type="button" class="btn btn--ghost" data-bp-mode="out" aria-pressed="false">Take out</button>
+      <button data-t="budget.s.move" type="button" class="btn btn--ghost" data-bp-mode="move" aria-pressed="false">Card ⇄ cash</button>
+    </div>
+  </div>
+  <form class="bp-form bp-put" data-bp-s-form hidden>
+    <h3 data-t="budget.putMoneyAside" class="bp-sub">Put money aside</h3>
+    <div class="bp-pair">
+      <label class="bp-field">
+        <span data-t="budget.for">For</span>
+        <select class="input" data-bp-s-goal></select>
+      </label>
+      <label class="bp-field">
+        <span data-t="budget.amount">Amount</span>
+        <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-s-amount />
+      </label>
+    </div>
+    <fieldset class="bp-seg bp-seg--small bp-where">
+      <legend data-t="budget.s.keptIn" class="bp-field">Kept</legend>
+      <label class="bp-seg__opt"><input type="radio" name="bp-s-where" value="card" class="visually-hidden" checked /><span data-t="budget.s.onCard">On card</span></label>
+      <label class="bp-seg__opt"><input type="radio" name="bp-s-where" value="cash" class="visually-hidden" /><span data-t="budget.s.inCash">In cash</span></label>
+    </fieldset>
+    <button data-t="budget.putAside" type="submit" class="btn">Put aside</button>
+  </form>
+  <form class="bp-form bp-put" data-bp-o-form hidden>
+    <h3 data-t="budget.s.takeOutTitle" class="bp-sub">Take out of savings</h3>
+    <p data-t="budget.s.takeOutWhy" class="muted bp-intro">It goes back into what is safe to spend this month. What you then buy is counted once, as usual.</p>
+    <div class="bp-pair">
+      <label class="bp-field">
+        <span data-t="budget.s.from">From</span>
+        <select class="input" data-bp-o-goal></select>
+      </label>
+      <label class="bp-field">
+        <span data-t="budget.amount">Amount</span>
+        <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-o-amount />
+      </label>
+    </div>
+    <fieldset class="bp-seg bp-seg--small bp-where" data-bp-o-where>
+      <legend data-t="budget.s.takenFrom" class="bp-field">Taken from</legend>
+      <label class="bp-seg__opt"><input type="radio" name="bp-o-where" value="card" class="visually-hidden" checked /><span data-t="budget.s.card">Card</span></label>
+      <label class="bp-seg__opt"><input type="radio" name="bp-o-where" value="cash" class="visually-hidden" /><span data-t="budget.s.cash">Cash</span></label>
+    </fieldset>
+    <p class="muted bp-hint" data-bp-o-hint></p>
+    <button data-t="budget.s.takeOut" type="submit" class="btn">Take out</button>
+  </form>
+  <form class="bp-form bp-put" data-bp-m-form hidden>
+    <h3 data-t="budget.s.moveTitle" class="bp-sub">Move between card and cash</h3>
+    <p data-t="budget.s.moveWhy" class="muted bp-intro">Took savings out at a cash machine, or paid cash back in? It stays savings either way.</p>
+    <fieldset class="bp-seg bp-seg--small bp-where">
+      <legend data-t="budget.s.moveTo" class="visually-hidden">Move to</legend>
+      <label class="bp-seg__opt"><input type="radio" name="bp-m-to" value="cash" class="visually-hidden" checked /><span data-t="budget.s.toCash">Card → cash</span></label>
+      <label class="bp-seg__opt"><input type="radio" name="bp-m-to" value="card" class="visually-hidden" /><span data-t="budget.s.toCard">Cash → card</span></label>
+    </fieldset>
+    <label class="bp-field">
+      <span data-t="budget.amount">Amount</span>
+      <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-m-amount />
+    </label>
+    <p class="muted bp-hint" data-bp-m-hint></p>
+    <button data-t="budget.s.moveIt" type="submit" class="btn">Move</button>
+  </form>
+  <h3 data-t="budget.goals" class="bp-sub">Goals</h3>
   <p class="muted bp-intro" data-bp-g-intro></p>
   <ul class="bp-goals" role="list" data-bp-g-list></ul>
   <button type="button" class="btn btn--ghost bp-suggest" data-bp-g-suggest hidden></button>
@@ -115,21 +184,7 @@ const TAGS = [
       <button data-t="budget.saveGoal" type="submit" class="btn">Save goal</button>
     </div>
   </form>
-  <button data-t="budget.newGoal" type="button" class="btn bp-form__save" data-bp-g-new>New goal</button>
-  <form class="bp-form bp-put" data-bp-s-form>
-    <h3 data-t="budget.putMoneyAside" class="bp-sub">Put money aside</h3>
-    <div class="bp-pair">
-      <label class="bp-field">
-        <span data-t="budget.for">For</span>
-        <select class="input" data-bp-s-goal></select>
-      </label>
-      <label class="bp-field">
-        <span data-t="budget.amount">Amount</span>
-        <input class="input" type="number" inputmode="decimal" min="0.01" max={AMOUNT_MAX} step="0.01" required data-bp-s-amount />
-      </label>
-    </div>
-    <button data-t="budget.putAside" type="submit" class="btn btn--ghost">Put aside</button>
-  </form>
+  <button data-t="budget.newGoal" type="button" class="btn btn--ghost bp-form__save" data-bp-g-new>New goal</button>
 </Sheet>
 
 <Sheet id="plan" title="Your plan" titleKey="budget.yourPlan">
@@ -204,6 +259,10 @@ const TAGS = [
     repeatDay,
     saveGoal,
     savedFor,
+    savingsWhere,
+    canTakeOut,
+    moveSavings,
+    takeOut,
     sourceLabel,
     setPlan,
     shiftMonth,
@@ -212,6 +271,7 @@ const TAGS = [
     type Goal,
     type IncomeSource,
     type MonthKey,
+    type SaveWhere,
     type Split,
   } from '../lib/budget';
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
@@ -315,10 +375,11 @@ const TAGS = [
         }
         setText(
           '[data-bp-saved]',
-          p.saved
+          (p.saved
             ? t('budget.p.putInSavings', { amount: whole(p.saved, sign) }) +
               (p.saved < p.planned.savings ? t('budget.p.stillToPut', { amount: whole(p.planned.savings - p.saved, sign) }) : '')
-            : t('budget.p.toPutInSavings', { amount: whole(p.planned.savings, sign) }),
+            : t('budget.p.toPutInSavings', { amount: whole(p.planned.savings, sign) })) +
+            (p.takenOut ? ` · ${t('budget.s.takenOutLine', { amount: whole(p.takenOut, sign) })}` : ''),
         );
         const [n, w, sv] = s.plan.split;
         const bars = [
@@ -344,8 +405,11 @@ const TAGS = [
         const unsorted = $('[data-bp-unsorted]');
         unsorted.hidden = !p.unsorted;
         unsorted.textContent = t('budget.p.unsorted', { amount: whole(p.unsorted, sign), ask: t('budget.needOrWant') });
-        const goals = s.goals.filter((g) => g.deletedAt === undefined);
-        setText('[data-bp-goals]', goals.length ? `${goals.length} · ${whole(savedFor(s.saves, '') + goals.reduce((a, g) => a + savedFor(s.saves, g.id), 0), sign)}` : t('budget.p.addOne'));
+        const pot = savingsWhere(s.saves);
+        setText(
+          '[data-bp-goals]',
+          pot.total > 0 ? whole(pot.total, sign) + (pot.cash > 0 ? ` · ${t('budget.s.cashShort', { amount: whole(pot.cash, sign) })}` : '') : s.goals.length ? whole(0, sign) : t('budget.p.addOne'),
+        );
         setText('[data-bp-split]', s.plan.split.join('/'));
         const upto = current ? Number(today().slice(8)) : daysInMonth(month);
         const ns = noSpend(p.byDay, upto);
@@ -353,6 +417,7 @@ const TAGS = [
       }
       renderIncome();
       renderGoals();
+      renderPot();
       renderPlan();
       renderCalendar();
     }
@@ -537,6 +602,7 @@ const TAGS = [
     c.add(
       listen($('[data-sheet="goals"]'), 'sheet:open', () => {
         closeGoal();
+        setMode(null);
         // Money put aside goes to the first goal unless you pick another.
         const select = $<HTMLSelectElement>('[data-bp-s-goal]');
         select.value = store().goals[0]?.id ?? '';
@@ -588,10 +654,88 @@ const TAGS = [
       listen($('[data-bp-s-form]'), 'submit', (e) => {
         e.preventDefault();
         const amount = $<HTMLInputElement>('[data-bp-s-amount]');
-        const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value));
+        const where = ($<HTMLInputElement>('input[name="bp-s-where"]:checked')?.value ?? 'card') as SaveWhere;
+        const save = addSave($<HTMLSelectElement>('[data-bp-s-goal]').value, Number(amount.value), where);
         if (!save) return;
         amount.value = '';
+        setMode(null);
         announce(t('budget.p.putAsideDone', { amount: formatMoney(save.amount, getBudget().currency) }));
+      }),
+    );
+
+    // ---- Savings: put in, take out, card and cash ----
+    type Mode = 'in' | 'out' | 'move';
+    let mode: Mode | null = null;
+    const forms: Record<Mode, string> = { in: '[data-bp-s-form]', out: '[data-bp-o-form]', move: '[data-bp-m-form]' };
+
+    function setMode(next: Mode | null): void {
+      mode = next;
+      if (mode === 'out') $('[data-bp-o-goal]').dataset.fresh = '1';
+      for (const m of Object.keys(forms) as Mode[]) $(forms[m]).hidden = m !== mode;
+      for (const b of $$<HTMLButtonElement>('[data-bp-mode]')) b.setAttribute('aria-pressed', String(b.dataset.bpMode === mode));
+      renderPot();
+      if (mode) $<HTMLInputElement>(`${forms[mode]} input[type="number"]`).focus();
+    }
+
+    const checked = (name: string) => $<HTMLInputElement>(`input[name="${name}"]:checked`)?.value as SaveWhere;
+
+    function renderPot(): void {
+      const s = store();
+      const sign = s.currency;
+      const pot = savingsWhere(s.saves);
+      setText('[data-bp-pot-total]', whole(pot.total, sign));
+      const share = (n: number) => `${pot.total > 0 ? Math.max(0, Math.min(100, (n / pot.total) * 100)) : 0}%`;
+      $('[data-bp-pot-card]').style.width = share(pot.card);
+      $('[data-bp-pot-cash]').style.width = share(pot.cash);
+      setText('[data-bp-pot-card-text]', t('budget.s.cardAmount', { amount: whole(pot.card, sign) }));
+      setText('[data-bp-pot-cash-text]', t('budget.s.cashAmount', { amount: whole(pot.cash, sign) }));
+      // Nothing saved: nothing to take out or move.
+      for (const b of $$<HTMLButtonElement>('[data-bp-mode="out"], [data-bp-mode="move"]')) b.disabled = pot.total <= 0;
+
+      const goals = s.goals;
+      const options = () => [...goals.filter((g) => savedFor(s.saves, g.id) > 0).map((g) => new Option(g.name, g.id)), new Option(t('budget.p.noGoal'), '')];
+      const oGoal = $<HTMLSelectElement>('[data-bp-o-goal]');
+      const was = oGoal.value;
+      oGoal.replaceChildren(...options());
+      // Opening the form picks the first goal with money in it; after that, what you picked stays.
+      if (oGoal.dataset.fresh || ![...oGoal.options].some((o) => o.value === was)) oGoal.selectedIndex = 0;
+      else oGoal.value = was;
+      delete oGoal.dataset.fresh;
+      $('[data-bp-o-where]').hidden = pot.cash <= 0;
+      if (pot.cash <= 0) $<HTMLInputElement>('input[name="bp-o-where"][value="card"]').checked = true;
+      const most = canTakeOut(s.saves, oGoal.value, checked('bp-o-where') ?? 'card');
+      setText('[data-bp-o-hint]', t('budget.s.upTo', { amount: formatMoney(most, sign) }));
+      $<HTMLInputElement>('[data-bp-o-amount]').max = String(Math.max(0.01, most));
+      const to = checked('bp-m-to') ?? 'cash';
+      const movable = Math.max(0, to === 'cash' ? pot.card : pot.cash);
+      setText('[data-bp-m-hint]', t('budget.s.upTo', { amount: formatMoney(movable, sign) }));
+      $<HTMLInputElement>('[data-bp-m-amount]').max = String(Math.max(0.01, movable));
+    }
+
+    for (const b of $$<HTMLButtonElement>('[data-bp-mode]')) c.add(listen(b, 'click', () => setMode(mode === b.dataset.bpMode ? null : (b.dataset.bpMode as Mode))));
+    c.add(listen($('[data-bp-o-form]'), 'change', renderPot));
+    c.add(listen($('[data-bp-m-form]'), 'change', renderPot));
+    c.add(
+      listen($('[data-bp-o-form]'), 'submit', (e) => {
+        e.preventDefault();
+        const amount = $<HTMLInputElement>('[data-bp-o-amount]');
+        const out = takeOut($<HTMLSelectElement>('[data-bp-o-goal]').value, Number(amount.value), checked('bp-o-where') ?? 'card');
+        if (!out) return;
+        amount.value = '';
+        setMode(null);
+        announce(t('budget.s.tookOut', { amount: formatMoney(-out.amount, getBudget().currency) }));
+      }),
+    );
+    c.add(
+      listen($('[data-bp-m-form]'), 'submit', (e) => {
+        e.preventDefault();
+        const amount = $<HTMLInputElement>('[data-bp-m-amount]');
+        const to = checked('bp-m-to') ?? 'cash';
+        const value = Math.min(Number(amount.value), Number(amount.max));
+        if (!moveSavings(value, to).length) return;
+        amount.value = '';
+        setMode(null);
+        announce(t(to === 'cash' ? 'budget.s.movedToCash' : 'budget.s.movedToCard', { amount: formatMoney(value, getBudget().currency) }));
       }),
     );
 
@@ -1068,6 +1212,87 @@ const TAGS = [
 
   .bp-put {
     margin-top: var(--space-2);
+  }
+
+  /* ---- Savings: the total, card and cash, and what you can do with it ---- */
+  .bp-pot {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .bp-pot p {
+    margin: 0;
+  }
+
+  .bp-pot__total {
+    font-size: 2.2rem;
+    font-weight: 750;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bp-pot__track {
+    display: flex;
+  }
+
+  .bp-pot__track i {
+    border-radius: 0;
+  }
+
+  .bp-pot__card {
+    background: var(--cat-structure);
+  }
+
+  .bp-pot__cash {
+    background: var(--cat-visual);
+  }
+
+  .bp-pot__where {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-4);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bp-pot__dot {
+    display: inline-block;
+    inline-size: 10px;
+    block-size: 10px;
+    margin-inline-end: 6px;
+    border-radius: 50%;
+  }
+
+  .bp-pot__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+  }
+
+  .bp-pot__actions .btn {
+    min-height: 48px;
+    padding-inline: var(--space-2);
+    white-space: normal;
+  }
+
+  .bp-pot__actions .btn[aria-pressed='true'] {
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+  }
+
+  .bp-where {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bp-where legend {
+    grid-column: 1 / -1;
+    margin-bottom: var(--space-1);
+    padding: 0;
+  }
+
+  .bp-hint {
+    margin: 0;
+    font-size: var(--text-sm);
   }
 
   .bp-splits {

@@ -12,7 +12,7 @@ import { read, write } from './storage';
 import { t, type Key } from './i18n';
 import { dayKey, fromDayKey, isDayKey, addDays, type DayKey } from './dates';
 import type { BankNotice, BankSources } from './device';
-import { CATEGORIES, currencyCode, getBudget, importSpend, importSpends, removeSpends, renameSpends, WHAT_MAX, type Category, type SpendEntry } from './budget';
+import { CATEGORIES, currencyCode, getBudget, importSpend, importSpends, intoSavings, removeSpends, renameSpends, WHAT_MAX, type Category, type IntoSavings, type SpendEntry } from './budget';
 
 /** Bank apps offered in setup, when they are on the phone (each also listed in AndroidManifest.xml <queries>). */
 export const BANK_APPS: { pkg: string; name: string }[] = [
@@ -32,7 +32,7 @@ export const SMS_APPS = ['com.samsung.android.messaging', 'com.google.android.ap
 export const BANK_SENDERS = ['Azericard', 'ABB', 'Birbank', 'KapitalBank', 'Rabitabank', 'Unibank', 'Leobank', 'PASHA Bank', 'Yelo Bank', 'AccessBank', 'Xalq Bank', 'Bank Respublika'];
 export const SENDER_MAX = 30;
 
-export type Outcome = 'added' | 'review' | 'skipped' | 'income' | 'declined' | 'duplicate' | 'not-money';
+export type Outcome = 'added' | 'review' | 'skipped' | 'saved' | 'income' | 'declined' | 'duplicate' | 'not-money';
 
 /** The outcome in the picked language. */
 export const outcomeLabel = (o: Outcome) => t(`budget.out.${o}` as Key);
@@ -41,6 +41,7 @@ export const OUTCOME_LABELS: Record<Outcome, string> = {
   added: 'Added',
   review: 'To check',
   skipped: 'Left out by you',
+  saved: 'Kept as savings',
   income: 'Money in: left out',
   declined: 'Declined: left out',
   duplicate: 'Same payment again: left out',
@@ -398,7 +399,7 @@ export function sourceName(notice: Pick<BankNotice, 'sms' | 'title' | 'app' | 'p
   return BANK_APPS.find((a) => a.pkg === notice.pkg)?.name ?? notice.app;
 }
 
-export type PlanOutcome = Exclude<Outcome, 'skipped'> | 'already' | 'known';
+export type PlanOutcome = Exclude<Outcome, 'skipped' | 'saved'> | 'already' | 'known';
 
 /** What one alert comes to, worked out without changing anything (`planAlerts`). */
 export interface Planned {
@@ -588,6 +589,16 @@ export function acceptPending(id: string, input: { what: string; category: Categ
   if (item.category !== input.category) learnCategory(item.what, input.category);
   dropPending(id, 'added');
   return entry;
+}
+
+/** Cash taken out (or money moved to your own account) that you keep as savings: counted once, not as spending. */
+export function savePending(id: string, input: { amount: number; day: DayKey }): IntoSavings | null {
+  const item = getBank().pending.find((p) => p.id === id);
+  if (!item) return null;
+  const result = intoSavings(input.amount, input.day, `${entryId(id)}-c`);
+  if (!result.ids.length) return null;
+  dropPending(id, 'saved');
+  return result;
 }
 
 /** Leaves a reviewed alert out. */
