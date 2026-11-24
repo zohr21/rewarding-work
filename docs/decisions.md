@@ -6,6 +6,14 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **25 Nov · Savings on card and in cash.** Cash taken out to keep as savings was counted twice
+  (once kept back as savings, again as spending). Picked option A, a savings pot: the Goals tile
+  is now Savings (total, card and cash), and its sheet has Put in · Take out · Card ⇄ cash above
+  the goals. Bank alerts that look like cash or a transfer get Into savings: what is already
+  saved on the card moves to cash, the rest is new savings in cash; safe to spend does not drop.
+  An expense can be turned into savings ("This was savings, not spending", with Undo). Money
+  taken out goes back into safe to spend. Not built (option C, later): month-end sweep of what
+  is left, round-ups, a reward when a goal is reached.
 - **24 Nov · Compact task list.** Picked option A: one slim row per task (tick to finish, name,
   one info line, play to focus), about 64 px; the ring, step and focus bars, dropdowns and the
   button row are gone. Tapping a row opens the task sheet, which now also holds its list, When,

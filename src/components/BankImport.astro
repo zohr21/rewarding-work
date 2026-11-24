@@ -201,6 +201,10 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
           ))
         }
       </fieldset>
+      <div class="bk-save" data-bk-r-save-row hidden>
+        <button data-t="budget.b.intoSavings" type="button" class="btn bk-save__btn" data-bk-r-save>Into savings</button>
+        <p class="muted bk-save__hint" data-bk-r-save-hint></p>
+      </div>
       <div class="bk-dialog__actions">
         <button data-t="budget.leaveOut" type="button" class="btn btn--ghost bk-dialog__off" data-bk-r-skip>Leave out</button>
         <button data-t="budget.cancel" type="button" class="btn btn--ghost" data-bk-cancel>Cancel</button>
@@ -225,12 +229,13 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
     getBank,
     outcomeLabel,
     planAlerts,
+    savePending,
     setBankSettings,
     undoImport,
     type Pending,
     type Planned,
   } from '../lib/bank';
-  import { currencyCode, currencySign, formatMoney, getBudget, type Category } from '../lib/budget';
+  import { currencyCode, currencySign, formatMoney, getBudget, savingsWhere, type Category } from '../lib/budget';
   import { dayKey, formatDay, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { dateFormat, locale, t, tn } from '../lib/i18n';
@@ -549,6 +554,12 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       rDay.value = p.day;
       rDay.max = dayKey(new Date());
       for (const r of $$<HTMLInputElement>('input[name="bk-r-cat"]')) r.checked = r.value === p.category;
+      // Cash taken out or money moved to your own account may be savings you keep.
+      $('[data-bk-r-save-row]').hidden = p.why !== 'transfer';
+      if (p.why === 'transfer') {
+        const card = savingsWhere(getBudget().saves).card;
+        $('[data-bk-r-save-hint]').textContent = card > 0 ? t('budget.b.intoSavingsHint', { amount: formatMoney(card, budget) }) : t('budget.b.intoSavingsNew');
+      }
       rDialog.showModal();
       if (foreign) rAmount.focus();
     }
@@ -558,6 +569,13 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
       const category = ($$<HTMLInputElement>('input[name="bk-r-cat"]:checked')[0]?.value ?? reviewing.category) as Category;
       acceptPending(reviewing.id, { what: rWhat.value, category, amount: Number(rAmount.value), day: rDay.value });
       reviewing = null;
+    });
+    $('[data-bk-r-save]').addEventListener('click', () => {
+      if (!reviewing || !rAmount.reportValidity() || !rDay.reportValidity()) return;
+      const done = savePending(reviewing.id, { amount: Number(rAmount.value), day: rDay.value });
+      reviewing = null;
+      rDialog.close();
+      if (done) $('[data-bk-live]').textContent = t('budget.b.keptAsSavings', { amount: formatMoney(done.moved + done.added, getBudget().currency) });
     });
     $('[data-bk-r-skip]').addEventListener('click', () => {
       if (reviewing) dropPending(reviewing.id);
@@ -957,6 +975,21 @@ import { AMOUNT_MAX, CATEGORIES, CATEGORY_COLORS, CATEGORY_SHORT, WHAT_MAX } fro
   .bk-cat:has(input:focus-visible) {
     outline: 2px solid var(--color-focus, var(--color-accent));
     outline-offset: 2px;
+  }
+
+  .bk-save {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .bk-save__btn {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .bk-save__hint {
+    margin: 0;
+    font-size: var(--text-sm, 0.875rem);
   }
 
   .bk-dialog__actions {

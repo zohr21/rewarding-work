@@ -178,13 +178,25 @@ export interface Goal {
   deletedAt?: number;
 }
 
-/** Money put towards a goal ("" for savings with no goal). */
+/** Where saved money is kept. Entries without `where` are on the card (in the bank). */
+export type SaveWhere = 'card' | 'cash';
+
+/**
+ * Money put towards a goal ("" for savings with no goal). Plain entries are money put in and
+ * are always above 0. Since 2026-11 there are two more:
+ * - `type: 'move'`, half of a move between card and cash: one entry below 0 where the money
+ *   left, one above 0 where it went, so the total stays the same;
+ * - `type: 'out'`, money taken out of savings (below 0), which goes back to what is safe to spend.
+ * An older app drops the entries below 0 when it reads them, so it shows a little more saved.
+ */
 export interface SaveEntry {
   id: string;
   goalId: string;
   day: DayKey;
   amount: number;
   createdAt: number;
+  where?: 'cash';
+  type?: 'move' | 'out';
   deletedAt?: number;
 }
 
@@ -345,8 +357,14 @@ function readGoal(v: unknown): Goal | null {
 
 function readSave(v: unknown): SaveEntry | null {
   const r = record(v);
-  if (!r || typeof r.goalId !== 'string' || !isDayKey(r.day) || !amountOk(r.amount, r.removed) || typeof r.createdAt !== 'number') return null;
+  if (!r) return null;
+  const type = r.type === 'move' || r.type === 'out' ? r.type : undefined;
+  // Moves and take-outs may be below 0; take-outs always are.
+  const signed = typeof r.amount === 'number' && (type === 'move' ? isAmount(Math.abs(r.amount)) : type === 'out' ? isAmount(-r.amount) : isAmount(r.amount));
+  if (typeof r.goalId !== 'string' || !isDayKey(r.day) || !(signed || (r.removed && r.amount === 0)) || typeof r.createdAt !== 'number') return null;
   const save: SaveEntry = { id: r.id, goalId: r.goalId, day: r.day, amount: r.amount as number, createdAt: r.createdAt };
+  if (r.where === 'cash') save.where = 'cash';
+  if (type) save.type = type;
   if (r.removed) save.deletedAt = r.deletedAt as number;
   return save;
 }
@@ -777,13 +795,107 @@ export function removeGoal(id: string): void {
 }
 
 /** Puts money towards a goal ("" for savings with no goal). */
-export function addSave(goalId: string, amount: number, day: DayKey = dayKey(new Date())): SaveEntry | null {
+export function addSave(goalId: string, amount: number, where: SaveWhere = 'card', day: DayKey = dayKey(new Date())): SaveEntry | null {
   const value = round(amount);
   if (!isAmount(value)) return null;
   const save: SaveEntry = { id: newId('s'), goalId, day, amount: value, createdAt: Date.now() };
+  if (where === 'cash') save.where = 'cash';
   const store = getStore();
   writeStore({ ...store, saves: [save, ...store.saves] });
   return save;
+}
+
+const live = <T extends { deletedAt?: number }>(x: T) => x.deletedAt === undefined;
+
+/** All savings, and how much of it is on the card and in cash. */
+export function savingsWhere(saves: SaveEntry[]): { total: number; card: number; cash: number } {
+  let total = 0;
+  let cash = 0;
+  for (const x of saves) {
+    if (!live(x)) continue;
+    total += x.amount;
+    if (x.where === 'cash') cash += x.amount;
+  }
+  return { total: round(total), card: round(total - cash), cash: round(cash) };
+}
+
+const saveEntry = (id: string, goalId: string, day: DayKey, amount: number, where: SaveWhere, type?: SaveEntry['type']): SaveEntry => {
+  const x: SaveEntry = { id, goalId, day, amount: round(amount), createdAt: Date.now() };
+  if (where === 'cash') x.where = 'cash';
+  if (type) x.type = type;
+  return x;
+};
+
+/** The two halves of a move, or none when nothing can move. */
+function moveEntries(amount: number, to: SaveWhere, day: DayKey, idBase = newId('m')): SaveEntry[] {
+  if (!isAmount(round(amount))) return [];
+  const from: SaveWhere = to === 'cash' ? 'card' : 'cash';
+  return [saveEntry(`${idBase}-from`, '', day, -amount, from, 'move'), saveEntry(`${idBase}-to`, '', day, amount, to, 'move')];
+}
+
+/** Moves savings between card and cash, at most what is there. Returns the ids written (for Undo). */
+export function moveSavings(amount: number, to: SaveWhere, day: DayKey = dayKey(new Date())): string[] {
+  const store = getStore();
+  const has = savingsWhere(store.saves)[to === 'cash' ? 'card' : 'cash'];
+  const entries = moveEntries(Math.min(round(amount), has), to, day);
+  if (entries.length) writeStore({ ...store, saves: [...entries, ...store.saves] });
+  return entries.map((x) => x.id);
+}
+
+export interface IntoSavings {
+  /** Already saved on the card and now kept in cash. */
+  moved: number;
+  /** Not saved before: new savings, in cash. */
+  added: number;
+  ids: string[];
+}
+
+/**
+ * Cash taken out to keep as savings. The part already saved on the card moves to cash (so it is
+ * not counted twice); the rest is new savings in cash. `idBase` keeps it once on every device.
+ */
+function intoSavingsEntries(store: BudgetStore, amount: number, day: DayKey, idBase: string): { entries: SaveEntry[]; moved: number; added: number } {
+  const value = round(amount);
+  if (!isAmount(value)) return { entries: [], moved: 0, added: 0 };
+  const moved = round(Math.max(0, Math.min(value, savingsWhere(store.saves).card)));
+  const added = round(value - moved);
+  const entries = [...moveEntries(moved, 'cash', day, idBase), ...(added > 0 ? [saveEntry(`${idBase}-s`, '', day, added, 'cash')] : [])];
+  return { entries, moved, added };
+}
+
+/** Cash taken out (a bank alert) kept as savings. */
+export function intoSavings(amount: number, day: DayKey = dayKey(new Date()), idBase = newId('c')): IntoSavings {
+  const store = getStore();
+  const { entries, moved, added } = intoSavingsEntries(store, amount, day, idBase);
+  if (entries.length) writeStore({ ...store, saves: [...entries, ...store.saves] });
+  return { moved, added, ids: entries.map((x) => x.id) };
+}
+
+/** An expense that was really cash kept as savings: removes it and puts the money in savings, in one write. */
+export function spendToSavings(id: string): IntoSavings | null {
+  const store = getStore();
+  const old = store.entries.find((e) => e.id === id && e.deletedAt === undefined);
+  if (!old) return null;
+  const { entries, moved, added } = intoSavingsEntries(store, old.amount, old.day, `${id}-c`);
+  const now = Date.now();
+  writeStore({ ...store, entries: store.entries.map((e) => (e.id === id ? marker(e, now) : e)), saves: [...entries, ...store.saves] });
+  return { moved, added, ids: entries.map((x) => x.id) };
+}
+
+/** Most that can be taken out of a goal ("" for savings with no goal) from the card or cash. */
+export function canTakeOut(saves: SaveEntry[], goalId: string, from: SaveWhere): number {
+  const where = savingsWhere(saves);
+  return round(Math.max(0, Math.min(savedFor(saves, goalId), from === 'cash' ? where.cash : where.card)));
+}
+
+/** Takes money out of savings; it goes back into what is safe to spend this month. */
+export function takeOut(goalId: string, amount: number, from: SaveWhere, day: DayKey = dayKey(new Date())): SaveEntry | null {
+  const store = getStore();
+  const value = round(Math.min(round(amount), canTakeOut(store.saves, goalId, from)));
+  if (!isAmount(value)) return null;
+  const x = saveEntry(newId('o'), goalId, day, -value, from, 'out');
+  writeStore({ ...store, saves: [x, ...store.saves] });
+  return x;
 }
 
 export function setPlan(plan: Plan): void {
@@ -810,6 +922,8 @@ export interface MonthPlan {
   planned: { needs: number; wants: number; savings: number };
   /** Put aside this month. Safe to spend keeps back the larger of this and the planned savings. */
   saved: number;
+  /** Taken out of savings this month: back in what is safe to spend. */
+  takenOut: number;
   spent: number;
   needs: number;
   wants: number;
@@ -850,7 +964,10 @@ export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = d
   const income = round(received + expected);
   const [n, w, sv] = store.plan.split;
   const planned = { needs: round((income * n) / 100), wants: round((income * w) / 100), savings: round((income * sv) / 100) };
-  const saved = round(store.saves.filter((x) => live(x) && monthOf(x.day) === month).reduce((a, x) => a + x.amount, 0));
+  const monthSaves = store.saves.filter((x) => live(x) && monthOf(x.day) === month);
+  // Moves between card and cash change neither; money taken out goes back to spend.
+  const saved = round(monthSaves.filter((x) => !x.type).reduce((a, x) => a + x.amount, 0));
+  const takenOut = round(-monthSaves.filter((x) => x.type === 'out').reduce((a, x) => a + x.amount, 0));
   const mine = store.entries.filter((e) => live(e) && monthOf(e.day) === month);
   let needs = 0;
   let wants = 0;
@@ -873,7 +990,7 @@ export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = d
   // Bills are planned for apart from the day's money, so one paid today does not eat today's share.
   const spentToday = current ? round(mine.filter((e) => e.day === today && !e.repeatId).reduce((a, e) => a + e.amount, 0)) : 0;
   const daysLeft = current ? days - dom + 1 : 0;
-  const free = round(income - Math.max(saved, planned.savings) - (spent - spentToday) - billsLater);
+  const free = round(income + takenOut - Math.max(saved, planned.savings) - (spent - spentToday) - billsLater);
   const perDay = daysLeft ? free / daysLeft : 0;
   return {
     income,
@@ -881,6 +998,7 @@ export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = d
     expected,
     planned,
     saved,
+    takenOut,
     spent,
     needs: round(needs),
     wants: round(wants),
