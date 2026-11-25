@@ -15,6 +15,21 @@ const CHEVRON = 'M9 6l6 6-6 6';
 {
   NATIVE_APP ? (
     <>
+      {/* Coach's day, while there is something to do with it (filled in by the script below). */}
+      <a class="way-row" href={coachUrl} data-coach-row hidden>
+        <span class="way-row__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M5 7h14M5 12h14M5 17h9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="way-row__text">
+          <strong data-coach-row-title></strong>
+          <span class="muted" data-coach-row-sub></span>
+        </span>
+        <svg class="way-chevron" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d={CHEVRON} fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </a>
       <button type="button" class="way-row" data-way-open aria-haspopup="dialog">
         <span class="way-row__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="20" height="20">
@@ -71,7 +86,48 @@ const CHEVRON = 'M9 6l6 6-6 6';
 }
 
 <script>
-  import { onPage } from '../lib/page';
+  import { onPage, cleanups } from '../lib/page';
+  import { t } from '../lib/i18n';
+  import { getCoach } from '../lib/coach';
+  import { phaseFor, topIds } from '../lib/coachday';
+  import { getSessions, getTasks, subscribe } from '../lib/storage';
+  import { todayTasks } from '../lib/tasks';
+  import { dayKey } from '../lib/dates';
+
+  // In the app, Today's row follows Coach's day: plan it, how the Top 3 is going, close it.
+  onPage('coach-row', () => {
+    const rowEl = document.querySelector<HTMLAnchorElement>('[data-coach-row]');
+    const wayEl = document.querySelector<HTMLButtonElement>('[data-way-open]');
+    if (!rowEl || !wayEl) return;
+    const row = rowEl;
+    const way = wayEl;
+    const c = cleanups();
+    function render(): void {
+      const key = dayKey(Date.now());
+      const day = getCoach().days[key];
+      const all = getTasks();
+      const open = todayTasks(all.filter((x) => x.status === 'active' && !x.deletedAt));
+      const top = topIds(day, open)
+        .map((id) => all.find((x) => x.id === id && !x.deletedAt))
+        .filter((x) => !!x);
+      const done = top.filter((x) => x.status === 'done' && x.doneAt !== undefined && dayKey(x.doneAt) === key).length;
+      const next = top.find((x) => x.status === 'active');
+      const phase = phaseFor(day, getSessions());
+      let title = '';
+      let sub = '';
+      if (phase === 'plan') [title, sub] = [t('cday.rowPlan'), t('cday.rowPlanSub')];
+      else if (phase === 'close' && !day?.closedAt && (top.length || done)) [title, sub] = [t('cday.closeDay'), t('cday.rowCloseSub', { done, n: top.length })];
+      else if (phase === 'now' && top.length && next) [title, sub] = [t('cday.rowTop', { done, n: top.length }), t('cday.rowNext', { task: next.title || t('tasks.untitled') })];
+      row.hidden = !title;
+      way.hidden = !!title;
+      row.querySelector('[data-coach-row-title]')!.textContent = title;
+      row.querySelector('[data-coach-row-sub]')!.textContent = sub;
+    }
+    c.add(subscribe('coach', render));
+    c.add(subscribe('tasks', render));
+    render();
+    return c.run;
+  });
 
   onPage('in-the-way', () => {
     const sheet = document.querySelector<HTMLDialogElement>('[data-way-sheet]');
@@ -170,7 +226,12 @@ const CHEVRON = 'M9 6l6 6-6 6';
     color: var(--color-text);
     font: inherit;
     text-align: start;
+    text-decoration: none;
     cursor: pointer;
+  }
+
+  .way-row[hidden] {
+    display: none;
   }
 
   .way-row__icon {
