@@ -248,7 +248,7 @@ export const TOURS: Tour[] = [
       { target: '#acc-help', title: 'Help any time', text: 'Tours, tips and playbooks, all in one place.' },
     ],
     faq: [
-      ['Is my data synced?', 'When you sign in, focus, tasks, chains, exam prep and Budget sync. Steps, sleep and phone time stay on this phone.'],
+      ['Is my data synced?', 'When you sign in, focus, tasks, chains, exam prep, Coach and Budget sync. Steps, sleep and phone time stay on this phone.'],
       ['How do I move to a new phone?', 'Sign in on both, or save a backup here and open it on the new one.'],
     ],
   },

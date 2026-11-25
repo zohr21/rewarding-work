@@ -52,7 +52,7 @@ const ALL_STORES: StoreName[] = ['theme', 'appearance', 'lang', 'sessions', 'tim
  * reads from Health Connect (`body`), the phone time it reads (`screen`) and the bank alerts it reads (`bank`; the expenses they add are in `health`). Each name must also be allowed in firestore.rules. `breakdown` stays listed only so
  * its removal (after moving into `tasks`) reaches the account too.
  */
-export const SYNCED_STORES = ['sessions', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance', 'board'] as const;
+export const SYNCED_STORES = ['sessions', 'done', 'chain', 'chain-detail', 'tasks', 'exam', 'health', 'breakdown', 'timer-prefs', 'theme', 'appearance', 'board', 'coach'] as const;
 export type SyncedStore = (typeof SYNCED_STORES)[number];
 
 export function isSyncedStore(name: string): name is SyncedStore {
@@ -1475,7 +1475,7 @@ export interface SyncMeta {
 }
 
 /** What `known` stands for on a device that signed in before it was recorded. */
-export const SYNCED_AT_FIRST: readonly SyncedStore[] = SYNCED_STORES.filter((name) => name !== 'health' && name !== 'chain-detail');
+export const SYNCED_AT_FIRST: readonly SyncedStore[] = SYNCED_STORES.filter((name) => name !== 'health' && name !== 'chain-detail' && name !== 'coach');
 
 const EMPTY_SYNC: SyncMeta = { uid: null, active: false, dirty: [] };
 

@@ -5,7 +5,7 @@
  *
  * The Top 3 are simply the tasks on Today (src/lib/tasks.ts), and parked thoughts are the
  * Inbox the timer's scratchpad already fills, so nothing here is a second list. What this
- * file keeps is in the `coach` store (src/lib/coach.ts, this device only): the day's energy,
+ * file keeps is in the `coach` store (src/lib/coach.ts, synced to your account): the day's energy,
  * which tasks were picked, the estimates, and when the day was planned and closed.
  *
  * Everything below is pure: it takes the stored data and the time, and says what to show.

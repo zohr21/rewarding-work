@@ -1,7 +1,8 @@
 /**
  * What Focus › Coach remembers: your plan, the technique you last started from it (so it
- * can ask whether it helped), and how often each technique helped you. Kept per device,
- * like the timer settings. The scoring is in src/data/coach.ts.
+ * can ask whether it helped), how often each technique helped you, and the day rhythm.
+ * Synced to your account (mergeCoach below joins two copies). The scoring is in
+ * src/data/coach.ts.
  */
 import type { PlanPicks, Worked } from '../data/coach';
 import { read, write } from './storage';
@@ -37,6 +38,8 @@ export interface CoachDay {
   closedAt?: number;
   /** Suggestions put off with "Not now", for this day only. */
   snoozed?: string[];
+  /** Epoch ms of the last change, so the newer copy of a day wins when two devices sync. */
+  at?: number;
 }
 
 /** Sunday's look ahead (WOOP): a wish, its best outcome, the obstacle, and an if-then plan. */
@@ -59,6 +62,8 @@ export interface CoachStore {
   /** Suggestions you said aren't true; never shown again. */
   muted: string[];
   woop: Woop | null;
+  /** Epoch ms of the last write: the newer copy's plan, try and WOOP win when syncing. */
+  at?: number;
 }
 
 export const PLAN_DAYS = 7;
@@ -84,6 +89,7 @@ function readDay(v: unknown): CoachDay | null {
   if (isNum(d.plannedAt)) out.plannedAt = d.plannedAt;
   if (isNum(d.closedAt)) out.closedAt = d.closedAt;
   if (Array.isArray(d.snoozed)) out.snoozed = d.snoozed.filter(isStr);
+  if (isNum(d.at)) out.at = d.at;
   return out;
 }
 
@@ -108,7 +114,11 @@ function isPlan(v: unknown): v is CoachPlan {
 
 /** Reads the store, dropping anything malformed rather than breaking the page. */
 export function getCoach(): CoachStore {
-  const raw = read<unknown>('coach', null);
+  return normaliseCoach(read<unknown>('coach', null));
+}
+
+/** Any stored value (old shapes and garbage included) as a CoachStore. */
+export function normaliseCoach(raw: unknown): CoachStore {
   if (!raw || typeof raw !== 'object') return { ...EMPTY };
   const r = raw as Record<string, unknown>;
   const tried = r.tried as CoachTry | null;
@@ -132,14 +142,49 @@ export function getCoach(): CoachStore {
     days,
     muted: Array.isArray(r.muted) ? r.muted.filter(isStr) : [],
     woop: readWoop(r.woop),
+    ...(isNum(r.at) ? { at: r.at } : {}),
+  };
+}
+
+const keepNewest = (days: Record<string, CoachDay>): Record<string, CoachDay> => {
+  const keys = Object.keys(days).sort();
+  return keys.length > DAYS_KEPT ? Object.fromEntries(keys.slice(-DAYS_KEPT).map((k) => [k, days[k]!])) : days;
+};
+
+/**
+ * Joins this device's Coach with the account's. Days join by date, the newer copy of a day
+ * winning (this device's on a tie); "this isn't true" answers add up; for each technique the
+ * copy with more tries counts. The plan, the pending "did it help?" and the WOOP come from
+ * whichever copy was written last, so clearing them on one device clears them on the other.
+ */
+export function mergeCoach(local: CoachStore, remote: CoachStore): CoachStore {
+  const days: Record<string, CoachDay> = { ...remote.days };
+  for (const [k, d] of Object.entries(local.days)) {
+    const r = days[k];
+    if (!r || (d.at ?? 0) >= (r.at ?? 0)) days[k] = d;
+  }
+  const worked: Record<string, Worked> = { ...remote.worked };
+  for (const [slug, w] of Object.entries(local.worked)) {
+    const r = worked[slug];
+    if (!r || w.tries >= r.tries) worked[slug] = w;
+  }
+  const newer = (remote.at ?? 0) > (local.at ?? 0) ? remote : local;
+  const at = Math.max(local.at ?? 0, remote.at ?? 0);
+  return {
+    plan: newer.plan,
+    tried: newer.tried,
+    woop: newer.woop,
+    worked,
+    days: keepNewest(days),
+    muted: [...new Set([...local.muted, ...remote.muted])],
+    ...(at ? { at } : {}),
   };
 }
 
 export function setCoach(patch: Partial<CoachStore>): CoachStore {
-  const next = { ...getCoach(), ...patch };
+  const next = { ...getCoach(), ...patch, at: Date.now() };
   // Only the newest days are kept.
-  const keys = Object.keys(next.days).sort();
-  if (keys.length > DAYS_KEPT) next.days = Object.fromEntries(keys.slice(-DAYS_KEPT).map((k) => [k, next.days[k]!]));
+  next.days = keepNewest(next.days);
   write('coach', next);
   return next;
 }
@@ -147,7 +192,7 @@ export function setCoach(patch: Partial<CoachStore>): CoachStore {
 /** Change one day of the rhythm. */
 export function setDay(key: string, change: (day: CoachDay) => CoachDay): CoachDay {
   const c = getCoach();
-  const day = change({ ...(c.days[key] ?? {}) });
+  const day = { ...change({ ...(c.days[key] ?? {}) }), at: Date.now() };
   setCoach({ days: { ...c.days, [key]: day } });
   return day;
 }

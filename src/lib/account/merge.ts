@@ -19,6 +19,7 @@ import {
 } from '../storage';
 import { mergeBudgetStores, normaliseBudget } from '../budget';
 import { mergeChainDetail, normaliseDetail } from '../chainkinds';
+import { mergeCoach, normaliseCoach } from '../coach';
 
 function parse(json: string | null): unknown {
   if (json === null) return undefined;
@@ -72,6 +73,8 @@ export function mergeJson(name: SyncedStore, localJson: string | null, remoteJso
       return JSON.stringify(mergeExamStores(normaliseExam(local), normaliseExam(remote)));
     case 'health':
       return JSON.stringify(mergeBudgetStores(normaliseBudget(local), normaliseBudget(remote)));
+    case 'coach':
+      return JSON.stringify(mergeCoach(normaliseCoach(local), normaliseCoach(remote)));
     default:
       return localJson;
   }
