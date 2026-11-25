@@ -119,7 +119,7 @@ export const TIPS: Tip[] = [
     area: 'Timer',
     title: 'Count the minutes toward a task',
     text: 'Pick a task before you start. Its minutes add up on the task, and Today shows how long it has had.',
-    show: { path: '/timer', target: '[data-task-picks], [data-label]' },
+    show: { path: '/timer', target: '[data-task-row], [data-task-picks], [data-label]' },
     when: (c) => done(c).length >= 3 && active(c).length > 0 && !c.sessions.some((s) => s.taskId),
     because: 'Because your sessions are not linked to a task yet.',
   },

@@ -1,27 +1,17 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import CategoryBadge from '../components/CategoryBadge.astro';
-import EvidenceBadge from '../components/EvidenceBadge.astro';
 import FocusTabs from '../components/FocusTabs.astro';
 import TimerWidget from '../components/TimerWidget.astro';
 import { NATIVE_APP } from '../config/app';
-import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
+import { TIMER_MODES } from '../data/taxonomy';
 import { getTechniques } from '../lib/techniques';
 import { url } from '../lib/paths';
 
-/** How the timer runs each mode, under the technique it comes from (keys in src/lib/i18n). */
-const RUN_KEYS = { pomodoro: 'timer.runsPomodoro', '52-17': 'timer.runsFiftyTwo', flowtime: 'timer.runsFlowtime', custom: 'timer.runsCustom' } as const;
-const RUNS: Record<TimerMode, string> = {
-  pomodoro: '25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.',
-  '52-17': 'Longer focus blocks with a proper break. Suits work that takes a while to get into.',
-  flowtime: 'Counts up. Press “Stop & take a break” when your focus fades; the break is a fifth of your focus time.',
-  custom: 'Your own lengths, handy for timeboxing a task. Set the break to 0 for no break.',
-};
-
+/** Each rhythm with the technique page it comes from, for "Why it works" in the rhythm sheet. */
 const techniques = await getTechniques();
 const rhythms = TIMER_MODES.flatMap((mode) => {
   const technique = techniques.find((t) => t.data.timer_mode === mode);
-  return technique ? [{ mode, technique }] : [];
+  return technique ? [{ mode, href: url(`/techniques/${technique.id}`) }] : [];
 });
 ---
 
@@ -35,211 +25,16 @@ const rhythms = TIMER_MODES.flatMap((mode) => {
       {!NATIVE_APP && <p data-t="timer.pickARhythmNameYour">Pick a rhythm, name your task if you like, and start.</p>}
     </header>
 
+    {/* One column: the task, the dial and Start. Rhythm, sound and the task list open as sheets. */}
     <div class="timer-page">
-      <TimerWidget standalone />
-
-      <aside data-t-aria-label="timer.alongsideTheTimer" class="timer-side" aria-label="Alongside the timer">
-        <section class="card side-card" aria-labelledby="side-today-heading" data-side-today data-timer-url={url('/timer')}>
-          <div class="side-card__head">
-            <h2 data-t="timer.onToday" id="side-today-heading">On Today</h2>
-            <a data-t="timer.allTasks" href={url('/tasks')}>All tasks</a>
-          </div>
-          <ul class="side-tasks" role="list" data-side-tasks></ul>
-          <p class="muted side-card__empty" data-side-empty hidden>
-            <span data-t="timer.sideEmptyBefore">Nothing on Today yet. Pick what matters on</span>
-            <a data-t="timer.tasks" href={url('/tasks')}>Tasks</a><span data-t="timer.sideEmptyAfter">, or just start the timer.</span>
-          </p>
-        </section>
-
-        <section data-t-aria-label="timer.theRhythmYouPicked" class="card side-card" aria-label="The rhythm you picked">
-          {
-            rhythms.map(({ mode, technique }) => (
-              <div class="rhythm" data-rhythm={mode} hidden={mode !== 'pomodoro'}>
-                <div class="rhythm__badges">
-                  <CategoryBadge category={technique.data.category} />
-                  <EvidenceBadge level={technique.data.evidence} />
-                </div>
-                <h2>{technique.data.title}</h2>
-                <p class="muted" data-t={RUN_KEYS[mode]}>{RUNS[mode]}</p>
-                <a data-t="timer.whyItWorksAndWhen" href={url(`/techniques/${technique.id}`)}>Why it works, and when it does not</a>
-              </div>
-            ))
-          }
-        </section>
-
-        <p class="muted note">
-          {
-            NATIVE_APP ? (
-              <span data-t="timer.noteApp">
-                Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
-                minute or more are saved on this phone and grow
-              </span>
-            ) : (
-              <span data-t="timer.noteSite">
-                Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a
-                minute or more are saved in this browser and grow
-              </span>
-            )
-          }{' '}
-          <a data-t="timer.yourGrove" href={url('/progress')}>your grove</a><span data-t="timer.noteEnd">.</span>
-        </p>
-      </aside>
+      <TimerWidget standalone rhythms={rhythms} />
     </div>
   </div>
 </BaseLayout>
 
-<script>
-  import { getSessions, getTasks, subscribe } from '../lib/storage';
-  import { focusByTask, formatFocus, taskName, todayTasks } from '../lib/tasks';
-  import { cleanups, listen, onPage } from '../lib/page';
-  import { el } from '../lib/dom';
-  import { t } from '../lib/i18n';
-
-  onPage('timer-side', () => {
-    const today = document.querySelector<HTMLElement>('[data-side-today]');
-    if (!today) return;
-    const c = cleanups();
-    const list = today.querySelector<HTMLElement>('[data-side-tasks]')!;
-    const empty = today.querySelector<HTMLElement>('[data-side-empty]')!;
-    const timerUrl = today.dataset.timerUrl!;
-
-    const renderTasks = () => {
-      const tasks = todayTasks(getTasks());
-      const focus = focusByTask(getSessions());
-      list.replaceChildren(
-        ...tasks.map((task) => {
-          const item = el('li');
-          const link = el('a', 'side-task');
-          link.href = `${timerUrl}?task=${encodeURIComponent(task.id)}`;
-          const seconds = focus.get(task.id) ?? 0;
-          link.append(el('span', 'side-task__name', taskName(task)), el('span', 'muted side-task__time', seconds ? formatFocus(seconds) : t('timer.notStarted')));
-          item.append(link);
-          return item;
-        }),
-      );
-      empty.hidden = tasks.length > 0;
-    };
-
-    /** The card under the list follows the mode picked in the timer. */
-    const showRhythm = () => {
-      const mode = document.querySelector<HTMLInputElement>('input[name="timer-mode"]:checked')?.value;
-      document.querySelectorAll<HTMLElement>('.rhythm[data-rhythm]').forEach((card) => (card.hidden = card.dataset.rhythm !== mode));
-    };
-
-    renderTasks();
-    // After the timer's own script has set the mode it remembers.
-    requestAnimationFrame(showRhythm);
-    (['tasks', 'sessions'] as const).forEach((name) => c.add(subscribe(name, renderTasks)));
-    c.add(listen(document, 'change', showRhythm));
-    return c.run;
-  });
-</script>
-
 <style>
   .timer-page {
-    display: grid;
-    gap: var(--space-5);
-    align-items: start;
-  }
-
-  @media (min-width: 62rem) {
-    .timer-page {
-      grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr);
-    }
-  }
-
-  .timer-side {
-    display: grid;
-    gap: var(--space-4);
-  }
-
-  .side-card h2 {
-    font-size: var(--text-lg);
-  }
-
-  .side-card__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-  }
-
-  .side-card__head a,
-  .side-card__empty,
-  .rhythm p,
-  .rhythm a {
-    font-size: var(--text-sm);
-  }
-
-  .side-card__head a,
-  .rhythm a {
-    font-weight: 600;
-  }
-
-  /* A link on its own, not in a sentence: a full-size tap target. */
-  .side-card__head a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    padding-inline: var(--space-2);
-    margin-inline-end: calc(-1 * var(--space-2));
-  }
-
-  .side-card__head {
-    align-items: center;
-  }
-
-  .side-tasks {
-    padding: 0;
-    list-style: none;
-  }
-
-  .side-tasks :global(li) {
-    max-width: none;
-  }
-
-  .side-tasks :global(.side-task) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    min-height: 48px;
-    border-top: 1px solid var(--color-border);
-    color: var(--color-text);
-    text-decoration: none;
-  }
-
-  .side-tasks :global(.side-task:hover .side-task__name) {
-    color: var(--color-accent);
-  }
-
-  .side-tasks :global(.side-task__name) {
-    min-width: 0;
-    overflow-wrap: anywhere;
-  }
-
-  .side-tasks :global(.side-task__time) {
-    flex: none;
-    font-size: var(--text-sm);
-  }
-
-  .rhythm {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .rhythm[hidden] {
-    display: none;
-  }
-
-  .rhythm__badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-  }
-
-  .note {
-    font-size: var(--text-sm);
+    max-width: 34rem;
+    margin-inline: auto;
   }
 </style>

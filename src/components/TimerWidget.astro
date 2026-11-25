@@ -12,15 +12,27 @@ import Sprig from './Sprig.astro';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 import { TONES } from '../lib/timer/cues';
+import Sheet from './Sheet.astro';
+
+/** What each rhythm does, shown under the picked one in the rhythm sheet (keys in src/lib/i18n). */
+const RUN_KEYS = { pomodoro: 'timer.runsPomodoro', '52-17': 'timer.runsFiftyTwo', flowtime: 'timer.runsFlowtime', custom: 'timer.runsCustom' } as const;
+const RUNS: Record<TimerMode, string> = {
+  pomodoro: '25 minutes focus, 5 minute break, a 15 minute break after every 4. Good default, especially for getting started.',
+  '52-17': 'Longer focus blocks with a proper break. Suits work that takes a while to get into.',
+  flowtime: 'Counts up. Press “Stop & take a break” when your focus fades; the break is a fifth of your focus time.',
+  custom: 'Your own lengths, handy for timeboxing a task. Set the break to 0 for no break.',
+};
 
 interface Props {
   /** Mode shown when no session is in progress. Standalone uses the user's last mode. */
   defaultMode?: TimerMode;
   /** Standalone page: enables Space / R shortcuts and a larger layout. */
   standalone?: boolean;
+  /** Standalone: each rhythm with the page of the technique it comes from, for "Why it works". */
+  rhythms?: { mode: TimerMode; href: string }[];
 }
 
-const { defaultMode, standalone = false } = Astro.props;
+const { defaultMode, standalone = false, rhythms = [] } = Astro.props;
 const RADIUS = 92;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 ---
@@ -35,39 +47,62 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   data-phase="work"
   data-status="idle"
   aria-labelledby="timer-heading">
-  <div class="timer__head">
-    <h2 data-t="timer.tryItFocusTimer" id="timer-heading" class:list={{ 'visually-hidden': standalone }}>Try it: focus timer</h2>
-    {/* In the app the rhythm is a chip under the dial that opens the four choices; the site shows them all, always open. */}
-    <details class="timer__rhythm" data-rhythm-menu open={!NATIVE_APP}>
-      <summary class="timer__rhythm-chip">
-        <span data-rhythm-label data-t={modeKey(defaultMode ?? 'pomodoro')}>{modeLabel(defaultMode ?? 'pomodoro')}</span>
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-      </summary>
-      <fieldset class="timer__modes" data-modes>
-        <legend data-t="timer.timerMode" class="visually-hidden">Timer mode</legend>
-        {
-          TIMER_MODES.map((m) => (
-            <label class="seg">
-              <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
-              <span data-t={modeKey(m)}>{modeLabel(m)}</span>
-            </label>
-          ))
-        }
-      </fieldset>
-    </details>
-    <p data-t="timer.resetToChangeMode" class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
-  </div>
+  {standalone && <h2 data-t="timer.tryItFocusTimer" id="timer-heading" class="visually-hidden">Try it: focus timer</h2>}
 
-  <div class="timer__custom" data-custom hidden>
-    <label>
-      <span data-t="timer.focusMin">Focus (min)</span>
-      <input type="number" inputmode="numeric" min="1" max="240" step="1" value="15" data-custom-work />
-    </label>
-    <label>
-      <span data-t="timer.breakMin">Break (min)</span>
-      <input type="number" inputmode="numeric" min="0" max="60" step="1" value="5" data-custom-break />
-    </label>
-  </div>
+  {
+    /* On /timer what you are focusing on sits at the top, one row that opens the task sheet. */
+    standalone && (
+      <button type="button" class="timer__taskrow" data-task-row data-sheet-open="timer-task" aria-haspopup="dialog">
+        <span class="timer__taskrow-text">
+          <span class="timer__taskrow-name" data-task-row-name></span>
+          <span class="timer__taskrow-meta muted" data-task-row-meta></span>
+        </span>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+    )
+  }
+
+  {
+    !standalone && (
+      <div class="timer__head">
+        <h2 data-t="timer.tryItFocusTimer" id="timer-heading">Try it: focus timer</h2>
+        {/* In the app the rhythm is a chip that opens the four choices; the site shows them all, always open. */}
+        <details class="timer__rhythm" data-rhythm-menu open={!NATIVE_APP}>
+          <summary class="timer__rhythm-chip">
+            <span data-rhythm-label data-t={modeKey(defaultMode ?? 'pomodoro')}>{modeLabel(defaultMode ?? 'pomodoro')}</span>
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </summary>
+          <fieldset class="timer__modes" data-modes>
+            <legend data-t="timer.timerMode" class="visually-hidden">Timer mode</legend>
+            {
+              TIMER_MODES.map((m) => (
+                <label class="seg">
+                  <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
+                  <span data-t={modeKey(m)}>{modeLabel(m)}</span>
+                </label>
+              ))
+            }
+          </fieldset>
+        </details>
+        <p data-t="timer.resetToChangeMode" class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
+      </div>
+    )
+  }
+
+  {
+    !standalone && (
+      <div class="timer__custom" data-custom hidden>
+        <label>
+          <span data-t="timer.focusMin">Focus (min)</span>
+          <input type="number" inputmode="numeric" min="1" max="240" step="1" value="15" data-custom-work />
+        </label>
+        <label>
+          <span data-t="timer.breakMin">Break (min)</span>
+          <input type="number" inputmode="numeric" min="0" max="60" step="1" value="5" data-custom-break />
+        </label>
+      </div>
+    )
+  }
 
   {/* On /timer a 3D tree grows out of the top of the dial as the session runs (focus-tree.ts). */}
   {
@@ -131,17 +166,48 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     <button data-t="timer.start" type="button" class="btn timer__main" data-action="toggle">Start</button>
     <button data-t="timer.stopTakeABreak" type="button" class="btn btn--ghost" data-action="stop" hidden>Stop &amp; take a break</button>
     <button data-t="timer.skipBreak" type="button" class="btn btn--ghost" data-action="skip" hidden>Skip break</button>
-    <button data-t="timer.reset" type="button" class="btn btn--ghost" data-action="reset">Reset</button>
+    {
+      standalone ? (
+        <button data-t-aria-label="timer.reset" data-t-title="timer.reset" type="button" class="btn btn--ghost timer__reset-icon" data-action="reset" aria-label="Reset" title="Reset">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      ) : (
+        <button data-t="timer.reset" type="button" class="btn btn--ghost" data-action="reset">Reset</button>
+      )
+    }
   </div>
 
-  <label class="timer__label">
-    <span><span data-t="timer.whatAreYouWorkingOn">What are you working on?</span> <span data-t="timer.optional" class="muted">(optional)</span></span>
-    <input data-t-placeholder="timer.eGChapter3Notes" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
-    <datalist data-task-options></datalist>
-  </label>
+  {
+    /* On /timer: the rhythm and the sound behind one chip, and today's total under it. */
+    standalone && (
+      <div class="timer__bar">
+        <button type="button" class="timer__rhythm-chip timer__rhythm-chip--sheet" data-rhythm-menu data-sheet-open="timer-rhythm" aria-haspopup="dialog">
+          <span data-rhythm-label data-t={modeKey(defaultMode ?? 'pomodoro')}>{modeLabel(defaultMode ?? 'pomodoro')}</span>
+          <svg class="timer__bell" data-bell viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path class="timer__bell-off" d="M4 4l16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </button>
+        <a href={url('/progress')} class="timer__today" data-today></a>
+      </div>
+    )
+  }
+
+  {
+    !standalone && (
+      <label class="timer__label">
+        <span><span data-t="timer.whatAreYouWorkingOn">What are you working on?</span> <span data-t="timer.optional" class="muted">(optional)</span></span>
+        <input data-t-placeholder="timer.eGChapter3Notes" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
+        <datalist data-task-options></datalist>
+      </label>
+    )
+  }
   {/* The Android app's web view doesn't open the suggestions above, so there your tasks are buttons (timer-ui.ts). */}
-  {NATIVE_APP && <div data-t-aria-label="timer.yourTasks" class="timer__picks" role="group" aria-label="Your tasks" data-task-picks hidden />}
-  <p class="timer__task muted" data-task-link hidden></p>
+  {!standalone && NATIVE_APP && <div data-t-aria-label="timer.yourTasks" class="timer__picks" role="group" aria-label="Your tasks" data-task-picks hidden />}
+  {!standalone && <p class="timer__task muted" data-task-link hidden></p>}
 
   <div class="timer__jot">
     <button data-t="timer.jotAThought" type="button" class="btn btn--ghost btn--small" aria-expanded="false" aria-controls="timer-jot-form" data-jot-open>
@@ -155,22 +221,26 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     <p class="timer__jot-status muted" data-jot-status hidden></p>
   </div>
 
-  <div class="timer__footer">
-    <label class="timer__sound">
-      <input type="checkbox" data-sound checked />
-      <span data-t="timer.sound">Sound</span>
-    </label>
-    <span class="timer__sound-options" data-sound-options>
-      <label data-t="timer.endSound" class="visually-hidden" for="timer-tone">End sound</label>
-      <select id="timer-tone" class="input timer__tone" data-tone>
-        {TONES.map((tone) => <option value={tone} data-t={`tone.${tone}`}>{toneLabel(tone)}</option>)}
-      </select>
-      <label data-t="timer.volume" class="visually-hidden" for="timer-volume">Volume</label>
-      <input id="timer-volume" class="timer__volume" type="range" min="5" max="100" step="5" value="70" data-volume />
-    </span>
-    <span class="muted" data-notify-status></span>
-    <a href={url('/progress')} class="timer__today" data-today></a>
-  </div>
+  {
+    !standalone && (
+      <div class="timer__footer">
+        <label class="timer__sound">
+          <input type="checkbox" data-sound checked />
+          <span data-t="timer.sound">Sound</span>
+        </label>
+        <span class="timer__sound-options" data-sound-options>
+          <label data-t="timer.endSound" class="visually-hidden" for="timer-tone">End sound</label>
+          <select id="timer-tone" class="input timer__tone" data-tone>
+            {TONES.map((tone) => <option value={tone} data-t={`tone.${tone}`}>{toneLabel(tone)}</option>)}
+          </select>
+          <label data-t="timer.volume" class="visually-hidden" for="timer-volume">Volume</label>
+          <input id="timer-volume" class="timer__volume" type="range" min="5" max="100" step="5" value="70" data-volume />
+        </span>
+        <span class="muted" data-notify-status></span>
+        <a href={url('/progress')} class="timer__today" data-today></a>
+      </div>
+    )
+  }
 
   {
     standalone && (
@@ -178,6 +248,98 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
         <span data-t="timer.keys">Keyboard:</span> <kbd data-t="timer.space">Space</kbd> <span data-t="timer.keysStartPause">start / pause</span> ·
         <kbd>R</kbd> <span data-t="timer.keysReset">reset</span> · <kbd>J</kbd> <span data-t="timer.keysJot">jot a thought</span>
       </p>
+    )
+  }
+
+  {
+    /* The rhythm sheet: the four rhythms, what the picked one does and why, and the end sound. */
+    standalone && (
+      <Sheet id="timer-rhythm" title="Rhythm and sound" titleKey="timer.rhythmAndSound">
+        <div class="timer__sheet">
+          <fieldset class="timer__modes" data-modes>
+            <legend data-t="timer.timerMode" class="visually-hidden">Timer mode</legend>
+            {
+              TIMER_MODES.map((m) => (
+                <label class="seg">
+                  <input type="radio" name="timer-mode" value={m} checked={m === (defaultMode ?? 'pomodoro')} />
+                  <span data-t={modeKey(m)}>{modeLabel(m)}</span>
+                </label>
+              ))
+            }
+          </fieldset>
+          <p data-t="timer.resetToChangeMode" class="timer__mode-hint muted" data-mode-hint hidden>Reset to change mode.</p>
+          <div class="timer__custom" data-custom hidden>
+            <label>
+              <span data-t="timer.focusMin">Focus (min)</span>
+              <input type="number" inputmode="numeric" min="1" max="240" step="1" value="15" data-custom-work />
+            </label>
+            <label>
+              <span data-t="timer.breakMin">Break (min)</span>
+              <input type="number" inputmode="numeric" min="0" max="60" step="1" value="5" data-custom-break />
+            </label>
+          </div>
+          {
+            rhythms.map((r) => (
+              <div class="timer__about" data-rhythm-about={r.mode} hidden={r.mode !== (defaultMode ?? 'pomodoro')}>
+                <p class="muted" data-t={RUN_KEYS[r.mode]}>{RUNS[r.mode]}</p>
+                <a href={r.href}>
+                  <span data-t="timer.whyItWorksAndWhen">Why it works, and when it does not</span>
+                </a>
+              </div>
+            ))
+          }
+          <div class="timer__sheet-sound">
+            <label class="timer__sound">
+              <input type="checkbox" data-sound checked />
+              <span data-t="timer.sound">Sound</span>
+            </label>
+            <span class="timer__sound-options" data-sound-options>
+              <label data-t="timer.endSound" class="visually-hidden" for="timer-tone">End sound</label>
+              <select id="timer-tone" class="input timer__tone" data-tone>
+                {TONES.map((tone) => <option value={tone} data-t={`tone.${tone}`}>{toneLabel(tone)}</option>)}
+              </select>
+              <label data-t="timer.volume" class="visually-hidden" for="timer-volume">Volume</label>
+              <input id="timer-volume" class="timer__volume" type="range" min="5" max="100" step="5" value="70" data-volume />
+            </span>
+          </div>
+          <span class="muted timer__notify" data-notify-status></span>
+          <p class="muted timer__note">
+            {
+              NATIVE_APP ? (
+                <span data-t="timer.noteApp">
+                  Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a minute or more are saved on this phone and grow
+                </span>
+              ) : (
+                <span data-t="timer.noteSite">
+                  Breaks start automatically when a focus session ends; the next focus session waits for you. Sessions of a minute or more are saved in this browser and grow
+                </span>
+              )
+            }{' '}
+            <a data-t="timer.yourGrove" href={url('/progress')}>your grove</a><span data-t="timer.noteEnd">.</span>
+          </p>
+        </div>
+      </Sheet>
+    )
+  }
+
+  {
+    /* The task sheet: Coach's Top 3 and Today first, then your other tasks and exam chapters, or your own words. */
+    standalone && (
+      <Sheet id="timer-task" title="Focus on" titleKey="timer.focusOn">
+        <div class="timer__sheet">
+          <ul class="timer__picklist" role="list" data-t-aria-label="timer.yourTasks" aria-label="Your tasks" data-task-picks data-rich></ul>
+          <label class="timer__own">
+            <span data-t="timer.orTypeYourOwn">Or type your own</span>
+            <input data-t-placeholder="timer.eGChapter3Notes" class="input" type="text" maxlength="80" autocomplete="off" placeholder="e.g. Chapter 3 notes" data-label />
+            <datalist data-task-options></datalist>
+          </label>
+          <p class="timer__task muted" data-task-link hidden></p>
+          <div class="timer__sheet-actions">
+            <button data-t="timer.noTask" type="button" class="btn btn--ghost btn--small" data-pick-clear hidden>No task</button>
+            <a data-t="timer.allTasks" class="btn btn--ghost btn--small" href={url('/tasks')}>All tasks</a>
+          </div>
+        </div>
+      </Sheet>
     )
   }
 
@@ -1255,5 +1417,294 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
     border-radius: 4px;
     font-family: var(--font-mono);
     font-size: 0.9em;
+  }
+
+  /* ---- /timer (option B, 26 Nov 2026): the task on top, rhythm and sound in a sheet, quiet while focusing ---- */
+
+  .timer__taskrow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: 100%;
+    min-height: 56px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--raised-grad);
+    box-shadow:
+      inset 0 1px 0 var(--raised-hl),
+      0 2px 0 var(--edge);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .timer__taskrow:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .timer__taskrow svg {
+    flex: none;
+    color: var(--color-text-muted);
+  }
+
+  .timer__taskrow-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+  }
+
+  .timer__taskrow-name {
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .timer__taskrow-name.is-empty {
+    color: var(--color-text-muted);
+    font-weight: 500;
+  }
+
+  .timer__taskrow-meta {
+    font-size: var(--text-xs);
+  }
+
+  .timer__taskrow-meta:empty {
+    display: none;
+  }
+
+  .timer__bar {
+    display: grid;
+    justify-items: center;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    transition:
+      opacity var(--duration-slow, 0.4s) var(--ease-out),
+      visibility 0s linear;
+  }
+
+  .timer__rhythm-chip--sheet {
+    background: none;
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  /* The site hides the <details> chip (its choices are always open), but not this one. */
+  :global(html:not([data-app])) .timer__rhythm-chip--sheet {
+    display: inline-flex;
+  }
+
+  .timer__rhythm-chip--sheet:focus-visible {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .timer__bell {
+    color: var(--color-text-muted);
+  }
+
+  .timer__bell-off {
+    display: none;
+  }
+
+  .timer[data-muted] .timer__bell-off {
+    display: inline;
+  }
+
+  .timer--standalone .timer__controls {
+    flex-wrap: nowrap;
+    inline-size: 100%;
+  }
+
+  .timer--standalone .timer__main {
+    flex: 1 1 0;
+  }
+
+  .timer__reset-icon {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    inline-size: 56px;
+    padding-inline: 0;
+  }
+
+  :global(html[data-app]) .timer--standalone .timer__main {
+    flex: 1 1 0;
+  }
+
+  :global(html[data-app]) .timer--standalone .timer__controls .timer__reset-icon {
+    flex: none;
+    inline-size: 60px;
+    min-height: 60px;
+    padding-inline: 0;
+    border-radius: 18px;
+  }
+
+  :global(html[data-app]) .timer__bar {
+    order: 6;
+  }
+
+  /* While you focus, only the task, the tree, the dial, Pause and Jot stay; the rest fades and comes back on a break. */
+  .timer--standalone[data-status='running'][data-phase='work'] .timer__bar,
+  .timer--standalone[data-status='running'][data-phase='work'] .timer__keys,
+  .timer--standalone[data-status='running'][data-phase='work'] .timer__jot-status {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity var(--duration-slow, 0.4s) var(--ease-out),
+      visibility 0s linear var(--duration-slow, 0.4s);
+  }
+
+  :global(html:has(.timer--standalone[data-status='running'][data-phase='work'])) :global(:is(.app-nav, .focus-bar, .site-header)) {
+    opacity: 0.4;
+    transition: opacity var(--duration-slow, 0.4s) var(--ease-out);
+  }
+
+  :global(html:has(.timer--standalone[data-status='running'][data-phase='work'])) :global(:is(.app-nav, .focus-bar, .site-header):is(:hover, :focus-within)) {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .timer__bar,
+    .timer--standalone[data-status='running'][data-phase='work'] .timer__bar {
+      transition: none;
+    }
+  }
+
+  /* Inside the two sheets. */
+  .timer__sheet {
+    display: grid;
+    gap: var(--space-4);
+    text-align: start;
+  }
+
+  .timer__sheet .timer__modes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    inline-size: 100%;
+  }
+
+  .timer__sheet .seg span {
+    justify-content: center;
+    inline-size: 100%;
+    padding: 0;
+  }
+
+  .timer__sheet .timer__custom {
+    justify-content: flex-start;
+  }
+
+  .timer__about {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  .timer__about[hidden] {
+    display: none;
+  }
+
+  .timer__about a {
+    font-weight: 600;
+  }
+
+  .timer__sheet-sound {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+  }
+
+  .timer__notify:empty {
+    display: none;
+  }
+
+  .timer__note,
+  .timer__notify {
+    font-size: var(--text-sm);
+  }
+
+  .timer__picklist {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .timer__picklist[hidden] {
+    display: none;
+  }
+
+  .timer__picklist :global(li) {
+    max-width: none;
+  }
+
+  .timer__picklist :global(.timer__pickrow) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    inline-size: 100%;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--surface-grad);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .timer__picklist :global(.timer__pickrow[aria-pressed='true']) {
+    border-color: var(--color-accent);
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+  }
+
+  .timer__picklist :global(.timer__pickrow:focus-visible) {
+    outline: 3px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  .timer__picklist :global(.timer__pickrow-name) {
+    min-width: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .timer__picklist :global(.timer__pickrow-meta) {
+    flex: none;
+    font-size: var(--text-xs);
+  }
+
+  .timer__own {
+    display: grid;
+    gap: var(--space-1);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+
+  .timer__own .input {
+    font-weight: 400;
+  }
+
+  .timer__sheet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  .timer__sheet-actions [hidden] {
+    display: none;
   }
 </style>

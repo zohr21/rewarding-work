@@ -6,6 +6,20 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **26 Nov · Timer layout (option B: task on top, quiet while running).** The Timer page was
+  ~1,740 px on a phone and repeated itself (task chips and an On Today card listed the same
+  tasks; a technique card repeated the rhythm chip). Now one column: a "Focusing on" row at
+  the top opens a task sheet (Coach's Top 3, then Today, other open tasks, open exam chapters,
+  each with its focus time, or your own words; picks link by id). The 3D tree stays above the
+  dial. Start with a small reset icon, then one rhythm chip that opens a "Rhythm and sound"
+  sheet (modes, Custom lengths, what the picked rhythm does with "Why it works", end sound,
+  the note about breaks), and today's total. While focusing the chip, total and keyboard hint
+  fade and the app bar, Focus tabs and header dim. Arriving from Tasks (row ▶, task sheet with
+  its step) or Exam (chapter Focus/Review, goal) sets the task when idle or on a break; in the
+  middle of a focus session it says to finish or reset first instead of moving the minutes.
+  Technique pages keep their inline timer as before. Options A (tidy) and C (full-screen
+  session) were set aside; C could come later on top of B.
+
 - **25 Nov · Coach day rhythm (option B).** Coach follows the day with tabs Plan · Now ·
   Close · Week, opening on the one that fits the time. Plan: energy (with last night's sleep
   when Health is on), a Top 3 that is simply the first three on Today (picked in a sheet),
