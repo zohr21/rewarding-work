@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.6 (Coach day rhythm, new Timer):
+
+```
+<en-US>
+New: Coach follows your day. Plan your Top 3 in the morning, see what to do now, close the day in the evening and look back on the week. Your Coach days sync with your account. The Timer is calmer: pick your task at the top, rhythm and sound open from one button, and the screen goes quiet while you focus. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: Ментор ведёт ваш день. Утром выберите Топ-3, днём смотрите, что делать сейчас, вечером подведите итог и взгляните на неделю. Дни Ментора синхронизируются с аккаунтом. Таймер стал спокойнее: задача выбирается сверху, ритм и звук открываются одной кнопкой, а во время фокуса экран затихает. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə edəcəyini gör, axşam günün yekununu vur və həftəyə bax. Mentor günlərin hesabınla sinxronlaşır. Taymer daha sakitdir: tapşırığı yuxarıdan seç, ritm və səs bir düymə ilə açılır, fokus zamanı ekran sakitləşir. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 ## 7. During the 14 days (both)
 
 - Keep a short log below: who joined, what they said, and what changed.
