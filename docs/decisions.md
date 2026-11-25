@@ -16,12 +16,13 @@ canvases are private pages and this repository is public, so their links are not
   first step for what's left, parked thoughts kept or let go, Close the day. Week (Sunday
   afternoon): the week so far, a kind line about quiet days, and a WOOP plan shown each
   morning. The six tiles and the weekly plan moved into a "Stuck?" fold. Today's app row shows
-  the day (Plan your day / Top 3 · 1 of 3 / Close the day). My choices, not confirmed: kept on
-  this device only (the `coach` store isn't synced); estimates live in Coach, not on tasks;
+  the day (Plan your day / Top 3 · 1 of 3 / Close the day). My choices, not confirmed: estimates live in Coach, not on tasks;
   closing the day doesn't tick the chain (the chain is for your own habit); no reminders.
   26 Nov, after the phone test: the Plan · Now · Close · Week tabs are plain words with an
   underline (not pills like Focus's own tabs), and the app hides the page's "Coach" heading,
-  as Timer and Tasks do.
+  as Timer and Tasks do. The owner chose to sync the `coach` store: days join by date (the
+  newer copy of a day wins), the plan and WOOP come from the copy written last, and it is not
+  in `SYNCED_AT_FIRST`, so devices already signed in send what they hold.
 
 - **25 Nov · Savings autopilot (option C).** In the Savings sheet: "Sweep what is left" (on
   by default) offers last month's rest on Budget at the start of a month, once (Save / Keep it),

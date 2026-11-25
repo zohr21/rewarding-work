@@ -4,7 +4,8 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { write, read, type FocusSession, type Task } from '../src/lib/storage';
-import { getCoach, setDay, DAYS_KEPT } from '../src/lib/coach';
+import { getCoach, setDay, DAYS_KEPT, mergeCoach, normaliseCoach } from '../src/lib/coach';
+import { mergeJson } from '../src/lib/account/merge';
 import { closeHour, energyFromSleep, estimateRatio, padded, phaseFor, signal, weekSummary, woopWeek } from '../src/lib/coachday';
 import { dayKey } from '../src/lib/dates';
 
@@ -133,5 +134,43 @@ describe('the week', () => {
   it('writes Sunday’s review for the coming week', () => {
     expect(woopWeek(at(2026, 11, 29, 18))).toBe('2026-11-30');
     expect(woopWeek(at(2026, 11, 25, 18))).toBe('2026-11-23');
+  });
+});
+
+describe('coach sync', () => {
+  const base = normaliseCoach(null);
+  it('keeps the newer copy of a day and joins the rest', () => {
+    const local = { ...base, days: { '2026-11-24': { energy: 'low' as const, at: 5 }, '2026-11-25': { top: ['a'], at: 1 } } };
+    const remote = { ...base, days: { '2026-11-25': { top: ['b'], at: 9 }, '2026-11-26': { energy: 'good' as const, at: 2 } } };
+    const m = mergeCoach(local, remote);
+    expect(Object.keys(m.days).sort()).toEqual(['2026-11-24', '2026-11-25', '2026-11-26']);
+    expect(m.days['2026-11-25']!.top).toEqual(['b']);
+  });
+  it('takes plan, try and WOOP from the copy written last, so clearing them sticks', () => {
+    const woop = { week: '2026-11-23', wish: 'w', outcome: 'o', obstacle: 'x', plan: 'p' };
+    const m = mergeCoach({ ...base, woop: null, tried: null, at: 20 }, { ...base, woop, tried: { slug: 'pomodoro', at: 1 }, at: 10 });
+    expect(m.woop).toBeNull();
+    expect(m.tried).toBeNull();
+    expect(m.at).toBe(20);
+  });
+  it('adds up muted suggestions and keeps the technique count with more tries', () => {
+    const m = mergeCoach(
+      { ...base, muted: ['phone'], worked: { pomodoro: { helped: 1, tries: 2 } } },
+      { ...base, muted: ['stuck', 'phone'], worked: { pomodoro: { helped: 3, tries: 4 }, flowtime: { helped: 1, tries: 1 } } },
+    );
+    expect(m.muted.sort()).toEqual(['phone', 'stuck']);
+    expect(m.worked).toEqual({ pomodoro: { helped: 3, tries: 4 }, flowtime: { helped: 1, tries: 1 } });
+  });
+  it('merges an old-shape store from the account without losing either side', () => {
+    const old = JSON.stringify({ plan: null, tried: null, worked: { pomodoro: { helped: 1, tries: 1 } } });
+    const mine = JSON.stringify({ ...base, days: { '2026-11-25': { energy: 'ok', at: 3 } }, at: 3 });
+    const out = normaliseCoach(JSON.parse(mergeJson('coach', mine, old)!));
+    expect(out.days['2026-11-25']!.energy).toBe('ok');
+    expect(out.worked.pomodoro!.tries).toBe(1);
+  });
+  it('stamps when a day changed', () => {
+    setDay('2026-11-25', (d) => ({ ...d, energy: 'good' }));
+    expect(getCoach().days['2026-11-25']!.at).toBeGreaterThan(0);
+    expect(getCoach().at).toBeGreaterThan(0);
   });
 });
