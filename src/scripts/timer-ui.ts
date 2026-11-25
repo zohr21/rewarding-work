@@ -876,7 +876,14 @@ function mountTimer(root: HTMLElement): () => void {
       input.checked = true;
       input.dispatchEvent(new Event('change'));
     }
-    history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&]mode=[^&]*/, '').replace(/^&/, '?'));
+    // Coach's shorter box: /timer?mode=custom&min=15. The timer takes that length, but your saved default doesn't change.
+    const wantedMin = Number(new URLSearchParams(location.search).get('min'));
+    if (wantedMode === 'custom' && wantedMin > 0 && state.status === 'idle' && state.phase === 'work') {
+      const custom = T.clampCustom({ workMin: wantedMin, breakMin: state.custom.breakMin });
+      els.customWork.value = String(custom.workMin);
+      commit(T.setCustom(state, custom));
+    }
+    history.replaceState(history.state, '', location.pathname + location.search.replace(/[?&](mode|min)=[^&]*/g, '').replace(/^&/, '?'));
   }
 
   // Arriving from Focus on the tasks page: /timer?task=<id>, with &step=<id> for the step you're on.

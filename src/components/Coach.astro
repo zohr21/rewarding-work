@@ -419,6 +419,9 @@ const ICONS: Record<string, string> = {
       picks = forBlocker(id, getCoach().worked).filter((s) => info[s]);
       pick = 0;
       if (!picks.length) return;
+      // On the Coach page this sits in the "Stuck?" fold; an answer shows it open.
+      const fold = root!.closest('details');
+      if (fold) fold.open = true;
       showView('answer');
       renderAnswer();
       answer.focus();

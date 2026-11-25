@@ -125,7 +125,8 @@ export const TOURS: Tour[] = [
     area: 'Coach',
     path: '/techniques',
     steps: [
-      { target: '[data-coach]', title: 'Stuck?', text: "Say what's in the way, and the coach picks a technique to try now." },
+      { target: '[data-cday]', title: 'Your day', text: "Pick a Top 3 in the morning, see what's next during the day, and close the day in the evening." },
+      { target: '[data-stuck]', title: 'Stuck?', text: "Say what's in the way, and the coach picks a technique to try now." },
       { target: '[data-library]', title: 'All techniques', text: 'Every technique, with how strong the evidence for it is.' },
     ],
     faq: [

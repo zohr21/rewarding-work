@@ -6,6 +6,23 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **25 Nov · Coach day rhythm (option B).** Coach follows the day with tabs Plan · Now ·
+  Close · Week, opening on the one that fits the time. Plan: energy (with last night's sleep
+  when Health is on), a Top 3 that is simply the first three on Today (picked in a sheet),
+  15/25/50/90-minute estimates, your best two hours. Now: Top 3 progress, one suggestion with
+  its reason (task waiting 3+ days, low energy, stopping early at this time of day, best hours,
+  an app that keeps coming up, next task), "Not now" for today and "This isn't true" for good,
+  and "Park a thought" into the Inbox. Close: done vs. planned, estimate vs. timer time, a
+  first step for what's left, parked thoughts kept or let go, Close the day. Week (Sunday
+  afternoon): the week so far, a kind line about quiet days, and a WOOP plan shown each
+  morning. The six tiles and the weekly plan moved into a "Stuck?" fold. Today's app row shows
+  the day (Plan your day / Top 3 · 1 of 3 / Close the day). My choices, not confirmed: kept on
+  this device only (the `coach` store isn't synced); estimates live in Coach, not on tasks;
+  closing the day doesn't tick the chain (the chain is for your own habit); no reminders.
+  26 Nov, after the phone test: the Plan · Now · Close · Week tabs are plain words with an
+  underline (not pills like Focus's own tabs), and the app hides the page's "Coach" heading,
+  as Timer and Tasks do.
+
 - **25 Nov · Savings autopilot (option C).** In the Savings sheet: "Sweep what is left" (on
   by default) offers last month's rest on Budget at the start of a month, once (Save / Keep it),
   to the first goal not yet reached; "Round up payments" (off by default) counts each payment's
