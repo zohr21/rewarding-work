@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.6 (Coach day rhythm, new Timer):
+
+```
+<en-US>
+New: Coach follows your day. Plan your Top 3 in the morning, see what to do now, close the day in the evening and look back on the week. Your Coach days sync with your account. The Timer is calmer: pick your task at the top, rhythm and sound open from one button, and the screen goes quiet while you focus. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: Ментор ведёт ваш день. Утром выберите Топ-3, днём смотрите, что делать сейчас, вечером подведите итог и взгляните на неделю. Дни Ментора синхронизируются с аккаунтом. Таймер стал спокойнее: задача выбирается сверху, ритм и звук открываются одной кнопкой, а во время фокуса экран затихает. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə edəcəyini gör, axşam günün yekununu vur və həftəyə bax. Mentor günlərin hesabınla sinxronlaşır. Taymer daha sakitdir: tapşırığı yuxarıdan seç, ritm və səs bir düymə ilə açılır, fokus zamanı ekran sakitləşir. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 ## 7. During the 14 days (both)
 
 - Keep a short log below: who joined, what they said, and what changed.
@@ -183,3 +197,4 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 | 15 Nov 2026 | Closed testing track (Alpha): 178 countries, feedback email `grovyn.support@gmail.com`, email list "Grovyn testers" (first tester: the owner). Release 100 (0.1.0) uploaded with notes in 3 languages; Health Connect permission reasons filled in. 17 changes sent for review. Opt-in link (works after approval): `https://play.google.com/apps/testing/app.grovyn`. Built before the AZ Health rings fix (PR 89), so that fix comes in the next version. |
 | 15 Nov 2026 | Firebase: both SHA-1s added to the `app.grovyn` Android app (Play app signing `D8:FB:45:B0:2D:25:A9:10:78:DF:74:5E:7C:3E:58:AD:95:30:84:51`, upload key `FD:3B:…:0D:0A`). Google sign-in in the Play build not yet tried. |
 | 19 Nov 2026 | Weekly board with report and block. Firestore rules published. Release 102 (0.1.2) uploaded to Alpha. New content rating questionnaire: users interact = Yes, block = Yes, report = Yes, no chat, not friends-only. Ratings unchanged (Everyone, ClassInd L) plus "Users Interact". Both sent for review. |
+| 26 Nov 2026 | Release 106 (0.1.6) uploaded to Alpha: Coach day rhythm and sync, the new Timer (task on top, rhythm and sound in a sheet, quiet while focusing). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.5 had been published 25 Nov. |
