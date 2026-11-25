@@ -18,7 +18,10 @@ import { clearTimerNotice, notificationsGranted, requestNotifications, showTimer
 import { isTone, notify, notificationPermission, playChime, requestNotificationPermission, unlockAudio, type Tone } from '../lib/timer/cues';
 import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
-import { focusLabel, jot, listOf, logSession, taskMatchingLabel, taskName, todayTasks, type SessionLog } from '../lib/tasks';
+import { focusByTask, focusLabel, formatFocus, jot, listOf, logSession, taskMatchingLabel, taskName, todayTasks, type SessionLog } from '../lib/tasks';
+import { getCoach } from '../lib/coach';
+import { topIds } from '../lib/coachday';
+import { dayKey } from '../lib/dates';
 import { checkSession, formatShort, type SessionPhone } from '../lib/screen';
 import { getProfile } from '../lib/profile';
 
@@ -110,7 +113,14 @@ function mountTimer(root: HTMLElement): () => void {
   const els = {
     modes: Array.from(root.querySelectorAll<HTMLInputElement>('input[name="timer-mode"]')),
     modeHint: q<HTMLElement>('[data-mode-hint]'),
-    rhythm: root.querySelector<HTMLDetailsElement>('[data-rhythm-menu]'),
+    /** The rhythm chip: a <details> on technique pages, a button that opens the rhythm sheet on /timer. */
+    rhythm: root.querySelector<HTMLElement>('[data-rhythm-menu]'),
+    /** /timer: what each rhythm does, under the picked one in the rhythm sheet. */
+    abouts: Array.from(root.querySelectorAll<HTMLElement>('[data-rhythm-about]')),
+    /** /timer: the row at the top naming what you focus on, and its sheet's "No task". */
+    taskRowName: root.querySelector<HTMLElement>('[data-task-row-name]'),
+    taskRowMeta: root.querySelector<HTMLElement>('[data-task-row-meta]'),
+    pickClear: root.querySelector<HTMLButtonElement>('[data-pick-clear]'),
     rhythmLabel: root.querySelector<HTMLElement>('[data-rhythm-label]'),
     custom: q<HTMLElement>('[data-custom]'),
     customWork: q<HTMLInputElement>('[data-custom-work]'),
@@ -377,6 +387,7 @@ function mountTimer(root: HTMLElement): () => void {
     if (els.rhythmLabel) els.rhythmLabel.textContent = rhythmText(mode, state.custom);
 
     els.custom.hidden = mode !== 'custom';
+    for (const about of els.abouts) about.hidden = about.dataset.rhythmAbout !== mode;
     els.customWork.disabled = els.customBreak.disabled = inPhase;
     if (document.activeElement !== els.customWork) els.customWork.value = String(state.custom.workMin);
     if (document.activeElement !== els.customBreak) els.customBreak.value = String(state.custom.breakMin);
@@ -401,6 +412,7 @@ function mountTimer(root: HTMLElement): () => void {
     if (document.activeElement !== els.label) els.label.value = state.label;
     els.sound.checked = prefs.sound;
     els.soundOptions.hidden = !prefs.sound;
+    root.toggleAttribute('data-muted', !prefs.sound);
     els.tone.value = prefs.tone;
     if (document.activeElement !== els.volume) els.volume.value = String(Math.round(prefs.volume * 100));
 
@@ -731,7 +743,7 @@ function mountTimer(root: HTMLElement): () => void {
       commit(T.setMode(state, mode));
       announce(t('timer.modeSaid', { mode: modeLabel(mode) }));
       // The app's chip folds the choices away once one is picked (the site keeps them open).
-      if (NATIVE_APP && els.rhythm) els.rhythm.open = false;
+      if (NATIVE_APP && els.rhythm instanceof HTMLDetailsElement) els.rhythm.open = false;
     });
   }
 
@@ -770,7 +782,8 @@ function mountTimer(root: HTMLElement): () => void {
         ...openChapters().map((ch) => ch.name),
       ].map((value) => Object.assign(document.createElement('option'), { value })),
     );
-    if (els.picks) {
+    if (els.picks?.hasAttribute('data-rich')) renderPickList();
+    else if (els.picks) {
       // Today's tasks first, in their order; then the rest, and open exam chapters.
       const open = getTasks().filter((t) => t.status === 'active' && t.title && listOf(t) !== 'inbox');
       const today = todayTasks(open);
@@ -789,6 +802,7 @@ function mountTimer(root: HTMLElement): () => void {
     }
     const task = state.taskId ? getTask(state.taskId) : null;
     const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
+    renderTaskRow(task, chapter);
     els.taskLink.hidden = !task && !chapter;
     els.taskLink.textContent = task
       ? t('timer.linkedTask')
@@ -796,6 +810,77 @@ function mountTimer(root: HTMLElement): () => void {
         ? t('timer.linkedChapter')
         : '';
     renderJotStatus();
+  }
+
+  /** /timer's top row: what you focus on, with its time so far, or the question. */
+  function renderTaskRow(task: Task | null | undefined, chapter: ExamChapter | undefined): void {
+    if (!els.taskRowName || !els.taskRowMeta) return;
+    const label = state.label.trim();
+    els.taskRowName.textContent = label || t('timer.whatAreYouWorkingOn');
+    els.taskRowName.classList.toggle('is-empty', !label);
+    const id = task?.id ?? chapter?.id;
+    const seconds = id ? (focusByTask(getSessions()).get(id) ?? 0) : 0;
+    const parts: string[] = [];
+    if (chapter) parts.push(t('timer.examChapter'));
+    if (id) parts.push(seconds ? t('timer.focusSoFar', { time: formatFocus(seconds) }) : t('timer.notStarted'));
+    else if (!label) parts.push(t('timer.tapToPick'));
+    els.taskRowMeta.textContent = parts.join(' · ');
+    if (els.pickClear) els.pickClear.hidden = !label;
+  }
+
+  /**
+   * /timer's task sheet: Coach's Top 3 first, then the rest of Today, your other open tasks,
+   * and open exam chapters, each with its focus time so far. A pick links the session by id.
+   */
+  function renderPickList(): void {
+    const list = els.picks!;
+    const open = getTasks().filter((x) => x.status === 'active' && x.title && listOf(x) !== 'inbox');
+    const today = todayTasks(open);
+    const day = getCoach().days[dayKey(Date.now())];
+    const top = day?.top?.length ? topIds(day, today) : [];
+    const byId = new Map(open.map((x) => [x.id, x]));
+    const ordered = [
+      ...top.map((id) => byId.get(id)).filter((x): x is Task => !!x),
+      ...today.filter((x) => !top.includes(x.id)),
+      ...open.filter((x) => !today.includes(x) && !top.includes(x.id)),
+    ];
+    const focus = focusByTask(getSessions());
+    const row = (id: string, name: string, tag: string, seconds: number) => {
+      const item = el('li');
+      const b = el('button', 'timer__pickrow');
+      b.type = 'button';
+      b.dataset.pickId = id;
+      b.dataset.pick = name;
+      b.setAttribute('aria-pressed', String(state.taskId === id));
+      const meta = [tag, seconds ? formatFocus(seconds) : ''].filter(Boolean).join(' · ');
+      b.append(el('span', 'timer__pickrow-name', name), el('span', 'muted timer__pickrow-meta', meta));
+      item.append(b);
+      return item;
+    };
+    const items = [
+      ...ordered.slice(0, 20).map((x) => row(x.id, taskName(x), top.includes(x.id) ? t('timer.topThree') : today.includes(x) ? t('timer.today') : '', focus.get(x.id) ?? 0)),
+      ...openChapters().map((ch) => row(ch.id, ch.name, t('timer.examChapter'), focus.get(ch.id) ?? 0)),
+    ];
+    list.hidden = items.length === 0;
+    list.replaceChildren(...items);
+  }
+
+  /**
+   * Focus on a task, step or chapter picked here or arriving from Tasks or Exam.
+   * On a break or before starting it is kept for the next focus; in the middle of a focus
+   * session it would move minutes already done, so it asks you to finish or reset first.
+   */
+  function focusOnItem(label: string, id: string | undefined): boolean {
+    if (state.phase === 'work' && state.status !== 'idle' && state.taskId !== id) {
+      setMessage(t('timer.busySwitch', { label }));
+      return false;
+    }
+    state = T.setLabel(state, label, id);
+    write('timer', state);
+    render();
+    renderTasks();
+    syncNotice();
+    return true;
   }
 
   // ---- Scratchpad: catch a stray thought without leaving the session ----
@@ -860,9 +945,22 @@ function mountTimer(root: HTMLElement): () => void {
     syncNotice();
   };
   els.label.addEventListener('input', onLabel);
+  els.pickClear?.addEventListener('click', () => {
+    els.label.value = '';
+    onLabel();
+    els.pickClear?.closest('dialog')?.close();
+  });
   els.picks?.addEventListener('click', (e) => {
     const pick = (e.target as HTMLElement).closest<HTMLElement>('[data-pick]');
     if (!pick) return;
+    // /timer's sheet links by id, so two tasks with the same name stay apart.
+    if (pick.dataset.pickId) {
+      // Picking re-renders the list, so find the sheet before.
+      const sheet = pick.closest('dialog');
+      if (focusOnItem(pick.dataset.pick!, pick.dataset.pickId)) announce(t('timer.workingOn', { label: pick.dataset.pick! }));
+      sheet?.close();
+      return;
+    }
     els.label.value = pick.dataset.pick!;
     onLabel();
     announce(t('timer.workingOn', { label: pick.dataset.pick! }));
@@ -892,10 +990,7 @@ function mountTimer(root: HTMLElement): () => void {
     const task = getTask(wantedTask);
     const stepId = new URLSearchParams(location.search).get('step');
     const step = task?.steps.find((s) => s.id === stepId && !s.done);
-    if (task && state.status === 'idle' && state.phase === 'work') {
-      state = T.setLabel(state, focusLabel(task, step), task.id);
-      write('timer', state);
-    }
+    if (task) focusOnItem(focusLabel(task, step), task.id);
     history.replaceState(history.state, '', location.pathname);
   }
 
@@ -924,16 +1019,14 @@ function mountTimer(root: HTMLElement): () => void {
   const wantedChapter = standalone ? new URLSearchParams(location.search).get('chapter') : null;
   if (wantedChapter) {
     const chapter = getExam()?.chapters.find((ch) => ch.id === wantedChapter);
-    if (chapter && state.status === 'idle' && state.phase === 'work') {
-      state = T.setLabel(state, chapter.name, chapter.id);
-      write('timer', state);
-    }
+    if (chapter) focusOnItem(chapter.name, chapter.id);
     history.replaceState(history.state, '', location.pathname);
   }
 
   els.sound.addEventListener('change', () => {
     savePrefs({ sound: els.sound.checked });
     els.soundOptions.hidden = !prefs.sound;
+    root.toggleAttribute('data-muted', !prefs.sound);
     if (els.sound.checked) preview();
   });
 
@@ -991,7 +1084,11 @@ function mountTimer(root: HTMLElement): () => void {
     },
     { otherTabsOnly: true },
   ));
-  c.add(subscribe('sessions', renderToday));
+  c.add(subscribe('sessions', () => {
+    renderToday();
+    renderTasks();
+  }));
+  c.add(subscribe('coach', renderTasks));
   c.add(subscribe('tasks', renderTasks));
   c.add(subscribe('exam', renderTasks));
 
