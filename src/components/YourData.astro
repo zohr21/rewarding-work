@@ -8,7 +8,7 @@ import Sheet from './Sheet.astro';
 import { SOURCES } from '../lib/findings';
 ---
 
-<Sheet id="mydata" title="Your data" titleKey="you.yourData">
+<Sheet id="mydata" title="What Grovyn learns" titleKey="you.whatGrovynLearns">
   <div class="yd" data-yd>
     <p data-t="you.yourFindingAndTomorrowS" class="muted yd__small">Your finding and tomorrow's plan are worked out on this phone. Health data never leaves it.</p>
 
@@ -37,7 +37,7 @@ import { SOURCES } from '../lib/findings';
 
     <div class="yd__actions">
       <button data-t="you.export" type="button" class="btn btn--ghost" data-yd-export>Export</button>
-      <button data-t="you.forgetEverything" type="button" class="btn btn--ghost yd__danger" data-yd-forget-all>Forget everything</button>
+      <button data-t="you.forgetEverything" type="button" class="btn btn--ghost yd__danger" data-yd-forget-all>Reset what Grovyn learned</button>
     </div>
     <p class="muted yd__small" role="status" data-yd-msg></p>
   </div>

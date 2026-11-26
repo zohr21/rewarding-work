@@ -260,29 +260,18 @@ onPage('account-page', () => {
   forceBtn.addEventListener('click', () => doSignOut(forceBtn, true));
   $('[data-sign-out-cancel]').addEventListener('click', () => (signOutWarn.hidden = true));
 
-  // Delete: the first press asks, the second press deletes (same pattern as "Delete all data").
+  // Delete: the button works once the confirm word is typed (in the chosen language, or DELETE).
   const deleteForm = $<HTMLFormElement>('[data-form="delete"]');
   const deleteBtn = $<HTMLButtonElement>('[data-delete]');
   const deleteMsg = $('[data-delete-msg]');
-  let armed = false;
-  let disarm = 0;
+  const deleteWord = $<HTMLInputElement>('[data-del-word]');
+  const fold = (s: string) => s.trim().toLocaleLowerCase(locale());
+  const wordTyped = () => [fold(t('you.del2.word')), 'delete'].includes(fold(deleteWord.value));
+  const syncDeleteBtn = () => (deleteBtn.disabled = !wordTyped());
+  deleteWord.addEventListener('input', syncDeleteBtn);
   deleteForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const label = getAccount().user?.isAnonymous ? t('you.deleteGuest') : t('you.deleteAccountBtn');
-    if (!armed) {
-      armed = true;
-      deleteBtn.textContent = t('you.deleteForever');
-      say(deleteMsg, t('you.pressAgain'));
-      disarm = window.setTimeout(() => {
-        armed = false;
-        deleteBtn.textContent = label;
-        say(deleteMsg, '');
-      }, 8000);
-      return;
-    }
-    armed = false;
-    window.clearTimeout(disarm);
-    deleteBtn.textContent = label;
+    if (!wordTyped()) return;
     void act(deleteForm, deleteMsg, async (m) => {
       const pw = $<HTMLInputElement>('input[name="confirm"]', deleteForm);
       const needsPassword = !$('[data-delete-password]').hidden;
@@ -290,9 +279,8 @@ onPage('account-page', () => {
       await m.deleteAccount(needsPassword ? pw.value : undefined);
       deleteForm.reset();
       return t('you.msg.deleted');
-    }, true);
+    }, true).finally(syncDeleteBtn);
   });
-  c.add(() => window.clearTimeout(disarm));
 
   // ---------- Render ----------
 
@@ -305,8 +293,11 @@ onPage('account-page', () => {
         // Clear messages that belonged to the view we just left (page-level messages stay).
         $$('[role="status"]:not([data-page-msg])').forEach((el) => say(el, ''));
         signOutWarn.hidden = true;
+        // Signed out or deleted from inside a sheet: close it, so the new view shows.
+        $$<HTMLDialogElement>('dialog[open]').forEach((d) => d.close());
       }
       lastView = view;
+      $('[data-hub-delete]').textContent = view === 'signed-in' ? t('you.hub.deleteBoth') : t('you.hub.deleteData');
 
       const u = s.user;
       if (!u) return;
@@ -335,8 +326,9 @@ onPage('account-page', () => {
       $('[data-google-linked]').hidden = !hasGoogle;
       $('[data-google-unlinked]').hidden = hasGoogle;
       $('[data-delete-password]').hidden = !hasPassword;
-      $('[data-delete-title]').textContent = guest ? t('you.deleteGuestDots') : t('you.deleteAccount');
-      if (!armed) deleteBtn.textContent = guest ? t('you.deleteGuest') : t('you.deleteAccountBtn');
+      $('[data-delete-title]').textContent = guest ? t('you.deleteGuest') : t('you.deleteAccountBtn');
+      deleteBtn.textContent = guest ? t('you.deleteGuest') : t('you.deleteAccountBtn');
+      if (u.email) $('[data-hub-account]').textContent = u.email;
 
       const sync = $('.sync');
       sync.dataset.sync = s.sync;
