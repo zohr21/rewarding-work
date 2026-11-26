@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.7 (Study, several plans, new You):
+
+```
+<en-US>
+New: Exam prep is now Study. One card shows what to do today, chapters show time and how often you get them right, and you can add questions by hand. Study can hold several plans at once. You is tidier: short rows that open sheets, and one place to delete your data or account. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: «Подготовка к экзамену» теперь называется «Учёба». Одна карточка показывает, что делать сегодня, у глав видно время и долю верных ответов, а вопросы можно добавлять вручную. В «Учёбе» может быть несколько планов сразу. «Профиль» стал проще: короткие строки открывают панели, а удалить данные или аккаунт можно в одном месте. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: İmtahana hazırlıq indi Təhsil adlanır. Bir kart bu gün nə edəcəyini göstərir, fəsillərdə vaxt və düzgün cavab payı görünür, sualları əl ilə əlavə edə bilərsən. Təhsildə eyni anda bir neçə plan ola bilər. Profil daha səliqəlidir: qısa sətirlər panel açır, məlumatlarını və ya hesabını bir yerdən silə bilərsən. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 Version 0.1.6 (Coach day rhythm, new Timer):
 
 ```
