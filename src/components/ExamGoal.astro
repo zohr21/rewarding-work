@@ -15,11 +15,11 @@ const timerUrl = url('/timer');
     <h2 data-t="exam.setYourGoal" id="eg-form-title" class="panel-title" data-eg-form-title>Set your goal</h2>
     <div class="goal-form__grid">
       <label class="goal-form__field goal-form__field--wide">
-        <span data-t="exam.examOrCertification">Exam or certification</span>
+        <span data-t="exam.examOrCertification">What are you studying for?</span>
         <input data-t-placeholder="exam.eGAwsSolutionsArchitect" class="input" type="text" maxlength="120" autocomplete="off" required placeholder="e.g. AWS Solutions Architect – Associate" data-eg-title />
       </label>
       <label class="goal-form__field">
-        <span><span data-t="exam.examDate">Exam date</span> <span data-t="exam.optional" class="muted">(optional)</span></span>
+        <span><span data-t="exam.examDate">Exam or due date</span> <span data-t="exam.optional" class="muted">(optional)</span></span>
         <input class="input" type="date" data-eg-date />
       </label>
       <label class="goal-form__field">
@@ -34,10 +34,10 @@ const timerUrl = url('/timer');
     </div>
     <p class="goal-form__plan" data-eg-plan aria-live="polite"></p>
     <div class="goal-form__actions">
-      <button data-t="exam.createExamPlan" type="submit" class="btn" data-eg-submit>Create exam plan</button>
+      <button data-t="exam.createExamPlan" type="submit" class="btn" data-eg-submit>Create study plan</button>
       <button data-t="exam.cancel" type="button" class="btn btn--ghost" data-eg-cancel hidden>Cancel</button>
       <button data-t="exam.iTookTheExam" type="button" class="btn btn--ghost" data-eg-took hidden>I took the exam</button>
-      <button data-t="exam.deleteThisExamPlan" type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this exam plan</button>
+      <button data-t="exam.deleteThisExamPlan" type="button" class="btn btn--ghost goal-form__delete" data-eg-delete hidden>Delete this plan</button>
     </div>
   </form>
 
@@ -52,27 +52,33 @@ const timerUrl = url('/timer');
     <button data-t="exam.notYet" type="button" class="btn btn--ghost btn--small" data-eg-finish-cancel>Not yet</button>
   </section>
 
+  {/* Today first: what you are studying, how far along, and the one thing to do now. */}
   <section class="card goal" data-eg-hero hidden aria-labelledby="eg-name">
     <div class="goal__top">
       <div class="goal__main">
-        <p data-t="exam.yourExam" class="goal__eyebrow">Your exam</p>
+        <p class="goal__when" data-eg-when></p>
         <h2 id="eg-name" class="goal__title" data-eg-name></h2>
-        <p class="goal__chips" data-eg-chips></p>
       </div>
-      <p class="goal__countdown" data-eg-days hidden></p>
+      <button data-t-aria-label="exam.editGoal" data-t-title="exam.editGoal" type="button" class="icon-btn goal__edit" aria-label="Edit goal" title="Edit goal" data-eg-edit>
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path></svg>
+      </button>
     </div>
-    <div class="goal__actions">
-      <a class="btn goal__continue" data-eg-continue hidden></a>
-      <button data-t="exam.iTookTheExam" type="button" class="btn goal__continue" data-eg-took-now hidden>I took the exam</button>
-      <button type="button" class="btn btn--ghost goal__continue" data-eg-practice hidden></button>
+    <div class="goal__today">
+      <div class="goal__ring" data-eg-ring aria-hidden="true"><span data-eg-pct></span></div>
+      <div class="goal__now">
+        <p class="goal__time muted" data-eg-time></p>
+        <p class="goal__pace" data-eg-pace></p>
+      </div>
     </div>
-    <div class="goal__target" data-eg-target hidden>
-      <p class="goal__time-head muted"><span data-eg-time></span><span data-eg-pct></span></p>
-      <div class="goal__bar" aria-hidden="true"><span data-eg-bar></span></div>
-      <p class="goal__pace muted" data-eg-pace></p>
+    {/* From exam day on, asking how it went comes first. */}
+    <button data-t="exam.iTookTheExam" type="button" class="btn goal__continue" data-eg-took-now hidden>I took the exam</button>
+    <a class="btn goal__continue" data-eg-continue hidden></a>
+    <div class="goal__chips" data-eg-chips hidden>
+      <button type="button" class="goal__chip" data-eg-practise="all" data-eb-start></button>
+      <button type="button" class="goal__chip goal__chip--weak" data-eg-practise="weak" hidden></button>
+      <button type="button" class="goal__chip" data-eg-practise="mistakes" hidden></button>
     </div>
     <p class="goal__facts muted" data-eg-facts></p>
-    <button data-t="exam.editGoal" type="button" class="btn btn--ghost btn--small goal__edit" data-eg-edit>Edit goal</button>
   </section>
   <p class="visually-hidden" aria-live="polite" data-eg-live></p>
 </div>
@@ -87,11 +93,14 @@ const timerUrl = url('/timer');
     examTime,
     finishExam,
     formatHM,
+    isMistake,
+    MISTAKES,
     nextChapter,
     pacePerDay,
     parseChapterLines,
     ROUND_SIZE,
     saveGoal,
+    weakestChapter,
     weekMinutes,
   } from '../lib/exam';
   import { celebrate } from '../lib/appearance';
@@ -155,10 +164,6 @@ const timerUrl = url('/timer');
       plan.textContent = parts.join(' · ');
     }
 
-    function chip(text: string, cls = ''): HTMLSpanElement {
-      return el('span', `badge goal__chip ${cls}`, text);
-    }
-
     function render(): void {
       const exam = getExam();
       if (!exam) editing = finishing = false;
@@ -184,25 +189,57 @@ const timerUrl = url('/timer');
       const sessions = getSessions();
       const time = examTime(exam, sessions);
       $<HTMLElement>('[data-eg-name]').textContent = exam.title;
+      // Times like "4 h 40 m" stay on one line.
+      const nbsp = (s: string) => s.replace(/(\d) (?=\S)/g, '$1 ');
 
-      const chips = $<HTMLElement>('[data-eg-chips]');
-      chips.replaceChildren();
+      // When: the date and the days left, which the rest is planned against.
       const days = daysLeft(exam);
-      if (exam.date) chips.append(chip(t('exam.examOn', { date: dateFmt.format(fromDayKey(exam.date)) })));
-      if (exam.targetHours) chips.append(chip(t('exam.targetChip', { target: t('unit.h', { n: exam.targetHours }) })));
-      // The days left are the headline: what the rest of the page is planned against.
-      const countdown = $<HTMLElement>('[data-eg-days]');
-      countdown.hidden = days === null;
-      if (days !== null) {
-        countdown.replaceChildren();
-        if (days > 0) countdown.append(el('strong', '', String(days)), el('span', '', tn('exam.daysLeft', days)));
-        else countdown.append(el('span', '', days === 0 ? t('exam.examIsToday') : t('exam.examDatePassed')));
-      }
+      const when = $<HTMLElement>('[data-eg-when]');
+      when.textContent =
+        days === null
+          ? t('exam.yourExam')
+          : days > 0
+            ? `${dateFmt.format(fromDayKey(exam.date!))} · ${days} ${tn('exam.daysLeft', days)}`
+            : days === 0
+              ? t('exam.examIsToday')
+              : t('exam.examDatePassed');
+      when.classList.toggle('is-soon', days !== null && days >= 0 && days <= 7);
+
+      // The ring: hours against the target, or chapters done without one.
+      const target = exam.targetHours ? exam.targetHours * 3600 : 0;
+      const done = exam.chapters.filter((ch) => ch.done).length;
+      const pct = target
+        ? Math.min(100, Math.round((time.total / target) * 100))
+        : exam.chapters.length
+          ? Math.round((done / exam.chapters.length) * 100)
+          : 0;
+      $<HTMLElement>('[data-eg-ring]').style.setProperty('--pct', String(pct));
+      $<HTMLElement>('[data-eg-pct]').textContent = `${pct}%`;
+      $<HTMLElement>('[data-eg-time]').textContent = nbsp(
+        target
+          ? t('exam.timeOfTarget', { time: formatHM(time.total), target: t('unit.h', { n: exam.targetHours! }) })
+          : exam.chapters.length
+            ? tn('exam.chaptersDone', exam.chapters.length, { done })
+            : time.total >= 60
+              ? t('exam.studied', { time: formatHM(time.total) })
+              : t('exam.timeAddsUp'),
+      );
 
       // From exam day on, the main button asks how it went; Continue stays available as a plain one.
       const examDay = days !== null && days <= 0;
       tookNow.hidden = !examDay;
       const next = nextChapter(exam, time);
+      const pace = pacePerDay(exam, time.total);
+      // The aim for today; the chapter's name is on the button under it.
+      $<HTMLElement>('[data-eg-pace]').textContent = nbsp(
+        pace === 0
+          ? t('exam.reachedTarget', { target: t('unit.h', { n: exam.targetHours! }) })
+          : pace && !examDay
+            ? t('exam.todayAim', { time: formatHM(pace) })
+            : !next && exam.chapters.length
+              ? t('exam.allFinished')
+              : '',
+      );
       const go = $<HTMLAnchorElement>('[data-eg-continue]');
       go.hidden = !next;
       go.classList.toggle('btn--ghost', examDay);
@@ -210,41 +247,36 @@ const timerUrl = url('/timer');
         go.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
         go.textContent = t(time.byChapter.has(next.id) ? 'exam.continueOn' : 'exam.startOn', { name: next.name });
       }
-      // Practice sits beside Continue; it starts the question bank's round (ExamBank.astro).
-      const practice = $<HTMLButtonElement>('[data-eg-practice]');
+
+      // Practice: the whole bank, the weakest chapter, and the questions to look at again.
       const n = Math.min(ROUND_SIZE, exam.questions.length);
-      practice.hidden = n === 0;
-      practice.textContent = tn('exam.practiceN', n);
+      $<HTMLElement>('[data-eg-chips]').hidden = n === 0;
+      const all = $<HTMLButtonElement>('[data-eg-practise="all"]');
+      all.textContent = tn('exam.practiseShort', n);
       // With nothing left to study, practice is the main thing to do.
-      practice.classList.toggle('btn--ghost', Boolean(next) || examDay);
-
-      const target = exam.targetHours ? exam.targetHours * 3600 : 0;
-      const pct = target ? Math.min(100, Math.round((time.total / target) * 100)) : 0;
-      $<HTMLElement>('[data-eg-target]').hidden = !target;
-      if (target) {
-        $<HTMLElement>('[data-eg-time]').textContent = t('exam.timeOfTarget', { time: formatHM(time.total), target: t('unit.h', { n: exam.targetHours! }) });
-        $<HTMLElement>('[data-eg-pct]').textContent = `${pct}%`;
-        $<HTMLElement>('[data-eg-bar]').style.inlineSize = `${pct}%`;
-        const pace = pacePerDay(exam, time.total);
-        $<HTMLElement>('[data-eg-pace]').textContent =
-          pace === null ? '' : pace === 0 ? t('exam.reachedTarget', { target: t('unit.h', { n: exam.targetHours! }) }) : t('exam.paceLine', { time: formatHM(pace) });
+      all.classList.toggle('is-main', !next || examDay);
+      const worst = n ? weakestChapter(exam) : null;
+      const weak = $<HTMLButtonElement>('[data-eg-practise="weak"]');
+      weak.hidden = !worst;
+      if (worst) {
+        weak.dataset.chapter = worst.chapter.id;
+        weak.textContent = t('exam.practiseWeakest', { name: worst.chapter.name });
+        weak.title = t('exam.weakest', { name: worst.chapter.name, correct: worst.correct, seen: worst.seen });
       }
+      const misses = exam.questions.filter(isMistake).length;
+      const mistakes = $<HTMLButtonElement>('[data-eg-practise="mistakes"]');
+      mistakes.hidden = misses === 0;
+      mistakes.textContent = tn('exam.mistakesN', misses);
 
-      // The rest in one line: studied (when there is no target bar), chapters, this week, last round.
-      const done = exam.chapters.filter((ch) => ch.done).length;
+      // The rest in one line: chapters (when the ring shows hours), this week, the last round.
       const week = weekMinutes(exam, sessions);
       const round = exam.rounds.at(-1);
       const facts = [
-        target ? '' : time.total >= 60 ? t('exam.studied', { time: formatHM(time.total) }) : t('exam.timeAddsUp'),
-        exam.chapters.length ? tn('exam.chaptersDone', exam.chapters.length, { done }) : '',
+        target && exam.chapters.length ? tn('exam.chaptersDone', exam.chapters.length, { done }) : '',
         week.total >= 60 ? t('exam.thisWeek', { time: formatHM(week.total) }) : '',
         round ? t('exam.lastRound', { correct: round.correct, total: round.total }) : '',
       ];
-      // Times like "4 h 40 m" stay on one line.
-      $<HTMLElement>('[data-eg-facts]').textContent = facts
-        .filter(Boolean)
-        .map((f) => f.replace(/(\d) (?=\S)/g, '$1\u00a0'))
-        .join(' · ');
+      $<HTMLElement>('[data-eg-facts]').textContent = facts.filter(Boolean).map(nbsp).join(' · ');
     }
 
     function disarmDelete(): void {
@@ -278,9 +310,14 @@ const timerUrl = url('/timer');
       $<HTMLElement>('[data-eg-finish-title]').focus();
     }
     took.addEventListener('click', askResult);
-    $<HTMLButtonElement>('[data-eg-practice]').addEventListener('click', () => {
-      document.querySelector<HTMLButtonElement>('[data-eb-start]')?.click();
-    });
+    // The question bank (ExamBank.astro) runs the round.
+    root.querySelectorAll<HTMLButtonElement>('[data-eg-practise]').forEach((b) =>
+      b.addEventListener('click', () => {
+        const kind = b.dataset.egPractise;
+        const scope = kind === 'weak' ? b.dataset.chapter! : kind === 'mistakes' ? MISTAKES : 'all';
+        document.dispatchEvent(new CustomEvent('exam:practise', { detail: scope }));
+      }),
+    );
     tookNow.addEventListener('click', askResult);
 
     $<HTMLButtonElement>('[data-eg-finish-cancel]').addEventListener('click', () => {
@@ -347,8 +384,10 @@ const timerUrl = url('/timer');
 </script>
 
 <style>
+  /* minmax(0, 1fr): long one-line text (the weakest chip) can't make the card wider than the screen. */
   .exam-goal {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-5);
   }
 
@@ -430,54 +469,100 @@ const timerUrl = url('/timer');
 
   .goal {
     display: grid;
-    gap: var(--space-4);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
   }
 
   .goal__top {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: var(--space-4);
+    gap: var(--space-3);
   }
 
   .goal__main {
     min-width: 0;
     display: grid;
-    gap: var(--space-2);
-    align-content: start;
+    gap: 2px;
   }
 
-  .goal__eyebrow {
-    color: var(--cat-reward);
+  .goal__when {
+    color: var(--color-text-muted);
     font-size: var(--text-sm);
     font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The last week before the exam is in the reward colour. */
+  .goal__when.is-soon {
+    color: var(--cat-reward);
   }
 
   .goal__title {
-    font-size: var(--text-xl);
-    line-height: 1.15;
+    font-size: var(--text-lg);
+    line-height: 1.2;
     overflow-wrap: anywhere;
   }
 
-  /* The countdown: a big number in the reward colour, "days left" under it. */
-  .goal__countdown {
+  .goal__edit {
     flex: none;
-    display: grid;
-    justify-items: center;
-    padding: var(--space-3) var(--space-4);
-    border-radius: var(--radius-md);
-    background: var(--cat-reward-bg);
-    color: var(--cat-reward);
-    font-size: var(--text-xs);
-    font-weight: 600;
-    text-align: center;
+    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0;
+    color: var(--color-text-muted);
   }
 
-  .goal :global(.goal__countdown strong) {
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    line-height: 1;
+  .goal__today {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  /* Progress as a ring: the share in accent, the rest a quiet well, the % inside. */
+  .goal__ring {
+    --pct: 0;
+    flex: none;
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: conic-gradient(var(--color-accent) calc(var(--pct) * 1%), var(--color-border-strong) 0);
+    font-size: var(--text-xs);
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+  }
+
+  .goal__ring::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: var(--color-surface-solid);
+  }
+
+  .goal__ring > span {
+    position: relative;
+  }
+
+  .goal__now {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .goal__time {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .goal__pace {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .goal__continue {
+    min-height: 48px;
+    overflow-wrap: anywhere;
   }
 
   .goal__chips {
@@ -486,73 +571,42 @@ const timerUrl = url('/timer');
     gap: var(--space-2);
   }
 
-  .goal__chips:empty {
-    display: none;
-  }
-
-  .goal :global(.goal__chip) {
-    padding-block: var(--space-1);
-    background: var(--well-bg);
-    box-shadow: var(--well-shadow);
-    font-size: var(--text-sm);
-    font-weight: 500;
-  }
-
-  .goal__actions {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  @media (min-width: 40rem) {
-    .goal__actions {
-      grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-    }
-  }
-
-  .goal__continue {
-    min-height: 52px;
-    font-size: var(--text-base);
-    overflow-wrap: anywhere;
-  }
-
-  .goal__target {
-    display: grid;
-    gap: var(--space-2);
-  }
-
-  .goal__time-head {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-3);
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-  }
-
-  .goal__bar {
-    height: 10px;
+  .goal__chip {
+    min-height: 44px;
+    padding: var(--space-1) var(--space-3);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-pill);
-    background: var(--heat-0);
-  }
-
-  .goal__bar > span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--accent-grad);
-  }
-
-  .goal__pace,
-  .goal__facts {
+    background: var(--well-bg);
+    color: var(--color-text);
+    font: inherit;
     font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .goal__chip:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .goal__chip.is-main,
+  .goal__chip--weak {
+    color: var(--color-accent);
+  }
+
+  /* A long chapter name stays on one line; the full name is in its tooltip. */
+  .goal__chip--weak {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .goal__facts {
+    font-size: var(--text-xs);
   }
 
   .goal__pace:empty,
   .goal__facts:empty {
     display: none;
-  }
-
-  .goal__edit {
-    justify-self: start;
-    min-height: 44px;
   }
 </style>

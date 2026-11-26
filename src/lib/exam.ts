@@ -492,9 +492,15 @@ export const TEMPLATE_CSV =
 
 // ---------- Practice ----------
 
-/** `chapterId` 'all' for the whole bank. Flagged, unseen and often-missed questions come first; the round is then shuffled. */
+/** The round of questions to look at again (`pickRound(exam, MISTAKES)`). */
+export const MISTAKES = 'mistakes';
+
+/** Marked "ask me again", or missed more often than got right. One right answer after a miss takes it off the list. */
+export const isMistake = (q: ExamQuestion): boolean => Boolean(q.again) || q.correct * 2 < q.seen;
+
+/** `chapterId` 'all' for the whole bank, MISTAKES for the ones to look at again. Flagged, unseen and often-missed questions come first; the round is then shuffled. */
 export function pickRound(exam: Exam, chapterId: string, size = ROUND_SIZE): ExamQuestion[] {
-  const pool = exam.questions.filter((q) => chapterId === 'all' || q.chapterId === chapterId);
+  const pool = exam.questions.filter((q) => chapterId === 'all' || (chapterId === MISTAKES ? isMistake(q) : q.chapterId === chapterId));
   const rank = (q: ExamQuestion) => (q.again ? 0 : q.seen === 0 ? 1 : 2 + q.correct / q.seen);
   const keyed = pool.map((q) => ({ q, rank: rank(q), tie: Math.random() }));
   keyed.sort((a, b) => a.rank - b.rank || a.tie - b.tie);
@@ -540,4 +546,71 @@ export function weakestChapter(exam: Exam, min = 5): ChapterScore | null {
   });
   const rated = scores.filter((s) => s.seen >= min && s.correct < s.seen);
   return rated.sort((a, b) => a.correct / a.seen - b.correct / b.seen)[0] ?? null;
+}
+
+/** Answers so far on each chapter's questions, by chapter id. Chapters never practised are left out. */
+export function chapterScores(exam: Exam): Map<string, { seen: number; correct: number }> {
+  const out = new Map<string, { seen: number; correct: number }>();
+  for (const q of exam.questions) {
+    if (!q.chapterId || !q.seen) continue;
+    const s = out.get(q.chapterId) ?? { seen: 0, correct: 0 };
+    s.seen += q.seen;
+    s.correct += q.correct;
+    out.set(q.chapterId, s);
+  }
+  return out;
+}
+
+// ---------- One question by hand ----------
+
+export const OPTIONS_MAX = 8;
+
+export interface QuestionDraft {
+  chapterId?: string;
+  text: string;
+  /** Empty boxes are dropped; `answer` points into this list as typed. */
+  options: string[];
+  answer: number[];
+  explanation?: string;
+}
+
+export type CleanQuestion =
+  | { ok: true; question: Omit<ExamQuestion, 'id' | 'seen' | 'correct'> }
+  | { ok: false; error: 'text' | 'options' | 'answer' };
+
+/** Checks a typed question: some text, at least two options and at least one of them right. */
+export function cleanQuestion(d: QuestionDraft, chapterIds: string[]): CleanQuestion {
+  const text = d.text.trim().slice(0, TEXT_MAX);
+  if (!text) return { ok: false, error: 'text' };
+  const kept: { label: string; right: boolean }[] = [];
+  d.options.forEach((o, i) => {
+    const label = o.trim().slice(0, OPTION_MAX);
+    if (label && kept.length < OPTIONS_MAX) kept.push({ label, right: d.answer.includes(i) });
+  });
+  if (kept.length < 2) return { ok: false, error: 'options' };
+  const answer = kept.flatMap((k, i) => (k.right ? [i] : []));
+  if (!answer.length) return { ok: false, error: 'answer' };
+  const explanation = d.explanation?.trim().slice(0, TEXT_MAX);
+  const chapterId = d.chapterId && chapterIds.includes(d.chapterId) ? d.chapterId : undefined;
+  return {
+    ok: true,
+    question: {
+      ...(chapterId ? { chapterId } : {}),
+      text,
+      options: kept.map((k) => k.label),
+      answer,
+      ...(explanation ? { explanation } : {}),
+    },
+  };
+}
+
+/** Adds a typed question to the bank. Returns why it wasn't added, or null when it was. */
+export function addQuestion(d: QuestionDraft): 'text' | 'options' | 'answer' | 'full' | null {
+  const exam = getExam();
+  if (!exam) return 'full';
+  if (exam.questions.length >= QUESTIONS_MAX) return 'full';
+  const clean = cleanQuestion(d, exam.chapters.map((c) => c.id));
+  if (!clean.ok) return clean.error;
+  updateExam((e) => ({ questions: [...e.questions, { id: newId('q'), ...clean.question, seen: 0, correct: 0 }] }));
+  return null;
 }

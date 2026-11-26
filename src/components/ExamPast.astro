@@ -5,11 +5,12 @@
  */
 ---
 
-<section class="card past" data-exam-past hidden aria-labelledby="past-heading">
-  <h2 data-t="exam.pastExams" id="past-heading" class="panel-title">Past exams</h2>
+{/* Looked at now and then: folded while you prepare for the next one, open when there is none. */}
+<details class="card disclosure past" data-exam-past hidden>
+  <summary class="past__summary"><h2 data-t="exam.pastExams" class="past__heading" data-px-heading>Past exams</h2></summary>
   <ul class="past__items" data-px-list></ul>
   <p class="visually-hidden" aria-live="polite" data-px-live></p>
-</section>
+</details>
 
 <script>
   import { getExamStore, subscribe, type PastExam } from '../lib/storage';
@@ -79,6 +80,7 @@
         actions.append(again);
       }
       const del = button(t('exam.remove'), () => remove(record));
+      del.classList.add('past__remove');
       del.setAttribute('aria-label', t('exam.removePastLabel', { name: record.title }));
       actions.append(del);
       li.append(body, actions);
@@ -89,6 +91,8 @@
       const { exam, past } = getExamStore();
       const shown = past.filter((p) => !removing.has(p.id)).sort((a, b) => b.finishedAt - a.finishedAt);
       root!.hidden = shown.length === 0;
+      root!.querySelector<HTMLElement>('[data-px-heading]')!.textContent = t('exam.pastExamsN', { n: shown.length });
+      if (!exam) (root as HTMLDetailsElement).open = true;
       list.replaceChildren(...shown.map((p) => renderRecord(p, !exam)));
     }
 
@@ -103,9 +107,20 @@
     display: none;
   }
 
+  .past__summary {
+    min-height: 44px;
+    align-content: center;
+  }
+
+  .past__heading {
+    display: inline;
+    font-size: var(--text-base);
+  }
+
   .past__items {
     display: grid;
     gap: var(--space-3);
+    margin-top: var(--space-3);
     padding: 0;
     list-style: none;
   }
@@ -162,5 +177,9 @@
 
   .past :global(.past__actions .btn) {
     min-height: 44px;
+  }
+
+  .past :global(.past__remove) {
+    color: var(--cat-rest);
   }
 </style>

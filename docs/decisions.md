@@ -6,6 +6,21 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **26 Nov · Exam prep becomes Study (option B: today first).** The page was ~2,560 px on a
+  phone: a 600 px goal card, chapter cards of ~200 px each with Focus/Done/Edit buttons, the
+  same Practice button twice, a weak-chapter note you couldn't tap and Past exams always open.
+  The tab, section and help area are now called Study (ru Учёба, az Təhsil, as the Tasks area);
+  routes, store and keys keep the `exam` name. One goal card: date and days left, the title, a
+  pencil to edit, a ring (hours of the target, or chapters done without one), "Aim for X
+  today", Continue/Start on the next chapter, and practice chips: the whole bank, the weakest
+  chapter, and "N to review" (flagged, or missed more often than right). Chapters are slim rows:
+  tick box, name with time of planned and a thin bar, share of right answers, play. A tap on
+  the name opens a chapter sheet (Focus, practise this chapter, add a question, name, hours,
+  notes, order, remove). Questions can now be added by hand in a sheet (2 to 8 options, one or
+  more right); import stays. Past exams fold into "Past exams (n)", open when there is no plan.
+  About 1,620 px with the same sample. Readiness %, mock exam and spaced review were left for
+  later (they need new stored data). Options A (tidy) and C (Plan/Practice tabs) were set aside.
+
 - **26 Nov · Timer layout (option B: task on top, quiet while running).** The Timer page was
   ~1,740 px on a phone and repeated itself (task chips and an On Today card listed the same
   tasks; a technique card repeated the rhythm chip). Now one column: a "Focusing on" row at

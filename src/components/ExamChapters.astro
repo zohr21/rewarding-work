@@ -1,11 +1,13 @@
 ---
 /**
- * The chapters (or parts) of the exam. The ones still to do come first, each with the focus
- * time spent against the time planned and its own Focus button, which starts a timer session
- * linked to it. Finished ones fold into one row, each a single line with Review.
- * "Edit" opens the chapter's name, planned hours, notes, order, reopening and removal.
+ * The chapters (or parts) of the exam, one slim row each: a box to tick it off, the name
+ * with the focus time against the time planned, how often its questions are answered
+ * right, and a play button that starts a timer session on it. Finished ones fold into one
+ * row. A tap on the name opens the chapter's sheet: practice, adding a question, its
+ * name, planned hours and notes, order, and removal.
  */
 import { url } from '../lib/paths';
+import Sheet from './Sheet.astro';
 
 const timerUrl = url('/timer');
 ---
@@ -21,7 +23,7 @@ const timerUrl = url('/timer');
 
   <details class="disclosure chapters__done" data-ec-done-box hidden>
     <summary data-ec-done-title></summary>
-    <ol class="chapters__items chapters__items--done" data-ec-done></ol>
+    <ol class="chapters__items" data-ec-done></ol>
   </details>
 
   <button data-t="exam.addChapter" type="button" class="btn btn--ghost btn--small chapters__add" data-ec-add-open>+ Add chapter</button>
@@ -35,9 +37,39 @@ const timerUrl = url('/timer');
   <p class="visually-hidden" aria-live="polite" data-ec-live></p>
 </section>
 
+<Sheet id="exam-chapter" labelledby="ec-sheet-title">
+  <div class="ch-sheet" data-ec-sheet>
+    <h2 id="ec-sheet-title" class="ch-sheet__title" data-ecs-title></h2>
+    <p class="muted ch-sheet__meta" data-ecs-meta></p>
+    <div class="ch-sheet__go">
+      <a class="btn" data-ecs-focus></a>
+      <button type="button" class="btn btn--ghost" data-ecs-practise></button>
+      <button data-t="exam.addAQuestion" type="button" class="btn btn--ghost" data-sheet-open="exam-question" data-ecs-ask>+ Add a question</button>
+    </div>
+    <label class="ch-sheet__field">
+      <span data-t="exam.name">Name</span>
+      <input class="input" type="text" maxlength="120" autocomplete="off" data-ecs-name />
+    </label>
+    <label class="ch-sheet__field ch-sheet__field--short">
+      <span data-t="exam.plannedHours">Planned hours</span>
+      <input class="input" type="number" min="0.5" max="10000" step="0.5" inputmode="decimal" data-ecs-hours />
+    </label>
+    <label class="ch-sheet__field">
+      <span data-t="exam.notes">Notes</span>
+      <textarea class="input" rows="3" data-ecs-notes></textarea>
+    </label>
+    <div class="ch-sheet__tools">
+      <button type="button" class="btn btn--ghost btn--small" data-ecs-done></button>
+      <button data-t="exam.moveUp" type="button" class="btn btn--ghost btn--small" data-ecs-up>Move up</button>
+      <button data-t="exam.moveDown" type="button" class="btn btn--ghost btn--small" data-ecs-down>Move down</button>
+      <button data-t="exam.remove" type="button" class="btn btn--ghost btn--small ch-sheet__remove" data-ecs-remove>Remove</button>
+    </div>
+  </div>
+</Sheet>
+
 <script>
   import { getExam, getSessions, subscribe, type ExamChapter } from '../lib/storage';
-  import { addChapter, EXAM_NOTES_MAX, examTime, formatHM, moveChapter, nextChapter, removeChapter, updateChapter } from '../lib/exam';
+  import { addChapter, chapterScores, EXAM_NOTES_MAX, examTime, formatHM, moveChapter, nextChapter, removeChapter, updateChapter } from '../lib/exam';
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
@@ -45,13 +77,23 @@ const timerUrl = url('/timer');
   import { t, tn } from '../lib/i18n';
 
   const CHECK_SVG =
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+
+  /** "64%", and a word for the colour band, from answers so far. */
+  function scoreOf(s: { seen: number; correct: number } | undefined): { text: string; band: string } | null {
+    if (!s?.seen) return null;
+    const pct = Math.round((s.correct / s.seen) * 100);
+    return { text: `${pct}%`, band: pct < 50 ? 'low' : pct < 75 ? 'mid' : 'high' };
+  }
 
   onPage('exam-chapters', () => {
     const root = document.querySelector<HTMLElement>('[data-exam-chapters]');
-    if (!root) return;
+    const sheet = document.querySelector<HTMLDialogElement>('[data-sheet="exam-chapter"]');
+    if (!root || !sheet) return;
     const c = cleanups();
     const $ = <E extends Element>(s: string) => root.querySelector<E>(s)!;
+    const s$ = <E extends Element>(s: string) => sheet.querySelector<E>(s)!;
     const list = $<HTMLOListElement>('[data-ec-list]');
     const doneBox = $<HTMLDetailsElement>('[data-ec-done-box]');
     const doneList = $<HTMLOListElement>('[data-ec-done]');
@@ -62,34 +104,19 @@ const timerUrl = url('/timer');
     const hoursInput = $<HTMLInputElement>('[data-ec-hours]');
     const live = $<HTMLElement>('[data-ec-live]');
     const timerUrl = root.dataset.timerUrl!;
+    const focusUrl = (id: string) => `${timerUrl}?chapter=${encodeURIComponent(id)}`;
     /** Removed chapters still offered for Undo (src/lib/undo.ts). */
     const removing = new Set<string>();
-    /** Chapters whose Edit panel is open, kept across re-renders. */
-    const open = new Set<string>();
-    /** A change arrived while a field in the list had focus; drawn once it loses it. */
-    let stale = false;
+    /** The chapter the sheet shows. */
+    let sheetId = '';
 
     const announce = (text: string) => {
       live.textContent = '';
       window.setTimeout(() => (live.textContent = text), 50);
     };
 
-    function button(text: string, onClick: () => void, cls = 'btn btn--ghost btn--small'): HTMLButtonElement {
-      const b = el('button', cls, text);
-      b.type = 'button';
-      b.addEventListener('click', onClick);
-      return b;
-    }
-
-    function field(label: string, control: HTMLElement, cls = ''): HTMLLabelElement {
-      const wrap = el('label', `chapter__field ${cls}`);
-      wrap.append(el('span', '', label), control);
-      return wrap;
-    }
-
     function remove(chapter: ExamChapter): void {
       removing.add(chapter.id);
-      nameInput.focus();
       render();
       offerUndo({
         message: t('exam.removedName', { name: chapter.name }),
@@ -106,113 +133,49 @@ const timerUrl = url('/timer');
       announce(t('exam.removedSaid', { name: chapter.name }));
     }
 
-    function editPanel(chapter: ExamChapter, index: number, count: number): HTMLDetailsElement {
-      const details = el('details', 'disclosure chapter__edit');
-      details.open = open.has(chapter.id);
-      details.addEventListener('toggle', () => (details.open ? open.add(chapter.id) : open.delete(chapter.id)));
-      const summary = el('summary', '', t('exam.edit'));
-      summary.setAttribute('aria-label', t('exam.editName', { name: chapter.name }));
-
-      const name = el('input', 'input');
-      name.type = 'text';
-      name.maxLength = 120;
-      name.value = chapter.name;
-      name.addEventListener('change', () => updateChapter(chapter.id, { name: name.value }));
-
-      const hours = el('input', 'input');
-      hours.type = 'number';
-      hours.min = '0.5';
-      hours.max = '10000';
-      hours.step = '0.5';
-      hours.inputMode = 'decimal';
-      hours.value = chapter.plannedHours ? String(chapter.plannedHours) : '';
-      hours.addEventListener('change', () => {
-        const n = Number(hours.value);
-        updateChapter(chapter.id, { plannedHours: n > 0 ? Math.round(n * 10) / 10 : undefined });
-      });
-
-      const notes = el('textarea', 'input');
-      notes.rows = 3;
-      notes.maxLength = EXAM_NOTES_MAX;
-      notes.value = chapter.notes ?? '';
-      notes.addEventListener('change', () => updateChapter(chapter.id, { notes: notes.value }));
-
-      const tools = el('div', 'chapter__tools');
-      const up = button(t('exam.moveUp'), () => moveChapter(chapter.id, -1));
-      up.disabled = index === 0;
-      const down = button(t('exam.moveDown'), () => moveChapter(chapter.id, 1));
-      down.disabled = index === count - 1;
-      const del = button(t('exam.remove'), () => remove(chapter));
-      del.classList.add('chapter__remove');
-      // Reopening is rare, so it lives here rather than beside Review.
-      if (chapter.done)
-        tools.append(
-          button(t('exam.reopen'), () => {
-            updateChapter(chapter.id, { done: false });
-            announce(t('exam.reopened', { name: chapter.name }));
-          }),
-        );
-      tools.append(up, down, del);
-
-      const body = el('div', 'chapter__edit-body');
-      body.append(field(t('exam.name'), name), field(t('exam.plannedHours'), hours, 'chapter__field--short'), field(t('exam.notes'), notes, 'chapter__field--wide'), tools);
-      details.append(summary, body);
-      return details;
+    function setDone(chapter: ExamChapter, done: boolean): void {
+      updateChapter(chapter.id, { done });
+      if (done) celebrate();
+      announce(done ? t('exam.finishedName', { name: chapter.name }) : t('exam.reopened', { name: chapter.name }));
     }
 
-    function renderChapter(chapter: ExamChapter, index: number, count: number, seconds: number, questions: number, isNext: boolean): HTMLLIElement {
-      const li = el('li', `chapter${chapter.done ? ' is-done' : ''}`);
+    function renderChapter(chapter: ExamChapter, seconds: number, score: ReturnType<typeof scoreOf>, isNext: boolean): HTMLLIElement {
+      const li = el('li', `chapter${chapter.done ? ' is-done' : ''}${isNext ? ' is-next' : ''}`);
+
+      const check = el('button', 'chapter__check');
+      check.type = 'button';
+      check.innerHTML = `<span class="chapter__box">${CHECK_SVG}</span>`;
+      check.setAttribute('aria-pressed', String(chapter.done));
+      check.setAttribute('aria-label', t(chapter.done ? 'exam.markNotFinished' : 'exam.markFinished', { name: chapter.name }));
+      check.addEventListener('click', () => setDone(chapter, !chapter.done));
+
+      // The name opens the sheet with everything else.
+      const open = el('button', 'chapter__open');
+      open.type = 'button';
+      open.dataset.sheetOpen = 'exam-chapter';
+      open.dataset.chapter = chapter.id;
       const time = seconds >= 60 ? formatHM(seconds) : '';
-      const qs = questions ? tn('exam.questionsN', questions) : t('exam.noQuestionsYet');
-
-      const num = el('span', 'chapter__num');
-      if (chapter.done) num.innerHTML = CHECK_SVG;
-      else num.textContent = String(index + 1);
-      num.setAttribute('aria-hidden', 'true');
-
-      const body = el('div', 'chapter__body');
-      if (chapter.done) {
-        // Finished: one line, with Review and Edit.
-        body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', [time, qs].filter(Boolean).join(' · ')));
-        const review = el('a', 'btn btn--ghost btn--small', t('exam.review'));
-        review.href = `${timerUrl}?chapter=${encodeURIComponent(chapter.id)}`;
-        review.setAttribute('aria-label', t('exam.reviewLabel', { name: chapter.name }));
-        const actions = el('div', 'chapter__actions');
-        actions.append(review);
-        li.append(num, body, actions, editPanel(chapter, index, count));
-        return li;
-      }
-      const status = seconds >= 60 ? t('exam.inProgress') : t('exam.toDo');
-      body.append(el('p', 'chapter__name', chapter.name), el('p', 'chapter__meta muted', `${status} · ${qs}`));
-
-      const progress = el('div', 'chapter__progress');
-      const line = el('p', 'chapter__time');
-      line.append(el('strong', '', time || t('exam.notStarted')));
-      if (chapter.plannedHours) line.append(el('span', 'muted', t('exam.ofPlanned', { planned: t('unit.h', { n: chapter.plannedHours }) })));
-      progress.append(line);
-      if (chapter.plannedHours) {
-        const meter = el('div', 'chapter__meter');
-        meter.setAttribute('aria-hidden', 'true');
+      const meta = chapter.plannedHours
+        ? t('exam.timeOfPlanned', { time: time || '0', planned: t('unit.h', { n: chapter.plannedHours }) })
+        : time || t('exam.notStarted');
+      open.append(el('span', 'chapter__name', chapter.name), el('span', 'chapter__meta', meta.replace(/(\d) (?=\S)/g, '$1 ')));
+      if (chapter.plannedHours && !chapter.done) {
+        const meter = el('span', 'chapter__meter');
         const fill = el('span');
         fill.style.inlineSize = `${Math.min(100, Math.round((seconds / (chapter.plannedHours * 3600)) * 100))}%`;
         meter.append(fill);
-        progress.append(meter);
+        open.append(meter);
       }
 
-      const actions = el('div', 'chapter__actions');
-      const focus = el('a', `btn btn--small${isNext ? '' : ' btn--ghost'}`, seconds >= 60 ? t('exam.focus') : t('exam.start'));
-      focus.href = `${timerUrl}?chapter=${encodeURIComponent(chapter.id)}`;
-      focus.setAttribute('aria-label', t('exam.focusLabel', { name: chapter.name }));
-      actions.append(
-        focus,
-        button(t('exam.done'), () => {
-          updateChapter(chapter.id, { done: true });
-          celebrate();
-          announce(t('exam.finishedName', { name: chapter.name }));
-        }),
-      );
+      const right = el('span', `chapter__score${score ? ` is-${score.band}` : ''}`, score?.text ?? '');
+      if (score) right.title = t('exam.rightShare', { pct: score.text });
 
-      li.append(num, body, progress, actions, editPanel(chapter, index, count));
+      const play = el('a', 'chapter__play');
+      play.href = focusUrl(chapter.id);
+      play.innerHTML = PLAY_SVG;
+      play.setAttribute('aria-label', t(chapter.done ? 'exam.reviewLabel' : 'exam.focusLabel', { name: chapter.name }));
+
+      li.append(check, open, right, play);
       return li;
     }
 
@@ -220,20 +183,13 @@ const timerUrl = url('/timer');
       const exam = getExam();
       root!.hidden = !exam;
       if (!exam) return;
-      const active = document.activeElement;
-      if (active && list.contains(active) && active.matches('input, textarea')) {
-        stale = true;
-        return;
-      }
-      stale = false;
       const chapters = exam.chapters.filter((ch) => !removing.has(ch.id));
       const time = examTime(exam, getSessions());
       const next = nextChapter(exam, time);
-      const counts = new Map<string, number>();
-      for (const q of exam.questions) if (q.chapterId) counts.set(q.chapterId, (counts.get(q.chapterId) ?? 0) + 1);
+      const scores = chapterScores(exam);
       empty.hidden = chapters.length > 0;
-      // Numbers and Move up/down keep the plan's order; only the finished ones fold away.
-      const rows = chapters.map((ch, i) => ({ ch, li: renderChapter(ch, i, chapters.length, time.byChapter.get(ch.id) ?? 0, counts.get(ch.id) ?? 0, ch.id === next?.id) }));
+      // The plan's order; only the finished ones fold away.
+      const rows = chapters.map((ch) => ({ ch, li: renderChapter(ch, time.byChapter.get(ch.id) ?? 0, scoreOf(scores.get(ch.id)), ch.id === next?.id) }));
       const done = rows.filter((r) => r.ch.done);
       list.replaceChildren(...rows.filter((r) => !r.ch.done).map((r) => r.li));
       list.hidden = rows.length > 0 && done.length === rows.length;
@@ -244,12 +200,86 @@ const timerUrl = url('/timer');
       $<HTMLElement>('[data-ec-count]').textContent = rows.length ? (todo ? `${tn('exam.nToDo', todo)} · ${tn('exam.nFinished', done.length)}` : t('exam.allFinished')) : '';
       // The add form waits behind its button, except when there is nothing yet.
       if (!rows.length) showForm();
+      if (sheet!.open) renderSheet(false);
     }
 
-    list.addEventListener('focusout', () => {
-      // After the field's own change handler has saved.
-      window.setTimeout(() => stale && render(), 0);
+    // ---------- The chapter's sheet ----------
+
+    const sName = s$<HTMLInputElement>('[data-ecs-name]');
+    const sHours = s$<HTMLInputElement>('[data-ecs-hours]');
+    const sNotes = s$<HTMLTextAreaElement>('[data-ecs-notes]');
+    sNotes.maxLength = EXAM_NOTES_MAX;
+
+    /** `fields`: also fill the inputs (not while you are typing in them). */
+    function renderSheet(fields: boolean): void {
+      const exam = getExam();
+      const chapters = exam?.chapters.filter((ch) => !removing.has(ch.id)) ?? [];
+      const index = chapters.findIndex((ch) => ch.id === sheetId);
+      const chapter = chapters[index];
+      if (!exam || !chapter) {
+        sheet!.close();
+        return;
+      }
+      const seconds = examTime(exam, getSessions()).byChapter.get(chapter.id) ?? 0;
+      const questions = exam.questions.filter((q) => q.chapterId === chapter.id).length;
+      const score = scoreOf(chapterScores(exam).get(chapter.id));
+      s$<HTMLElement>('[data-ecs-title]').textContent = chapter.name;
+      s$<HTMLElement>('[data-ecs-meta]').textContent = [
+        seconds >= 60 ? t('exam.studied', { time: formatHM(seconds) }) : t('exam.notStarted'),
+        questions ? tn('exam.questionsN', questions) : t('exam.noQuestionsYet'),
+        score ? t('exam.rightShare', { pct: score.text }) : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+
+      const focus = s$<HTMLAnchorElement>('[data-ecs-focus]');
+      focus.href = focusUrl(chapter.id);
+      focus.textContent = chapter.done ? t('exam.review') : seconds >= 60 ? t('exam.focus') : t('exam.start');
+      const practise = s$<HTMLButtonElement>('[data-ecs-practise]');
+      practise.hidden = questions === 0;
+      practise.textContent = t('exam.practiseThis');
+      s$<HTMLButtonElement>('[data-ecs-ask]').dataset.chapter = chapter.id;
+
+      if (fields) {
+        sName.value = chapter.name;
+        sHours.value = chapter.plannedHours ? String(chapter.plannedHours) : '';
+        sNotes.value = chapter.notes ?? '';
+      }
+      s$<HTMLButtonElement>('[data-ecs-done]').textContent = chapter.done ? t('exam.reopen') : t('exam.markDone');
+      s$<HTMLButtonElement>('[data-ecs-up]').disabled = index === 0;
+      s$<HTMLButtonElement>('[data-ecs-down]').disabled = index === chapters.length - 1;
+    }
+
+    const current = () => getExam()?.chapters.find((ch) => ch.id === sheetId);
+
+    sheet.addEventListener('sheet:open', (e) => {
+      sheetId = (e as CustomEvent<Record<string, string>>).detail.chapter ?? '';
+      renderSheet(true);
     });
+    sName.addEventListener('change', () => updateChapter(sheetId, { name: sName.value }));
+    sHours.addEventListener('change', () => {
+      const n = Number(sHours.value);
+      updateChapter(sheetId, { plannedHours: n > 0 ? Math.round(n * 10) / 10 : undefined });
+    });
+    sNotes.addEventListener('change', () => updateChapter(sheetId, { notes: sNotes.value }));
+    s$<HTMLButtonElement>('[data-ecs-practise]').addEventListener('click', () => {
+      sheet.close();
+      document.dispatchEvent(new CustomEvent('exam:practise', { detail: sheetId }));
+    });
+    s$<HTMLButtonElement>('[data-ecs-done]').addEventListener('click', () => {
+      const chapter = current();
+      if (chapter) setDone(chapter, !chapter.done);
+    });
+    s$<HTMLButtonElement>('[data-ecs-up]').addEventListener('click', () => moveChapter(sheetId, -1));
+    s$<HTMLButtonElement>('[data-ecs-down]').addEventListener('click', () => moveChapter(sheetId, 1));
+    s$<HTMLButtonElement>('[data-ecs-remove]').addEventListener('click', () => {
+      const chapter = current();
+      if (!chapter) return;
+      sheet.close();
+      remove(chapter);
+    });
+
+    // ---------- Adding ----------
 
     function showForm(): void {
       form.hidden = false;
@@ -273,13 +303,15 @@ const timerUrl = url('/timer');
     render();
     c.add(subscribe('exam', render));
     c.add(subscribe('sessions', render));
+    c.add(() => sheet.close());
     return c.run;
   });
 </script>
 
 <style>
   .chapters[hidden],
-  .chapters [hidden] {
+  .chapters [hidden],
+  .ch-sheet [hidden] {
     display: none;
   }
 
@@ -299,8 +331,15 @@ const timerUrl = url('/timer');
     font-size: var(--text-sm);
   }
 
+  .chapters__items {
+    display: grid;
+    margin-top: var(--space-2);
+    padding: 0;
+    list-style: none;
+  }
+
   .chapters__done {
-    margin-top: var(--space-4);
+    margin-top: var(--space-2);
   }
 
   .chapters__done > summary {
@@ -309,69 +348,21 @@ const timerUrl = url('/timer');
     font-weight: 600;
   }
 
-  .chapters__items--done {
+  .chapters__empty {
     margin-top: var(--space-2);
-  }
-
-  /* A finished chapter is one quiet line: check, name, Review, Edit. */
-  .chapters__items--done {
-    gap: 0;
-  }
-
-  .chapters :global(.chapters__items--done .chapter) {
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-2) 0;
-    border: 0;
-    border-bottom: 1px solid var(--color-border);
-    border-radius: 0;
-    background: none;
-    box-shadow: none;
-  }
-
-  .chapters :global(.chapters__items--done .chapter:last-child) {
-    border-bottom: 0;
-  }
-
-  .chapters :global(.chapters__items--done .chapter__num) {
-    width: 28px;
-    height: 28px;
-  }
-
-  /* Name beside the check; Review and Edit on the line under it. */
-  .chapters :global(.chapters__items--done .chapter__body) {
-    flex: 1 1 calc(100% - 28px - var(--space-3));
-  }
-
-  .chapters :global(.chapters__items--done .chapter__actions) {
-    margin-inline-start: calc(28px + var(--space-3));
-  }
-
-  .chapters :global(.chapters__items--done .chapter__actions .btn) {
-    min-height: 40px;
+    font-size: var(--text-sm);
   }
 
   .chapters__add {
-    margin-top: var(--space-4);
+    margin-top: var(--space-2);
     min-height: 44px;
-  }
-
-  .chapters__items {
-    display: grid;
-    gap: var(--space-3);
-    margin-top: var(--space-4);
-    padding: 0;
-    list-style: none;
-  }
-
-  .chapters__empty {
-    font-size: var(--text-sm);
   }
 
   .chapters__form {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
-    margin-top: var(--space-4);
+    margin-top: var(--space-3);
     padding: var(--space-3);
     border: 1px dashed var(--color-border-strong);
     border-radius: var(--radius-md);
@@ -386,41 +377,68 @@ const timerUrl = url('/timer');
     flex: 0 1 6.5rem;
   }
 
-  /* A chapter is a small raised card: number, name, time against plan, actions. */
+  /* A chapter is one line: tick, name and time, accuracy, play. */
   .chapters :global(.chapter) {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    gap: var(--space-3) var(--space-4);
-    padding: var(--space-3) var(--space-4);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--raised-grad);
-    box-shadow:
-      inset 0 1px 0 var(--raised-hl),
-      0 2px 0 var(--edge);
+    gap: var(--space-1);
+    border-top: 1px solid var(--color-border);
   }
 
-  .chapters :global(.chapter__num) {
+  .chapters :global(.chapter:first-child) {
+    border-top: 0;
+  }
+
+  .chapters :global(.chapter__check),
+  .chapters :global(.chapter__play) {
     flex: none;
     display: grid;
     place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: var(--color-surface-2);
-    color: var(--color-text-muted);
-    font-weight: 700;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
   }
 
-  .chapters :global(.chapter.is-done .chapter__num) {
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
+  .chapters :global(.chapter__check) {
+    margin-inline-start: calc(-1 * var(--space-2));
   }
 
-  .chapters :global(.chapter__body) {
-    flex: 1 1 12rem;
+  .chapters :global(.chapter__box) {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 2px solid var(--color-border-strong);
+    border-radius: 7px;
+    color: transparent;
+  }
+
+  .chapters :global(.chapter__check:hover .chapter__box) {
+    border-color: var(--color-accent);
+  }
+
+  .chapters :global(.chapter__check[aria-pressed='true'] .chapter__box) {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .chapters :global(.chapter__open) {
+    flex: 1;
     min-width: 0;
+    display: grid;
+    gap: 2px;
+    padding: var(--space-2) 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
   }
 
   .chapters :global(.chapter__name) {
@@ -428,111 +446,126 @@ const timerUrl = url('/timer');
     overflow-wrap: anywhere;
   }
 
+  .chapters :global(.chapter.is-done .chapter__name) {
+    color: var(--color-text-muted);
+  }
+
   .chapters :global(.chapter__meta) {
+    color: var(--color-text-muted);
     font-size: var(--text-xs);
-  }
-
-  .chapters :global(.chapter__progress) {
-    flex: 1 1 11rem;
-    min-width: 0;
-    display: grid;
-    gap: var(--space-1);
-  }
-
-  .chapters :global(.chapter__time) {
-    display: flex;
-    justify-content: space-between;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
     font-variant-numeric: tabular-nums;
   }
 
   .chapters :global(.chapter__meter) {
-    height: 8px;
-    border-radius: 4px;
+    display: block;
+    height: 3px;
+    margin-top: 2px;
+    border-radius: 2px;
     background: var(--heat-0);
   }
 
   .chapters :global(.chapter__meter > span) {
     display: block;
     height: 100%;
-    border-radius: 4px;
+    border-radius: inherit;
     background: var(--color-accent);
   }
 
-  .chapters :global(.chapter.is-done .chapter__meter > span) {
-    background: var(--heat-2);
-  }
-
-  .chapters :global(.chapter__actions) {
+  /* Share of right answers: a small tag, its colour backed by the number itself. */
+  .chapters :global(.chapter__score) {
     flex: none;
-    display: flex;
-    gap: var(--space-2);
+    min-width: 2.75rem;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: end;
   }
 
-  .chapters :global(.chapter__actions .btn) {
-    min-height: 44px;
+  .chapters :global(.chapter__score.is-low) {
+    color: var(--cat-rest);
   }
 
-  /* Closed, "Edit" sits beside the actions; open, its fields take a row of their own. */
-  .chapters :global(.chapter__edit) {
-    flex: none;
+  .chapters :global(.chapter__score.is-mid) {
+    color: var(--cat-reward);
+  }
+
+  .chapters :global(.chapter__score.is-high) {
+    color: var(--color-accent);
+  }
+
+  .chapters :global(.chapter__play) {
+    margin-inline-end: calc(-1 * var(--space-2));
+    color: var(--color-accent);
+  }
+
+  .chapters :global(.chapter__play svg) {
+    box-sizing: content-box;
+    padding: 8px;
+    border-radius: 50%;
+    background: var(--color-surface-2);
+  }
+
+  /* The chapter Continue points at. */
+  .chapters :global(.chapter.is-next .chapter__play svg) {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  /* Sheet */
+  .ch-sheet {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .ch-sheet__title {
+    font-size: var(--text-xl);
+    overflow-wrap: anywhere;
+  }
+
+  .ch-sheet__meta {
+    margin-top: calc(-1 * var(--space-3));
     font-size: var(--text-sm);
   }
 
-  .chapters :global(.chapter__edit[open]) {
-    flex: 1 1 100%;
-  }
-
-  .chapters :global(.chapter__edit > summary) {
-    width: max-content;
-    color: var(--color-text-muted);
-    font-weight: 500;
-  }
-
-  .chapters :global(.chapter__edit-body) {
+  .ch-sheet__go {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-3);
-    padding-block: var(--space-2);
+    gap: var(--space-2);
   }
 
-  .chapters :global(.chapter__field) {
-    flex: 1 1 14rem;
-    min-width: 0;
+  .ch-sheet__go .btn {
+    min-height: 44px;
+  }
+
+  .ch-sheet__field {
     display: grid;
     gap: var(--space-1);
     font-weight: 600;
   }
 
-  .chapters :global(.chapter__field--short) {
-    flex: 0 1 9rem;
-  }
-
-  .chapters :global(.chapter__field--wide),
-  .chapters :global(.chapter__tools) {
-    flex: 1 1 100%;
-  }
-
-  .chapters :global(.chapter__field .input) {
+  .ch-sheet__field .input {
     font-weight: 400;
   }
 
-  .chapters :global(.chapter__field textarea) {
+  .ch-sheet__field--short .input {
+    max-width: 9rem;
+  }
+
+  .ch-sheet__field textarea {
     resize: vertical;
   }
 
-  .chapters :global(.chapter__tools) {
+  .ch-sheet__tools {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
   }
 
-  .chapters :global(.chapter__tools .btn) {
+  .ch-sheet__tools .btn {
     min-height: 44px;
   }
 
-  .chapters :global(.chapter__remove) {
+  .ch-sheet__remove {
     margin-inline-start: auto;
     color: var(--cat-rest);
   }

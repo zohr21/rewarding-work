@@ -6,28 +6,50 @@
  * explanation show after each question; questions you flag or miss come back first.
  */
 import { NATIVE_APP } from '../config/app';
+import Sheet from './Sheet.astro';
 ---
 
+{/* Practice starts from the goal card's chips and a chapter's sheet (event exam:practise); this card keeps the bank itself. */}
 <section class="card bank" data-exam-bank hidden aria-labelledby="bank-heading">
-  <h2 data-t="exam.questionBank" id="bank-heading" class="panel-title">Question bank</h2>
-  <p data-eb-count></p>
-  <p class="bank__weak" data-eb-weak hidden></p>
-  <div class="bank__practice" data-eb-practice-row hidden>
-    <label data-t="exam.practiseQuestionsFrom" for="eb-scope" class="visually-hidden">Practise questions from</label>
-    <select id="eb-scope" class="input" data-eb-scope></select>
-    <button data-t="exam.practice" type="button" class="btn" data-eb-start>Practice</button>
+  <div class="bank__head">
+    <h2 data-t="exam.questionBank" id="bank-heading" class="panel-title">Question bank</h2>
+    <p class="muted bank__count" data-eb-count></p>
   </div>
-  {/* Importing and removing are occasional: folded away once there are questions. */}
-  <details class="disclosure bank__manage" data-eb-manage>
-    <summary data-t="exam.importOrRemoveQuestions">Import or remove questions</summary>
-    <div class="bank__manage-body">
-      <button data-t="exam.importQuestions" type="button" class="btn btn--ghost" data-eb-import-open>Import questions</button>
-      <p data-t="exam.fromACsvOrJson" class="muted bank__note">From a .csv or .json file of multiple-choice questions.</p>
-      <button data-t="exam.removeAllQuestions" type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
-    </div>
-  </details>
+  <div class="bank__tools">
+    <button data-t="exam.addAQuestion" type="button" class="btn btn--ghost btn--small" data-sheet-open="exam-question" data-chapter="" data-eb-add>+ Add a question</button>
+    <button data-t="exam.importAFile" type="button" class="btn btn--ghost btn--small" data-eb-import-open>Import a file</button>
+  </div>
+  <p data-t="exam.fromACsvOrJson" class="muted bank__note" data-eb-note>From a .csv or .json file of multiple-choice questions.</p>
+  <button data-t="exam.removeAllQuestions" type="button" class="bank__clear" data-eb-clear hidden>Remove all questions</button>
   <p class="visually-hidden" aria-live="polite" data-eb-live></p>
 </section>
+
+<Sheet id="exam-question" title="Add a question" titleKey="exam.addAQuestionTitle">
+  <form class="ask" data-eq-form novalidate>
+    <label class="ask__field">
+      <span data-t="exam.chapter">Chapter</span>
+      <select class="input" data-eq-chapter></select>
+    </label>
+    <label class="ask__field">
+      <span data-t="exam.question">Question</span>
+      <textarea class="input" rows="3" maxlength="1000" required data-eq-text></textarea>
+    </label>
+    <fieldset class="ask__options">
+      <legend><span data-t="exam.options">Options</span> <span data-t="exam.tickTheRightOne" class="muted">(tick the right one, or several)</span></legend>
+      <div class="ask__list" data-eq-options></div>
+      <button data-t="exam.anotherOption" type="button" class="btn btn--ghost btn--small" data-eq-more>+ Another option</button>
+    </fieldset>
+    <label class="ask__field">
+      <span><span data-t="exam.explanation">Why it's right</span> <span data-t="exam.optional" class="muted">(optional)</span></span>
+      <textarea class="input" rows="2" maxlength="1000" data-eq-why></textarea>
+    </label>
+    <p class="ask__error" role="alert" data-eq-error hidden></p>
+    <div class="ask__foot">
+      <p class="muted ask__added" aria-live="polite" data-eq-added></p>
+      <button data-t="exam.addQuestion" type="submit" class="btn">Add question</button>
+    </div>
+  </form>
+</Sheet>
 
 <dialog class="exam-dialog popover" data-eb-import aria-labelledby="eb-import-title">
   <div class="exam-dialog__head">
@@ -133,26 +155,26 @@ import { NATIVE_APP } from '../config/app';
 <script>
   import { getExam, subscribe, type ExamQuestion } from '../lib/storage';
   import {
+    addQuestion,
     CHOICE_NEW,
     CHOICE_NONE,
     clearQuestions,
     guessChapter,
     importQuestions,
     isRight,
+    OPTIONS_MAX,
     parseQuestionFile,
     pickRound,
     recordAnswer,
     recordRound,
-    ROUND_SIZE,
     setAgain,
     TEMPLATE_CSV,
-    weakestChapter,
     type ChapterChoice,
     type ParsedFile,
   } from '../lib/exam';
   import { celebrate } from '../lib/appearance';
   import { el } from '../lib/dom';
-  import { cleanups, onPage } from '../lib/page';
+  import { cleanups, listen, onPage } from '../lib/page';
   import { t, tn } from '../lib/i18n';
 
   const letter = (i: number) => String.fromCharCode(65 + i);
@@ -172,10 +194,6 @@ import { NATIVE_APP } from '../config/app';
     // ---------- The card ----------
 
     const count = $<HTMLElement>('[data-eb-count]');
-    const weak = $<HTMLElement>('[data-eb-weak]');
-    const practiceRow = $<HTMLElement>('[data-eb-practice-row]');
-    const scope = $<HTMLSelectElement>('[data-eb-scope]');
-    const start = $<HTMLButtonElement>('[data-eb-start]');
     const clear = $<HTMLButtonElement>('[data-eb-clear]');
     const live = $<HTMLElement>('[data-eb-live]');
     let clearArmed = false;
@@ -184,15 +202,6 @@ import { NATIVE_APP } from '../config/app';
       node.textContent = '';
       window.setTimeout(() => (node.textContent = text), 50);
     };
-
-    const poolSize = (questions: ExamQuestion[], chapterId: string) =>
-      chapterId === 'all' ? questions.length : questions.filter((q) => q.chapterId === chapterId).length;
-
-    function renderStart(): void {
-      const n = Math.min(ROUND_SIZE, poolSize(getExam()?.questions ?? [], scope.value));
-      start.textContent = tn('exam.practiceN', n);
-      start.disabled = n === 0;
-    }
 
     function render(): void {
       const exam = getExam();
@@ -205,22 +214,96 @@ import { NATIVE_APP } from '../config/app';
           ? `${tn('exam.questionsN', n)} · ${tn('exam.chaptersN', withQuestions.length)}`
           : tn('exam.questionsN', n)
         : t('exam.noQuestionsYetDot');
-      const worst = n ? weakestChapter(exam) : null;
-      weak.hidden = !worst;
-      if (worst) weak.textContent = t('exam.weakest', { name: worst.chapter.name, correct: worst.correct, seen: worst.seen });
-
-      practiceRow.hidden = clear.hidden = n === 0;
-      // With no questions yet, importing is the only thing to do here.
-      if (n === 0) $<HTMLDetailsElement>('[data-eb-manage]').open = true;
-      const before = scope.value || 'all';
-      const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
-      scope.replaceChildren(option('all', t('exam.allChapters', { n })), ...withQuestions.map((ch) => option(ch.id, `${ch.name} (${poolSize(exam.questions, ch.id)})`)));
-      scope.value = [...scope.options].some((o) => o.value === before) ? before : 'all';
-      scope.hidden = withQuestions.length === 0;
-      renderStart();
+      clear.hidden = n === 0;
+      // What a file should hold, only until there are questions.
+      $<HTMLElement>('[data-eb-note]').hidden = n > 0;
+      renderAsk();
     }
 
-    scope.addEventListener('change', renderStart);
+    // ---------- One question by hand ----------
+
+    const askSheet = $<HTMLDialogElement>('[data-sheet="exam-question"]');
+    const askForm = $<HTMLFormElement>('[data-eq-form]');
+    const askChapter = $<HTMLSelectElement>('[data-eq-chapter]');
+    const askText = $<HTMLTextAreaElement>('[data-eq-text]');
+    const askOptions = $<HTMLElement>('[data-eq-options]');
+    const askMore = $<HTMLButtonElement>('[data-eq-more]');
+    const askWhy = $<HTMLTextAreaElement>('[data-eq-why]');
+    const askError = $<HTMLElement>('[data-eq-error]');
+    const askAdded = $<HTMLElement>('[data-eq-added]');
+
+    function optionRow(i: number): HTMLElement {
+      const row = el('div', 'ask__option');
+      const right = el('input');
+      right.type = 'checkbox';
+      right.setAttribute('aria-label', t('exam.optionIsRight', { letter: letter(i) }));
+      const box = el('input', 'input');
+      box.type = 'text';
+      box.maxLength = 300;
+      box.setAttribute('aria-label', t('exam.optionN', { letter: letter(i) }));
+      row.append(el('span', 'ask__letter', letter(i)), box, right);
+      return row;
+    }
+
+    function resetAsk(chapterId: string): void {
+      askText.value = askWhy.value = '';
+      askOptions.replaceChildren(...[0, 1, 2, 3].map(optionRow));
+      askMore.hidden = false;
+      askError.hidden = true;
+      renderAsk();
+      askChapter.value = [...askChapter.options].some((o) => o.value === chapterId) ? chapterId : '';
+    }
+
+    /** The chapter list, kept in step with the exam. */
+    function renderAsk(): void {
+      const exam = getExam();
+      const before = askChapter.value;
+      const option = (value: string, text: string) => Object.assign(document.createElement('option'), { value, textContent: text });
+      askChapter.replaceChildren(...(exam?.chapters ?? []).map((ch) => option(ch.id, ch.name)), option('', t('exam.noChapter')));
+      askChapter.value = [...askChapter.options].some((o) => o.value === before) ? before : askChapter.options[0]?.value ?? '';
+    }
+
+    askSheet.addEventListener('sheet:open', (e) => {
+      askAdded.textContent = '';
+      resetAsk((e as CustomEvent<Record<string, string>>).detail.chapter ?? '');
+    });
+
+    askMore.addEventListener('click', () => {
+      const n = askOptions.children.length;
+      if (n >= OPTIONS_MAX) return;
+      const row = optionRow(n);
+      askOptions.append(row);
+      askMore.hidden = n + 1 >= OPTIONS_MAX;
+      row.querySelector<HTMLInputElement>('.input')!.focus();
+    });
+
+    askForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const rows = [...askOptions.children];
+      const why = addQuestion({
+        chapterId: askChapter.value || undefined,
+        text: askText.value,
+        options: rows.map((r) => r.querySelector<HTMLInputElement>('.input')!.value),
+        answer: rows.flatMap((r, i) => (r.querySelector<HTMLInputElement>('[type="checkbox"]')!.checked ? [i] : [])),
+        explanation: askWhy.value,
+      });
+      if (why) {
+        askError.textContent = t(`exam.ask.${why}`);
+        askError.hidden = false;
+        (why === 'text' ? askText : why === 'options' ? rows[0]?.querySelector<HTMLInputElement>('.input') : rows[0]?.querySelector<HTMLInputElement>('[type="checkbox"]'))?.focus();
+        return;
+      }
+      // Ready for the next one, in the same chapter.
+      const chapterId = askChapter.value;
+      resetAsk(chapterId);
+      askAdded.textContent = t('exam.questionAdded');
+      askText.focus();
+    });
+
+    // A half-written question asks before it is put away.
+    askSheet.addEventListener('sheet:dismiss', (e) => {
+      if (askText.value.trim() && !window.confirm(t('exam.discardQuestion'))) e.preventDefault();
+    });
 
     // Press twice to remove: the first press says what will happen.
     function disarmClear(): void {
@@ -514,10 +597,15 @@ import { NATIVE_APP } from '../config/app';
       if (correct === round.length) celebrate();
     }
 
+    /** What the round is drawn from: 'all', a chapter id or MISTAKES. "Another round" keeps it. */
+    let scope = 'all';
+
     function startRound(): void {
       const exam = getExam();
       if (!exam) return;
-      round = pickRound(exam, scope.value || 'all');
+      round = pickRound(exam, scope);
+      // The mistakes may all be put right; the next round is then the whole bank.
+      if (!round.length && scope !== 'all') round = pickRound(exam, (scope = 'all'));
       if (!round.length) return;
       index = 0;
       picked = new Set();
@@ -528,7 +616,13 @@ import { NATIVE_APP } from '../config/app';
       if (!practiceDialog!.open) practiceDialog!.showModal();
     }
 
-    start.addEventListener('click', startRound);
+    // Asked for by the goal card's chips and a chapter's sheet.
+    c.add(
+      listen(document, 'exam:practise', (e) => {
+        scope = String((e as CustomEvent<string>).detail || 'all');
+        startRound();
+      }),
+    );
     more.addEventListener('click', startRound);
     check.addEventListener('click', answer);
     done.addEventListener('click', () => practiceDialog.close());
@@ -574,45 +668,135 @@ import { NATIVE_APP } from '../config/app';
   }
 
   .bank[hidden],
-  .bank__practice[hidden],
-  .bank__weak[hidden],
-  .bank__clear[hidden] {
+  .bank [hidden] {
     display: none;
   }
 
-  .bank .panel-title {
-    margin-bottom: 0;
+  .bank__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-1) var(--space-3);
   }
 
-  .bank__weak {
+  .bank .panel-title {
+    margin: 0;
+  }
+
+  .bank__count {
+    font-size: var(--text-sm);
+  }
+
+  .bank__tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .bank__tools .btn {
+    min-height: 44px;
+  }
+
+  .bank__note {
+    font-size: var(--text-xs);
+  }
+
+  /* Add a question (sheet) */
+  .ask {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .ask [hidden] {
+    display: none;
+  }
+
+  .ask__field {
+    display: grid;
+    gap: var(--space-1);
+    font-weight: 600;
+  }
+
+  .ask__field .input {
+    font-weight: 400;
+  }
+
+  .ask__field textarea {
+    resize: vertical;
+  }
+
+  .ask__options {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .ask__options legend {
+    margin-bottom: var(--space-2);
+    padding: 0;
+    font-weight: 600;
+  }
+
+  .ask__list {
+    display: grid;
+    gap: var(--space-2);
+  }
+
+  .ask :global(.ask__option) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .ask :global(.ask__letter) {
+    flex: none;
+    width: 1.5rem;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .ask :global(.ask__option .input) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* The "right answer" tick: a 44 px target. */
+  .ask :global(.ask__option input[type='checkbox']) {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    margin: 9px;
+    accent-color: var(--color-accent);
+  }
+
+  .ask__options > .btn {
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  .ask__error {
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-md);
     background: var(--cat-reward-bg);
     color: var(--cat-reward);
-    font-size: var(--text-sm);
+    font-weight: 600;
   }
 
-  .bank__practice {
-    display: grid;
+  .ask__foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     gap: var(--space-3);
   }
 
-  .bank__note {
-    margin-top: calc(-1 * var(--space-1));
-    font-size: var(--text-xs);
-  }
-
-  .bank__manage > summary {
-    min-height: 44px;
-    align-content: center;
-    color: var(--color-text-muted);
+  .ask__added {
+    flex: 1;
     font-size: var(--text-sm);
-  }
-
-  .bank__manage-body {
-    display: grid;
-    gap: var(--space-3);
-    padding-top: var(--space-2);
   }
 
   .bank__clear {
