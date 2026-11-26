@@ -173,10 +173,10 @@ export const TIPS: Tip[] = [
     when: (c) => onList(c, 'inbox').length >= 5,
     because: 'Because 5 or more thoughts are waiting in your Inbox.',
   },
-  // Exam prep
+  // Study (exam prep)
   {
     id: 'exam-hours',
-    area: 'Exam prep',
+    area: 'Study',
     title: 'Plan hours per chapter',
     text: 'Give each chapter the hours you think it needs. You can see at a glance which ones are behind.',
     show: { path: '/exam', target: '[data-exam-chapters]' },
@@ -185,16 +185,16 @@ export const TIPS: Tip[] = [
   },
   {
     id: 'exam-import',
-    area: 'Exam prep',
+    area: 'Study',
     title: 'Practise with your own questions',
-    text: 'Import multiple-choice questions from a .csv or .json file and match them to your chapters. The import window has a template.',
+    text: 'Add questions one at a time, or import a .csv or .json file and match it to your chapters.',
     show: { path: '/exam', target: '[data-eb-import-open]' },
     when: (c) => !!c.exam && c.exam.chapters.length > 0 && c.exam.questions.length === 0,
     because: 'Because your exam has chapters but no practice questions.',
   },
   {
     id: 'exam-practice',
-    area: 'Exam prep',
+    area: 'Study',
     title: 'Practise in short rounds',
     text: 'A round asks a few questions. Mark the hard ones "Ask me this again" and they come back.',
     show: { path: '/exam', target: '[data-eb-start], [data-exam-bank]' },
@@ -386,7 +386,7 @@ export const PLAYBOOKS: Playbook[] = [
   {
     id: 'exam',
     name: 'Study for an exam',
-    sub: 'Exam prep, practice and the timer',
+    sub: 'Study, practice and the timer',
     module: 'exam',
     why: 'A date, a plan per chapter and testing yourself beat rereading. Practice questions show what you really know.',
     techniques: [
@@ -394,7 +394,7 @@ export const PLAYBOOKS: Playbook[] = [
       { slug: 'implementation-intentions', name: 'Implementation intentions' },
     ],
     steps: [
-      { id: 'exam-set', title: 'Set the exam and its date', how: 'Exam prep › Set your goal.', go: { path: '/exam', tour: 'exam' }, done: (c) => !!c.exam },
+      { id: 'exam-set', title: 'Set the exam and its date', how: 'Study › Set your goal.', go: { path: '/exam', tour: 'exam' }, done: (c) => !!c.exam },
       { id: 'exam-hours', title: 'Add chapters with hours', how: 'One chapter per part to study, with the hours you plan for it.', go: { path: '/exam', tip: 'exam-hours' }, done: (c) => !!c.exam?.chapters.some((ch) => ch.plannedHours) },
       { id: 'exam-import', title: 'Bring in practice questions', how: 'Import a .csv or .json of multiple-choice questions.', go: { path: '/exam', tip: 'exam-import' }, done: (c) => !!c.exam && c.exam.questions.length > 0 },
       { id: 'exam-round', title: 'Practise one round', how: 'Answer a few, and mark the hard ones to come back.', go: { path: '/exam', tip: 'exam-practice' }, done: (c) => !!c.exam && c.exam.rounds.length > 0 },

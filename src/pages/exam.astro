@@ -9,12 +9,13 @@ import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
 ---
 
-<BaseLayout title="Exam prep" titleKey="module.exam" description="Prepare for an exam or certification: set the goal, list the chapters, focus on one at a time and practise test questions.">
+<BaseLayout title="Study" titleKey="module.exam" description="Study for an exam, a course or anything you learn: set the goal, list the chapters, focus on one at a time and practise test questions.">
   <div class="container">
     <FocusTabs />
-    <header class="page-header">
-      <h1 data-t="exam.examPrep">Exam prep</h1>
-      {/* The app goes straight to the exam; the website explains the page first. */}
+    {/* In the app the goal's own title heads the page; the word "Study" is already the tab above. */}
+    <header class={NATIVE_APP ? 'visually-hidden' : 'page-header'}>
+      <h1 data-t="exam.examPrep">Study</h1>
+      {/* The app goes straight to the plan; the website explains the page first. */}
       {
         !NATIVE_APP && (
           <p>
@@ -41,7 +42,8 @@ import { url } from '../lib/paths';
   .exam-page,
   .exam-page__grid {
     display: grid;
-    gap: var(--space-5);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-4);
     align-items: start;
   }
 

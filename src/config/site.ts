@@ -26,7 +26,7 @@ export interface NavItem {
 
 /** Optional sections, picked on Welcome and changed under You. Focus, Tasks and the grove are always on. */
 export const MODULES = [
-  { id: 'exam', label: 'Exam prep', hint: 'A study plan for one exam' },
+  { id: 'exam', label: 'Study', hint: 'A plan for an exam, a course or anything you learn' },
   { id: 'health', label: 'Health', hint: 'Sleep, steps and wellbeing spend' },
   { id: 'budget', label: 'Budget', hint: 'Spending, from your bank alerts' },
   { id: 'screen', label: 'Screen time', hint: 'Phone time next to your plan' },
@@ -39,7 +39,7 @@ export const APP_ONLY_MODULES: readonly ModuleId[] = ['screen'];
 export const FOCUS_TABS: NavItem[] = [
   { label: 'Timer', t: 'nav.timer', href: '/timer' },
   { label: 'Tasks', t: 'nav.tasks', href: '/tasks' },
-  { label: 'Exam prep', t: 'nav.exam', href: '/exam', module: 'exam' },
+  { label: 'Study', t: 'nav.exam', href: '/exam', module: 'exam' },
   { label: 'Coach', t: 'nav.coach', href: '/techniques', under: ['/techniques', '/problems'] },
 ];
 

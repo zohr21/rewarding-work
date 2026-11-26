@@ -25,12 +25,12 @@ export interface TourStep {
 }
 
 /** The areas help is grouped by, in the order the guides list shows them. */
-export const AREAS = ['Today', 'Timer', 'Tasks', 'Exam prep', 'Coach', 'Grove', 'Health', 'Budget', 'Screen time', 'You'] as const;
+export const AREAS = ['Today', 'Timer', 'Tasks', 'Study', 'Coach', 'Grove', 'Health', 'Budget', 'Screen time', 'You'] as const;
 export type Area = (typeof AREAS)[number];
 
 /** Areas that belong to an optional section. */
 export const AREA_MODULE: Partial<Record<Area, ModuleId>> = {
-  'Exam prep': 'exam',
+  'Study': 'exam',
   Health: 'health',
   Budget: 'budget',
   'Screen time': 'screen',
@@ -104,14 +104,14 @@ export const TOURS: Tour[] = [
   },
   {
     id: 'exam',
-    name: 'Exam prep',
-    area: 'Exam prep',
+    name: 'Study',
+    area: 'Study',
     path: '/exam',
     module: 'exam',
     steps: [
-      { target: '[data-eg-hero], [data-eg-form]', title: 'Your exam', text: 'The exam, its date, and how far along you are. Edit it any time.' },
-      { target: '[data-exam-chapters]', title: 'Chapters', text: 'Add the parts to study, with the hours you plan for each. Start a session on one from here.' },
-      { target: '[data-exam-bank]', title: 'Practice questions', text: 'Import multiple-choice questions, then practise in short rounds.' },
+      { target: '[data-eg-hero], [data-eg-form]', title: 'Your goal', text: 'What you study for, its date, and what to do today. The pencil edits it.' },
+      { target: '[data-exam-chapters]', title: 'Chapters', text: "Tick a chapter when it's done, or press play to focus on it. Tap its name for hours, notes and practice." },
+      { target: '[data-exam-bank]', title: 'Questions', text: 'Add questions one at a time or import a file, then practise from the buttons at the top.' },
       { target: '[data-exam-past]', title: 'Past exams', text: 'Finished exams and how they went stay here.' },
     ],
     faq: [
@@ -242,13 +242,13 @@ export const TOURS: Tour[] = [
     area: 'You',
     path: '/account',
     steps: [
-      { target: '#acc-sections', title: 'Your sections', text: 'Turn Exam prep, Health, Budget and Screen time on or off.' },
+      { target: '#acc-sections', title: 'Your sections', text: 'Turn Study, Health, Budget and Screen time on or off.' },
       { target: '#acc-prefs', title: 'Make it yours', text: 'Look, sound and timer preferences.' },
       { target: '#acc-device, #acc-data', title: 'Your data', text: 'Save a backup, bring one back, or delete everything.' },
       { target: '#acc-help', title: 'Help any time', text: 'Tours, tips and playbooks, all in one place.' },
     ],
     faq: [
-      ['Is my data synced?', 'When you sign in, focus, tasks, chains, exam prep, Coach and Budget sync. Steps, sleep and phone time stay on this phone.'],
+      ['Is my data synced?', 'When you sign in, focus, tasks, chains, study, Coach and Budget sync. Steps, sleep and phone time stay on this phone.'],
       ['How do I move to a new phone?', 'Sign in on both, or save a backup here and open it on the new one.'],
     ],
   },
