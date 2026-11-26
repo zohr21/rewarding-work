@@ -66,7 +66,7 @@ export const TOURS: Tour[] = [
     ],
     faq: [
       ['Where do I start a focus session?', 'Tap Start focusing here, or open Focus in the bar below.'],
-      ['Can I change what shows up here?', 'Yes. Turn sections on or off under You › Sections.'],
+      ['Can I change what shows up here?', 'Yes. Turn sections on or off under You › Preferences.'],
     ],
   },
   {
@@ -242,9 +242,9 @@ export const TOURS: Tour[] = [
     area: 'You',
     path: '/account',
     steps: [
-      { target: '#acc-sections', title: 'Your sections', text: 'Turn Study, Health, Budget and Screen time on or off.' },
-      { target: '#acc-prefs', title: 'Make it yours', text: 'Look, sound and timer preferences.' },
-      { target: '#acc-device, #acc-data', title: 'Your data', text: 'Save a backup, bring one back, or delete everything.' },
+      { target: '#acc-prefs', title: 'Your sections', text: 'Under Preferences, turn Study, Health, Budget and Screen time on or off.' },
+      { target: '#acc-data', title: 'Your data', text: 'Save a backup, bring one back, and see what is kept.' },
+      { target: '#acc-delete', title: 'Start fresh', text: 'Delete your data or your account, both in one place.' },
       { target: '#acc-help', title: 'Help any time', text: 'Tours, tips and playbooks, all in one place.' },
     ],
     faq: [

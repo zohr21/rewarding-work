@@ -330,8 +330,8 @@ export const TIPS: Tip[] = [
     id: 'you-backup',
     area: 'You',
     title: 'Keep a backup',
-    text: 'You › This device: save a backup file now and then, or sign in so your focus and tasks follow you.',
-    show: { path: '/account', target: '#acc-device, #acc-data' },
+    text: 'You › Data and privacy: save a backup file now and then, or sign in so your focus and tasks follow you.',
+    show: { path: '/account', target: '#acc-data' },
     when: (c) => done(c).length >= 25,
     because: 'Because you have a lot of focus history worth keeping.',
   },
@@ -339,8 +339,8 @@ export const TIPS: Tip[] = [
     id: 'you-sections',
     area: 'You',
     title: 'Only what you use',
-    text: 'Turn sections on or off under You › Sections. Off means hidden, not deleted.',
-    show: { path: '/account', target: '#acc-sections' },
+    text: 'Turn sections on or off under You › Preferences. Off means hidden, not deleted.',
+    show: { path: '/account', target: '#acc-prefs' },
   },
 ];
 

@@ -6,6 +6,20 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **27 Nov · You becomes a hub of sheets (option B), one delete sheet, type DELETE.** The page
+  had eight groups, a jump list, four delete or forget actions in three places, and a "Timer
+  defaults" row that only opened the Timer. Now: profile, then short rows that each open a
+  sheet and show their state: Account (email, password, Google, sign out), Weekly board,
+  Preferences (sections, appearance, language, sounds), Notifications, Data and privacy
+  (what's kept, backup, Google, Health Connect, What Grovyn learns, Lock Budget, Privacy),
+  Help & guides, Write to us, and at the bottom "Delete data or account…". That sheet holds
+  Start fresh (deletes the data, keeps the sign-in; two presses) and Delete account (type
+  DELETE, or the word in the chosen language, plus the password if there is one), with a link
+  to /delete-account. Timer defaults and the "This device" group are gone; "Forget everything"
+  reads "Reset what Grovyn learned". Old `#acc-…` links open the matching sheet. The website
+  uses the same hub. Options A (regroup the long list) and C (everyday settings inline) were
+  set aside.
+
 - **27 Nov · Several study plans at once (option B: one Today card).** Study held one plan;
   starting another meant finishing or deleting it. Now up to 5 run side by side. With one plan
   the page is unchanged apart from "+ New plan". With two or more, the goal card becomes one

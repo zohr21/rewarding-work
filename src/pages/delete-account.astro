@@ -24,14 +24,15 @@ const SUBJECT = encodeURIComponent(`Delete my ${SITE.name} account`);
       <h2 data-t="you.inTheApp">In the app</h2>
       <ol>
         <li><span data-t="you.del.openApp">Open {SITE.name} and go to</span> <strong data-t="you.you">You</strong>.</li>
-        <li><span data-t="you.del.atBottom">At the bottom, under</span> <strong data-t="you.signOut">Sign out</strong><span data-t="you.del.press">, press</span> <strong data-t="you.deleteAccount">Delete account…</strong>.</li>
-        <li data-t="you.confirmIfYouSignedIn">Confirm. If you signed in with a password, you're asked for it once more.</li>
+        <li><span data-t="you.del.atBottom2">At the bottom, press</span> <strong data-t="you.hub.deleteBoth">Delete data or account…</strong>.</li>
+        <li data-t="you.del.typeConfirm">Under Delete account, type DELETE (and your password, if you use one), then press Delete account.</li>
       </ol>
 
       <h2 data-t={NATIVE_APP ? 'you.del.onWebsite' : 'you.del.here'}>{NATIVE_APP ? 'On the website' : 'Here, without the app'}</h2>
       <ol>
-        <li><span data-t="you.del.open">Open</span> <a data-t="you.account" href={`${url('/account')}#acc-device`}>Account</a> <span data-t="you.del.signInSame">and sign in the same way you did in the app (Google, or email and password).</span></li>
-        <li><span data-t="you.del.under">Under</span> <strong data-t="you.thisDevice">This device</strong><span data-t="you.del.press">, press</span> <strong data-t="you.deleteAccount">Delete account…</strong> <span data-t="you.del.andConfirm">and confirm.</span></li>
+        <li><span data-t="you.del.open">Open</span> <a data-t="you.account" href={`${url('/account')}#acc-delete`}>Account</a> <span data-t="you.del.signInSame">and sign in the same way you did in the app (Google, or email and password).</span></li>
+        <li><span data-t="you.del.atBottom2">At the bottom, press</span> <strong data-t="you.hub.deleteBoth">Delete data or account…</strong> <span data-t="you.del.andConfirm">and confirm.</span></li>
+        <li data-t="you.del.typeConfirm">Under Delete account, type DELETE (and your password, if you use one), then press Delete account.</li>
       </ol>
 
       <h2 data-t="you.ifYouCanTSign">If you can't sign in</h2>
@@ -56,7 +57,7 @@ const SUBJECT = encodeURIComponent(`Delete my ${SITE.name} account`);
       </ul>
       <p data-t="you.del.nothingKept">
         Nothing is kept afterwards; {SITE.name} has no other copy. Health numbers, screen time, bank alerts and workouts were
-        never in the account. They stay on your phone until you use <strong data-t="you.deleteAllData">Delete all data</strong> under You, or uninstall
+        never in the account. They stay on your phone until you use <strong data-t="you.del2.fresh">Start fresh</strong> under You, or uninstall
         the app. A backup file you saved yourself stays wherever you saved it.
       </p>
 

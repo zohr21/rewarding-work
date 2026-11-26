@@ -9,6 +9,7 @@ import LanguagePicker from '../components/LanguagePicker.astro';
 import RowIcon from '../components/RowIcon.astro';
 import BoardJoin from '../components/BoardJoin.astro';
 import YourData from '../components/YourData.astro';
+import Sheet from '../components/Sheet.astro';
 import { ACCOUNTS_ENABLED, BOARD_ENABLED, GOOGLE_SIGNIN_ENABLED } from '../config/firebase';
 import { NATIVE_APP } from '../config/app';
 import { url } from '../lib/paths';
@@ -97,21 +98,6 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     </section>
 
     <div class="you">
-      {/* Wide screens only: the sections are one short scroll on a phone. */}
-      <nav data-t-aria-label="you.onThisPage" class="you__nav" aria-label="On this page" data-you-nav>
-        <ul>
-          <li data-view="signed-out" hidden><a data-t="you.signIn" href="#acc-signin">Sign in</a></li>
-          <li data-view="signed-in" data-member-only hidden><a data-t="you.signInAndSecurity" href="#acc-security">Sign-in and security</a></li>
-          {BOARD_ENABLED && <li><a data-t="you.weeklyBoard" href="#acc-board">Weekly board</a></li>}
-          <li><a data-t="you.dataAndSync" href="#acc-data">Data and sync</a></li>
-          <li><a data-t="you.connections" href="#acc-connections">Connections</a></li>
-          <li><a data-t="you.preferences" href="#acc-prefs">Preferences</a></li>
-          <li data-view="signed-in" hidden><a data-t="you.thisDevice" href="#acc-device">This device</a></li>
-          <li><a data-t="you.help" href="#acc-help">Help</a></li>
-        </ul>
-      </nav>
-
-      <div class="you__body">
         {
           /* Set-up note for whoever runs a copy of the site. The Play build refuses to build without accounts. */
           !ACCOUNTS_ENABLED && !NATIVE_APP && (
@@ -164,9 +150,79 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
           <AuthPanel id="guest" guest />
         </section>
 
-        <section class="group o-sec" id="acc-security" aria-labelledby="acc-security-h" data-view="signed-in" data-member-only hidden>
-          <h2 data-t="you.signInAndSecurity" id="acc-security-h" class="group__title">Sign-in and security</h2>
-          <div class="rows">
+        <!-- The hub: each row opens a sheet and says what it is set to. -->
+        <div class="rows hub" data-view="signed-in" data-member-only hidden>
+          <button type="button" class="row" id="acc-account" data-sheet-open="you-account">
+            <RowIcon name="user" />
+            <span class="row__main"><span data-t="you.hub.account">Account</span><small data-hub-account data-t="you.hub.accountSub">Email, Google, password and sign out</small></span>
+            <RowIcon chevron />
+          </button>
+        </div>
+
+        <div class="rows hub">
+          {
+            BOARD_ENABLED && (
+              <button type="button" class="row" id="acc-board" data-sheet-open="you-board">
+                <RowIcon name="leaf" />
+                <span class="row__main"><span data-t="you.weeklyBoard">Weekly board</span><small data-hub-board data-t="you.offNobodySeesYou">Off · nobody sees you</small></span>
+                <RowIcon chevron />
+              </button>
+            )
+          }
+          <button type="button" class="row" id="acc-prefs" data-sheet-open="you-prefs">
+            <RowIcon name="sun" />
+            <span class="row__main"><span data-t="you.preferences">Preferences</span><small data-hub-prefs data-t="you.hub.prefsSub">Sections, look, language and sounds</small></span>
+            <RowIcon chevron />
+          </button>
+            {
+              NATIVE_APP && (
+                <button type="button" class="row" data-notify>
+                  <RowIcon name="bell" />
+                  <span class="row__main">
+                    <span data-t="you.notifications">Notifications and widgets</span><small data-t="you.timerAlertsWidgetsAreAdded" data-notify-note>Timer alerts. Widgets are added from your home screen.</small>
+                  </span>
+                  <span class="row__value" data-pref-notify />
+                </button>
+              )
+            }
+        </div>
+
+        <div class="rows hub">
+          <button type="button" class="row" id="acc-data" data-sheet-open="you-data">
+            <RowIcon name="shield" />
+            <span class="row__main"><span data-t="you.hub.data">Data and privacy</span><small data-t={NATIVE_APP ? 'you.hub.dataSubPhone' : 'you.hub.dataSub'}>{NATIVE_APP ? 'Backup, Health Connect, what Grovyn learns' : 'Backup, sync and privacy'}</small></span>
+            <RowIcon chevron />
+          </button>
+          <button type="button" class="row" id="acc-help" data-sheet-open="guides">
+            <RowIcon name="help" />
+            <span class="row__main">
+              <span data-t="you.help">Help &amp; guides</span><small data-t="you.toursTipsAndTricksAnd">Tours, tips and tricks, and playbooks for your goals</small>
+            </span>
+            <RowIcon chevron />
+          </button>
+          <a class="row" href={HELP_MAIL}>
+            <RowIcon name="mail" />
+            <span class="row__main">
+              <span data-t="you.writeToUs">Write to us</span><small><span data-t="you.questions">Questions, problems or ideas:</span> {SITE.supportEmail}</small>
+            </span>
+            <RowIcon chevron />
+          </a>
+        </div>
+
+        <div class="rows hub hub--danger">
+          <button type="button" class="row" id="acc-delete" data-sheet-open="you-delete">
+            <RowIcon name="trash" />
+            <span class="row__main" data-hub-delete data-t="you.hub.deleteData">Delete all data…</span>
+            <RowIcon chevron />
+          </button>
+        </div>
+
+        {NATIVE_APP && <p class="account__version muted"><span data-t="you.version">Version</span> {pkg.version}</p>}
+    </div>
+
+    <!-- The sheets sit inside the page, so its scripts find them. -->
+    <Sheet id="you-account" title="Account" titleKey="you.hub.account">
+      <div class="rows">
             <div class="row">
               <RowIcon name="mail" />
               <span class="row__main"><span data-t="you.email">Email</span><small data-email-sub></small></span>
@@ -187,15 +243,39 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                 </form>
               </div>
             </details>
-            <p class="account__msg row-note" role="status" data-security-msg></p>
+            <div class="row">
+              <RowIcon name="link" />
+              <span class="row__main"><span translate="no">Google</span><small data-t="you.signInWithOneTap">Sign in with one tap</small></span>
+              <span data-t="you.connected" class="badge badge--ok" data-google-linked hidden>Connected</span>
+              <span data-google-unlinked hidden>
+                <button data-t="you.connect" type="button" class="btn btn--ghost btn--small" data-link-google>Connect</button>
+              </span>
+            </div>
+        <div class="row row--signout">
+          <RowIcon name="signout" />
+          <span class="row__main">
+            <span data-t="you.signOut" class="row__label">Sign out</span>
+            <small data-t={NATIVE_APP ? 'you.signOutPhone' : 'you.signOutBrowser'}>Removes your data from this {NATIVE_APP ? 'phone' : 'browser'}. It stays in your account.</small>
+          </span>
+          <button data-t="you.signOut" type="button" class="btn btn--ghost btn--small" data-sign-out>Sign out</button>
+        </div>
+        <div class="account__warn row-note" data-sign-out-warn hidden>
+          <p data-t="you.someChangesHavenTReached">Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
+          <div class="account__actions">
+            <button data-t="you.signOutAnyway" type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
+            <button data-t="you.staySignedIn" type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
           </div>
-        </section>
+        </div>
+        <p class="account__msg row-note" role="status" data-security-msg></p>
+        <p class="account__msg row-note" role="status" data-connect-msg></p>
+        <p class="account__msg row-note" role="status" data-device-msg></p>
+      </div>
+    </Sheet>
 
-        {
-          BOARD_ENABLED && (
-            <section class="group o-board" id="acc-board" aria-labelledby="acc-board-h" data-board-card>
-              <h2 data-t="you.weeklyBoard" id="acc-board-h" class="group__title">Weekly board</h2>
-              <div class="rows">
+    {
+      BOARD_ENABLED && (
+        <Sheet id="you-board" title="Weekly board" titleKey="you.weeklyBoard">
+          <div class="rows" data-board-card>
                 <label class="row row--toggle">
                   <RowIcon name="leaf" />
                   <span class="row__main">
@@ -258,53 +338,13 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                 </details>
                 <p class="account__msg row-note" role="status" data-board-msg></p>
               </div>
-            </section>
-          )
-        }
+        </Sheet>
+      )
+    }
 
-        {/* For everyone, signed in or not: the data is in this browser either way. */}
-        <div class="o-data" id="acc-data">
-          <DataTools />
-        </div>
-
-        <section class="group o-conn" id="acc-connections" aria-labelledby="acc-connections-h">
-          <h2 data-t="you.connections" id="acc-connections-h" class="group__title">Connections</h2>
-          <div class="rows">
-            <div class="row" data-view="signed-in" data-member-only hidden>
-              <RowIcon name="link" />
-              <span class="row__main"><span translate="no">Google</span><small data-t="you.signInWithOneTap">Sign in with one tap</small></span>
-              <span data-t="you.connected" class="badge badge--ok" data-google-linked hidden>Connected</span>
-              <span data-google-unlinked hidden>
-                <button data-t="you.connect" type="button" class="btn btn--ghost btn--small" data-link-google>Connect</button>
-              </span>
-            </div>
-            <div class="row">
-              <RowIcon name="heart" />
-              <span class="row__main"
-                ><span data-t={NATIVE_APP ? 'you.healthConnect' : 'you.healthData'}>{NATIVE_APP ? 'Health Connect' : 'Health data'}</span><small data-t={NATIVE_APP ? 'you.healthConnectSub' : 'you.healthDataSub'}
-                  >{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small
-                ></span
-              >
-              <a class="btn btn--ghost btn--small" href={url('/health')} data-t={NATIVE_APP ? 'you.manage' : 'you.open'}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
-            </div>
-            {
-              NATIVE_APP && (
-                <button type="button" class="row" data-sheet-open="mydata">
-                  <RowIcon name="shield" />
-                  <span class="row__main">
-                    <span data-t="you.yourData">Your data</span><small data-t="you.whatYourFindingLearnsFrom">What your finding learns from, and forgetting it</small>
-                  </span>
-                  <RowIcon chevron />
-                </button>
-              )
-            }
-            <p class="account__msg row-note" role="status" data-connect-msg></p>
-          </div>
-        </section>
-
-        <section class="group o-prefs" id="acc-sections" aria-labelledby="acc-sections-h">
-          <h2 data-t="you.sections" id="acc-sections-h" class="group__title">Sections</h2>
-          <div class="rows">
+    <Sheet id="you-prefs" title="Preferences" titleKey="you.preferences">
+      <h3 data-t="you.sections" class="group__title">Sections</h3>
+      <div class="rows" id="acc-sections">
             {
               MODULES.filter((m) => NATIVE_APP || !APP_ONLY_MODULES.includes(m.id)).map((m) => (
                 <label class="row row--toggle">
@@ -316,13 +356,10 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
                 </label>
               ))
             }
-            <p data-t="you.focusTasksAndYourGrove" class="row-note muted">Focus, Tasks and your grove are always on.</p>
-          </div>
-        </section>
-
-        <section class="group o-prefs" id="acc-prefs" aria-labelledby="acc-prefs-h">
-          <h2 data-t="you.preferences" id="acc-prefs-h" class="group__title">Preferences</h2>
-          <div class="rows">
+        <p data-t="you.focusTasksAndYourGrove" class="row-note muted">Focus, Tasks and your grove are always on.</p>
+      </div>
+      <h3 data-t="you.lookAndSound" class="group__title prefs__title">Look and sound</h3>
+      <div class="rows">
             <details class="row-more">
               <summary class="row">
                 <RowIcon name="sun" />
@@ -351,112 +388,86 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
               <span class="row__value" data-pref-sound></span>
               <RowIcon chevron />
             </button>
-            <a class="row" href={url('/timer')}>
-              <RowIcon name="timer" />
-              <span data-t="you.timerDefaults" class="row__main">Timer defaults</span>
-              <span class="row__value" data-pref-timer></span>
-              <RowIcon chevron />
-            </a>
-            {
-              NATIVE_APP && (
-                <button type="button" class="row" data-notify>
-                  <RowIcon name="bell" />
-                  <span class="row__main">
-                    <span data-t="you.notifications">Notifications and widgets</span><small data-t="you.timerAlertsWidgetsAreAdded" data-notify-note>Timer alerts. Widgets are added from your home screen.</small>
-                  </span>
-                  <span class="row__value" data-pref-notify />
-                </button>
-              )
-            }
-          </div>
-        </section>
+      </div>
+    </Sheet>
 
-        <section class="group device o-device" id="acc-device" aria-labelledby="acc-device-h" data-view="signed-in" hidden>
-          <h2 data-t="you.thisDevice" id="acc-device-h" class="group__title">This device</h2>
-          <div class="rows">
-            <div data-member-only hidden>
-              <div class="row row--signout">
-                <RowIcon name="signout" />
-                <span class="row__main">
-                  <span data-t="you.signOut" class="row__label">Sign out</span>
-                  <small data-t={NATIVE_APP ? 'you.signOutPhone' : 'you.signOutBrowser'}>Removes your data from this {NATIVE_APP ? 'phone' : 'browser'}. It stays in your account.</small>
-                </span>
-                <button data-t="you.signOut" type="button" class="btn btn--ghost btn--small" data-sign-out>Sign out</button>
-              </div>
-              <div class="account__warn row-note" data-sign-out-warn hidden>
-                <p data-t="you.someChangesHavenTReached">Some changes haven't reached your account yet (are you offline?). If you sign out now they'll be lost.</p>
-                <div class="account__actions">
-                  <button data-t="you.signOutAnyway" type="button" class="btn btn--danger btn--small" data-sign-out-force>Sign out anyway</button>
-                  <button data-t="you.staySignedIn" type="button" class="btn btn--ghost btn--small" data-sign-out-cancel>Stay signed in</button>
-                </div>
-              </div>
+    <Sheet id="you-data" title="Data and privacy" titleKey="you.hub.data">
+      <DataTools>
+            <div class="row">
+              <RowIcon name="heart" />
+              <span class="row__main"
+                ><span data-t={NATIVE_APP ? 'you.healthConnect' : 'you.healthData'}>{NATIVE_APP ? 'Health Connect' : 'Health data'}</span><small data-t={NATIVE_APP ? 'you.healthConnectSub' : 'you.healthDataSub'}
+                  >{NATIVE_APP ? 'Sleep, steps and activity' : 'Read by the Android app'}</small
+                ></span
+              >
+              <a class="btn btn--ghost btn--small" href={url('/health')} data-t={NATIVE_APP ? 'you.manage' : 'you.open'}>{NATIVE_APP ? 'Manage' : 'Open'}</a>
             </div>
-            <p data-t="you.youReUsingAGuest" class="muted row-note" data-guest-only hidden>
-              You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
-              Google first if you want to use it elsewhere.
-            </p>
-            <p class="account__msg row-note" role="status" data-device-msg></p>
-
-            <details class="row-more row-more--danger">
-              <summary class="row">
-                <RowIcon name="trash" />
-                <span class="row__main">
-                  <span data-t="you.deleteAccount" class="row__label" data-delete-title>Delete account…</span>
-                  <small data-t="you.permanentlyDeletesYourAccountAnd">Permanently deletes your account and everything in it. Export a backup first.</small>
-                </span>
-                <RowIcon chevron />
-              </summary>
-              <div class="row-more__body">
-                <p class="muted">
-                  <span data-t={NATIVE_APP ? 'you.deletePhone' : 'you.deleteBrowser'}
-                    >This removes your account, everything stored in it, and this {NATIVE_APP ? "phone's" : "browser's"} copy. It can't be undone —</span
-                  >{' '}
-                  <a data-t="you.exportABackup" href="#acc-data">export a backup</a> <span data-t="you.deleteTail">first if you might want your data.</span>
-                </p>
-                <form class="auth__form" data-form="delete" novalidate>
-                  <div data-delete-password hidden>
-                    <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
-                  </div>
-                  <div class="account__actions">
-                    <button data-t="you.deleteAccount2" type="submit" class="btn btn--danger btn--small" data-delete>Delete account</button>
-                  </div>
-                </form>
-                <p class="account__msg" role="status" data-delete-msg></p>
-              </div>
-            </details>
-          </div>
-        </section>
-
-        <section class="group o-help" id="acc-help" aria-labelledby="acc-help-h">
-          <h2 data-t="you.help" id="acc-help-h" class="group__title">Help</h2>
-          <div class="rows">
-            <button type="button" class="row" data-sheet-open="guides">
-              <RowIcon name="help" />
+        {
+          NATIVE_APP && (
+            <button type="button" class="row" data-sheet-open="mydata">
+              <RowIcon name="leaf" />
               <span class="row__main">
-                <span data-t="you.help">Help &amp; guides</span><small data-t="you.toursTipsAndTricksAnd">Tours, tips and tricks, and playbooks for your goals</small>
+                <span data-t="you.whatGrovynLearns">What Grovyn learns</span><small data-t="you.whatYourFindingLearnsFrom">What your finding learns from, and forgetting it</small>
               </span>
               <RowIcon chevron />
             </button>
-            <a class="row" href={HELP_MAIL}>
-              <RowIcon name="mail" />
-              <span class="row__main">
-                <span data-t="you.writeToUs">Write to us</span><small><span data-t="you.questions">Questions, problems or ideas:</span> {SITE.supportEmail}</small>
-              </span>
-              <RowIcon chevron />
-            </a>
-            <a class="row" href={url('/delete-account')}>
-              <RowIcon name="link" />
-              <span class="row__main">
-                <span data-t="you.deleting">Deleting your account</span><small data-t="you.howAndWhatGoesWith">How, and what goes with it</small>
-              </span>
-              <RowIcon chevron />
-            </a>
+          )
+        }
+      </DataTools>
+    </Sheet>
+
+    <Sheet id="you-delete" title="Delete data or account" titleKey="you.hub.deleteTitle">
+      <div class="del">
+        <p class="del__lead">
+          <button data-t="you.del2.exportFirst" type="button" class="del__link" data-sheet-open="you-data">Export a backup first</button>
+        </p>
+
+        <section class="del__choice" aria-labelledby="del-fresh-h">
+          <h3 id="del-fresh-h" data-t="you.del2.fresh">Start fresh</h3>
+          <p class="muted" data-t={`you.clear${NATIVE_APP ? 'Phone' : 'Browser'}${ACCOUNTS_ENABLED ? 'Account' : ''}`}>
+            Removes your sessions, done list, tasks, chain and settings from {NATIVE_APP ? 'this phone' : 'this browser'}{ACCOUNTS_ENABLED && ' — and from your account, if you are signed in'}.
+            Export first if you might want them back.
+          </p>
+          <p class="muted" data-view="signed-in" hidden data-t="you.del2.freshStays">Your sign-in stays, so you keep the same account.</p>
+          <div class="account__actions">
+            <button data-t="you.del2.freshBtn" type="button" class="btn btn--danger btn--small" data-clear>Delete my data</button>
           </div>
+          <p class="account__msg" role="status" data-clear-msg></p>
         </section>
 
-        {NATIVE_APP && <p class="account__version muted o-ver"><span data-t="you.version">Version</span> {pkg.version}</p>}
+        <section class="del__choice" aria-labelledby="del-acc-h" data-view="signed-in" hidden>
+          <h3 id="del-acc-h" data-t="you.deleteAccountBtn" data-delete-title>Delete account</h3>
+          <p class="muted" data-t={NATIVE_APP ? 'you.del2.accPhone' : 'you.del2.accBrowser'}>
+            Removes your sign-in, everything stored in your account, your weekly board profile and this {NATIVE_APP ? "phone's" : "browser's"} copy. It can't be undone.
+          </p>
+          <p class="muted" data-guest-only hidden data-t="you.youReUsingAGuest">
+            You're using a guest account. There's no password, so you can't sign back in to it — save it with an email or
+            Google first if you want to use it elsewhere.
+          </p>
+          <form class="auth__form" data-form="delete" novalidate>
+            <div class="field">
+              <label for="acc-del-word"><span data-t="you.del2.typeLead">To confirm, type</span> <strong class="del__word" data-t="you.del2.word">DELETE</strong></label>
+              <input id="acc-del-word" class="input" type="text" name="word" autocomplete="off" autocapitalize="characters" spellcheck="false" data-del-word />
+            </div>
+            <div data-delete-password hidden>
+              <PasswordField id="acc-del-pw" label="Confirm with your password" name="confirm" />
+            </div>
+            <button data-t="you.deleteAccountBtn" type="submit" class="btn btn--danger btn--small" data-delete disabled>Delete account</button>
+          </form>
+          <p class="account__msg" role="status" data-delete-msg></p>
+        </section>
+
+        <div class="rows">
+          <a class="row" href={url('/delete-account')}>
+            <RowIcon name="link" />
+            <span class="row__main">
+              <span data-t="you.del2.how">How deleting works</span><small data-t="you.howAndWhatGoesWith">How, and what goes with it</small>
+            </span>
+            <RowIcon chevron />
+          </a>
+        </div>
       </div>
-    </div>
+    </Sheet>
   </div>
   {BOARD_ENABLED && <BoardJoin />}
   {NATIVE_APP && <YourData />}
@@ -469,14 +480,59 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
 <script>
   import { getProfile, setModule } from '../lib/profile';
   import type { ModuleId } from '../config/site';
-  import { getAppearance, getChain, getDone, getSessions, getSoundPrefs, getTheme, read, subscribe } from '../lib/storage';
+  import { clearAll, getAppearance, getChain, getDone, getSessions, getSoundPrefs, getTheme, subscribe } from '../lib/storage';
+  import { applyAppearance, applyTheme } from '../lib/appearance';
   import { allProgress, chainInput, tierLabel } from '../lib/rewards';
   import { tierIcon } from '../lib/tier-icons';
-  import { FIFTY_TWO, POMODORO } from '../lib/timer/engine';
   import { onPlayerChange } from '../lib/sound/player';
   import { exactAlarmsAllowed, notificationsGranted, openAlarmSettings, requestNotifications } from '../lib/device';
   import { cleanups, onPage } from '../lib/page';
+  import { NATIVE_APP } from '../config/app';
   import { getLang, LANGS, t, type Key } from '../lib/i18n';
+
+  /** Old links to a section (#acc-board, #acc-data, …) open the sheet that holds it now. */
+  const HASH_ALIAS: Record<string, string> = { 'acc-sections': 'acc-prefs', 'acc-device': 'acc-delete', 'acc-security': 'acc-account', 'acc-connections': 'acc-account' };
+  onPage('account-hash', () => {
+    const id = location.hash.slice(1);
+    if (!id) return;
+    const row = document.getElementById(HASH_ALIAS[id] ?? id);
+    if (!row?.matches('[data-sheet-open]')) return;
+    // After the sheet's own click handler is listening.
+    const timer = window.setTimeout(() => row.click());
+    return () => window.clearTimeout(timer);
+  });
+
+  // Start fresh: the first press asks, the second deletes the data (the sign-in stays).
+  onPage('account-clear', () => {
+    const btn = document.querySelector<HTMLButtonElement>('[data-clear]');
+    const msg = document.querySelector<HTMLElement>('[data-clear-msg]');
+    if (!btn || !msg) return;
+    let armed = false;
+    let disarm = 0;
+    const reset = () => {
+      armed = false;
+      btn.textContent = t('you.del2.freshBtn');
+    };
+    btn.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        btn.textContent = t('you.yesDeleteEverything');
+        msg.textContent = t('you.pressAgain');
+        disarm = window.setTimeout(() => {
+          reset();
+          msg.textContent = '';
+        }, 6000);
+        return;
+      }
+      window.clearTimeout(disarm);
+      reset();
+      clearAll();
+      applyTheme(getTheme());
+      applyAppearance(getAppearance());
+      msg.textContent = NATIVE_APP ? t('you.allDeletedPhone') : t('you.allDeletedBrowser');
+    });
+    return () => window.clearTimeout(disarm);
+  });
 
   // The profile's tier row: the highest tier reached on any track.
   onPage('account-tier', () => {
@@ -507,34 +563,22 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     const q = <E extends HTMLElement = HTMLElement>(s: string) => page.querySelector<E>(s);
 
     const lang = getLang();
-    q('[data-pref-lang]')!.textContent = LANGS.find((l) => l.id === lang)?.name ?? '';
+    const langName = LANGS.find((l) => l.id === lang)?.name ?? '';
+    q('[data-pref-lang]')!.textContent = langName;
 
+    // The hub row says how things are set: look · language.
+    const hubPrefs = q('[data-hub-prefs]')!;
     const look = q('[data-pref-look]')!;
     const renderLook = () => {
       const theme = getTheme();
       const bg = page.querySelector<HTMLInputElement>(`input[data-pref="bg"][value="${getAppearance().bg}"]`);
       const bgName = bg?.closest('label')?.textContent?.trim();
       look.textContent = [t(`you.themeName.${theme}` as Key), bgName].filter(Boolean).join(' · ');
+      hubPrefs.textContent = [t(`you.themeName.${theme}` as Key), langName].filter(Boolean).join(' · ');
     };
     renderLook();
     c.add(subscribe('theme', renderLook));
     c.add(subscribe('appearance', renderLook));
-
-    const timer = q('[data-pref-timer]')!;
-    const renderTimer = () => {
-      const p = read<{ mode?: string; custom?: { workMin?: number; breakMin?: number } } | null>('timer-prefs', null);
-      const mode = p?.mode ?? 'pomodoro';
-      timer.textContent =
-        mode === 'flowtime'
-          ? 'Flowtime'
-          : mode === '52-17'
-            ? t('unit.min', { n: `${FIFTY_TWO.workMin} / ${FIFTY_TWO.breakMin}` })
-            : mode === 'custom' && p?.custom?.workMin
-              ? t('unit.min', { n: `${p.custom.workMin} / ${p.custom.breakMin ?? 0}` })
-              : t('unit.min', { n: `${POMODORO.workMin} / ${POMODORO.shortMin}` });
-    };
-    renderTimer();
-    c.add(subscribe('timer-prefs', renderTimer));
 
     // Sounds live in the header's menu, which also holds the player.
     const soundMenu = document.querySelector<HTMLDetailsElement>('[data-sound-menu]');
@@ -549,8 +593,11 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       }),
     );
     c.add(subscribe('sound', renderSound));
-    q('[data-open-sound]')!.addEventListener('click', () => {
+    const openSound = q('[data-open-sound]')!;
+    openSound.addEventListener('click', () => {
       if (!soundMenu) return;
+      // The menu is in the header, under the open sheet.
+      openSound.closest('dialog')?.close();
       window.scrollTo({ top: 0 });
       // After this click has finished, or the menu's own outside-click handler closes it again.
       window.setTimeout(() => {
@@ -595,22 +642,6 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
       auth.removeAttribute('data-collapsed');
       auth.querySelector<HTMLInputElement>('form:not([hidden]) input')?.focus();
     });
-
-    // Mark the section in view in the side links.
-    const links = [...page.querySelectorAll<HTMLAnchorElement>('[data-you-nav] a')];
-    const mark = (id: string) => links.forEach((l) => (l.hash === `#${id}` ? l.setAttribute('aria-current', 'true') : l.removeAttribute('aria-current')));
-    const io = new IntersectionObserver(
-      (entries) => {
-        const hit = entries.find((e) => e.isIntersecting);
-        if (hit) mark(hit.target.id);
-      },
-      { rootMargin: '-15% 0px -70% 0px' },
-    );
-    links.forEach((l) => {
-      const target = document.getElementById(l.hash.slice(1));
-      if (target) io.observe(target);
-    });
-    c.add(() => io.disconnect());
 
     return c.run;
   });
@@ -662,6 +693,8 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
         : settings.visibility === 'all'
           ? t('you.board.onAll')
           : t('you.board.onFriends');
+      const hub = document.querySelector<HTMLElement>('[data-hub-board]');
+      if (hub) hub.textContent = $('[data-board-line]').textContent;
       card.querySelectorAll<HTMLElement>('[data-board-on]').forEach((n) => (n.hidden = !on));
       renderBlocked(settings.blocked);
       if (!on) return;
@@ -1069,165 +1102,82 @@ const HELP_MAIL = `mailto:${SITE.supportEmail}?subject=${encodeURIComponent(`${S
     }
   }
 
-  /* ---------- Sections ---------- */
-  /* Section links beside the page on wide screens; the sections themselves in one column. */
+  /* ---------- The hub ---------- */
+  /* Short groups of rows; each opens a sheet. One column, kept readable on wide screens. */
   .you {
     display: grid;
-    gap: var(--space-5);
-    align-items: start;
+    gap: var(--space-4);
+    max-width: 40rem;
   }
 
-  .you__nav {
-    display: none;
+  .you [id] {
+    scroll-margin-top: 7rem;
   }
 
-  .you__nav ul {
-    display: grid;
-    gap: var(--space-1);
-    padding: 0;
-    list-style: none;
-  }
-
-  .you__nav a {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    padding-inline: var(--space-3);
-    border-radius: var(--radius-md);
-    color: var(--color-text);
-    font-weight: 500;
-    text-decoration: none;
-  }
-
-  .you__nav a:hover {
-    background: var(--color-surface-2);
-  }
-
-  .you__nav a[aria-current] {
-    background: var(--color-accent-soft);
-    color: var(--color-accent);
-    font-weight: 600;
-  }
-
-  .you__body {
-    display: grid;
-    gap: var(--space-5);
-    min-width: 0;
-  }
-
-  .you__body [id] {
-    scroll-margin-top: var(--space-5);
-  }
-
-  @media (min-width: 64rem) {
-    .you {
-      grid-template-columns: 13rem minmax(0, 1fr);
-      gap: var(--space-6);
-    }
-
-    .you__nav {
-      display: block;
-      position: sticky;
-      top: var(--space-5);
-    }
-  }
-
-  /* Phones: preferences first, the account's own settings after, as in the app's design. */
-  @media (max-width: 51.99rem) {
-    /* Clear the header that follows you down the page. */
-    .you__body [id] {
-      scroll-margin-top: 7rem;
-    }
-
-    .o-prefs {
-      order: 1;
-    }
-
-    .o-conn {
-      order: 2;
-    }
-
-    .o-data {
-      order: 3;
-    }
-
-    .o-sec {
-      order: 4;
-    }
-
-    .o-device {
-      order: 5;
-    }
-
-    .o-help {
-      order: 6;
-    }
-
-    .o-ver {
-      order: 7;
-    }
-
-    /* Signing out is a plain button under the lists, deleting a quiet link under that. */
-    .device .group__title {
-      display: none;
-    }
-
-    .device .rows {
-      overflow: visible;
-      border: 0;
-      background: none;
-      box-shadow: none;
-    }
-
-    .device .rows > *,
-    .device .rows > * > * {
-      box-shadow: none;
-    }
-
-    .row--signout {
-      flex-direction: column-reverse;
-      gap: var(--space-2);
-      padding: 0;
-      text-align: center;
-    }
-
-    .row--signout :global(.row__icon),
-    .row--signout .row__label {
-      display: none;
-    }
-
-    .row--signout .btn {
-      width: 100%;
-      min-height: 48px;
-    }
-
-    .row-more--danger > summary {
-      justify-content: center;
-      min-height: 48px;
-    }
-
-    .row-more--danger > summary .row__main {
-      flex: none;
-    }
-
-    .row-more--danger > summary :global(.row__icon),
-    .row-more--danger > summary :global(.row__chev),
-    .row-more--danger > summary small {
-      display: none;
-    }
-  }
-
-  .row-more--danger .row__label {
-    color: var(--color-danger);
-  }
-
-  .row-more--danger :global(.row__icon) {
+  .hub--danger :global(.row),
+  .hub--danger :global(.row__icon) {
     color: var(--color-danger);
   }
 
   .account__version {
     text-align: center;
     font-size: var(--text-xs);
+  }
+
+  /* Sheets: a group's heading inside, and the sign-out row. */
+  .prefs__title {
+    margin-top: var(--space-5);
+  }
+
+  .row--signout .btn {
+    margin-left: auto;
+  }
+
+  /* ---------- Delete data or account ---------- */
+  .del {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .del__lead {
+    font-size: var(--text-sm);
+  }
+
+  .del__link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .del__choice {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .del__choice h3 {
+    font-size: var(--text-base);
+  }
+
+  .del__choice > .muted {
+    font-size: var(--text-sm);
+  }
+
+  .del__choice .account__actions,
+  .del__choice .auth__form .btn {
+    margin-top: var(--space-1);
+  }
+
+  .del__word {
+    font-family: var(--font-mono);
+    letter-spacing: 0.08em;
   }
 
   /* ---------- Signed out ---------- */
