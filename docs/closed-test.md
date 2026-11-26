@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.7 (Study, several plans, new You):
+
+```
+<en-US>
+New: Exam prep is now Study. One card shows what to do today, chapters show time and how often you get them right, and you can add questions by hand. Study can hold several plans at once. You is tidier: short rows that open sheets, and one place to delete your data or account. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: «Подготовка к экзамену» теперь называется «Учёба». Одна карточка показывает, что делать сегодня, у глав видно время и долю верных ответов, а вопросы можно добавлять вручную. В «Учёбе» может быть несколько планов сразу. «Профиль» стал проще: короткие строки открывают панели, а удалить данные или аккаунт можно в одном месте. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: İmtahana hazırlıq indi Təhsil adlanır. Bir kart bu gün nə edəcəyini göstərir, fəsillərdə vaxt və düzgün cavab payı görünür, sualları əl ilə əlavə edə bilərsən. Təhsildə eyni anda bir neçə plan ola bilər. Profil daha səliqəlidir: qısa sətirlər panel açır, məlumatlarını və ya hesabını bir yerdən silə bilərsən. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 Version 0.1.6 (Coach day rhythm, new Timer):
 
 ```
@@ -198,3 +212,4 @@ Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə 
 | 15 Nov 2026 | Firebase: both SHA-1s added to the `app.grovyn` Android app (Play app signing `D8:FB:45:B0:2D:25:A9:10:78:DF:74:5E:7C:3E:58:AD:95:30:84:51`, upload key `FD:3B:…:0D:0A`). Google sign-in in the Play build not yet tried. |
 | 19 Nov 2026 | Weekly board with report and block. Firestore rules published. Release 102 (0.1.2) uploaded to Alpha. New content rating questionnaire: users interact = Yes, block = Yes, report = Yes, no chat, not friends-only. Ratings unchanged (Everyone, ClassInd L) plus "Users Interact". Both sent for review. |
 | 26 Nov 2026 | Release 106 (0.1.6) uploaded to Alpha: Coach day rhythm and sync, the new Timer (task on top, rhythm and sound in a sheet, quiet while focusing). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.5 had been published 25 Nov. |
+| 27 Nov 2026 | Release 107 (0.1.7) uploaded to Alpha: Study (was Exam prep), several study plans at once, and the You page as rows that open sheets with one delete sheet (type DELETE). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.6 was available to testers. |
