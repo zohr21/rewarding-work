@@ -13,6 +13,8 @@ import Sheet from './Sheet.astro';
 <section class="card bank" data-exam-bank hidden aria-labelledby="bank-heading">
   <div class="bank__head">
     <h2 data-t="exam.questionBank" id="bank-heading" class="panel-title">Question bank</h2>
+    {/* With several plans: which plan's questions these are (the open one). */}
+    <p class="bank__plan" data-eb-plan hidden></p>
     <p class="muted bank__count" data-eb-count></p>
   </div>
   <div class="bank__tools">
@@ -153,7 +155,7 @@ import Sheet from './Sheet.astro';
 </dialog>
 
 <script>
-  import { getExam, subscribe, type ExamQuestion } from '../lib/storage';
+  import { getExam, getPlans, openPlan, planOfChapter, subscribe, type ExamQuestion } from '../lib/storage';
   import {
     addQuestion,
     CHOICE_NEW,
@@ -207,6 +209,9 @@ import Sheet from './Sheet.astro';
       const exam = getExam();
       root!.hidden = !exam;
       if (!exam) return;
+      const planName = $<HTMLElement>('[data-eb-plan]');
+      planName.hidden = getPlans().length < 2;
+      planName.textContent = exam.title;
       const n = exam.questions.length;
       const withQuestions = exam.chapters.filter((ch) => exam.questions.some((q) => q.chapterId === ch.id));
       count.textContent = n
@@ -265,7 +270,11 @@ import Sheet from './Sheet.astro';
 
     askSheet.addEventListener('sheet:open', (e) => {
       askAdded.textContent = '';
-      resetAsk((e as CustomEvent<Record<string, string>>).detail.chapter ?? '');
+      const chapterId = (e as CustomEvent<Record<string, string>>).detail.chapter ?? '';
+      // Opened from a chapter of another plan: that plan's bank takes the question.
+      const plan = chapterId ? planOfChapter(chapterId) : null;
+      if (plan) openPlan(plan.id);
+      resetAsk(chapterId);
     });
 
     askMore.addEventListener('click', () => {
@@ -619,7 +628,12 @@ import Sheet from './Sheet.astro';
     // Asked for by the goal card's chips and a chapter's sheet.
     c.add(
       listen(document, 'exam:practise', (e) => {
-        scope = String((e as CustomEvent<string>).detail || 'all');
+        // 'all', MISTAKES or a chapter id; or { plan, scope } for a plan that may not be the open one.
+        const detail = (e as CustomEvent<string | { plan: string; scope: string }>).detail;
+        const asked = typeof detail === 'object' && detail ? detail : { plan: '', scope: String(detail || 'all') };
+        scope = asked.scope || 'all';
+        const plan = asked.plan || planOfChapter(scope)?.id;
+        if (plan) openPlan(plan);
         startRound();
       }),
     );
@@ -678,6 +692,14 @@ import Sheet from './Sheet.astro';
     align-items: baseline;
     justify-content: space-between;
     gap: var(--space-1) var(--space-3);
+  }
+
+  .bank__plan {
+    order: 3;
+    flex-basis: 100%;
+    margin: 0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .bank .panel-title {

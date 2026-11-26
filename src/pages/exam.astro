@@ -33,6 +33,8 @@ import { url } from '../lib/paths';
         <ExamChapters />
         <ExamBank />
       </div>
+      {/* Another plan next to the ones running (ExamGoal shows the form). */}
+      <button data-t="exam.newPlan" type="button" class="btn btn--ghost btn--small exam-page__new" data-eg-new hidden>+ New plan</button>
       <ExamPast />
     </div>
   </div>
@@ -45,6 +47,15 @@ import { url } from '../lib/paths';
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
     align-items: start;
+  }
+
+  .exam-page__new {
+    justify-self: start;
+    min-height: 44px;
+  }
+
+  .exam-page__new[hidden] {
+    display: none;
   }
 
   @media (min-width: 56rem) {

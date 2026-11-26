@@ -11,7 +11,7 @@
  * Worked out on this device; the `findings` store holds only your Helpful / Not true tap, the
  * sources you turned off and when you last asked Grovyn to forget what it learned.
  */
-import { getExamStore, read, write, type FocusSession } from './storage';
+import { getExamStore, getPlans, read, write, type FocusSession } from './storage';
 import type { BodyDay } from './device';
 import { minutesByDay } from './stats';
 import { addDays, dayKey, type DayKey } from './dates';
@@ -65,7 +65,7 @@ export function rows(body: BodyDay[], sessions: FocusSession[], now = new Date()
   const exams = new Set<string>();
   if (sourceOn('exams')) {
     const store = getExamStore();
-    if (store.exam?.date) exams.add(store.exam.date);
+    for (const p of getPlans(store)) if (p.date) exams.add(p.date);
     for (const p of store.past) if (p.date) exams.add(p.date);
   }
   for (const d of body) {
@@ -339,12 +339,13 @@ export function plan(sessions: FocusSession[], workouts: Workout[], f: Finding, 
   return items.sort((a, b) => a.hour - b.hour);
 }
 
-/** Days until the current exam, when it is still ahead. */
+/** Days until the nearest exam of your study plans, when one is still ahead. */
 export function examIn(now = new Date()): { title: string; days: number } | undefined {
-  const exam = getExamStore().exam;
-  if (!sourceOn('exams') || !exam?.date) return undefined;
   const today = dayKey(now);
-  if (exam.date < today) return undefined;
+  const exam = getPlans()
+    .filter((p) => p.date && p.date >= today)
+    .sort((a, b) => a.date!.localeCompare(b.date!))[0];
+  if (!sourceOn('exams') || !exam?.date) return undefined;
   const days = Math.round((new Date(`${exam.date}T12:00`).getTime() - new Date(`${today}T12:00`).getTime()) / 86_400_000);
   return { title: exam.title, days };
 }

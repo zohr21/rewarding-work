@@ -7,7 +7,7 @@ import { chapterScores, cleanQuestion, isMistake, MISTAKES, pickRound } from '..
 import type { Exam, ExamQuestion } from '../src/lib/storage';
 
 const q = (id: string, more: Partial<ExamQuestion> = {}): ExamQuestion => ({ id, text: id, options: ['a', 'b'], answer: [0], seen: 0, correct: 0, ...more });
-const exam = (questions: ExamQuestion[]): Exam => ({ title: 'Test', chapters: [{ id: 'c1', name: 'One', done: false }], questions, rounds: [], createdAt: 1 });
+const exam = (questions: ExamQuestion[]): Exam => ({ id: 'p1', updatedAt: 1, title: 'Test', chapters: [{ id: 'c1', name: 'One', done: false }], questions, rounds: [], createdAt: 1 });
 
 describe('cleanQuestion', () => {
   it('drops empty options and keeps the right answer pointing at the same text', () => {

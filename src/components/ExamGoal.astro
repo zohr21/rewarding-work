@@ -4,8 +4,14 @@
  * summary of where you stand: the days left, a button that resumes the chapter you were
  * last on and one that starts a practice round, then one line of numbers (time studied,
  * chapters, this week, last round) and, with a target, the pace that gets you there.
+ *
+ * With several study plans the summary becomes one Today card for all of them: the aim per
+ * plan ("Aim for 1 h on UiPath and 40 m on AWS"), a row per plan with its play button,
+ * Continue on the plan furthest behind today, and practice on the weakest chapter overall
+ * and the questions to review (a sheet asks which plan when more than one has some).
  */
 import { url } from '../lib/paths';
+import Sheet from './Sheet.astro';
 
 const timerUrl = url('/timer');
 ---
@@ -80,12 +86,39 @@ const timerUrl = url('/timer');
     </div>
     <p class="goal__facts muted" data-eg-facts></p>
   </section>
+
+  {/* Several plans: one card for today across all of them. */}
+  <section class="card goal" data-eg-today hidden aria-labelledby="eg-today-aim">
+    <div class="goal__today">
+      <div class="goal__ring" data-eg-today-ring aria-hidden="true"><span data-eg-today-pct></span></div>
+      <div class="goal__now">
+        <p class="goal__time muted" data-eg-today-time></p>
+        <p class="goal__pace" id="eg-today-aim" data-eg-today-aim></p>
+      </div>
+    </div>
+    <ul class="goal__plans" data-eg-today-plans></ul>
+    <a class="btn goal__continue" data-eg-today-go hidden></a>
+    <div class="goal__chips" data-eg-today-chips hidden>
+      <button type="button" class="goal__chip goal__chip--weak" data-eg-today-weak hidden></button>
+      <button type="button" class="goal__chip" data-eg-today-review hidden></button>
+    </div>
+  </section>
   <p class="visually-hidden" aria-live="polite" data-eg-live></p>
 </div>
 
+<Sheet id="exam-review" title="Review mistakes" titleKey="exam.reviewTitle">
+  <p data-t="exam.reviewIntro" class="muted">Questions you flagged, or got wrong more often than right. A round stays inside one exam.</p>
+  <ul class="review-plans" data-eg-review-list></ul>
+</Sheet>
+
 <script>
-  import { getExam, getSessions, subscribe, type ExamResult } from '../lib/storage';
+  import { getExam, getExamStore, getPlans, getSessions, openPlan, subscribe, type Exam, type ExamResult } from '../lib/storage';
   import {
+    byDate,
+    canAddPlan,
+    dayAim,
+    planToContinue,
+    weakestOverall,
     cleanHours,
     createExam,
     daysLeft,
@@ -106,8 +139,8 @@ const timerUrl = url('/timer');
   import { celebrate } from '../lib/appearance';
   import { fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
-  import { cleanups, onPage } from '../lib/page';
-  import { dateFormat, t, tn } from '../lib/i18n';
+  import { cleanups, listen, onPage } from '../lib/page';
+  import { dateFormat, locale, t, tn } from '../lib/i18n';
 
   const dateFmt = dateFormat({ day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -134,6 +167,11 @@ const timerUrl = url('/timer');
     const live = $<HTMLElement>('[data-eg-live]');
     const timerUrl = root.dataset.timerUrl!;
     let editing = false;
+    /** Making another plan next to the ones running. */
+    let creating = false;
+    const newBtn = document.querySelector<HTMLButtonElement>('[data-eg-new]');
+    const today = $<HTMLElement>('[data-eg-today]');
+    const reviewSheet = document.querySelector<HTMLDialogElement>('[data-sheet="exam-review"]');
     /** Asking how the exam went. */
     let finishing = false;
     let deleteArmed = false;
@@ -165,17 +203,24 @@ const timerUrl = url('/timer');
     }
 
     function render(): void {
-      const exam = getExam();
-      if (!exam) editing = finishing = false;
-      const showForm = (!exam || editing) && !finishing;
+      const store = getExamStore();
+      const exam = store.exam;
+      const plans = getPlans(store);
+      if (!exam) editing = finishing = creating = false;
+      const showForm = (!exam || editing || creating) && !finishing;
+      const many = plans.length > 1;
+      const edit = Boolean(exam) && editing;
       form.hidden = !showForm;
       finish.hidden = !finishing;
-      hero.hidden = showForm || finishing;
-      formTitle.textContent = exam ? t('exam.editYourGoal') : t('exam.setYourGoal');
-      submit.textContent = exam ? t('exam.save') : t('exam.createExamPlan');
-      chaptersField.hidden = Boolean(exam);
-      cancel.hidden = del.hidden = took.hidden = !exam;
-      if (!exam) {
+      hero.hidden = showForm || finishing || many;
+      today.hidden = showForm || finishing || !many;
+      formTitle.textContent = edit ? t('exam.editYourGoal') : exam ? t('exam.newPlanTitle') : t('exam.setYourGoal');
+      submit.textContent = edit ? t('exam.save') : t('exam.createExamPlan');
+      chaptersField.hidden = edit;
+      cancel.hidden = !exam;
+      del.hidden = took.hidden = !edit;
+      if (newBtn) newBtn.hidden = !exam || showForm || finishing || !canAddPlan();
+      if (!exam || (creating && !finishing)) {
         renderPlan();
         return;
       }
@@ -185,6 +230,10 @@ const timerUrl = url('/timer');
         return;
       }
       if (showForm) return;
+      if (many) {
+        renderToday(plans);
+        return;
+      }
 
       const sessions = getSessions();
       const time = examTime(exam, sessions);
@@ -279,14 +328,142 @@ const timerUrl = url('/timer');
       $<HTMLElement>('[data-eg-facts]').textContent = facts.filter(Boolean).map(nbsp).join(' · ');
     }
 
+    /**
+     * A plan's name in a sentence: its first word ("UiPath", "AWS"), or the first two when
+     * the first is very short; the whole title when two plans would read the same.
+     */
+    function shortNames(plans: Exam[]): Map<string, string> {
+      const cut = (title: string) => {
+        const words = title.trim().split(/\s+/);
+        return (words[0]!.length < 3 ? words.slice(0, 2) : words.slice(0, 1)).join(' ').replace(/[,:;–-]+$/, '');
+      };
+      const names = plans.map((p) => cut(p.title));
+      return new Map(plans.map((p, i) => [p.id, names.filter((n) => n.toLowerCase() === names[i]!.toLowerCase()).length > 1 ? p.title : names[i]!]));
+    }
+
+    const nbspTimes = (s: string) => s.replace(/(\d) (?=\S)/g, '$1\u00a0');
+    const list = (items: string[]) => new Intl.ListFormat(locale(), { type: 'conjunction' }).format(items);
+
+    /** Several plans: today's aim across them, a row per plan, Continue and practice. */
+    function renderToday(all: Exam[]): void {
+      const sessions = getSessions();
+      const short = shortNames(all);
+      const plans = byDate(all).map((p) => ({ p, d: dayAim(p, sessions), time: examTime(p, sessions) }));
+      const aimed = plans.filter((x) => x.d.aim);
+      const aim = aimed.reduce((n, x) => n + x.d.aim!, 0);
+      const done = aimed.reduce((n, x) => n + Math.min(x.d.done, x.d.aim!), 0);
+      const pct = aim ? Math.min(100, Math.round((done / aim) * 100)) : 0;
+      $<HTMLElement>('[data-eg-today-ring]').style.setProperty('--pct', String(pct));
+      $<HTMLElement>('[data-eg-today-pct]').textContent = `${pct}%`;
+      $<HTMLElement>('[data-eg-today-time]').textContent = nbspTimes(
+        aim ? t('exam.todayOfAim', { done: formatHM(done), aim: formatHM(aim) }) : tn('exam.plansN', plans.length),
+      );
+      $<HTMLElement>('[data-eg-today-aim]').textContent = nbspTimes(
+        aimed.length
+          ? t('exam.aimAcross', { list: list(aimed.map((x) => t('exam.aimOn', { time: formatHM(x.d.aim!), name: short.get(x.p.id)! }))) })
+          : t('exam.pickAPlan'),
+      );
+
+      $<HTMLUListElement>('[data-eg-today-plans]').replaceChildren(
+        ...plans.map(({ p, d, time }) => {
+          const li = el('li', 'goal__plan');
+          const ring = el('span', 'goal__ring--small');
+          const target = p.targetHours ? p.targetHours * 3600 : 0;
+          const share = d.aim ? d.done / d.aim : target ? time.total / target : p.chapters.length ? p.chapters.filter((c) => c.done).length / p.chapters.length : 0;
+          ring.style.setProperty('--pct', String(Math.min(100, Math.round(share * 100))));
+          ring.setAttribute('aria-hidden', 'true');
+          const days = daysLeft(p);
+          const when = days === null ? '' : days > 0 ? `${dateFmt.format(fromDayKey(p.date!))} · ${days} ${tn('exam.daysLeft', days)}` : days === 0 ? t('exam.examIsToday') : t('exam.examDatePassed');
+          const todayText = d.aim ? (d.left >= 60 ? t('exam.leftToday', { time: formatHM(d.left) }) : t('exam.doneForToday')) : '';
+          const body = el('span', 'goal__plan-body');
+          body.append(el('span', 'goal__plan-name', p.title), el('span', 'muted goal__plan-meta', nbspTimes([todayText, when].filter(Boolean).join(' · '))));
+          li.append(ring, body);
+          const next = nextChapter(p, time);
+          if (next) {
+            const play = el('a', 'goal__plan-play');
+            play.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
+            play.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
+            play.setAttribute('aria-label', t('exam.focusOnIn', { name: next.name, plan: p.title }));
+            li.append(play);
+          }
+          return li;
+        }),
+      );
+
+      const pick = planToContinue(all, sessions);
+      const go = $<HTMLAnchorElement>('[data-eg-today-go]');
+      const next = pick ? nextChapter(pick, examTime(pick, sessions)) : null;
+      go.hidden = !pick || !next;
+      if (pick && next) {
+        go.href = `${timerUrl}?chapter=${encodeURIComponent(next.id)}`;
+        go.textContent = t(examTime(pick, sessions).byChapter.has(next.id) ? 'exam.continueOnIn' : 'exam.startOnIn', { name: next.name, plan: short.get(pick.id)! });
+      }
+
+      const worst = weakestOverall(all);
+      const weak = $<HTMLButtonElement>('[data-eg-today-weak]');
+      weak.hidden = !worst;
+      if (worst) {
+        weak.dataset.plan = worst.plan.id;
+        weak.dataset.chapter = worst.chapter.id;
+        weak.textContent = t('exam.practiseWeakestIn', { name: worst.chapter.name, plan: short.get(worst.plan.id)! });
+        weak.title = t('exam.weakest', { name: worst.chapter.name, correct: worst.correct, seen: worst.seen });
+      }
+      const misses = all.map((p) => ({ p, n: p.questions.filter(isMistake).length })).filter((x) => x.n);
+      const total = misses.reduce((n, x) => n + x.n, 0);
+      const review = $<HTMLButtonElement>('[data-eg-today-review]');
+      review.hidden = total === 0;
+      review.textContent = tn('exam.mistakesN', total);
+      // One plan with mistakes: straight into its round. More: a sheet asks which.
+      if (misses.length > 1) review.dataset.sheetOpen = 'exam-review';
+      else delete review.dataset.sheetOpen;
+      review.dataset.plan = misses.length === 1 ? misses[0]!.p.id : '';
+      $<HTMLElement>('[data-eg-today-chips]').hidden = weak.hidden && review.hidden;
+      if (reviewSheet?.open) renderReview();
+    }
+
+    const practise = (plan: string, scope: string) => document.dispatchEvent(new CustomEvent('exam:practise', { detail: { plan, scope } }));
+
+    $<HTMLButtonElement>('[data-eg-today-weak]').addEventListener('click', (e) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      practise(b.dataset.plan!, b.dataset.chapter!);
+    });
+    $<HTMLButtonElement>('[data-eg-today-review]').addEventListener('click', (e) => {
+      const b = e.currentTarget as HTMLButtonElement;
+      if (b.dataset.plan) practise(b.dataset.plan, MISTAKES);
+    });
+
+    /** The review sheet: each plan with questions to look at again. */
+    function renderReview(): void {
+      const box = reviewSheet!.querySelector<HTMLUListElement>('[data-eg-review-list]')!;
+      box.replaceChildren(
+        ...byDate(getPlans())
+          .map((p) => ({ p, n: p.questions.filter(isMistake).length }))
+          .filter((x) => x.n)
+          .map(({ p, n }) => {
+            const li = el('li');
+            const b = el('button', 'review-plans__row');
+            b.type = 'button';
+            b.append(el('span', 'review-plans__name', p.title), el('span', 'muted', tn('exam.mistakesN', n)));
+            b.addEventListener('click', () => {
+              reviewSheet!.close();
+              practise(p.id, MISTAKES);
+            });
+            li.append(b);
+            return li;
+          }),
+      );
+    }
+    reviewSheet?.addEventListener('sheet:open', renderReview);
+
     function disarmDelete(): void {
       deleteArmed = false;
       del.textContent = t('exam.deleteThisExamPlan');
     }
 
-    $<HTMLButtonElement>('[data-eg-edit]').addEventListener('click', () => {
+    function startEdit(): void {
       const exam = getExam();
       if (!exam) return;
+      creating = false;
       editing = true;
       title.value = exam.title;
       date.value = exam.date ?? '';
@@ -294,10 +471,34 @@ const timerUrl = url('/timer');
       render();
       renderPlan();
       title.focus();
-    });
+      form.scrollIntoView({ block: 'nearest' });
+    }
+    $<HTMLButtonElement>('[data-eg-edit]').addEventListener('click', startEdit);
+    // The pencil on a plan's group of chapters: that plan opens and its goal shows here.
+    c.add(
+      listen(document, 'exam:edit', (e) => {
+        if (openPlan(String((e as CustomEvent<string>).detail))) startEdit();
+      }),
+    );
+
+    // "+ New plan" under the page: another plan next to the ones running.
+    if (newBtn) {
+      const onNew = () => {
+        if (!canAddPlan()) return;
+        editing = finishing = false;
+        creating = true;
+        disarmDelete();
+        form.reset();
+        render();
+        title.focus();
+        form.scrollIntoView({ block: 'nearest' });
+      };
+      newBtn.addEventListener('click', onNew);
+      c.add(() => newBtn.removeEventListener('click', onNew));
+    }
 
     cancel.addEventListener('click', () => {
-      editing = false;
+      editing = creating = false;
       disarmDelete();
       render();
     });
@@ -367,10 +568,10 @@ const timerUrl = url('/timer');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (!title.value.trim()) return;
-      const wasEditing = Boolean(getExam());
+      const wasEditing = editing && Boolean(getExam());
       if (wasEditing) saveGoal(draft());
-      else createExam(draft(), parseChapterLines(chapters.value));
-      editing = false;
+      else if (!createExam(draft(), parseChapterLines(chapters.value))) return;
+      editing = creating = false;
       form.reset();
       render();
       announce(wasEditing ? t('exam.goalSaved') : t('exam.created'));
@@ -379,6 +580,7 @@ const timerUrl = url('/timer');
     render();
     c.add(subscribe('exam', render));
     c.add(subscribe('sessions', render));
+    c.add(() => reviewSheet?.close());
     return c.run;
   });
 </script>
@@ -603,6 +805,97 @@ const timerUrl = url('/timer');
 
   .goal__facts {
     font-size: var(--text-xs);
+  }
+
+  /* Several plans: a row each in the Today card (made in the script, hence :global). */
+  .goal__plans {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .goal__plans :global(.goal__plan) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 52px;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .goal__plans :global(.goal__ring--small) {
+    --pct: 0;
+    flex: none;
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: conic-gradient(var(--color-accent) calc(var(--pct) * 1%), var(--color-border-strong) 0);
+  }
+
+  .goal__plans :global(.goal__ring--small::before) {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border-radius: 50%;
+    background: var(--color-surface-solid);
+  }
+
+  .goal__plans :global(.goal__plan-body) {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .goal__plans :global(.goal__plan-name) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .goal__plans :global(.goal__plan-meta) {
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .goal__plans :global(.goal__plan-play) {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--well-bg);
+    color: var(--color-accent);
+  }
+
+  .review-plans {
+    display: grid;
+    gap: var(--space-2);
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .review-plans :global(.review-plans__row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    width: 100%;
+    min-height: 52px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--well-bg);
+    color: var(--color-text);
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .review-plans :global(.review-plans__name) {
+    font-weight: 600;
+    overflow-wrap: anywhere;
   }
 
   .goal__pace:empty,
