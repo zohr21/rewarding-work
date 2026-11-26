@@ -6,6 +6,21 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **27 Nov · Several study plans at once (option B: one Today card).** Study held one plan;
+  starting another meant finishing or deleting it. Now up to 5 run side by side. With one plan
+  the page is unchanged apart from "+ New plan". With two or more, the goal card becomes one
+  Today card: "Aim for 1 h on UiPath and 38 min on AWS" (short names), a row per plan with
+  its day ring, time left today, date and play, Continue on the plan furthest behind today,
+  and chips for the weakest chapter overall and "N to review" (a sheet asks which plan when
+  more than one has some; a round never mixes exams). Chapters group under each plan, nearest
+  date first and open, with a pencil (edits that plan in the goal form, where "I took the
+  exam" and delete live), "+ Add chapter" and "Practise N". The question bank shows the open
+  plan's name. The Timer's task sheet lists every plan's open chapters, nearest exam first,
+  tagged with the plan. Store: `exam` stays the open plan (the one last worked on), plus
+  `others`, `removed` tombstones and per-plan `id` (`'p' + createdAt`) and `updatedAt`; the old
+  shape still reads; the sync merge joins plans by id. Options A (switcher) and C (plan
+  cards) were set aside.
+
 - **26 Nov · Exam prep becomes Study (option B: today first).** The page was ~2,560 px on a
   phone: a 600 px goal card, chapter cards of ~200 px each with Focus/Done/Edit buttons, the
   same Practice button twice, a weak-chapter note you couldn't tap and Past exams always open.

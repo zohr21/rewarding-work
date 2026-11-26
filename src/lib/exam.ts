@@ -8,14 +8,20 @@
 import {
   CHAPTERS_MAX,
   PAST_MAX,
+  PLANS_MAX,
   QUESTIONS_MAX,
   ROUNDS_MAX,
   getExam,
   getExamStore,
+  getPlans,
   newId,
+  planIdFor,
+  planOfChapter,
   setExam,
   setExamStore,
   updateExam,
+  updatePlan,
+  withRemoved,
   type Exam,
   type ExamChapter,
   type ExamQuestion,
@@ -80,8 +86,24 @@ function cleanGoal(goal: GoalDraft): GoalDraft {
   };
 }
 
-export function createExam(goal: GoalDraft, chapters: ChapterDraft[]): void {
-  setExam({ ...cleanGoal(goal), chapters: chapters.map(toChapter), questions: [], rounds: [], createdAt: Date.now() });
+/** Now, moved on past any plan's createdAt, since a plan's id comes from it. */
+function freshCreatedAt(plans: Exam[]): number {
+  let at = Date.now();
+  while (plans.some((p) => p.createdAt === at || p.id === planIdFor(at))) at++;
+  return at;
+}
+
+/** Room for one more plan next to the ones already running. */
+export const canAddPlan = (): boolean => getPlans().length < PLANS_MAX;
+
+/** A new plan, which becomes the open one; the plans already running stay. False when there is no room. */
+export function createExam(goal: GoalDraft, chapters: ChapterDraft[]): boolean {
+  const store = getExamStore();
+  if (getPlans(store).length >= PLANS_MAX) return false;
+  const createdAt = freshCreatedAt(getPlans(store));
+  const plan: Exam = { id: planIdFor(createdAt), ...cleanGoal(goal), chapters: chapters.map(toChapter), questions: [], rounds: [], createdAt, updatedAt: createdAt };
+  setExamStore({ exam: plan, others: store.exam ? [store.exam, ...store.others] : store.others });
+  return true;
 }
 
 export function saveGoal(goal: GoalDraft): void {
@@ -102,7 +124,7 @@ export const resultLabel = (result: ExamResult): string => t(`exam.result.${resu
  * for the next goal. `studiedSeconds` is the focus time on its chapters (examTime).
  */
 export function finishExam(result: ExamResult, studiedSeconds: number): PastExam | null {
-  const { exam, past } = getExamStore();
+  const { exam, others, removed, past } = getExamStore();
   if (!exam) return null;
   const record: PastExam = {
     id: newId('px'),
@@ -115,22 +137,28 @@ export function finishExam(result: ExamResult, studiedSeconds: number): PastExam
     chaptersTotal: exam.chapters.length,
     ...(result === 'failed' ? { retry: { chapters: exam.chapters, questions: exam.questions } } : {}),
   };
-  setExamStore({ exam: null, past: [...past, record].slice(-PAST_MAX) });
+  const [next = null, ...rest] = others;
+  setExamStore({ exam: next, others: rest, removed: withRemoved(removed, [exam.id]), past: [...past, record].slice(-PAST_MAX) });
   return record;
 }
 
 /**
  * Start a new plan from an exam you didn't pass: same chapters and questions, with the
- * time, the finished marks and the practice results starting again. Needs the page to be free.
+ * time, the finished marks and the practice results starting again. It opens next to the
+ * plans already running; false when there is no room for another.
  */
 export function retryExam(pastId: string): boolean {
-  const { exam, past } = getExamStore();
+  const store = getExamStore();
+  const { exam, past } = store;
   const record = past.find((p) => p.id === pastId);
-  if (exam || !record?.retry) return false;
+  if (!record?.retry || getPlans(store).length >= PLANS_MAX) return false;
   const newIds = new Map(record.retry.chapters.map((c) => [c.id, newId('ch')] as const));
   const { retry, ...rest } = record;
+  const createdAt = freshCreatedAt(getPlans(store));
   setExamStore({
+    others: exam ? [exam, ...store.others] : store.others,
     exam: {
+      id: planIdFor(createdAt),
       title: record.title,
       chapters: retry.chapters.map((c) => ({ ...c, id: newIds.get(c.id)!, done: false })),
       questions: retry.questions.map((q) => ({
@@ -141,7 +169,8 @@ export function retryExam(pastId: string): boolean {
         again: undefined,
       })),
       rounds: [],
-      createdAt: Date.now(),
+      createdAt,
+      updatedAt: createdAt,
     },
     past: past.map((p) => (p.id === pastId ? rest : p)),
   });
@@ -149,20 +178,28 @@ export function retryExam(pastId: string): boolean {
 }
 
 export function removePastExam(id: string): void {
-  setExamStore({ past: getExamStore().past.filter((p) => p.id !== id) });
+  const { past, removed } = getExamStore();
+  setExamStore({ past: past.filter((p) => p.id !== id), removed: withRemoved(removed, [id]) });
 }
 
-export function addChapter(name: string, plannedHours?: number): ExamChapter | null {
+/** Add a chapter to the plan with this id (the open plan when left out). */
+export function addChapter(name: string, plannedHours?: number, planId = getExam()?.id): ExamChapter | null {
   const clean = cleanName(name);
-  const exam = getExam();
+  const exam = getPlans().find((p) => p.id === planId);
   if (!clean || !exam || exam.chapters.length >= CHAPTERS_MAX) return null;
   const chapter = toChapter({ name: clean, plannedHours: plannedHours === undefined ? undefined : cleanHours(plannedHours) });
-  updateExam((e) => ({ chapters: [...e.chapters, chapter] }));
+  updatePlan(exam.id, (e) => ({ chapters: [...e.chapters, chapter] }));
   return chapter;
 }
 
+/** Apply `change` to the plan holding this chapter. */
+function updateChapterPlan(chapterId: string, change: (exam: Exam) => Partial<Exam>): void {
+  const plan = planOfChapter(chapterId);
+  if (plan) updatePlan(plan.id, change);
+}
+
 export function updateChapter(id: string, patch: Partial<Omit<ExamChapter, 'id'>>): void {
-  updateExam((e) => ({
+  updateChapterPlan(id, (e) => ({
     chapters: e.chapters.map((c) => {
       if (c.id !== id) return c;
       const next = { ...c, ...patch };
@@ -175,7 +212,7 @@ export function updateChapter(id: string, patch: Partial<Omit<ExamChapter, 'id'>
 
 /** Its questions stay in the bank, without a chapter. Its focus sessions stay in your history. */
 export function removeChapter(id: string): void {
-  updateExam((e) => ({
+  updateChapterPlan(id, (e) => ({
     chapters: e.chapters.filter((c) => c.id !== id),
     questions: e.questions.map((q) => (q.chapterId === id ? { ...q, chapterId: undefined } : q)),
   }));
@@ -183,7 +220,7 @@ export function removeChapter(id: string): void {
 
 /** Move a chapter one place up (-1) or down (1). */
 export function moveChapter(id: string, by: -1 | 1): void {
-  updateExam((e) => {
+  updateChapterPlan(id, (e) => {
     const from = e.chapters.findIndex((c) => c.id === id);
     const to = from + by;
     if (from < 0 || to < 0 || to >= e.chapters.length) return {};
@@ -251,6 +288,46 @@ export function weekMinutes(exam: Exam, sessions: FocusSession[], now = new Date
     total += s.focusSeconds;
   }
   return { values: values.map(Math.round), today: (now.getDay() + 6) % 7, total };
+}
+
+/** A plan's aim for today, worked out from the time studied before today so it holds still while you study. */
+export interface DayAim {
+  /** Seconds to aim for today; 0 when the target is reached, null without a date and target or after the exam. */
+  aim: number | null;
+  /** Seconds studied on the plan today. */
+  done: number;
+  /** Seconds still to go today (0 without an aim). */
+  left: number;
+}
+
+export function dayAim(exam: Exam, sessions: FocusSession[], now = new Date()): DayAim {
+  const ids = new Set(exam.chapters.map((c) => c.id));
+  const from = startOfDay(now).getTime();
+  let before = 0;
+  let done = 0;
+  for (const s of sessions) {
+    if (!s.taskId || !ids.has(s.taskId)) continue;
+    if (s.start >= from) done += s.focusSeconds;
+    else before += s.focusSeconds;
+  }
+  const days = daysLeft(exam, now);
+  const aim = days === null || days < 0 || !exam.targetHours ? null : Math.max(0, exam.targetHours * 3600 - before) / Math.max(1, days);
+  return { aim, done, left: aim ? Math.max(0, aim - done) : 0 };
+}
+
+/** Plans in the order to work through them: nearest exam date first, plans without a date last. */
+export function byDate(plans: Exam[]): Exam[] {
+  return [...plans].sort((a, b) => (a.date ?? '9999').localeCompare(b.date ?? '9999') || a.createdAt - b.createdAt);
+}
+
+/** The plan to continue: the one with most still to do today, else the nearest one with a chapter left. */
+export function planToContinue(plans: Exam[], sessions: FocusSession[], now = new Date()): Exam | null {
+  const open = byDate(plans).filter((p) => p.chapters.some((c) => !c.done));
+  const behind = open
+    .map((p) => ({ p, left: dayAim(p, sessions, now).left }))
+    .filter((x) => x.left >= 60)
+    .sort((a, b) => b.left - a.left)[0];
+  return behind?.p ?? open[0] ?? null;
 }
 
 /** The chapter to continue with: the open one focused on most recently, else the first open one. */
@@ -536,6 +613,15 @@ export interface ChapterScore {
   chapter: ExamChapter;
   seen: number;
   correct: number;
+}
+
+/** The weakest chapter over all plans, with the plan it belongs to. */
+export function weakestOverall(plans: Exam[], min = 5): (ChapterScore & { plan: Exam }) | null {
+  const all = plans.flatMap((plan) => {
+    const w = weakestChapter(plan, min);
+    return w ? [{ ...w, plan }] : [];
+  });
+  return all.sort((a, b) => a.correct / a.seen - b.correct / b.seen)[0] ?? null;
 }
 
 /** The chapter with the lowest share of right answers, among those answered at least `min` times. */

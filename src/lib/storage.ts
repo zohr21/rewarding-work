@@ -1118,7 +1118,10 @@ export interface ExamRound {
   correct: number;
 }
 
+/** A study plan. Several can run at once; the open one is `ExamStore.exam`. */
 export interface Exam {
+  /** `'p' + createdAt`, so a plan an older app saved without an id gets the same one on every device. */
+  id: string;
   title: string;
   /** Local YYYY-MM-DD of the exam, when known. */
   date?: string;
@@ -1128,6 +1131,8 @@ export interface Exam {
   /** Practice rounds, oldest first, at most ROUNDS_MAX. */
   rounds: ExamRound[];
   createdAt: number;
+  /** Last change to this plan (epoch ms); account sync keeps the newer copy of each plan. */
+  updatedAt: number;
 }
 
 export const EXAM_RESULTS = ['passed', 'failed', 'finished'] as const;
@@ -1152,15 +1157,30 @@ export interface PastExam {
 }
 
 export interface ExamStore {
-  /** The exam you're preparing for now. */
+  /**
+   * The open plan: the one you last worked on. Kept in the same place as when there could
+   * be only one, so an older app (0.1.6 and before) still shows and edits it.
+   */
   exam: Exam | null;
+  /** The other plans you are studying for at the same time (at most PLANS_MAX - 1). */
+  others: Exam[];
+  /** Ids of plans and past exams removed, so sync doesn't bring them back. */
+  removed: ExamRemoval[];
   /** Exams you've taken, oldest first, at most PAST_MAX. */
   past: PastExam[];
-  /** Bumped on every change; account sync keeps the newer copy whole. */
+  /** Bumped on every change. */
   updatedAt: number;
 }
 
-export const EMPTY_EXAM: ExamStore = { exam: null, past: [], updatedAt: 0 };
+export interface ExamRemoval {
+  id: string;
+  /** Epoch ms. */
+  at: number;
+}
+
+export const EMPTY_EXAM: ExamStore = { exam: null, others: [], removed: [], past: [], updatedAt: 0 };
+export const PLANS_MAX = 5;
+const REMOVED_MAX = 100;
 export const CHAPTERS_MAX = 60;
 export const QUESTIONS_MAX = 2000;
 export const ROUNDS_MAX = 50;
@@ -1221,58 +1241,171 @@ export function isPastExam(v: unknown): v is PastExam {
   );
 }
 
-/** Tolerant: malformed chapters, questions, rounds and past exams are dropped, not the whole store. */
+export const planIdFor = (createdAt: number): string => `p${createdAt}`;
+
+/** One plan, or null when it can't be used. `fallbackUpdatedAt` is for plans saved before plans had their own. */
+function normalisePlan(e: unknown, fallbackUpdatedAt: number): Exam | null {
+  if (!isObj(e) || typeof e.title !== 'string' || typeof e.createdAt !== 'number') return null;
+  return {
+    id: typeof e.id === 'string' && e.id ? e.id : planIdFor(e.createdAt),
+    title: e.title,
+    ...(isDayKey(e.date) ? { date: e.date } : {}),
+    ...(typeof e.targetHours === 'number' && isHours(e.targetHours) ? { targetHours: e.targetHours } : {}),
+    chapters: Array.isArray(e.chapters) ? e.chapters.filter(isExamChapter) : [],
+    questions: Array.isArray(e.questions) ? e.questions.filter(isExamQuestion) : [],
+    rounds: Array.isArray(e.rounds) ? e.rounds.filter(isExamRound) : [],
+    createdAt: e.createdAt,
+    updatedAt: typeof e.updatedAt === 'number' ? e.updatedAt : fallbackUpdatedAt,
+  };
+}
+
+const isRemoval = (v: unknown): v is ExamRemoval => isObj(v) && typeof v.id === 'string' && typeof v.at === 'number';
+
+/**
+ * Tolerant: malformed chapters, questions, rounds, plans and past exams are dropped, not the
+ * whole store. Reads the older one-plan shape `{ exam, past, updatedAt }` too (no `others`).
+ */
 export function normaliseExam(v: unknown): ExamStore {
   if (!isObj(v) || typeof v.updatedAt !== 'number') return EMPTY_EXAM;
-  const past = Array.isArray(v.past) ? v.past.filter(isPastExam) : [];
-  const e = v.exam;
-  if (!isObj(e) || typeof e.title !== 'string' || typeof e.createdAt !== 'number') return { exam: null, past, updatedAt: v.updatedAt };
-  return {
-    exam: {
-      title: e.title,
-      ...(isDayKey(e.date) ? { date: e.date } : {}),
-      ...(typeof e.targetHours === 'number' && isHours(e.targetHours) ? { targetHours: e.targetHours } : {}),
-      chapters: Array.isArray(e.chapters) ? e.chapters.filter(isExamChapter) : [],
-      questions: Array.isArray(e.questions) ? e.questions.filter(isExamQuestion) : [],
-      rounds: Array.isArray(e.rounds) ? e.rounds.filter(isExamRound) : [],
-      createdAt: e.createdAt,
-    },
-    past,
-    updatedAt: v.updatedAt,
-  };
+  const updatedAt = v.updatedAt;
+  const removed = Array.isArray(v.removed) ? v.removed.filter(isRemoval).slice(-REMOVED_MAX) : [];
+  const gone = new Set(removed.map((r) => r.id));
+  const past = Array.isArray(v.past) ? v.past.filter(isPastExam).filter((p) => !gone.has(p.id)) : [];
+  let exam = normalisePlan(v.exam, updatedAt);
+  if (exam && gone.has(exam.id)) exam = null;
+  const seen = new Set(exam ? [exam.id] : []);
+  const others: Exam[] = [];
+  for (const raw of Array.isArray(v.others) ? v.others : []) {
+    const plan = normalisePlan(raw, updatedAt);
+    if (!plan || seen.has(plan.id) || gone.has(plan.id)) continue;
+    seen.add(plan.id);
+    others.push(plan);
+  }
+  // The open plan was removed: the next one opens.
+  if (!exam && others.length) exam = others.shift()!;
+  return { exam, others: others.slice(0, PLANS_MAX - 1), removed, past, updatedAt };
 }
 
 export function getExamStore(): ExamStore {
   return normaliseExam(read<unknown>('exam', null));
 }
 
+/** The open plan. */
 export function getExam(): Exam | null {
   return getExamStore().exam;
 }
 
-/** Change the current exam, the past exams, or both. */
-export function setExamStore(patch: Partial<Pick<ExamStore, 'exam' | 'past'>>): void {
+/** Every plan, the open one first. */
+export function getPlans(store = getExamStore()): Exam[] {
+  return store.exam ? [store.exam, ...store.others] : [];
+}
+
+/** The plan a chapter belongs to. */
+export function planOfChapter(chapterId: string, store = getExamStore()): Exam | null {
+  return getPlans(store).find((p) => p.chapters.some((ch) => ch.id === chapterId)) ?? null;
+}
+
+/** Change the open plan, the other plans, removals, the past exams, or several. */
+export function setExamStore(patch: Partial<Pick<ExamStore, 'exam' | 'others' | 'removed' | 'past'>>): void {
   const old = getExamStore();
-  write('exam', { exam: old.exam, past: old.past, ...patch, updatedAt: Math.max(Date.now(), old.updatedAt + 1) });
+  write('exam', {
+    exam: old.exam,
+    others: old.others,
+    removed: old.removed,
+    past: old.past,
+    ...patch,
+    updatedAt: Math.max(Date.now(), old.updatedAt + 1),
+  });
 }
 
-/** Replace the exam (null deletes it; the store stays so the deletion reaches your other devices). */
+/** `removed` with these ids added (or moved to the end with a new time). */
+export function withRemoved(removed: ExamRemoval[], ids: string[], at = Date.now()): ExamRemoval[] {
+  const drop = new Set(ids);
+  return [...removed.filter((r) => !drop.has(r.id)), ...ids.map((id) => ({ id, at }))].slice(-REMOVED_MAX);
+}
+
+/** Replace the open plan, or with null remove it (the next plan, if any, opens). */
 export function setExam(exam: Exam | null): void {
-  setExamStore({ exam });
+  const store = getExamStore();
+  if (exam) {
+    setExamStore({ exam: { ...exam, updatedAt: Date.now() } });
+    return;
+  }
+  const [next, ...rest] = store.others;
+  setExamStore({
+    exam: next ?? null,
+    others: rest,
+    removed: store.exam ? withRemoved(store.removed, [store.exam.id]) : store.removed,
+  });
 }
 
-/** Apply `change` to the exam. Returns the updated exam, or null if there isn't one. */
-export function updateExam(change: (exam: Exam) => Partial<Exam>): Exam | null {
-  const old = getExam();
+/** Apply `change` to the plan with this id. Returns the updated plan, or null if there isn't one. */
+export function updatePlan(id: string, change: (exam: Exam) => Partial<Exam>): Exam | null {
+  const store = getExamStore();
+  const old = getPlans(store).find((p) => p.id === id);
   if (!old) return null;
-  const next = { ...old, ...change(old) };
-  setExam(next);
+  const next: Exam = { ...old, ...change(old), id: old.id, updatedAt: Math.max(Date.now(), old.updatedAt + 1) };
+  if (store.exam?.id === id) setExamStore({ exam: next });
+  else setExamStore({ others: store.others.map((p) => (p.id === id ? next : p)) });
   return next;
 }
 
-/** Combine two copies (account sync, backup import): the one changed last wins whole. */
+/** Apply `change` to the open plan. Returns the updated plan, or null if there isn't one. */
+export function updateExam(change: (exam: Exam) => Partial<Exam>): Exam | null {
+  const exam = getExam();
+  return exam ? updatePlan(exam.id, change) : null;
+}
+
+/**
+ * Make this plan the open one (the one practice, the question bank and older apps work on).
+ * Returns false when there is no such plan.
+ */
+export function openPlan(id: string): boolean {
+  const store = getExamStore();
+  if (store.exam?.id === id) return true;
+  const plan = store.others.find((p) => p.id === id);
+  if (!plan) return false;
+  setExamStore({ exam: plan, others: [...(store.exam ? [store.exam] : []), ...store.others.filter((p) => p.id !== id)] });
+  return true;
+}
+
+/**
+ * Combine two copies (account sync, backup import). Plans and past exams are joined by id,
+ * keeping the newer copy of each plan; anything removed on either side stays removed. The
+ * open plan comes from the copy changed last. A copy from an older app holds one plan, its
+ * `exam`, and simply counts as that plan.
+ */
 export function mergeExamStores(a: ExamStore, b: ExamStore): ExamStore {
-  return b.updatedAt > a.updatedAt ? b : a;
+  const [older, newer] = b.updatedAt > a.updatedAt ? [a, b] : [b, a];
+  const removedAt = new Map<string, number>();
+  for (const r of [...older.removed, ...newer.removed]) removedAt.set(r.id, Math.max(removedAt.get(r.id) ?? 0, r.at));
+  const removed = [...removedAt].map(([id, at]) => ({ id, at })).sort((x, y) => x.at - y.at).slice(-REMOVED_MAX);
+  const gone = new Set(removed.map((r) => r.id));
+
+  const plans = new Map<string, Exam>();
+  for (const p of [...getPlans(newer), ...getPlans(older)]) {
+    if (gone.has(p.id)) continue;
+    const had = plans.get(p.id);
+    if (!had || p.updatedAt > had.updatedAt) plans.set(p.id, p);
+  }
+  // The newer copy's order (its open plan first), then plans only the older copy has.
+  const ids = [...new Set([...getPlans(newer), ...getPlans(older)].map((p) => p.id))].filter((id) => plans.has(id));
+  const [exam = null, ...others] = ids.map((id) => plans.get(id)!);
+
+  // A past exam used for "Prepare again" has lost its retry copy; the used one wins.
+  const past = new Map<string, PastExam>();
+  for (const p of [...newer.past, ...older.past]) {
+    if (gone.has(p.id)) continue;
+    const had = past.get(p.id);
+    if (!had || (had.retry && !p.retry)) past.set(p.id, p);
+  }
+  return {
+    exam,
+    others: others.slice(0, PLANS_MAX - 1),
+    removed,
+    past: [...past.values()].sort((x, y) => x.finishedAt - y.finishedAt).slice(-PAST_MAX),
+    updatedAt: Math.max(a.updatedAt, b.updatedAt),
+  };
 }
 
 // ---------- Legacy: the single task breakdown (before tasks existed) ----------

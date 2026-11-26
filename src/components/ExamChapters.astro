@@ -5,6 +5,9 @@
  * right, and a play button that starts a timer session on it. Finished ones fold into one
  * row. A tap on the name opens the chapter's sheet: practice, adding a question, its
  * name, planned hours and notes, order, and removal.
+ *
+ * With several study plans, each plan is a group of its own (nearest exam first, open), with
+ * a pencil to edit the plan, "+ Add chapter" and a practice round on its questions.
  */
 import { url } from '../lib/paths';
 import Sheet from './Sheet.astro';
@@ -25,6 +28,8 @@ const timerUrl = url('/timer');
     <summary data-ec-done-title></summary>
     <ol class="chapters__items" data-ec-done></ol>
   </details>
+
+  <div class="chapters__groups" data-ec-groups hidden></div>
 
   <button data-t="exam.addChapter" type="button" class="btn btn--ghost btn--small chapters__add" data-ec-add-open>+ Add chapter</button>
   <form class="chapters__form" data-ec-form hidden>
@@ -68,8 +73,8 @@ const timerUrl = url('/timer');
 </Sheet>
 
 <script>
-  import { getExam, getSessions, subscribe, type ExamChapter } from '../lib/storage';
-  import { addChapter, chapterScores, EXAM_NOTES_MAX, examTime, formatHM, moveChapter, nextChapter, removeChapter, updateChapter } from '../lib/exam';
+  import { getExamStore, getPlans, getSessions, planOfChapter, subscribe, type Exam, type ExamChapter } from '../lib/storage';
+  import { addChapter, byDate, chapterScores, EXAM_NOTES_MAX, examTime, formatHM, moveChapter, nextChapter, removeChapter, ROUND_SIZE, updateChapter } from '../lib/exam';
   import { celebrate } from '../lib/appearance';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
@@ -78,6 +83,8 @@ const timerUrl = url('/timer');
 
   const CHECK_SVG =
     '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const EDIT_SVG =
+    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
   const PLAY_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg>';
 
   /** "64%", and a word for the colour band, from answers so far. */
@@ -109,6 +116,11 @@ const timerUrl = url('/timer');
     const removing = new Set<string>();
     /** The chapter the sheet shows. */
     let sheetId = '';
+    const groupsBox = $<HTMLElement>('[data-ec-groups]');
+    /** Groups opened or closed by hand, by plan id; the nearest plan starts open. */
+    const openGroups = new Map<string, boolean>();
+    /** The plan "+ Add chapter" adds to. */
+    let addPlanId = '';
 
     const announce = (text: string) => {
       live.textContent = '';
@@ -179,19 +191,41 @@ const timerUrl = url('/timer');
       return li;
     }
 
-    function render(): void {
-      const exam = getExam();
-      root!.hidden = !exam;
-      if (!exam) return;
+    /** The plan's chapter rows: open ones in the plan's order, then the finished ones. */
+    function planRows(exam: Exam) {
       const chapters = exam.chapters.filter((ch) => !removing.has(ch.id));
       const time = examTime(exam, getSessions());
       const next = nextChapter(exam, time);
       const scores = chapterScores(exam);
-      empty.hidden = chapters.length > 0;
-      // The plan's order; only the finished ones fold away.
       const rows = chapters.map((ch) => ({ ch, li: renderChapter(ch, time.byChapter.get(ch.id) ?? 0, scoreOf(scores.get(ch.id)), ch.id === next?.id) }));
-      const done = rows.filter((r) => r.ch.done);
-      list.replaceChildren(...rows.filter((r) => !r.ch.done).map((r) => r.li));
+      return { rows, open: rows.filter((r) => !r.ch.done), done: rows.filter((r) => r.ch.done) };
+    }
+
+    function render(): void {
+      const store = getExamStore();
+      const exam = store.exam;
+      root!.hidden = !exam;
+      if (!exam) return;
+      const plans = byDate(getPlans(store));
+      const many = plans.length > 1;
+      groupsBox.hidden = !many;
+      $<HTMLElement>('[data-ec-count]').hidden = many;
+      if (!plans.some((p) => p.id === addPlanId)) addPlanId = exam.id;
+      // Each group has its own "+ Add chapter".
+      addOpen.hidden = many || !form.hidden;
+      if (many) {
+        list.hidden = doneBox.hidden = empty.hidden = true;
+        groupsBox.replaceChildren(...plans.map((p, i) => renderGroup(p, i)));
+        nameInput.placeholder = t('exam.addChapterTo', { name: plans.find((p) => p.id === addPlanId)?.title ?? '' });
+        if (sheet!.open) renderSheet(false);
+        return;
+      }
+      addPlanId = exam.id;
+      nameInput.placeholder = t('exam.addAChapterOrPart');
+      const { rows, open, done } = planRows(exam);
+      empty.hidden = rows.length > 0;
+      // The plan's order; only the finished ones fold away.
+      list.replaceChildren(...open.map((r) => r.li));
       list.hidden = rows.length > 0 && done.length === rows.length;
       doneList.replaceChildren(...done.map((r) => r.li));
       doneBox.hidden = !done.length;
@@ -203,6 +237,63 @@ const timerUrl = url('/timer');
       if (sheet!.open) renderSheet(false);
     }
 
+    /** One plan's group: its name and count, a pencil, its chapters, "+ Add chapter" and practice. */
+    function renderGroup(plan: Exam, index: number): HTMLDetailsElement {
+      const box = el('details', 'chapters__group');
+      box.open = openGroups.get(plan.id) ?? index === 0;
+      box.addEventListener('toggle', () => openGroups.set(plan.id, box.open));
+      const { rows, open, done } = planRows(plan);
+
+      const head = el('summary', 'chapters__group-head');
+      const name = el('span', 'chapters__group-name');
+      name.append(
+        el('span', 'chapters__group-title', plan.title),
+        el('span', 'muted chapters__group-count', rows.length ? (open.length ? tn('exam.nToDo', open.length) : t('exam.allFinished')) : t('exam.noChaptersShort')),
+      );
+      const edit = el('button', 'icon-btn chapters__group-edit');
+      edit.type = 'button';
+      edit.innerHTML = EDIT_SVG;
+      edit.setAttribute('aria-label', t('exam.editPlan', { name: plan.title }));
+      edit.title = t('exam.editGoal');
+      edit.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.dispatchEvent(new CustomEvent('exam:edit', { detail: plan.id }));
+      });
+      head.append(name, edit);
+
+      const ol = el('ol', 'chapters__items');
+      ol.append(...open.map((r) => r.li));
+      box.append(head, ol);
+      if (done.length) {
+        const fold = el('details', 'disclosure chapters__done');
+        fold.append(el('summary', '', tn('exam.nFinished', done.length)));
+        const doneOl = el('ol', 'chapters__items');
+        doneOl.append(...done.map((r) => r.li));
+        fold.append(doneOl);
+        box.append(fold);
+      }
+
+      const tools = el('div', 'chapters__group-tools');
+      const add = el('button', 'btn btn--ghost btn--small', t('exam.addChapter'));
+      add.type = 'button';
+      add.addEventListener('click', () => {
+        addPlanId = plan.id;
+        nameInput.placeholder = t('exam.addChapterTo', { name: plan.title });
+        showForm();
+        nameInput.focus();
+      });
+      tools.append(add);
+      const n = Math.min(ROUND_SIZE, plan.questions.length);
+      if (n) {
+        const practise = el('button', 'btn btn--ghost btn--small', tn('exam.practiseShort', n));
+        practise.type = 'button';
+        practise.addEventListener('click', () => document.dispatchEvent(new CustomEvent('exam:practise', { detail: { plan: plan.id, scope: 'all' } })));
+        tools.append(practise);
+      }
+      box.append(tools);
+      return box;
+    }
+
     // ---------- The chapter's sheet ----------
 
     const sName = s$<HTMLInputElement>('[data-ecs-name]');
@@ -212,7 +303,7 @@ const timerUrl = url('/timer');
 
     /** `fields`: also fill the inputs (not while you are typing in them). */
     function renderSheet(fields: boolean): void {
-      const exam = getExam();
+      const exam = planOfChapter(sheetId);
       const chapters = exam?.chapters.filter((ch) => !removing.has(ch.id)) ?? [];
       const index = chapters.findIndex((ch) => ch.id === sheetId);
       const chapter = chapters[index];
@@ -250,7 +341,7 @@ const timerUrl = url('/timer');
       s$<HTMLButtonElement>('[data-ecs-down]').disabled = index === chapters.length - 1;
     }
 
-    const current = () => getExam()?.chapters.find((ch) => ch.id === sheetId);
+    const current = () => planOfChapter(sheetId)?.chapters.find((ch) => ch.id === sheetId);
 
     sheet.addEventListener('sheet:open', (e) => {
       sheetId = (e as CustomEvent<Record<string, string>>).detail.chapter ?? '';
@@ -292,7 +383,7 @@ const timerUrl = url('/timer');
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const added = addChapter(nameInput.value, hoursInput.value ? Number(hoursInput.value) : undefined);
+      const added = addChapter(nameInput.value, hoursInput.value ? Number(hoursInput.value) : undefined, addPlanId || undefined);
       if (!added) return;
       nameInput.value = '';
       hoursInput.value = '';
@@ -346,6 +437,99 @@ const timerUrl = url('/timer');
     min-height: 44px;
     align-content: center;
     font-weight: 600;
+  }
+
+  /* Several plans: one group each (made in the script, hence :global). */
+  .chapters__groups {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .chapters :global(.chapters__group) {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-1);
+  }
+
+  .chapters :global(.chapters__group:first-child) {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .chapters :global(.chapters__group-head) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: 44px;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .chapters :global(.chapters__group-head::-webkit-details-marker) {
+    display: none;
+  }
+
+  /* A small arrow that turns when the group opens. */
+  .chapters :global(.chapters__group-head::before) {
+    content: '›';
+    flex: none;
+    inline-size: 1em;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    transition: transform 0.15s;
+  }
+
+  .chapters :global(.chapters__group[open] > .chapters__group-head::before) {
+    transform: rotate(90deg);
+  }
+
+  .chapters :global(.chapters__group-name) {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .chapters :global(.chapters__group-title) {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .chapters :global(.chapters__group-count) {
+    font-size: var(--text-sm);
+  }
+
+  .chapters :global(.chapters__group-edit) {
+    flex: none;
+    min-inline-size: 44px;
+    min-block-size: 44px;
+  }
+
+  .chapters :global(.chapters__group .chapters__items) {
+    display: grid;
+    margin: var(--space-1) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chapters :global(.chapters__group .chapters__done) {
+    margin-top: var(--space-1);
+  }
+
+  .chapters :global(.chapters__group .chapters__done > summary) {
+    min-height: 44px;
+    align-content: center;
+    font-weight: 600;
+  }
+
+  .chapters :global(.chapters__group-tools) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+
+  .chapters :global(.chapters__group-tools .btn) {
+    min-height: 44px;
   }
 
   .chapters__empty {

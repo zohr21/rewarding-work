@@ -6,7 +6,7 @@ import * as T from '../lib/timer/engine';
 import type { TimerState, TimerEvent, CustomDurations } from '../lib/timer/engine';
 import { TIMER_MODES, type TimerMode } from '../data/taxonomy';
 import { modeLabel } from '../lib/i18n/labels';
-import { addSession, getExam, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
+import { addSession, getPlans, getSessions, getTask, getTasks, read, subscribe, write, type ExamChapter, type FocusSession, type Task } from '../lib/storage';
 import { TRACKS, tierLabel, trackProgress } from '../lib/rewards';
 import { tierIcon } from '../lib/tier-icons';
 import { paintSprig, sprigMood, sprigStage, sprigStageName, type SprigMood } from '../lib/sprig';
@@ -20,6 +20,7 @@ import { celebrate as celebrateBackground } from '../lib/appearance';
 import { cleanups, listen } from '../lib/page';
 import { focusByTask, focusLabel, formatFocus, jot, listOf, logSession, taskMatchingLabel, taskName, todayTasks, type SessionLog } from '../lib/tasks';
 import { getCoach } from '../lib/coach';
+import { byDate } from '../lib/exam';
 import { topIds } from '../lib/coachday';
 import { dayKey } from '../lib/dates';
 import { checkSession, formatShort, type SessionPhone } from '../lib/screen';
@@ -765,8 +766,17 @@ function mountTimer(root: HTMLElement): () => void {
     );
   }
 
-  /** Exam chapters link the same way (src/lib/exam.ts): the session's taskId is the chapter's id. */
-  const openChapters = (): ExamChapter[] => (getExam()?.chapters ?? []).filter((ch) => !ch.done);
+  /**
+   * Study chapters link the same way (src/lib/exam.ts): the session's taskId is the chapter's
+   * id. Open chapters of every plan, the plan with the nearest exam first; with several plans
+   * each row is tagged with its plan's name.
+   */
+  const openChapters = (): ExamChapter[] => planChapters().map((x) => x.chapter);
+  function planChapters(): { chapter: ExamChapter; tag: string }[] {
+    const plans = byDate(getPlans());
+    return plans.flatMap((p) => p.chapters.filter((ch) => !ch.done).map((chapter) => ({ chapter, tag: plans.length > 1 ? p.title : t('timer.examChapter') })));
+  }
+  const anyChapter = (id: string): ExamChapter | undefined => getPlans().flatMap((p) => p.chapters).find((ch) => ch.id === id);
 
   function chapterForLabel(label: string): ExamChapter | undefined {
     const key = label.trim().toLowerCase();
@@ -801,7 +811,7 @@ function mountTimer(root: HTMLElement): () => void {
       );
     }
     const task = state.taskId ? getTask(state.taskId) : null;
-    const chapter = state.taskId && !task ? getExam()?.chapters.find((ch) => ch.id === state.taskId) : undefined;
+    const chapter = state.taskId && !task ? anyChapter(state.taskId) : undefined;
     renderTaskRow(task, chapter);
     els.taskLink.hidden = !task && !chapter;
     els.taskLink.textContent = task
@@ -859,7 +869,7 @@ function mountTimer(root: HTMLElement): () => void {
     };
     const items = [
       ...ordered.slice(0, 20).map((x) => row(x.id, taskName(x), top.includes(x.id) ? t('timer.topThree') : today.includes(x) ? t('timer.today') : '', focus.get(x.id) ?? 0)),
-      ...openChapters().map((ch) => row(ch.id, ch.name, t('timer.examChapter'), focus.get(ch.id) ?? 0)),
+      ...planChapters().map(({ chapter: ch, tag }) => row(ch.id, ch.name, tag, focus.get(ch.id) ?? 0)),
     ];
     list.hidden = items.length === 0;
     list.replaceChildren(...items);
@@ -1018,7 +1028,7 @@ function mountTimer(root: HTMLElement): () => void {
   // Arriving from "Focus" on the exam page: /timer?chapter=<id>
   const wantedChapter = standalone ? new URLSearchParams(location.search).get('chapter') : null;
   if (wantedChapter) {
-    const chapter = getExam()?.chapters.find((ch) => ch.id === wantedChapter);
+    const chapter = anyChapter(wantedChapter);
     if (chapter) focusOnItem(chapter.name, chapter.id);
     history.replaceState(history.state, '', location.pathname);
   }

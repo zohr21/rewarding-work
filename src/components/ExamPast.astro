@@ -1,7 +1,8 @@
 ---
 /**
  * Exams you've taken: the result, when, and how the preparation went. An exam you
- * didn't pass can be prepared again with the same chapters and questions.
+ * didn't pass can be prepared again with the same chapters and questions, next to the
+ * plans already running.
  */
 ---
 
@@ -14,7 +15,7 @@
 
 <script>
   import { getExamStore, subscribe, type PastExam } from '../lib/storage';
-  import { formatHM, removePastExam, resultLabel, retryExam } from '../lib/exam';
+  import { canAddPlan, formatHM, removePastExam, resultLabel, retryExam } from '../lib/exam';
   import { dateFormat, t, tn } from '../lib/i18n';
   import { offerUndo } from '../lib/undo';
   import { el } from '../lib/dom';
@@ -76,7 +77,7 @@
           if (retryExam(record.id)) announce(t('exam.retrySaid', { name: record.title }));
         });
         again.disabled = !free;
-        if (!free) again.title = t('exam.finishFirst');
+        if (!free) again.title = t('exam.plansFull');
         actions.append(again);
       }
       const del = button(t('exam.remove'), () => remove(record));
@@ -93,7 +94,8 @@
       root!.hidden = shown.length === 0;
       root!.querySelector<HTMLElement>('[data-px-heading]')!.textContent = t('exam.pastExamsN', { n: shown.length });
       if (!exam) (root as HTMLDetailsElement).open = true;
-      list.replaceChildren(...shown.map((p) => renderRecord(p, !exam)));
+      const room = canAddPlan();
+      list.replaceChildren(...shown.map((p) => renderRecord(p, room)));
     }
 
     render();
