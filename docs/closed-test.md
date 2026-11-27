@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.8 (Budget months that start on payday):
+
+```
+<en-US>
+New: your Budget month can start on payday. Pick a day from 1 to 28 in Plan, and paid early or late, the salary counts for the right month. What a month leaves carries into the next one, and so does an overspend; Grovyn never takes your savings by itself, it asks first. Set your balance once and see what you have. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Новое: месяц в Бюджете может начинаться в день зарплаты. Выберите день от 1 до 28 в «Плане», и зарплата, пришедшая раньше или позже, попадёт в нужный месяц. Остаток месяца переходит в следующий, перерасход тоже; сбережения Grovyn сам не трогает, а сначала спрашивает. Укажите баланс один раз и видите, сколько у вас есть. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Yeni: Büdcədə ay maaş günü başlaya bilər. Planda 1-dən 28-ə qədər gün seç, maaş tez və ya gec gəlsə də düzgün aya düşəcək. Ayın qalığı növbəti aya keçir, artıq xərc də; Grovyn yığımlarına özü toxunmur, əvvəlcə soruşur. Balansını bir dəfə yaz və nə qədər pulun olduğunu gör. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 Version 0.1.7 (Study, several plans, new You):
 
 ```
@@ -213,3 +227,4 @@ Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə 
 | 19 Nov 2026 | Weekly board with report and block. Firestore rules published. Release 102 (0.1.2) uploaded to Alpha. New content rating questionnaire: users interact = Yes, block = Yes, report = Yes, no chat, not friends-only. Ratings unchanged (Everyone, ClassInd L) plus "Users Interact". Both sent for review. |
 | 26 Nov 2026 | Release 106 (0.1.6) uploaded to Alpha: Coach day rhythm and sync, the new Timer (task on top, rhythm and sound in a sheet, quiet while focusing). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.5 had been published 25 Nov. |
 | 27 Nov 2026 | Release 107 (0.1.7) uploaded to Alpha: Study (was Exam prep), several study plans at once, and the You page as rows that open sheets with one delete sheet (type DELETE). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.6 was available to testers. |
+| 28 Nov 2026 | Release 108 (0.1.8) uploaded to Alpha: Budget months can start on payday, a month's rest or overspend carries into the next (savings only with a yes), and a "You have" balance row. Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
