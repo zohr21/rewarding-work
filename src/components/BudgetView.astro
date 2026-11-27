@@ -16,7 +16,7 @@ const icon = (d: string, w = 2) =>
   <div class="bv__bar">
     <div class="bv__month">
       <button data-t-aria-label="budget.previousMonth" type="button" class="icon-btn" data-bv-prev aria-label="Previous month" set:html={icon('M15 6l-6 6 6 6')} />
-      <span data-bv-month aria-live="polite"></span>
+      <span class="bv__month-name" aria-live="polite"><span data-bv-month></span><small class="muted" data-bv-range hidden></small></span>
       <button data-t-aria-label="budget.nextMonth" type="button" class="icon-btn" data-bv-next aria-label="Next month" set:html={icon('M9 6l6 6-6 6')} />
     </div>
     <div class="bv__actions">
@@ -258,18 +258,20 @@ const icon = (d: string, w = 2) =>
     changeSpend,
     currencyCode,
     currencySign,
-    daysInMonth,
     dueSoon,
     formatMoney,
     getBudget,
     kindLabel,
     monthBudget,
-    monthOf,
     monthSpend,
     monthTotals,
     needOf,
     needLabel,
     paceLine,
+    dayIndex,
+    period,
+    periodOf,
+    startDayOf,
     removeRepeat,
     removeSpend,
     spendToSavings,
@@ -302,7 +304,7 @@ const icon = (d: string, w = 2) =>
   const r1 = (n: number) => Math.round(n * 10) / 10;
 
   /** Money spent through the month against the budget's pace (budget.ts, paceLine). */
-  function paceChart(run: number[], upto: number, paced: number[] | null, sign: string, label: string): string {
+  function paceChart(run: number[], upto: number, paced: number[] | null, sign: string, label: string, ends: [string, string]): string {
     const budget = paced ? (paced.at(-1) ?? 0) : null;
     const W = 640;
     const H = 230;
@@ -326,7 +328,7 @@ const icon = (d: string, w = 2) =>
     const pts = [`${x(0)},${y(0)}`, ...run.slice(0, upto).map((v, i) => `${x(i + 1)},${y(v)}`)].join(' ');
     const ex = x(upto);
     const ey = y(run[upto - 1] ?? 0);
-    const days1 = `<text class="pc__axis" x="${L}" y="${H - 2}">1</text><text class="pc__axis" x="${W}" y="${H - 2}" text-anchor="end">${days}</text>`;
+    const days1 = `<text class="pc__axis" x="${L}" y="${H - 2}">${esc(ends[0])}</text><text class="pc__axis" x="${W}" y="${H - 2}" text-anchor="end">${esc(ends[1])}</text>`;
     return `<svg class="pc" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${grid}${pace}<polyline class="pc__line" points="${pts}"/><circle class="pc__dot" cx="${ex}" cy="${ey}" r="6"/>${days1}</svg>`;
   }
 
@@ -379,8 +381,12 @@ const icon = (d: string, w = 2) =>
     const live = $('[data-bv-live]');
 
     const today = () => dayKey(new Date());
-    const thisMonth = () => monthOf(today());
+    /** The day budget months start (1, or payday): see Plan.monthStart. */
+    const startDay = () => startDayOf(getBudget().plan);
+    const thisMonth = () => periodOf(today(), startDay());
     let month = thisMonth();
+    /** The start day the page last drew with: when it changes, the month shown moves with it. */
+    let drawnStart = startDay();
     let filter: Category | null = null;
     let query = '';
     /** Expense groups you opened or closed yourself this month, by group key; the rest follow the default in render. */
@@ -432,11 +438,18 @@ const icon = (d: string, w = 2) =>
     function render(): void {
       const store = getBudget();
       const sign = store.currency;
+      const s0 = startDayOf(store.plan);
+      if (s0 !== drawnStart) {
+        // Months now start on another day: stay on the month that holds today, or the same days.
+        month = month === periodOf(today(), drawnStart) ? periodOf(today(), s0) : periodOf(period(month, drawnStart).end, s0);
+        drawnStart = s0;
+      }
+      const p = period(month, s0);
       const entries = store.entries.filter((e) => !removing.has(e.id));
       const current = month === thisMonth();
-      const days = daysInMonth(month);
-      const dom = current ? fromDayKey(today()).getDate() : days;
-      const spent = monthSpend(entries, month);
+      const days = p.days;
+      const dom = current ? dayIndex(p, today()) + 1 : days;
+      const spent = monthSpend(entries, month, 31, s0);
       const budget = monthBudget(store);
       const fmt = (n: number) => formatMoney(n, sign);
       const whole = (n: number) => formatMoney(Math.round(n), sign, 0);
@@ -446,6 +459,9 @@ const icon = (d: string, w = 2) =>
       $('[data-bv-month]').closest<HTMLElement>('[data-budget]')!.toggleAttribute('data-fresh', store.entries.length === 0 && !budget && store.repeats.length === 0);
 
       setText('[data-bv-month]', monthLong.format(fromDayKey(`${month}-01`)));
+      // A month that starts on payday says which days it is.
+      $('[data-bv-range]').hidden = s0 === 1;
+      setText('[data-bv-range]', s0 === 1 ? '' : `${formatShort(fromDayKey(p.start))} – ${formatShort(fromDayKey(p.end))}`);
       // The plan card above (BudgetPlan.astro) follows the month shown here.
       document.dispatchEvent(new CustomEvent('budget:month', { detail: month }));
       $<HTMLButtonElement>('[data-bv-next]').disabled = current;
@@ -453,7 +469,7 @@ const icon = (d: string, w = 2) =>
       // ---- What is left, and the pace ----
       const meter = $('[data-bv-meter]');
       const repeats = store.repeats.filter((r) => !removing.has(r.id));
-      const plan = budget ? paceLine(repeats, month, budget) : null;
+      const plan = budget ? paceLine(repeats, month, budget, undefined, s0) : null;
       const pace = plan ? plan.line[dom - 1]! : 0;
       // Bills still to come this month are set aside before "a day".
       const billsLater = plan && current ? billsAfter(plan.billsByDay, dom) : 0;
@@ -521,7 +537,7 @@ const icon = (d: string, w = 2) =>
         }),
       );
 
-      const run = runningTotals(entries, month);
+      const run = runningTotals(entries, month, s0);
       $('[data-bv-pace-key]').hidden = !budget;
       setText('[data-bv-pace-title]', budget ? t('budget.v.vsPace') : current ? t('budget.v.thisMonthSoFar') : name);
       setText('[data-bv-pace-key-text]', budget ? t('budget.v.paceTo', { amount: whole(budget) }) : '');
@@ -531,12 +547,13 @@ const icon = (d: string, w = 2) =>
         plan?.line ?? null,
         sign,
         t('budget.v.chartLabel', { month: name, amount: fmt(run[dom - 1] ?? 0), day: dom }) + (budget ? t('budget.v.againstPace', { amount: whole(pace) }) : '') + '.',
+        s0 === 1 ? ['1', String(days)] : [formatShort(fromDayKey(p.start)), formatShort(fromDayKey(p.end))],
       );
 
       // ---- Short facts: only the ones with something to say ----
       const facts: [string, string][] = [];
       const prevMonth = shiftMonth(month, -1);
-      const prev = monthSpend(entries, prevMonth, dom).total;
+      const prev = monthSpend(entries, prevMonth, dom, s0).total;
       const prevShort = monthShort.format(fromDayKey(`${prevMonth}-01`));
       if (prev > 0 && spent.total > 0) {
         const pct = Math.round(((spent.total - prev) / prev) * 100);
@@ -579,7 +596,7 @@ const icon = (d: string, w = 2) =>
           fill.style.width = `${Math.min(100, (sum / (own ?? Math.max(spent.total, 1))) * 100)}%`;
           track.append(fill);
           meterEl.append(track);
-          const catPlan = own ? paceLine(repeats, month, own, cat) : null;
+          const catPlan = own ? paceLine(repeats, month, own, cat, s0) : null;
           const catPace = catPlan ? catPlan.line[dom - 1]! : 0;
           if (own && current) {
             const tick = el('span', 'bv__tick bv__tick--thin');
@@ -620,9 +637,9 @@ const icon = (d: string, w = 2) =>
       // From the first month with an expense, so a new budget is not five empty bars; 2 to 6 months.
       const first = entries.reduce((min, e) => (e.day < min ? e.day : min), today());
       let span = 1;
-      while (span < 6 && shiftMonth(month, -span) >= monthOf(first)) span++;
+      while (span < 6 && shiftMonth(month, -span) >= periodOf(first, s0)) span++;
       span = Math.max(2, span);
-      const months = monthTotals(entries, month, span, filter ?? undefined);
+      const months = monthTotals(entries, month, span, filter ?? undefined, s0);
       const line = filter ? (store.budgets[filter] ?? null) : budget;
       setText('[data-bv-months-title]', tn('budget.v.lastMonths', span) + (filter ? ` · ${categoryShort(filter)}` : ''));
       $('[data-bv-months-key]').hidden = !line;
@@ -719,8 +736,9 @@ const icon = (d: string, w = 2) =>
       const now = today();
       const yesterday = dayKey(addDays(fromDayKey(now), -1));
       const thisWeek = dayKey(startOfWeek(fromDayKey(now)));
-      const firstDay = fromDayKey(`${month}-01`);
-      const lastDay = fromDayKey(`${month}-${String(daysInMonth(month)).padStart(2, '0')}`);
+      const shown = period(month, startDay());
+      const firstDay = fromDayKey(shown.start);
+      const lastDay = fromDayKey(shown.end);
       const groups: { key: string; label: string; week: boolean; entries: SpendEntry[] }[] = [];
       for (const e of list) {
         let g: Omit<(typeof groups)[number], 'entries'>;
@@ -788,9 +806,11 @@ const icon = (d: string, w = 2) =>
       }
       const amount = Number(xAmount.value) || 0;
       const entries = store.entries.filter((e) => e.id !== editing?.id);
-      const sum = monthSpend(entries, monthOf(day)).byCategory.get(cat) ?? 0;
+      const s0 = startDayOf(store.plan);
+      const its = periodOf(day, s0);
+      const sum = monthSpend(entries, its, 31, s0).byCategory.get(cat) ?? 0;
       const left = own - sum - amount;
-      const mName = monthName.format(fromDayKey(day));
+      const mName = monthName.format(fromDayKey(`${its}-01`));
       hint.textContent =
         left >= 0
           ? t(amount ? 'budget.v.catLeftAfter' : 'budget.v.catLeft', { cat: categoryShort(cat), amount: formatMoney(Math.round(left), store.currency, 0), month: mName })
@@ -804,7 +824,7 @@ const icon = (d: string, w = 2) =>
       setText('[data-bv-x-sign]', currencySign(store.currency));
       xAmount.value = entry ? String(entry.amount) : '';
       xWhat.value = entry ? entry.what : '';
-      xDay.value = entry ? entry.day : month === thisMonth() ? today() : `${month}-01`;
+      xDay.value = entry ? entry.day : month === thisMonth() ? today() : period(month, startDay()).start;
       xDay.max = repeat ? '' : today();
       xKind.value = entry?.kind ?? '';
       const cat = entry?.category ?? filter ?? 'food';
@@ -850,7 +870,7 @@ const icon = (d: string, w = 2) =>
       } else {
         const entry = addSpend(input);
         if (!entry) return;
-        month = monthOf(entry.day);
+        month = periodOf(entry.day, startDay());
         announce(t('budget.v.added', { what: entry.what, amount: formatMoney(entry.amount, sign) }));
       }
       editing = null;
@@ -968,7 +988,7 @@ const icon = (d: string, w = 2) =>
 
     root.querySelector('[data-bv-csv]')?.addEventListener('click', () => {
       const store = getBudget();
-      const blob = new Blob([toCsv(monthSpend(store.entries, month).entries, store.currency)], { type: 'text/csv' });
+      const blob = new Blob([toCsv(monthSpend(store.entries, month, 31, startDayOf(store.plan)).entries, store.currency)], { type: 'text/csv' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `budget-${month}.csv`;
@@ -1002,7 +1022,7 @@ const icon = (d: string, w = 2) =>
     let shownDay = today();
     const tick = window.setInterval(() => {
       if (today() === shownDay) return;
-      if (month === monthOf(shownDay)) month = thisMonth();
+      if (month === periodOf(shownDay, startDay())) month = thisMonth();
       shownDay = today();
       catchUpRepeats();
       render();
@@ -1063,9 +1083,16 @@ const icon = (d: string, w = 2) =>
     font-weight: 600;
   }
 
-  .bv__month span {
+  .bv__month-name {
+    display: grid;
     min-inline-size: 9.5rem;
     text-align: center;
+    line-height: 1.25;
+  }
+
+  .bv__month-name small {
+    font-size: var(--text-xs);
+    font-weight: 400;
   }
 
   /* The app has only the eye and the lock beside the month: keep them on one row, even at 360 px. */
@@ -1079,7 +1106,7 @@ const icon = (d: string, w = 2) =>
     min-inline-size: 0;
   }
 
-  :global(html[data-app]) .bv__month span {
+  :global(html[data-app]) .bv__month-name {
     flex: 1;
     min-inline-size: 0;
   }

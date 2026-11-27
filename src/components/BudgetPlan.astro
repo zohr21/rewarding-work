@@ -31,6 +31,7 @@ const TAGS = [
       <p class="bp__label" id="bp-label" data-bp-label></p>
       <p class="bp__big" data-bp-big></p>
       <p class="muted bp__line" data-bp-line></p>
+      <p class="muted bp__line" data-bp-carried hidden></p>
       <p class="bp__saved" data-bp-saved></p>
     </div>
     <p class="bp-reached" data-bp-reached hidden><span class="bp-leaf" aria-hidden="true"></span><span data-bp-reached-text></span></p>
@@ -39,6 +40,14 @@ const TAGS = [
       <div class="bp-sweep__actions">
         <button type="button" class="btn" data-bp-sweep-save></button>
         <button data-t="budget.ap.keepIt" type="button" class="btn btn--ghost" data-bp-sweep-keep>Keep it</button>
+      </div>
+    </div>
+    {/* Last month went over: take it from savings, or let it come off this month (coverOffer). */}
+    <div class="bp-sweep" data-bp-cover hidden>
+      <p class="bp-sweep__text"><strong data-bp-cover-title></strong><span class="muted" data-bp-cover-line></span></p>
+      <div class="bp-sweep__actions">
+        <button type="button" class="btn" data-bp-cover-take></button>
+        <button type="button" class="btn btn--ghost" data-bp-cover-carry></button>
       </div>
     </div>
     <ul class="bp__bars" role="list" data-bp-bars></ul>
@@ -53,7 +62,31 @@ const TAGS = [
       <button type="button" class="bp__tile" data-sheet-open="budget-cal"><span data-t="budget.noSpendDays" class="muted">No-spend days</span><strong data-bp-nospend></strong></button>
     </div>
   </div>
+  {/* What you have, counted on from a balance you set once (Plan: StartBalance). */}
+  <button type="button" class="bp-balance" data-sheet-open="balance">
+    <span data-t="budget.bal.youHave" class="muted bp-balance__label">You have</span>
+    <strong class="bp-balance__value" data-bp-bal></strong>
+    <span class="muted bp-balance__sub" data-bp-bal-sub></span>
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  </button>
 </section>
+
+<Sheet id="balance" title="How much do you have now?" titleKey="budget.bal.title">
+  <p data-t="budget.bal.why" class="muted bp-intro">Cards and cash together, roughly. From here Grovyn adds what comes in and takes off what you spend, so you always see what you have.</p>
+  <form class="bp-form" data-bp-bal-form>
+    <label class="bp-amount">
+      <span data-t="budget.bal.today" class="visually-hidden">Balance today</span>
+      <span class="bp-amount__sign" data-bp-bal-sign aria-hidden="true"></span>
+      <input data-t-aria-label="budget.bal.today" type="number" inputmode="decimal" min={-AMOUNT_MAX} max={AMOUNT_MAX} step="0.01" required placeholder="0" aria-label="Balance today" data-bp-bal-amount />
+    </label>
+    <ul class="muted bp-bal-notes" role="list">
+      <li data-t="budget.bal.noteBefore">Months before today don't count as a loss.</li>
+      <li data-t="budget.bal.noteFix">If it drifts from your bank, set it again here any time.</li>
+      <li data-t="budget.bal.noteWhere">It is kept with your budget, and copied to your account only if you are signed in.</li>
+    </ul>
+    <button data-t="budget.bal.save" type="submit" class="btn bp-form__save">Save</button>
+  </form>
+</Sheet>
 
 <Sheet id="income" title="Income" titleKey="budget.income">
   <form class="bp-form" data-bp-i-form>
@@ -221,6 +254,18 @@ const TAGS = [
 </Sheet>
 
 <Sheet id="plan" title="Your plan" titleKey="budget.yourPlan">
+  <h3 data-t="budget.ms.title" class="bp-sub">Your month starts on</h3>
+  <p data-t="budget.ms.why" class="muted bp-intro">Paid near the end of the month? Start your month on payday, so each salary pays for the month it starts. Your entries keep their own days.</p>
+  <div class="bp-ms">
+    <label class="bp-field">
+      <span data-t="budget.ms.day">Day of the month</span>
+      <select class="input" data-bp-ms>
+        {Array.from({ length: 28 }, (_, i) => <option value={String(i + 1)}>{i + 1}</option>)}
+      </select>
+    </label>
+    <button type="button" class="btn btn--ghost btn--small" data-bp-ms-payday hidden></button>
+  </div>
+  <p class="muted bp-hint" data-bp-ms-hint></p>
   <p data-t="budget.howIncomeIsSplitSavings" class="muted bp-intro">How income is split. Savings come off first, when the income comes in.</p>
   <fieldset class="bp-splits">
     <legend data-t="budget.needsWantsSavings" class="bp-sub">Needs · wants · savings</legend>
@@ -280,20 +325,30 @@ const TAGS = [
     categoryTag,
     currencySign,
     needLabel,
-    daysInMonth,
+    balance,
+    dayIndex,
     formatMoney,
     getBudget,
     monthOf,
     monthPlan,
+    period,
+    periodDays,
+    periodOf,
+    repeatDayIn,
+    setMonthStart,
+    setStartBalance,
+    startDayOf,
     needOf,
     removeGoal,
     removeIncome,
     removeIncomeRepeat,
-    repeatDay,
     saveGoal,
     savedFor,
     savingsWhere,
     answerSweep,
+    answerCover,
+    coverOffer,
+    type CoverOffer,
     markReached,
     roundUpsIn,
     setAutopilot,
@@ -313,7 +368,7 @@ const TAGS = [
     type SaveWhere,
     type Split,
   } from '../lib/budget';
-  import { dayKey, formatDay, fromDayKey } from '../lib/dates';
+  import { dayKey, formatDay, formatShort, fromDayKey } from '../lib/dates';
   import { el } from '../lib/dom';
   import { offerUndo } from '../lib/undo';
   import { celebrate } from '../lib/appearance';
@@ -333,7 +388,10 @@ const TAGS = [
     const $ = <E extends Element = HTMLElement>(s: string) => document.querySelector<E>(s)!;
     const $$ = <E extends Element = HTMLElement>(s: string) => [...document.querySelectorAll<E>(s)];
     const today = () => dayKey(new Date());
-    let month: MonthKey = monthOf(today());
+    /** The day budget months start (Plan.monthStart); BudgetView shows the same month. */
+    const startDay = () => startDayOf(getBudget().plan);
+    const thisMonth = () => periodOf(today(), startDay());
+    let month: MonthKey = thisMonth();
     /** The day picked in the calendar. */
     let picked: string | null = null;
     /** Removals still offered for Undo. */
@@ -384,7 +442,7 @@ const TAGS = [
       const s = store();
       const sign = s.currency;
       const p = monthPlan(s, month, today());
-      const current = month === monthOf(today());
+      const current = month === thisMonth();
       const name = monthName.format(fromDayKey(`${month}-01`));
       const planned = p.income > 0;
       card.querySelector<HTMLElement>('[data-bp-empty]')!.hidden = planned;
@@ -407,12 +465,22 @@ const TAGS = [
               : t('budget.p.overPlan', { amount: whole(-p.free, sign), month: name }) + bills,
           );
         } else {
-          const left = p.income - keep - p.spent;
+          const left = p.income + p.carried - keep - p.spent;
           setText('[data-bp-label]', left >= 0 ? t('budget.p.leftFrom', { month: name }) : t('budget.p.overIn', { month: name }));
           setText('[data-bp-big]', whole(Math.abs(left), sign));
           $('[data-bp-big]').classList.toggle('is-over', left < 0);
           setText('[data-bp-line]', t('budget.p.cameIn', { income: whole(p.income, sign), spent: whole(p.spent, sign) }));
         }
+        // What the months before left over, already in the numbers above.
+        const carried = $('[data-bp-carried]');
+        const prevName = monthName.format(fromDayKey(`${shiftMonth(month, -1)}-01`));
+        carried.hidden = Math.abs(p.carried) < 1;
+        carried.textContent =
+          p.carried >= 1
+            ? t('budget.p.carried', { amount: whole(p.carried, sign), month: prevName })
+            : p.carried <= -1
+              ? t('budget.p.carriedOver', { amount: whole(-p.carried, sign), month: prevName })
+              : '';
         setText(
           '[data-bp-saved]',
           (p.saved
@@ -451,10 +519,11 @@ const TAGS = [
           pot.total > 0 ? whole(pot.total, sign) + (pot.cash > 0 ? ` · ${t('budget.s.cashShort', { amount: whole(pot.cash, sign) })}` : '') : s.goals.length ? whole(0, sign) : t('budget.p.addOne'),
         );
         setText('[data-bp-split]', s.plan.split.join('/'));
-        const upto = current ? Number(today().slice(8)) : daysInMonth(month);
+        const upto = current ? dayIndex(period(month, startDay()), today()) + 1 : p.byDay.length;
         const ns = noSpend(p.byDay, upto);
         setText('[data-bp-nospend]', `${ns.days}${ns.best > 1 ? ` · ${t('budget.p.bestRun', { n: ns.best })}` : ''}`);
       }
+      renderBalance();
       renderIncome();
       renderGoals();
       renderPot();
@@ -462,6 +531,33 @@ const TAGS = [
       renderPlan();
       renderCalendar();
     }
+
+    // ---- What you have ----
+    function renderBalance(): void {
+      const s = store();
+      const have = balance(s);
+      const pot = savingsWhere(s.saves);
+      setText('[data-bp-bal]', have === null ? t('budget.bal.set') : whole(have, s.currency));
+      setText('[data-bp-bal-sub]', have !== null && pot.total > 0 ? t('budget.bal.inSavings', { amount: whole(pot.total, s.currency) }) : '');
+      setText('[data-bp-bal-sign]', currencySign(s.currency));
+    }
+
+    c.add(
+      listen($('[data-sheet="balance"]'), 'sheet:open', () => {
+        const have = balance(store());
+        $<HTMLInputElement>('[data-bp-bal-amount]').value = have === null ? '' : String(have);
+      }),
+    );
+    c.add(
+      listen($('[data-bp-bal-form]'), 'submit', (e) => {
+        e.preventDefault();
+        const amount = Number($<HTMLInputElement>('[data-bp-bal-amount]').value);
+        if (!Number.isFinite(amount)) return;
+        setStartBalance(amount);
+        announce(t('budget.bal.saved', { amount: formatMoney(amount, getBudget().currency) }));
+        $<HTMLDialogElement>('[data-sheet="balance"]').close();
+      }),
+    );
 
     // ---- Income ----
     const iForm = $<HTMLFormElement>('[data-bp-i-form]');
@@ -474,7 +570,8 @@ const TAGS = [
       setText('[data-bp-sign]', currencySign(sign));
       setText('[data-bp-i-save-label]', t('budget.p.saveFirst', { pct: s.plan.split[2] }) + (s.goals.length ? t('budget.p.sharedOverGoals') : ''));
       const name = monthName.format(fromDayKey(`${month}-01`));
-      const mine = s.incomes.filter((i) => monthOf(i.day) === month);
+      const shown = period(month, startDayOf(s.plan));
+      const mine = s.incomes.filter((i) => i.day >= shown.start && i.day <= shown.end);
       setText('[data-bp-i-list-title]', mine.length ? t('budget.p.inMonth', { month: name }) : t('budget.p.nothingInMonth', { month: name }));
       $('[data-bp-i-list]').replaceChildren(
         ...mine.map((i) => {
@@ -536,7 +633,7 @@ const TAGS = [
 
     function fillIncome(): void {
       iForm.reset();
-      iDay.value = month === monthOf(today()) ? today() : `${month}-01`;
+      iDay.value = month === thisMonth() ? today() : period(month, startDay()).start;
       renderIncome();
     }
 
@@ -550,7 +647,7 @@ const TAGS = [
           { repeat: $<HTMLInputElement>('[data-bp-i-repeat]').checked, saveFirst: $<HTMLInputElement>('[data-bp-i-save]').checked },
         );
         if (!income) return;
-        month = monthOf(income.day);
+        month = periodOf(income.day, startDay());
         announce(t('budget.v.added', { what: income.what, amount: formatMoney(income.amount, getBudget().currency) }));
         $<HTMLDialogElement>('[data-sheet="income"]').close();
       }),
@@ -787,11 +884,12 @@ const TAGS = [
 
     // ---- Autopilot: the month-end sweep, round-ups, a goal reached ----
     let offer: SweepOffer | null = null;
+    let cover: CoverOffer | null = null;
 
     function renderAutopilot(): void {
       const s = store();
       const sign = s.currency;
-      const current = month === monthOf(today());
+      const current = month === thisMonth();
 
       // Last month's rest, offered once at the start of the month.
       offer = current ? sweepOffer(today()) : null;
@@ -801,6 +899,23 @@ const TAGS = [
         setText('[data-bp-sweep-title]', t('budget.ap.ended', { month: monthName.format(fromDayKey(`${offer.month}-01`)), amount: whole(offer.amount, sign) }));
         setText('[data-bp-sweep-line]', goal ? t('budget.ap.toGoal', { name: goal.name }) : t('budget.ap.toSavings'));
         setText('[data-bp-sweep-save]', t('budget.ap.save', { amount: whole(offer.amount, sign) }));
+      }
+
+      // Last month went over: offered once, take it from savings or let it come off this month.
+      cover = current ? coverOffer(today()) : null;
+      $('[data-bp-cover]').hidden = !cover;
+      if (cover) {
+        const coverMonth = monthName.format(fromDayKey(`${cover.month}-01`));
+        const thisName = monthName.format(fromDayKey(`${month}-01`));
+        setText('[data-bp-cover-title]', t('budget.cv.wentOver', { month: coverMonth, amount: whole(cover.over, sign) }));
+        setText(
+          '[data-bp-cover-line]',
+          cover.amount < cover.over
+            ? t('budget.cv.partly', { amount: whole(cover.amount, sign), rest: whole(cover.over - cover.amount, sign), month: thisName })
+            : t('budget.cv.choose', { month: thisName }),
+        );
+        setText('[data-bp-cover-take]', t('budget.cv.take', { amount: whole(cover.amount, sign) }));
+        setText('[data-bp-cover-carry]', t('budget.cv.carry', { month: thisName }));
       }
 
       // A goal that reached its target: celebrated once, then noted for a week.
@@ -820,7 +935,7 @@ const TAGS = [
       // The switches in the Savings sheet.
       $<HTMLInputElement>('[data-bp-ap-sweep]').checked = !s.plan.sweepOff;
       $<HTMLInputElement>('[data-bp-ap-round]').checked = !!s.plan.roundUpFrom;
-      const rounded = roundUpsIn(s.saves, monthOf(today()));
+      const rounded = roundUpsIn(s.saves, thisMonth(), startDayOf(s.plan));
       setText(
         '[data-bp-ap-round-why]',
         t('budget.ap.roundWhy', { from: formatMoney(24.3, sign), to: formatMoney(25, sign), cents: formatMoney(0.7, sign) }) +
@@ -842,6 +957,19 @@ const TAGS = [
         if (offer) answerSweep(offer, null);
       }),
     );
+    c.add(
+      listen($('[data-bp-cover-take]'), 'click', () => {
+        if (!cover) return;
+        const taken = answerCover(cover, true);
+        const sum = -taken.reduce((a, x) => a + x.amount, 0);
+        if (sum > 0) announce(t('budget.s.tookOut', { amount: formatMoney(sum, getBudget().currency) }));
+      }),
+    );
+    c.add(
+      listen($('[data-bp-cover-carry]'), 'click', () => {
+        if (cover) answerCover(cover, false);
+      }),
+    );
     c.add(listen($('[data-bp-ap-sweep]'), 'change', (e) => setAutopilot({ sweep: (e.target as HTMLInputElement).checked })));
     c.add(listen($('[data-bp-ap-round]'), 'change', (e) => setAutopilot({ roundUps: (e.target as HTMLInputElement).checked })));
 
@@ -856,7 +984,31 @@ const TAGS = [
         span.textContent = p.income ? parts.map((n) => whole((p.income * n) / 100, s.currency)).join(' · ') : '';
       }
       for (const r of $$<HTMLInputElement>('[data-bp-tag]')) r.checked = r.value === categoryTag(s.plan, r.dataset.bpTag as Category);
+
+      // When the month starts, and what that makes of this month.
+      const s0 = startDayOf(s.plan);
+      $<HTMLSelectElement>('[data-bp-ms]').value = String(s0);
+      const now = period(periodOf(today(), s0), s0);
+      const range = `${formatShort(fromDayKey(now.start))} – ${formatShort(fromDayKey(now.end))}`;
+      const nowName = monthName.format(fromDayKey(`${now.month}-01`));
+      setText('[data-bp-ms-hint]', s0 === 1 ? t('budget.ms.calendar', { month: nowName, range }) : t('budget.ms.runs', { month: nowName, range }));
+      // A repeating salary on a day a month can start on: offer that day.
+      const payday = s.incomeRepeats.find((r) => r.source === 'salary' && r.dayOfMonth >= 2 && r.dayOfMonth <= 28)?.dayOfMonth;
+      const offerDay = $<HTMLButtonElement>('[data-bp-ms-payday]');
+      offerDay.hidden = !payday || payday === s0;
+      if (payday) {
+        offerDay.textContent = t('budget.ms.usePayday', { n: payday });
+        offerDay.dataset.day = String(payday);
+      }
     }
+
+    const pickStart = (day: number) => {
+      setMonthStart(day);
+      month = thisMonth();
+      announce(t('budget.ms.saved'));
+    };
+    c.add(listen($('[data-bp-ms]'), 'change', (e) => pickStart(Number((e.target as HTMLSelectElement).value))));
+    c.add(listen($('[data-bp-ms-payday]'), 'click', (e) => pickStart(Number((e.currentTarget as HTMLElement).dataset.day))));
 
     c.add(
       listen($('[data-sheet="plan"]'), 'change', (e) => {
@@ -864,6 +1016,7 @@ const TAGS = [
         const plan = getBudget().plan;
         if (x.name === 'bp-split') setPlan({ ...plan, split: x.value.split('/').map(Number) as Split });
         else if (x.dataset.bpTag) setPlan({ ...plan, tags: { ...plan.tags, [x.dataset.bpTag]: x.value as CategoryTag } });
+        else return;
         announce(t('budget.p.planSaved'));
       }),
     );
@@ -873,25 +1026,29 @@ const TAGS = [
       const s = store();
       const sign = s.currency;
       const p = monthPlan(s, month, today());
-      const days = daysInMonth(month);
-      const current = month === monthOf(today());
-      const upto = month < monthOf(today()) ? days : current ? Number(today().slice(8)) : 0;
+      const shown = period(month, startDayOf(s.plan));
+      const days = shown.days;
+      const current = month === thisMonth();
+      const upto = month < thisMonth() ? days : current ? dayIndex(shown, today()) + 1 : 0;
       // The day's share of the month: income less savings and all the bills, over the days.
       const bills = p.billsByDay.reduce((a, b) => a + b, 0);
       const share = p.income ? (p.income - Math.max(p.saved, p.planned.savings) - bills) / days : 0;
-      setText('[data-bp-cal-title]', monthLong.format(fromDayKey(`${month}-01`)));
-      const first = fromDayKey(`${month}-01`);
+      setText(
+        '[data-bp-cal-title]',
+        monthLong.format(fromDayKey(`${month}-01`)) + (shown.start.endsWith('-01') ? '' : ` · ${formatShort(fromDayKey(shown.start))} – ${formatShort(fromDayKey(shown.end))}`),
+      );
+      const first = fromDayKey(shown.start);
       const lead = (first.getDay() + 6) % 7;
       $('[data-bp-cal-week]').replaceChildren(
         ...Array.from({ length: 7 }, (_, i) => el('span', '', weekday.format(new Date(2024, 0, 1 + i)))),
       );
-      if (!picked || monthOf(picked) !== month) picked = current ? today() : `${month}-01`;
+      if (!picked || picked < shown.start || picked > shown.end) picked = current ? today() : shown.start;
       const cells: HTMLElement[] = Array.from({ length: lead }, () => el('span'));
-      for (let d = 1; d <= days; d++) {
-        const key = `${month}-${String(d).padStart(2, '0')}`;
-        const spent = p.byDay[d - 1] ?? 0;
-        const past = d <= upto;
-        const bill = p.billsByDay[d - 1] ?? 0;
+      for (const [i, key] of periodDays(shown).entries()) {
+        const d = Number(key.slice(8));
+        const spent = p.byDay[i] ?? 0;
+        const past = i < upto;
+        const bill = p.billsByDay[i] ?? 0;
         const b = el('button', 'bp-cal__cell');
         b.type = 'button';
         if (past) b.classList.add(spent === 0 ? 'is-none' : share && spent > share ? 'is-over' : 'is-under');
@@ -925,7 +1082,7 @@ const TAGS = [
       const day = $('[data-bp-cal-day]');
       const entries = s.entries.filter((e) => e.deletedAt === undefined && e.day === picked);
       const incomes = s.incomes.filter((i) => i.day === picked);
-      const dueBills = picked! > today() ? s.repeats.filter((r) => r.deletedAt === undefined && r.from <= month && repeatDay(r, month) === picked) : [];
+      const dueBills = picked! > today() ? s.repeats.filter((r) => r.deletedAt === undefined && repeatDayIn(r, shown)?.day === picked) : [];
       const rows: [string, string][] = [
         ...entries.map((e): [string, string] => {
           const need = needOf(e, s.plan);
@@ -1651,5 +1808,65 @@ const TAGS = [
 
   .bp-cal__stats span {
     font-size: var(--text-xs);
+  }
+
+  /* What you have: one slim row under the plan, opening its sheet. */
+  .bp-balance {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    column-gap: var(--space-2);
+    inline-size: 100%;
+    min-block-size: 48px;
+    margin-block-start: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-md, 14px);
+    background: var(--well-bg);
+    box-shadow: var(--well-shadow);
+    color: inherit;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .bp-balance__value {
+    justify-self: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bp-balance svg {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    color: var(--color-text-muted);
+  }
+
+  .bp-balance__sub {
+    grid-column: 1 / span 2;
+    justify-self: end;
+    font-size: var(--text-xs);
+  }
+
+  .bp-balance__sub:empty {
+    display: none;
+  }
+
+  .bp-ms {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: var(--space-2);
+  }
+
+  .bp-ms .bp-field {
+    flex: 1 1 10rem;
+  }
+
+  .bp-bal-notes {
+    display: grid;
+    gap: var(--space-1);
+    margin: 0;
+    padding-inline-start: 1.1rem;
+    font-size: var(--text-sm);
   }
 </style>
