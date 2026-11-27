@@ -6,6 +6,18 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **28 Nov · Budget months can start on payday (option A), with a balance row.** A salary paid
+  late in the month (26 October for November) made one month look rich and the next broke.
+  Plan › "Your month starts on" picks a day 1–28 (a repeating salary offers its own day);
+  with 26, "December" runs 26 Nov – 25 Dec and everything in Budget follows it: safe to spend,
+  pace, categories, calendar, sweep, round-ups and the Health spend summary. Entries keep their
+  real days. What a month leaves over (counted like the sweep, nothing once swept to savings)
+  carries into the next, and so does a minus when it went over: the owner chose that as more
+  honest. Savings are never taken by themselves; at the start of the month a card asks once
+  "Take X from savings" or "Take it off <month>". A "You have" row counts on from a balance
+  you set once. Options B (tag income "for next month") and C (one running balance instead of months)
+  were not picked; a Flow view (in vs out per month) and starting the month on the day the
+  salary actually lands are not built yet.
 - **27 Nov · You becomes a hub of sheets (option B), one delete sheet, type DELETE.** The page
   had eight groups, a jump list, four delete or forget actions in three places, and a "Timer
   defaults" row that only opened the Timer. Now: profile, then short rows that each open a

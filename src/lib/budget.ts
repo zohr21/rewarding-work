@@ -213,6 +213,12 @@ export interface Plan {
   sweepOff?: true;
   /** Round-ups are on from this day: each payment's cents up to the next whole amount count as savings. */
   roundUpFrom?: DayKey;
+  /**
+   * The day budget months start (2026-11), 2–28; left out for the 1st. A month that starts on
+   * the 26th runs from 26 October to 25 November and is called November: the salary paid on
+   * the 26th pays for the month it starts. Entries keep their real days.
+   */
+  monthStart?: number;
 }
 
 export const DEFAULT_PLAN: Plan = { split: [50, 30, 20], tags: {} };
@@ -237,6 +243,17 @@ export interface BudgetStore {
   plan: Plan;
   /** When the plan was last set, so the newer one wins between devices. */
   planAt: number;
+  /**
+   * What you had (cards and cash together) when you set it, on `day` at `at` (epoch ms).
+   * The balance counts from there; the newer one wins between devices. Left out until set.
+   */
+  start?: StartBalance;
+}
+
+export interface StartBalance {
+  amount: number;
+  day: DayKey;
+  at: number;
 }
 
 /** What a budget nobody has set up yet counts in: the device's own currency when Grovyn lists it, else "$". */
@@ -392,7 +409,19 @@ function readPlan(v: unknown): Plan {
   const plan: Plan = { split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
   if (p.sweepOff === true) plan.sweepOff = true;
   if (isDayKey(p.roundUpFrom)) plan.roundUpFrom = p.roundUpFrom;
+  if (isMonthStart(p.monthStart)) plan.monthStart = p.monthStart;
   return plan;
+}
+
+/** The last day a month can start on, so every month has it. */
+export const MONTH_START_MAX = 28;
+const isMonthStart = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 2 && v <= MONTH_START_MAX;
+
+function readStart(v: unknown): StartBalance | undefined {
+  if (typeof v !== 'object' || v === null) return undefined;
+  const r = v as Record<string, unknown>;
+  if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || Math.abs(r.amount) > AMOUNT_MAX || !isDayKey(r.day) || typeof r.at !== 'number') return undefined;
+  return { amount: r.amount, day: r.day, at: r.at };
 }
 
 /** Newest day first, and within a day the one added last. */
@@ -416,6 +445,7 @@ export function normaliseBudget(raw: unknown): BudgetStore {
   } else if (typeof s.budgets === 'object' && s.budgets !== null) {
     for (const [key, value] of Object.entries(s.budgets)) if (isCategory(key) && isAmount(value)) budgets[key] = value;
   }
+  const start = readStart(s.start);
   return {
     v: 2,
     budget: !legacy && isAmount(s.budget) ? s.budget : null,
@@ -430,6 +460,7 @@ export function normaliseBudget(raw: unknown): BudgetStore {
     saves: pick(s.saves, readSave).sort(byNewest),
     plan: readPlan(s.plan),
     planAt: typeof s.planAt === 'number' ? s.planAt : 0,
+    ...(start ? { start } : {}),
   };
 }
 
@@ -921,7 +952,36 @@ export function setPlan(plan: Plan): void {
   const next: Plan = { split: [...plan.split] as Split, tags };
   if (plan.sweepOff) next.sweepOff = true;
   if (plan.roundUpFrom && isDayKey(plan.roundUpFrom)) next.roundUpFrom = plan.roundUpFrom;
+  if (isMonthStart(plan.monthStart)) next.monthStart = plan.monthStart;
   writeStore({ ...getStore(), plan: next, planAt: Date.now() });
+}
+
+/** Budget months start on `day` (1 for the calendar month). */
+export function setMonthStart(day: number): void {
+  const plan = { ...getStore().plan };
+  if (isMonthStart(day)) plan.monthStart = day;
+  else delete plan.monthStart;
+  setPlan(plan);
+}
+
+/** What you have now, cards and cash together; the balance counts on from it. */
+export function setStartBalance(amount: number, day: DayKey = dayKey(new Date())): void {
+  if (!Number.isFinite(amount) || Math.abs(amount) > AMOUNT_MAX) return;
+  writeStore({ ...getStore(), start: { amount: round(amount), day, at: Date.now() } });
+}
+
+/**
+ * What you have: the starting balance, plus income and less spending added after it was set
+ * (on its own day, only what was added after it). Savings are still yours, so they stay in;
+ * null until a starting balance is set.
+ */
+export function balance(store: BudgetStore): number | null {
+  const s = store.start;
+  if (!s) return null;
+  const after = (x: { day: DayKey; createdAt: number; deletedAt?: number }) => x.deletedAt === undefined && (x.day > s.day || (x.day === s.day && x.createdAt > s.at));
+  const income = store.incomes.filter(after).reduce((a, i) => a + i.amount, 0);
+  const spent = store.entries.filter(after).reduce((a, e) => a + e.amount, 0);
+  return round(s.amount + income - spent);
 }
 
 /** Turns the autopilot parts on or off. Round-ups count from the day they are turned on. */
@@ -943,8 +1003,6 @@ function firstOpenGoal(store: BudgetStore): string {
   return store.goals.find((g) => g.deletedAt === undefined && savedFor(store.saves, g.id) < g.target)?.id ?? '';
 }
 
-const lastDay = (month: MonthKey): DayKey => `${month}-${String(daysInMonth(month)).padStart(2, '0')}`;
-
 export interface SweepOffer {
   month: MonthKey;
   /** What was left of last month, in whole units. */
@@ -959,7 +1017,7 @@ export interface SweepOffer {
 export function sweepOffer(today: DayKey = dayKey(new Date())): SweepOffer | null {
   const store = getStore();
   if (store.plan.sweepOff) return null;
-  const month = shiftMonth(monthOf(today), -1);
+  const month = shiftMonth(periodOf(today, startDayOf(store.plan)), -1);
   if (store.saves.some((x) => x.id === `sweep-${month}`)) return null;
   const p = monthPlan(store, month, today);
   const amount = Math.floor(p.free);
@@ -972,7 +1030,7 @@ export function answerSweep(offer: SweepOffer, amount: number | null): SaveEntry
   const store = getStore();
   const id = `sweep-${offer.month}`;
   if (store.saves.some((x) => x.id === id)) return null;
-  const day = lastDay(offer.month);
+  const day = period(offer.month, startDayOf(store.plan)).end;
   const value = amount === null ? 0 : round(amount);
   const x: SaveEntry = { id, goalId: offer.goalId, day, amount: value, createdAt: Date.now() };
   if (amount === null || !isAmount(value)) x.deletedAt = Date.now();
@@ -980,9 +1038,68 @@ export function answerSweep(offer: SweepOffer, amount: number | null): SaveEntry
   return x.deletedAt === undefined ? x : null;
 }
 
+export interface CoverOffer {
+  month: MonthKey;
+  /** How much last month went over. */
+  over: number;
+  /** How much of it savings can cover (all of it, or what is saved). */
+  amount: number;
+}
+
+const coverId = (month: MonthKey) => `cover-${month}`;
+
+/**
+ * At the start of a month: last month went over, and there are savings. Offered once: take it
+ * from savings (so it does not come off this month), or let it come off this month. Answered
+ * when an entry `cover-<month>…` exists, live or as a removal marker.
+ */
+export function coverOffer(today: DayKey = dayKey(new Date())): CoverOffer | null {
+  const store = getStore();
+  const month = shiftMonth(periodOf(today, startDayOf(store.plan)), -1);
+  if (store.saves.some((x) => x.id === coverId(month) || x.id.startsWith(`${coverId(month)}-`))) return null;
+  const over = round(-monthPlan(store, month, today).free);
+  const saved = savingsWhere(store.saves).total;
+  if (over < 1 || saved <= 0) return null;
+  return { month, over, amount: round(Math.min(over, saved)) };
+}
+
+/**
+ * Answers the offer. `take` true: takes it out of savings on the month's last day (savings with
+ * no goal first, then the goals with the most in them; card before cash), so the month ends
+ * even. False: nothing is taken, and the minus comes off this month.
+ */
+export function answerCover(offer: CoverOffer, take: boolean): SaveEntry[] {
+  const store = getStore();
+  const id = coverId(offer.month);
+  if (store.saves.some((x) => x.id === id || x.id.startsWith(`${id}-`))) return [];
+  const day = period(offer.month, startDayOf(store.plan)).end;
+  const now = Date.now();
+  if (!take) {
+    writeStore({ ...store, saves: [{ id, goalId: '', day, amount: 0, createdAt: now, deletedAt: now }, ...store.saves] });
+    return [];
+  }
+  const goals = ['', ...store.goals.filter(live).map((g) => g.id).sort((a, b) => savedFor(store.saves, b) - savedFor(store.saves, a))];
+  const taken: SaveEntry[] = [];
+  let left = round(offer.amount);
+  for (const goalId of goals) {
+    for (const from of ['card', 'cash'] as SaveWhere[]) {
+      if (left <= 0) break;
+      const saves = [...taken, ...store.saves];
+      const part = round(Math.min(left, canTakeOut(saves, goalId, from)));
+      if (!isAmount(part)) continue;
+      taken.push(saveEntry(`${id}-${taken.length + 1}`, goalId, day, -part, from, 'out'));
+      left = round(left - part);
+    }
+  }
+  if (!taken.length) return [];
+  writeStore({ ...store, saves: [...taken, ...store.saves] });
+  return taken;
+}
+
 /** Round-ups put in savings in `month`. */
-export function roundUpsIn(saves: SaveEntry[], month: MonthKey): number {
-  return round(saves.filter((x) => live(x) && x.id.startsWith('ru-') && monthOf(x.day) === month).reduce((a, x) => a + x.amount, 0));
+export function roundUpsIn(saves: SaveEntry[], month: MonthKey, startDay = 1): number {
+  const p = period(month, startDay);
+  return round(saves.filter((x) => live(x) && x.id.startsWith('ru-') && inPeriod(p, x.day)).reduce((a, x) => a + x.amount, 0));
 }
 
 /**
@@ -1038,6 +1155,8 @@ export interface MonthPlan {
   income: number;
   received: number;
   expected: number;
+  /** Passed on from the months before: left over (above 0) or gone over (below 0). */
+  carried: number;
   /** The split of `income`. */
   planned: { needs: number; wants: number; savings: number };
   /** Put aside this month. Safe to spend keeps back the larger of this and the planned savings. */
@@ -1059,36 +1178,68 @@ export interface MonthPlan {
   leftToday: number;
   /** Free after savings and the bills still to come, for the days left (today included). */
   free: number;
-  /** Spent each day of the month, repeating bills left out. */
+  /** Spent each day of the month (from its first day), repeating bills left out. */
   byDay: number[];
   /** Repeating bills on each day of the month. */
   billsByDay: number[];
 }
 
+/** One month's money: what came in, was saved, taken out of savings and spent. */
+function flow(store: BudgetStore, p: Period) {
+  const received = round(store.incomes.filter((i) => live(i) && inPeriod(p, i.day)).reduce((a, i) => a + i.amount, 0));
+  const saves = store.saves.filter((x) => live(x) && inPeriod(p, x.day));
+  // Moves between card and cash change neither; money taken out goes back to spend.
+  const saved = round(saves.filter((x) => !x.type).reduce((a, x) => a + x.amount, 0));
+  const takenOut = round(-saves.filter((x) => x.type === 'out').reduce((a, x) => a + x.amount, 0));
+  const spent = round(store.entries.filter((e) => live(e) && inPeriod(p, e.day)).reduce((a, e) => a + e.amount, 0));
+  return { received, saved, takenOut, spent };
+}
+
+/**
+ * What the months before `month` passed on, counted from the first month with income. Each
+ * month's rest is worked out like the month-end sweep: what came in (with what it was passed,
+ * and what was taken out of savings) less the savings (at least the planned share) and what
+ * was spent. A rest the sweep put in savings is passed on no further. A month that went over
+ * passes on a minus (2026-11-28, the owner's choice): it comes off the next month's money,
+ * unless it was taken from savings at the end of the month (`coverOffer`).
+ */
+export function carriedInto(store: BudgetStore, month: MonthKey): number {
+  const startDay = startDayOf(store.plan);
+  const first = store.incomes.filter(live).reduce<DayKey | null>((min, i) => (min === null || i.day < min ? i.day : min), null);
+  if (!first) return 0;
+  const [, , sv] = store.plan.split;
+  let carried = 0;
+  for (let m = periodOf(first, startDay); m < month; m = shiftMonth(m, 1)) {
+    const f = flow(store, period(m, startDay));
+    const swept = store.saves.some((x) => live(x) && x.id === `sweep-${m}`);
+    const keep = Math.max(f.saved, round((f.received * sv) / 100));
+    carried = swept ? 0 : round(carried + f.received + f.takenOut - keep - f.spent);
+  }
+  return carried;
+}
+
 /** The month against the plan. `today` decides whether it is the current month and how many days are left. */
 export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = dayKey(new Date())): MonthPlan {
-  const days = daysInMonth(month);
-  const current = monthOf(today) === month;
-  const dom = current ? Number(today.slice(8)) : days;
-  const live = <T extends { deletedAt?: number }>(x: T) => x.deletedAt === undefined;
-  const incomes = store.incomes.filter(live);
-  const received = round(incomes.filter((i) => monthOf(i.day) === month).reduce((a, i) => a + i.amount, 0));
-  const known = new Set(incomes.map((i) => i.id));
+  const p = period(month, startDayOf(store.plan));
+  const days = p.days;
+  const current = inPeriod(p, today);
+  const dom = current ? dayIndex(p, today) + 1 : days;
+  const { received, saved, takenOut } = flow(store, p);
+  const known = new Set(store.incomes.map((i) => i.id));
   const expected = current
     ? round(
         store.incomeRepeats
-          .filter((r) => live(r) && r.from <= month && repeatDay(r, month) > today && !known.has(`${r.id}-${month}`))
-          .reduce((a, r) => a + r.amount, 0),
+          .filter(live)
+          .map((r) => ({ r, at: repeatDayIn(r, p) }))
+          .filter(({ r, at }) => at && at.day > today && !known.has(`${r.id}-${at.month}`))
+          .reduce((a, { r }) => a + r.amount, 0),
       )
     : 0;
   const income = round(received + expected);
+  const carried = carriedInto(store, month);
   const [n, w, sv] = store.plan.split;
   const planned = { needs: round((income * n) / 100), wants: round((income * w) / 100), savings: round((income * sv) / 100) };
-  const monthSaves = store.saves.filter((x) => live(x) && monthOf(x.day) === month);
-  // Moves between card and cash change neither; money taken out goes back to spend.
-  const saved = round(monthSaves.filter((x) => !x.type).reduce((a, x) => a + x.amount, 0));
-  const takenOut = round(-monthSaves.filter((x) => x.type === 'out').reduce((a, x) => a + x.amount, 0));
-  const mine = store.entries.filter((e) => live(e) && monthOf(e.day) === month);
+  const mine = store.entries.filter((e) => live(e) && inPeriod(p, e.day));
   let needs = 0;
   let wants = 0;
   let unsorted = 0;
@@ -1098,24 +1249,21 @@ export function monthPlan(store: BudgetStore, month: MonthKey, today: DayKey = d
     if (tag === 'need') needs += e.amount;
     else if (tag === 'want') wants += e.amount;
     else unsorted += e.amount;
-    if (!e.repeatId) byDay[Number(e.day.slice(8)) - 1]! += e.amount;
+    if (!e.repeatId) byDay[dayIndex(p, e.day)]! += e.amount;
   }
   const spent = round(needs + wants + unsorted);
-  const billsByDay = new Array<number>(days).fill(0);
-  for (const r of store.repeats) {
-    if (!live(r) || r.from > month) continue;
-    billsByDay[Number(repeatDay(r, month).slice(8)) - 1]! += r.amount;
-  }
+  const billsByDay = billsIn(store.repeats, p);
   const billsLater = current ? billsAfter(billsByDay, dom) : 0;
   // Bills are planned for apart from the day's money, so one paid today does not eat today's share.
   const spentToday = current ? round(mine.filter((e) => e.day === today && !e.repeatId).reduce((a, e) => a + e.amount, 0)) : 0;
   const daysLeft = current ? days - dom + 1 : 0;
-  const free = round(income + takenOut - Math.max(saved, planned.savings) - (spent - spentToday) - billsLater);
+  const free = round(income + carried + takenOut - Math.max(saved, planned.savings) - (spent - spentToday) - billsLater);
   const perDay = daysLeft ? free / daysLeft : 0;
   return {
     income,
     received,
     expected,
+    carried,
     planned,
     saved,
     takenOut,
@@ -1195,7 +1343,14 @@ export function mergeBudgetStores(a: BudgetStore, b: BudgetStore): BudgetStore {
     saves: mergeById(a.saves, b.saves).sort(byNewest),
     plan: newerPlan.plan,
     planAt: newerPlan.planAt,
+    ...newerStart(a.start, b.start),
   };
+}
+
+/** The starting balance set last, from either copy. */
+function newerStart(a?: StartBalance, b?: StartBalance): { start?: StartBalance } {
+  const x = !a ? b : !b ? a : b.at > a.at ? b : a;
+  return x ? { start: x } : {};
 }
 
 /** "2026-10" for a day in October 2026. */
@@ -1212,6 +1367,69 @@ export function daysInMonth(month: MonthKey): number {
   return new Date(y!, m!, 0).getDate();
 }
 
+/**
+ * A budget month: from its first day to its last. With months starting on the 1st it is the
+ * calendar month; starting on the 26th, November runs from 26 October to 25 November.
+ */
+export interface Period {
+  month: MonthKey;
+  start: DayKey;
+  end: DayKey;
+  days: number;
+}
+
+export const startDayOf = (plan: Pick<Plan, 'monthStart'>): number => plan.monthStart ?? 1;
+
+const onDay = (month: MonthKey, day: number): DayKey => `${month}-${String(Math.min(day, daysInMonth(month))).padStart(2, '0')}`;
+
+export function period(month: MonthKey, startDay = 1): Period {
+  if (startDay <= 1) return { month, start: `${month}-01`, end: onDay(month, 31), days: daysInMonth(month) };
+  const start = onDay(shiftMonth(month, -1), startDay);
+  const end = dayKey(addDays(fromDayKey(onDay(month, startDay)), -1));
+  return { month, start, end, days: dayIndex({ start }, end) + 1 };
+}
+
+/** The budget month `day` falls in. */
+export function periodOf(day: DayKey, startDay = 1): MonthKey {
+  const month = monthOf(day);
+  return startDay > 1 && day >= onDay(month, startDay) ? shiftMonth(month, 1) : month;
+}
+
+export const inPeriod = (p: Pick<Period, 'start' | 'end'>, day: DayKey): boolean => day >= p.start && day <= p.end;
+
+/** Days from the period's first day (0 for the first day itself). */
+export function dayIndex(p: Pick<Period, 'start'>, day: DayKey): number {
+  const utc = (k: DayKey) => Date.UTC(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, Number(k.slice(8, 10)));
+  return Math.round((utc(day) - utc(p.start)) / 86_400_000);
+}
+
+/** Every day of the period, in order. */
+export function periodDays(p: Period): DayKey[] {
+  const first = fromDayKey(p.start);
+  return Array.from({ length: p.days }, (_, i) => dayKey(addDays(first, i)));
+}
+
+/** The day a repeat falls on in the period, with the calendar month it is counted for (its entry id); null when it does not. */
+export function repeatDayIn(r: Pick<Repeat, 'dayOfMonth' | 'from'>, p: Period): { day: DayKey; month: MonthKey } | null {
+  for (const month of [shiftMonth(p.month, -1), p.month]) {
+    if (month < r.from) continue;
+    const day = repeatDay(r, month);
+    if (inPeriod(p, day)) return { day, month };
+  }
+  return null;
+}
+
+/** Repeating bills on each day of the period. */
+function billsIn(repeats: Repeat[], p: Period, category?: Category): number[] {
+  const byDay = new Array<number>(p.days).fill(0);
+  for (const r of repeats) {
+    if (r.deletedAt !== undefined || (category && r.category !== category)) continue;
+    const at = repeatDayIn(r, p);
+    if (at) byDay[dayIndex(p, at.day)]! += r.amount;
+  }
+  return byDay;
+}
+
 export interface MonthSpend {
   entries: SpendEntry[];
   total: number;
@@ -1219,17 +1437,20 @@ export interface MonthSpend {
   byCategory: Map<Category, number>;
 }
 
-export function monthSpend(entries: SpendEntry[], month: MonthKey, uptoDayOfMonth = 31): MonthSpend {
-  const mine = entries.filter((e) => monthOf(e.day) === month && Number(e.day.slice(8)) <= uptoDayOfMonth);
+/** Spent in the month, up to its `upto`-th day. */
+export function monthSpend(entries: SpendEntry[], month: MonthKey, upto = 31, startDay = 1): MonthSpend {
+  const p = period(month, startDay);
+  const mine = entries.filter((e) => inPeriod(p, e.day) && dayIndex(p, e.day) < upto);
   const byCategory = new Map<Category, number>();
   for (const e of mine) byCategory.set(e.category, round((byCategory.get(e.category) ?? 0) + e.amount));
   return { entries: mine, total: round(mine.reduce((sum, e) => sum + e.amount, 0)), byCategory };
 }
 
 /** Spent so far by the end of each day of the month, one number per day. */
-export function runningTotals(entries: SpendEntry[], month: MonthKey): number[] {
-  const perDay = new Array<number>(daysInMonth(month)).fill(0);
-  for (const e of entries) if (monthOf(e.day) === month) perDay[Number(e.day.slice(8)) - 1]! += e.amount;
+export function runningTotals(entries: SpendEntry[], month: MonthKey, startDay = 1): number[] {
+  const p = period(month, startDay);
+  const perDay = new Array<number>(p.days).fill(0);
+  for (const e of entries) if (inPeriod(p, e.day)) perDay[dayIndex(p, e.day)]! += e.amount;
   let sum = 0;
   return perDay.map((v) => (sum = round(sum + v)));
 }
@@ -1239,31 +1460,28 @@ export function runningTotals(entries: SpendEntry[], month: MonthKey): number[] 
  * full on their day, and the rest of the budget is spread evenly. So rent on the 1st does
  * not make the month look ahead of pace.
  */
-export function paceLine(repeats: Repeat[], month: MonthKey, budget: number, category?: Category): { line: number[]; billsByDay: number[] } {
-  const days = daysInMonth(month);
-  const billsByDay = new Array<number>(days).fill(0);
-  for (const r of repeats) {
-    if (r.deletedAt !== undefined || r.from > month || (category && r.category !== category)) continue;
-    billsByDay[Number(repeatDay(r, month).slice(8)) - 1]! += r.amount;
-  }
+export function paceLine(repeats: Repeat[], month: MonthKey, budget: number, category?: Category, startDay = 1): { line: number[]; billsByDay: number[] } {
+  const p = period(month, startDay);
+  const billsByDay = billsIn(repeats, p, category);
   const bills = billsByDay.reduce((a, b) => a + b, 0);
-  const spread = Math.max(0, budget - bills) / days;
+  const spread = Math.max(0, budget - bills) / p.days;
   let sum = 0;
   const line = billsByDay.map((b, i) => (sum += b) + spread * (i + 1));
   return { line, billsByDay };
 }
 
-/** Repeating bills in the month that fall after `dayOfMonth`. */
+/** Repeating bills in the month that fall after its `dayOfMonth`-th day. */
 export function billsAfter(billsByDay: number[], dayOfMonth: number): number {
   return round(billsByDay.slice(dayOfMonth).reduce((a, b) => a + b, 0));
 }
 
 /** The totals of `count` months ending with `last`, oldest first. */
-export function monthTotals(entries: SpendEntry[], last: MonthKey, count: number, category?: Category): { month: MonthKey; total: number }[] {
+export function monthTotals(entries: SpendEntry[], last: MonthKey, count: number, category?: Category, startDay = 1): { month: MonthKey; total: number }[] {
   const out: { month: MonthKey; total: number }[] = [];
   for (let i = count - 1; i >= 0; i--) {
     const month = shiftMonth(last, -i);
-    const mine = entries.filter((e) => monthOf(e.day) === month && (!category || e.category === category));
+    const p = period(month, startDay);
+    const mine = entries.filter((e) => inPeriod(p, e.day) && (!category || e.category === category));
     out.push({ month, total: round(mine.reduce((sum, e) => sum + e.amount, 0)) });
   }
   return out;

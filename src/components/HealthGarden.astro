@@ -23,7 +23,7 @@
 </section>
 
 <script>
-  import { getBudget, monthBudget, monthOf, monthSpend, paceLine, formatMoney } from '../lib/budget';
+  import { dayIndex, getBudget, monthBudget, monthSpend, paceLine, period, periodOf, startDayOf, formatMoney } from '../lib/budget';
   import { getScreen } from '../lib/screen';
   import { getSessions, subscribe } from '../lib/storage';
   import { minutesByDay } from '../lib/stats';
@@ -113,10 +113,12 @@
     const store = getBudget();
     const budget = monthBudget(store);
     if (!budget) return null;
-    const month = monthOf(today);
-    const dayOfMonth = fromDayKey(today).getDate();
-    const spent = monthSpend(store.entries, month, dayOfMonth).total;
-    const pace = paceLine(store.repeats, month, budget).line[dayOfMonth - 1] ?? budget;
+    // The budget month, which may start on payday (Plan.monthStart).
+    const s0 = startDayOf(store.plan);
+    const month = periodOf(today, s0);
+    const dayOfMonth = dayIndex(period(month, s0), today) + 1;
+    const spent = monthSpend(store.entries, month, dayOfMonth, s0).total;
+    const pace = paceLine(store.repeats, month, budget, undefined, s0).line[dayOfMonth - 1] ?? budget;
     const lastAdded = store.entries.reduce((m, e) => Math.max(m, e.createdAt), 0);
     const left = budget - spent;
     return {

@@ -34,7 +34,7 @@ const budget = url('/budget');
 
 <script>
   import { subscribe } from '../lib/storage';
-  import { catchUpRepeats, dueSoon, formatMoney, getBudget, kindLabel, monthOf, paceLine, WELLBEING_KINDS } from '../lib/budget';
+  import { catchUpRepeats, dayIndex, dueSoon, formatMoney, getBudget, inPeriod, kindLabel, paceLine, period, periodOf, startDayOf, WELLBEING_KINDS } from '../lib/budget';
   import { dateFormat, t } from '../lib/i18n';
   import { dayKey, formatShort, fromDayKey } from '../lib/dates';
   import { cleanups, onPage } from '../lib/page';
@@ -51,13 +51,16 @@ const budget = url('/budget');
     function render(): void {
       const store = getBudget();
       const today = dayKey(new Date());
-      const month = monthOf(today);
-      const mine = store.entries.filter((e) => e.category === 'wellbeing' && monthOf(e.day) === month);
+      // The budget month, which may start on payday (Plan.monthStart).
+      const s0 = startDayOf(store.plan);
+      const month = periodOf(today, s0);
+      const shown = period(month, s0);
+      const mine = store.entries.filter((e) => e.category === 'wellbeing' && inPeriod(shown, e.day));
       const total = mine.reduce((sum, e) => sum + e.amount, 0);
       const own = store.budgets.wellbeing;
       const money = (n: number) => formatMoney(Math.round(n * 100) / 100, store.currency);
 
-      $('[data-ws-month]').textContent = monthName.format(fromDayKey(today));
+      $('[data-ws-month]').textContent = monthName.format(fromDayKey(`${month}-01`));
       $('[data-ws-total]').textContent = money(total);
       $('[data-ws-of]').textContent = own
         ? t(total <= own ? 'health.ofLeft' : 'health.ofOver', { own: money(own), diff: money(Math.abs(own - total)) })
@@ -67,7 +70,7 @@ const budget = url('/budget');
         const fill = $('[data-ws-fill]');
         fill.style.width = `${Math.min(100, (total / own) * 100)}%`;
         fill.classList.toggle('is-over', total > own);
-        const pace = paceLine(store.repeats, month, own, 'wellbeing').line[fromDayKey(today).getDate() - 1]!;
+        const pace = paceLine(store.repeats, month, own, 'wellbeing', s0).line[dayIndex(shown, today)]!;
         $('[data-ws-tick]').style.left = `${Math.min(100, (pace / own) * 100)}%`;
       }
 
