@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.10 (Budget safety):
+
+```
+<en-US>
+Budget is safer: removed bills stay removed, and syncing two phones never drops your entries. Two payments of the same amount a few minutes apart are both counted, and amounts like 1,234.56 read right. A changed bill stays a bill, Undo after a bank import takes back all of it, and "You have" no longer counts a payment twice. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Бюджет стал надёжнее: удалённые счета не возвращаются, а синхронизация двух телефонов больше не теряет записи. Два платежа на одну сумму с разницей в несколько минут учитываются оба, а суммы вроде 1,234.56 читаются верно. Изменённый счёт остаётся счётом, «Отменить» после импорта из банка отменяет всё, а «У вас есть» больше не считает платёж дважды. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Büdcə daha etibarlıdır: silinən hesablar geri qayıtmır, iki telefonun sinxronlaşması qeydləri itirmir. Bir neçə dəqiqə arayla eyni məbləğli iki ödəniş ikisi də sayılır, 1,234.56 kimi məbləğlər düz oxunur. Dəyişdirilən hesab hesab olaraq qalır, bank idxalından sonra «Geri al» hamısını geri alır, «Səndə var» isə ödənişi iki dəfə saymır. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 Version 0.1.9 (Budget fixes):
 
 ```
@@ -243,3 +257,4 @@ Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə 
 | 27 Nov 2026 | Release 107 (0.1.7) uploaded to Alpha: Study (was Exam prep), several study plans at once, and the You page as rows that open sheets with one delete sheet (type DELETE). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.6 was available to testers. |
 | 28 Nov 2026 | Release 108 (0.1.8) uploaded to Alpha: Budget months can start on payday, a month's rest or overspend carries into the next (savings only with a yes), and a "You have" balance row. Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
 | 28 Nov 2026 | 0.1.8 approved and available to testers. Release 109 (0.1.9) uploaded to Alpha: Budget fixes (no overspend card before the first income, savings and "You have" count up to today, save first only for salary and freelance, Wants bar shrinks when needs go over). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
+| 28 Nov 2026 | 0.1.9 approved and available to testers. Release 110 (0.1.10) uploaded to Alpha: Budget safety (review items 1–14, PRs 117–119): removal markers kept, sync always merges Budget, big stores packed, same-price payments and comma thousands read right, bills keep their link, bank Undo/redo, truer balance. Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
