@@ -471,6 +471,12 @@ export function normaliseBudget(raw: unknown): BudgetStore {
     for (const [key, value] of Object.entries(s.budgets)) if (isCategory(key) && isAmount(value)) budgets[key] = value;
   }
   const start = readStart(s.start);
+  const goals = pick(s.goals, readGoal).sort(byCreated);
+  // Money put towards a goal that was removed (or never reached this device) is savings with no goal.
+  const liveGoals = new Set(goals.filter((g) => g.deletedAt === undefined).map((g) => g.id));
+  const saves = pick(s.saves, readSave)
+    .map((x) => (x.goalId && !liveGoals.has(x.goalId) ? { ...x, goalId: '' } : x))
+    .sort(byNewest);
   return {
     ...(legacy ? {} : extras(s, STORE_KEYS)),
     v: 2,
@@ -482,8 +488,8 @@ export function normaliseBudget(raw: unknown): BudgetStore {
     repeats: pick(s.repeats, readRepeat).sort(byDayOfMonth),
     incomes: pick(s.incomes, readIncome).sort(byNewest),
     incomeRepeats: pick(s.incomeRepeats, readIncomeRepeat).sort(byDayOfMonth),
-    goals: pick(s.goals, readGoal).sort(byCreated),
-    saves: pick(s.saves, readSave).sort(byNewest),
+    goals,
+    saves,
     plan: readPlan(s.plan),
     planAt: typeof s.planAt === 'number' ? s.planAt : 0,
     ...(start ? { start } : {}),
@@ -634,8 +640,12 @@ export function removeSpends(ids: string[]): void {
 export function changeSpend(id: string, input: SpendInput): SpendEntry | null {
   const store = getStore();
   const old = store.entries.find((e) => e.id === id && e.deletedAt === undefined);
-  const entry = makeEntry(input);
-  if (!old || !entry) return null;
+  const made = makeEntry(input);
+  if (!old || !made) return null;
+  // Still the same bill, or the same bank payment: it stays a bill (not daily spending) and keeps its bank.
+  const entry: SpendEntry = { ...extras(old as unknown as Record<string, unknown>, ENTRY_KEYS), ...made };
+  if (old.repeatId) entry.repeatId = old.repeatId;
+  if (old.from) entry.from = old.from;
   const now = Date.now();
   writeStore({ ...store, entries: [entry, ...store.entries.map((e) => (e.id === id ? marker(e, now) : e))] });
   return entry;
@@ -867,14 +877,17 @@ export function saveGoal(input: GoalInput, id?: string): Goal | null {
   return goal;
 }
 
-/** Removes a goal. The money put towards it stays in your savings, with no goal. */
+/**
+ * Removes a goal. The money put towards it stays in your savings, with no goal. The saves are
+ * not changed in place: another device would keep its own copy of them, still on the goal.
+ */
 export function removeGoal(id: string): void {
   const store = getStore();
   const now = Date.now();
   writeStore({
     ...store,
+    // Its savings are left as they are: reading them, a save whose goal is gone counts as no goal (`normaliseBudget`).
     goals: store.goals.map((g) => (g.id === id && g.deletedAt === undefined ? { ...g, name: '', target: 0, updatedAt: now, deletedAt: now } : g)),
-    saves: store.saves.map((x) => (x.goalId === id ? { ...x, goalId: '' } : x)),
   });
 }
 

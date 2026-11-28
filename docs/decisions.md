@@ -14,7 +14,9 @@ canvases are private pages and this repository is public, so their links are not
   account gzipped (`gz1:` + base64, src/lib/account/pack.ts). Bank alerts read "$1,234.56" and
   "1.234,56 €". The same amount twice within 5 minutes is one payment only when it comes from
   two sources, and one typed expense now covers one alert, not every alert at that price.
-  Editing an expense still drops its repeat and bank link (review item 6, not fixed yet).
+  Items 6–8 too: a changed expense keeps its bill and bank link; a past month counts money
+  taken out of savings (a month covered from savings ends even); a removed goal's savings read
+  as savings with no goal on every device instead of being rewritten in place.
 - **28 Nov · Budget fixes after the first real month: one pot for needs and wants.** The
   budget starts with the first income, so a month before it (October's imported spending) is
   never offered as gone over. Savings and "You have" count entries up to today, so a salary
