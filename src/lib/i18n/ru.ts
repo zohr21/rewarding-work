@@ -2333,6 +2333,7 @@ export const ru: Messages = {
   'budget.v.changed': 'Изменено: {what}, {amount}',
   'budget.v.repeats': '{what}: повторяется каждый месяц, {day}-го числа',
   'budget.v.added': 'Добавлено: {what}, {amount}',
+  'budget.bs.andMore': { one: ' и ещё {n}', few: ' и ещё {n}', many: ' и ещё {n}', other: ' и ещё {n}' },
   'budget.v.deleted': 'Удалено: «{what}»',
   'budget.v.saved': 'Бюджеты сохранены.',
   'budget.p.nothingCameIn': 'Поступлений не было · {month}',

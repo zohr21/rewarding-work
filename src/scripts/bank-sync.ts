@@ -7,23 +7,26 @@
 import { subscribe } from '../lib/storage';
 import { bankAck, bankPending, onBankNotice, setBankSources, type BankNotice } from '../lib/device';
 import { dropPending, getBank, repairImportedNames, sourcesOf, takeAlerts } from '../lib/bank';
-import { formatMoney, getBudget, removeSpend } from '../lib/budget';
+import { formatMoney, getBudget, removeSpends } from '../lib/budget';
+import { t, tn } from '../lib/i18n';
 import { offerUndo } from '../lib/undo';
 import { cleanups, listen } from '../lib/page';
 
 function take(notices: BankNotice[]): void {
   const taken = takeAlerts(notices);
   if (taken.ids.length) void bankAck(taken.ids);
-  // One at a time: the newest is the one you just paid.
-  const entry = taken.added.at(-1);
+  // Named by the newest, the one you just paid; Undo takes back all of them.
+  const added = taken.added;
+  const entry = added.at(-1);
   if (!entry) return;
   const sign = getBudget().currency;
+  const more = added.length - 1;
   offerUndo({
-    message: `Added ${entry.what}, ${formatMoney(entry.amount, sign)}${taken.added.length > 1 ? ` and ${taken.added.length - 1} more` : ''}`,
+    message: t('budget.v.added', { what: entry.what, amount: formatMoney(entry.amount, sign) }) + (more ? tn('budget.bs.andMore', more) : ''),
     commit: () => {},
     undo: () => {
-      removeSpend(entry.id);
-      dropPending(entry.id.replace(/^b-/, ''));
+      removeSpends(added.map((e) => e.id));
+      for (const e of added) dropPending(e.id.replace(/^b-/, ''));
     },
   });
 }

@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { read, write } from '../src/lib/storage';
-import { catchUpRepeats, changeSpend, getBudget, mergeBudgetStores, normaliseBudget, removeGoal, savedFor } from '../src/lib/budget';
+import { addSpend, balance, catchUpRepeats, changeSpend, coverOffer, getBudget, importSpends, mergeBudgetStores, normaliseBudget, removeGoal, removeSpends, savedFor, savingsWhere } from '../src/lib/budget';
 import { planAlerts, readAlert, setBankSettings } from '../src/lib/bank';
 import { pack, unpack, PLAIN_MAX } from '../src/lib/account/pack';
 import type { BankNotice } from '../src/lib/device';
@@ -191,5 +191,96 @@ describe('a removed goal', () => {
     const merged = normaliseBudget(JSON.parse(JSON.stringify(mergeBudgetStores(there, here))));
     expect(savedFor(merged.saves, '')).toBe(100);
     expect(savedFor(merged.saves, 'g1')).toBe(0);
+  });
+});
+
+describe('a salary shared out on two devices at once', () => {
+  it('counts one share, the one made first, whichever copy merges', () => {
+    const base = {
+      v: 2,
+      goals: [
+        { id: 'g1', name: 'Trip', target: 900, monthly: 100, createdAt: 1, updatedAt: 1 },
+        { id: 'g2', name: 'Bike', target: 900, monthly: 100, createdAt: 2, updatedAt: 2 },
+      ],
+      incomes: [{ id: 'ir1-2026-11', day: '2026-11-01', what: 'Salary', source: 'salary', amount: 1500, createdAt: 5, repeatId: 'ir1' }],
+    };
+    const a = normaliseBudget({ ...base, saves: [
+      { id: 'ir1-2026-11-s-g1', goalId: 'g1', day: '2026-11-01', amount: 150, createdAt: 10 },
+      { id: 'ir1-2026-11-s-g2', goalId: 'g2', day: '2026-11-01', amount: 150, createdAt: 10 },
+    ] });
+    const b = normaliseBudget({ ...base, saves: [{ id: 'ir1-2026-11-s-g1', goalId: 'g1', day: '2026-11-01', amount: 300, createdAt: 20 }] });
+    for (const [x, y] of [[a, b], [b, a]] as const) {
+      const merged = normaliseBudget(JSON.parse(JSON.stringify(mergeBudgetStores(x, y))));
+      expect(savingsWhere(merged.saves).total).toBe(300);
+      expect(savedFor(merged.saves, 'g2')).toBe(150);
+    }
+  });
+});
+
+describe('the offer to cover a month from savings', () => {
+  const store = (novIncome: number) => ({
+    v: 2,
+    incomes: [
+      { id: 'i1', day: '2026-10-05', what: 'Salary', source: 'salary', amount: 100, createdAt: 1 },
+      ...(novIncome ? [{ id: 'i2', day: '2026-11-05', what: 'Salary', source: 'salary', amount: novIncome, createdAt: 2 }] : []),
+    ],
+    entries: [{ id: 'h1', day: '2026-11-10', what: 'Rent', category: 'home', amount: 500, createdAt: 3 }],
+    saves: [{ id: 's1', goalId: '', day: '2026-10-05', amount: 400, createdAt: 1, type: 'had' }],
+  });
+
+  it('is not made for a month with no income written in', () => {
+    write('health', store(0));
+    expect(coverOffer('2026-12-05')).toBeNull();
+  });
+
+  it('is made for a month with income that went over', () => {
+    write('health', store(10));
+    expect(coverOffer('2026-12-05')).toMatchObject({ month: '2026-11' });
+  });
+});
+
+describe('big amounts', () => {
+  it('takes a salary in the millions', () => {
+    write('health', { v: 2 });
+    expect(addSpend({ what: 'Rent', category: 'home', amount: 5_000_000, day: '2026-11-02' })).not.toBeNull();
+    expect(normaliseBudget(getBudget()).entries[0]!.amount).toBe(5_000_000);
+  });
+});
+
+describe('the balance on the day it was set', () => {
+  it('leaves out a bill a repeat added that day and a payment made before it was set', () => {
+    const at = Date.parse('2026-11-20T12:00:00');
+    const s = normaliseBudget({
+      v: 2,
+      start: { amount: 1000, day: '2026-11-20', at },
+      entries: [
+        { id: 'r1-2026-11', day: '2026-11-20', what: 'Rent', category: 'home', amount: 500, createdAt: at + 60_000, repeatId: 'r1' },
+        { id: 'b-n1', day: '2026-11-20', what: 'Wolt', category: 'food', amount: 7, createdAt: at - 60_000, from: 'ABB' },
+        { id: 'h1', day: '2026-11-20', what: 'Bread', category: 'food', amount: 2, createdAt: at + 60_000 },
+      ],
+    });
+    expect(balance(s, '2026-11-20')).toBe(998);
+  });
+});
+
+describe('adding past SMS again after undoing an import', () => {
+  it('adds them again under a new id; a live alert removed once stays removed', () => {
+    write('health', { v: 2, entries: [] });
+    const item = { input: { what: 'Wolt', category: 'food' as const, amount: 7, day: '2026-11-02' }, id: 'b-n1', from: 'ABB', at: 5 };
+    importSpends([item]);
+    removeSpends(['b-n1']);
+    expect(importSpends([item])).toEqual([]);
+    expect(importSpends([{ ...item, again: true }]).map((e) => e.id)).toEqual(['b-n1-a1']);
+    expect(importSpends([{ ...item, again: true }])).toEqual([]);
+    expect(getBudget().entries[0]!.createdAt).toBe(5);
+  });
+
+  it('does not add one again that was renamed and is still there', () => {
+    write('health', { v: 2, entries: [
+      { id: 'b-n1', day: '2026-11-02', what: '', category: 'food', amount: 0, createdAt: 5, deletedAt: 6 },
+      { id: 'b-n1-r', day: '2026-11-02', what: 'Wolt', category: 'food', amount: 7, createdAt: 6, from: 'ABB' },
+    ] });
+    const item = { input: { what: 'Wolt', category: 'food' as const, amount: 7, day: '2026-11-02' }, id: 'b-n1', from: 'ABB', again: true };
+    expect(importSpends([item])).toEqual([]);
   });
 });
