@@ -29,6 +29,7 @@ const MESSAGES: Record<string, Key> = {
   'auth/unauthorized-domain': 'err.domain',
   'permission-denied': 'err.rules',
   unavailable: 'err.offline',
+  'sync/too-big': 'err.tooBig',
 };
 
 export function errorCode(err: unknown): string {

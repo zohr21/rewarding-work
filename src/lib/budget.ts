@@ -290,6 +290,26 @@ const isTag = (v: unknown): v is CategoryTag => isNeed(v) || v === 'mixed';
 const isSource = (v: unknown): v is IncomeSource => (INCOME_SOURCES as readonly unknown[]).includes(v);
 const isDayOfMonth = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 31;
 
+/**
+ * Keys a newer app version added that this one does not know: kept as they are, so an
+ * older app never strips them when it writes (and sync then sends the stripped copy on).
+ */
+function extras(o: Record<string, unknown>, known: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(o)) if (!known.includes(k) && k !== 'removed' && k !== '__proto__') out[k] = v;
+  return out;
+}
+
+const ENTRY_KEYS = ['id', 'day', 'what', 'category', 'kind', 'amount', 'createdAt', 'repeatId', 'from', 'need', 'deletedAt'];
+const REPEAT_KEYS = ['id', 'what', 'category', 'kind', 'amount', 'dayOfMonth', 'from', 'need', 'createdAt', 'deletedAt'];
+const INCOME_KEYS = ['id', 'day', 'what', 'source', 'amount', 'createdAt', 'repeatId', 'deletedAt'];
+const INCOME_REPEAT_KEYS = ['id', 'what', 'source', 'amount', 'dayOfMonth', 'from', 'saveFirst', 'createdAt', 'deletedAt'];
+const GOAL_KEYS = ['id', 'name', 'target', 'monthly', 'by', 'createdAt', 'updatedAt', 'reachedAt', 'deletedAt'];
+const SAVE_KEYS = ['id', 'goalId', 'day', 'amount', 'createdAt', 'where', 'type', 'deletedAt'];
+const PLAN_KEYS = ['split', 'tags', 'sweepOff', 'roundUpFrom', 'monthStart'];
+const START_KEYS = ['amount', 'day', 'at'];
+const STORE_KEYS = ['v', 'budget', 'budgets', 'currency', 'budgetAt', 'entries', 'repeats', 'incomes', 'incomeRepeats', 'goals', 'saves', 'plan', 'planAt', 'start'];
+
 function readEntry(v: unknown, legacy: boolean): SpendEntry | null {
   if (typeof v !== 'object' || v === null) return null;
   const e = v as Record<string, unknown>;
@@ -313,7 +333,7 @@ function readEntry(v: unknown, legacy: boolean): SpendEntry | null {
     category = e.category;
     kind = category === 'wellbeing' && isKind(e.kind) ? e.kind : undefined;
   }
-  const entry: SpendEntry = { id: e.id, day: e.day, what: e.what, category, amount: e.amount as number, createdAt: e.createdAt };
+  const entry: SpendEntry = { ...(legacy ? {} : extras(e, ENTRY_KEYS)), id: e.id, day: e.day, what: e.what, category, amount: e.amount as number, createdAt: e.createdAt };
   if (kind) entry.kind = kind;
   if (typeof e.repeatId === 'string') entry.repeatId = e.repeatId;
   if (typeof e.from === 'string' && e.from) entry.from = e.from.slice(0, WHAT_MAX);
@@ -339,7 +359,7 @@ function readRepeat(v: unknown): Repeat | null {
     typeof r.createdAt !== 'number'
   )
     return null;
-  const repeat: Repeat = { id: r.id, what: r.what, category: r.category, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, createdAt: r.createdAt };
+  const repeat: Repeat = { ...extras(r, REPEAT_KEYS), id: r.id, what: r.what, category: r.category, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, createdAt: r.createdAt };
   if (r.category === 'wellbeing' && isKind(r.kind)) repeat.kind = r.kind;
   if (isNeed(r.need)) repeat.need = r.need;
   if (removed) repeat.deletedAt = r.deletedAt as number;
@@ -358,7 +378,7 @@ const amountOk = (amount: unknown, removed: boolean) => isAmount(amount) || (rem
 function readIncome(v: unknown): IncomeEntry | null {
   const r = record(v);
   if (!r || !isDayKey(r.day) || typeof r.what !== 'string' || !isSource(r.source) || !amountOk(r.amount, r.removed) || typeof r.createdAt !== 'number') return null;
-  const income: IncomeEntry = { id: r.id, day: r.day, what: r.what, source: r.source, amount: r.amount as number, createdAt: r.createdAt };
+  const income: IncomeEntry = { ...extras(r, INCOME_KEYS), id: r.id, day: r.day, what: r.what, source: r.source, amount: r.amount as number, createdAt: r.createdAt };
   if (typeof r.repeatId === 'string') income.repeatId = r.repeatId;
   if (r.removed) income.deletedAt = r.deletedAt as number;
   return income;
@@ -367,7 +387,7 @@ function readIncome(v: unknown): IncomeEntry | null {
 function readIncomeRepeat(v: unknown): IncomeRepeat | null {
   const r = record(v);
   if (!r || typeof r.what !== 'string' || !isSource(r.source) || !amountOk(r.amount, r.removed) || !isDayOfMonth(r.dayOfMonth) || !isMonthKey(r.from) || typeof r.createdAt !== 'number') return null;
-  const repeat: IncomeRepeat = { id: r.id, what: r.what, source: r.source, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, saveFirst: r.saveFirst === true, createdAt: r.createdAt };
+  const repeat: IncomeRepeat = { ...extras(r, INCOME_REPEAT_KEYS), id: r.id, what: r.what, source: r.source, amount: r.amount as number, dayOfMonth: r.dayOfMonth, from: r.from, saveFirst: r.saveFirst === true, createdAt: r.createdAt };
   if (r.removed) repeat.deletedAt = r.deletedAt as number;
   return repeat;
 }
@@ -375,7 +395,7 @@ function readIncomeRepeat(v: unknown): IncomeRepeat | null {
 function readGoal(v: unknown): Goal | null {
   const r = record(v);
   if (!r || typeof r.name !== 'string' || !amountOk(r.target, r.removed) || typeof r.monthly !== 'number' || r.monthly < 0 || typeof r.createdAt !== 'number') return null;
-  const goal: Goal = { id: r.id, name: r.name, target: r.target as number, monthly: r.monthly, createdAt: r.createdAt, updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : r.createdAt };
+  const goal: Goal = { ...extras(r, GOAL_KEYS), id: r.id, name: r.name, target: r.target as number, monthly: r.monthly, createdAt: r.createdAt, updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : r.createdAt };
   if (isMonthKey(r.by)) goal.by = r.by;
   if (typeof r.reachedAt === 'number') goal.reachedAt = r.reachedAt;
   if (r.removed) goal.deletedAt = r.deletedAt as number;
@@ -389,7 +409,7 @@ function readSave(v: unknown): SaveEntry | null {
   // Moves and take-outs may be below 0; take-outs always are.
   const signed = typeof r.amount === 'number' && (type === 'move' ? isAmount(Math.abs(r.amount)) : type === 'out' ? isAmount(-r.amount) : isAmount(r.amount));
   if (typeof r.goalId !== 'string' || !isDayKey(r.day) || !(signed || (r.removed && r.amount === 0)) || typeof r.createdAt !== 'number') return null;
-  const save: SaveEntry = { id: r.id, goalId: r.goalId, day: r.day, amount: r.amount as number, createdAt: r.createdAt };
+  const save: SaveEntry = { ...extras(r, SAVE_KEYS), id: r.id, goalId: r.goalId, day: r.day, amount: r.amount as number, createdAt: r.createdAt };
   if (r.where === 'cash') save.where = 'cash';
   if (type) save.type = type;
   if (r.removed) save.deletedAt = r.deletedAt as number;
@@ -406,7 +426,7 @@ function readPlan(v: unknown): Plan {
     (p.split as number[]).reduce((a, b) => a + b, 0) === 100;
   const tags: Partial<Record<Category, CategoryTag>> = {};
   if (typeof p.tags === 'object' && p.tags !== null) for (const [key, value] of Object.entries(p.tags)) if (isCategory(key) && isTag(value)) tags[key] = value;
-  const plan: Plan = { split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
+  const plan: Plan = { ...extras(p, PLAN_KEYS), split: [...(ok ? (p.split as Split) : DEFAULT_PLAN.split)] as Split, tags };
   if (p.sweepOff === true) plan.sweepOff = true;
   if (isDayKey(p.roundUpFrom)) plan.roundUpFrom = p.roundUpFrom;
   if (isMonthStart(p.monthStart)) plan.monthStart = p.monthStart;
@@ -421,14 +441,18 @@ function readStart(v: unknown): StartBalance | undefined {
   if (typeof v !== 'object' || v === null) return undefined;
   const r = v as Record<string, unknown>;
   if (typeof r.amount !== 'number' || !Number.isFinite(r.amount) || Math.abs(r.amount) > AMOUNT_MAX || !isDayKey(r.day) || typeof r.at !== 'number') return undefined;
-  return { amount: r.amount, day: r.day, at: r.at };
+  return { ...extras(r, START_KEYS), amount: r.amount, day: r.day, at: r.at };
 }
 
-/** Newest day first, and within a day the one added last. */
-const byDay = (a: SpendEntry, b: SpendEntry) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt;
-const byDayOfMonth = <T extends { dayOfMonth: number; createdAt: number }>(a: T, b: T) => a.dayOfMonth - b.dayOfMonth || a.createdAt - b.createdAt;
-const byNewest = <T extends { day: DayKey; createdAt: number }>(a: T, b: T) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt;
-const byCreated = (a: Goal, b: Goal) => a.createdAt - b.createdAt;
+/**
+ * Newest day first, and within a day the one added last. Every order ends on the id, so two
+ * devices holding the same items write them in the same order (sync compares the text).
+ */
+const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const byDay = (a: SpendEntry, b: SpendEntry) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt || byId(a, b);
+const byDayOfMonth = <T extends { id: string; dayOfMonth: number; createdAt: number }>(a: T, b: T) => a.dayOfMonth - b.dayOfMonth || a.createdAt - b.createdAt || byId(a, b);
+const byNewest = <T extends { id: string; day: DayKey; createdAt: number }>(a: T, b: T) => b.day.localeCompare(a.day) || b.createdAt - a.createdAt || byId(a, b);
+const byCreated = (a: Goal, b: Goal) => a.createdAt - b.createdAt || byId(a, b);
 
 const pick = <T>(list: unknown, fn: (v: unknown) => T | null): T[] =>
   Array.isArray(list) ? list.map(fn).filter((x): x is T => x !== null) : [];
@@ -437,7 +461,8 @@ const pick = <T>(list: unknown, fn: (v: unknown) => T | null): T[] =>
 export function normaliseBudget(raw: unknown): BudgetStore {
   if (typeof raw !== 'object' || raw === null) return { ...EMPTY_BUDGET, currency: defaultCurrency() };
   const s = raw as Record<string, unknown>;
-  const legacy = s.v !== 2;
+  // Only a store from before Budget has no `v`. A newer version (3, …) is read as this one, never as wellbeing spend.
+  const legacy = typeof s.v !== 'number';
   const budgets: Partial<Record<Category, number>> = {};
   if (legacy) {
     // The old single budget was for wellbeing.
@@ -447,6 +472,7 @@ export function normaliseBudget(raw: unknown): BudgetStore {
   }
   const start = readStart(s.start);
   return {
+    ...(legacy ? {} : extras(s, STORE_KEYS)),
     v: 2,
     budget: !legacy && isAmount(s.budget) ? s.budget : null,
     budgets,
@@ -483,19 +509,30 @@ export function getBudget(): BudgetStore {
   };
 }
 
-function writeStore(next: BudgetStore): void {
-  const store = withRoundUps(next);
-  const cutoff = Date.now() - MARKER_MS;
-  const keep = (x: { deletedAt?: number }) => x.deletedAt === undefined || x.deletedAt > cutoff;
-  write('health', {
+/**
+ * Drops removal markers older than MARKER_MS, except the ones a catch-up would otherwise undo:
+ * a bill or income a repeat added (`<repeat>-<month>`) that you removed or changed. While its
+ * repeat runs, `catchUpRepeats` goes back over every month since it began, so without the
+ * marker the entry would come back.
+ */
+function pruneMarkers(store: BudgetStore, now = Date.now()): BudgetStore {
+  const cutoff = now - MARKER_MS;
+  const repeats = new Set(store.repeats.filter(live).map((r) => r.id));
+  const incomeRepeats = new Set(store.incomeRepeats.filter(live).map((r) => r.id));
+  const fresh = (x: { deletedAt?: number }) => x.deletedAt === undefined || x.deletedAt > cutoff;
+  return {
     ...store,
-    entries: store.entries.filter(keep).sort(byDay),
-    repeats: store.repeats.filter(keep).sort(byDayOfMonth),
-    incomes: store.incomes.filter(keep).sort(byNewest),
-    incomeRepeats: store.incomeRepeats.filter(keep).sort(byDayOfMonth),
-    goals: store.goals.filter(keep).sort(byCreated),
-    saves: store.saves.filter(keep).sort(byNewest),
-  });
+    entries: store.entries.filter((e) => fresh(e) || (e.repeatId !== undefined && repeats.has(e.repeatId))).sort(byDay),
+    repeats: store.repeats.filter(fresh).sort(byDayOfMonth),
+    incomes: store.incomes.filter((i) => fresh(i) || (i.repeatId !== undefined && incomeRepeats.has(i.repeatId))).sort(byNewest),
+    incomeRepeats: store.incomeRepeats.filter(fresh).sort(byDayOfMonth),
+    goals: store.goals.filter(fresh).sort(byCreated),
+    saves: store.saves.filter(fresh).sort(byNewest),
+  };
+}
+
+function writeStore(next: BudgetStore): void {
+  write('health', pruneMarkers(withRoundUps(next)));
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
@@ -950,7 +987,7 @@ export function takeOut(goalId: string, amount: number, from: SaveWhere, day: Da
 export function setPlan(plan: Plan): void {
   const tags: Partial<Record<Category, CategoryTag>> = {};
   for (const c of CATEGORIES) if (plan.tags[c] && plan.tags[c] !== DEFAULT_TAGS[c]) tags[c] = plan.tags[c];
-  const next: Plan = { split: [...plan.split] as Split, tags };
+  const next: Plan = { ...extras(plan as unknown as Record<string, unknown>, PLAN_KEYS), split: [...plan.split] as Split, tags };
   if (plan.sweepOff) next.sweepOff = true;
   if (plan.roundUpFrom && isDayKey(plan.roundUpFrom)) next.roundUpFrom = plan.roundUpFrom;
   if (isMonthStart(plan.monthStart)) next.monthStart = plan.monthStart;
@@ -1314,51 +1351,74 @@ export function monthBudget(store: Pick<BudgetStore, 'budget' | 'budgets'>): num
   return sum > 0 ? sum : null;
 }
 
-function mergeById<T extends { id: string; deletedAt?: number }>(a: T[], b: T[]): T[] {
+/** The same choice whichever copy is `a`: the copy whose text sorts first. */
+const firstText = <T>(a: T, b: T): T => (JSON.stringify(b) < JSON.stringify(a) ? b : a);
+
+/**
+ * Per id, a removal marker beats the live copy (the earlier removal between two); two live
+ * copies (a repeat's entry added on two devices at once) settle on the same one either way.
+ * Merging must not depend on which copy is this device's: every store merges on every device
+ * (src/lib/account/firebase.ts), and two devices choosing differently would send their copies
+ * back and forth for ever.
+ */
+function mergeById<T extends { id: string; deletedAt?: number }>(a: T[], b: T[], prefer?: (x: T, y: T) => number): T[] {
+  const pick = (x: T, y: T): T => {
+    if (x.deletedAt !== undefined || y.deletedAt !== undefined) {
+      if (x.deletedAt === undefined) return y;
+      if (y.deletedAt === undefined) return x;
+      if (x.deletedAt !== y.deletedAt) return x.deletedAt < y.deletedAt ? x : y;
+    } else if (prefer) {
+      const p = prefer(x, y);
+      if (p) return p < 0 ? x : y;
+    }
+    return firstText(x, y);
+  };
   const byId = new Map(a.map((x) => [x.id, x]));
-  for (const x of b) {
-    const mine = byId.get(x.id);
-    if (!mine || (x.deletedAt !== undefined && (mine.deletedAt === undefined || x.deletedAt < mine.deletedAt))) byId.set(x.id, x);
+  for (const y of b) {
+    const x = byId.get(y.id);
+    byId.set(y.id, x ? pick(x, y) : y);
   }
   return [...byId.values()];
 }
 
-/**
- * Combine two copies of the store (account sync). Entries and repeats are never edited,
- * only added or removed, so per id a removal marker beats the live copy. The budgets and
- * currency come from whichever copy set them last.
- */
-export function mergeBudgetStores(a: BudgetStore, b: BudgetStore): BudgetStore {
-  const newer = b.budgetAt > a.budgetAt ? b : a;
-  const newerPlan = b.planAt > a.planAt ? b : a;
-  // Goals change in place: a removal wins, else the copy changed last.
-  const goals = new Map(a.goals.map((g) => [g.id, g]));
-  for (const g of b.goals) {
-    const mine = goals.get(g.id);
-    if (!mine || (g.deletedAt !== undefined && mine.deletedAt === undefined) || (mine.deletedAt === undefined && g.updatedAt > mine.updatedAt)) goals.set(g.id, g);
-  }
-  return {
-    v: 2,
-    budget: newer.budget,
-    budgets: newer.budgets,
-    currency: newer.currency,
-    budgetAt: newer.budgetAt,
-    entries: mergeById(a.entries, b.entries).sort(byDay),
-    repeats: mergeById(a.repeats, b.repeats).sort(byDayOfMonth),
-    incomes: mergeById(a.incomes, b.incomes).sort(byNewest),
-    incomeRepeats: mergeById(a.incomeRepeats, b.incomeRepeats).sort(byDayOfMonth),
-    goals: [...goals.values()].sort(byCreated),
-    saves: mergeById(a.saves, b.saves).sort(byNewest),
-    plan: newerPlan.plan,
-    planAt: newerPlan.planAt,
-    ...newerStart(a.start, b.start),
-  };
+/** The copy set last (`at`), the same one whichever copy is `a`. */
+function newerOf<T>(a: T, b: T, at: (x: T) => number): T {
+  return at(a) !== at(b) ? (at(b) > at(a) ? b : a) : firstText(a, b);
 }
 
-/** The starting balance set last, from either copy. */
-function newerStart(a?: StartBalance, b?: StartBalance): { start?: StartBalance } {
-  const x = !a ? b : !b ? a : b.at > a.at ? b : a;
-  return x ? { start: x } : {};
+/**
+ * Combine two copies of the store (account sync). Entries and repeats are never edited,
+ * only added or removed, so per id a removal marker beats the live copy. Goals change in place:
+ * a removal wins, else the copy changed last. The budgets and currency, the plan and the
+ * starting balance come from whichever copy set them last. Keys a newer app added are kept.
+ */
+export function mergeBudgetStores(a: BudgetStore, b: BudgetStore, now = Date.now()): BudgetStore {
+  const set = (x: BudgetStore) => ({ budget: x.budget, budgets: x.budgets, currency: x.currency, budgetAt: x.budgetAt });
+  const plan = (x: BudgetStore) => ({ plan: x.plan, planAt: x.planAt });
+  const newer = newerOf(set(a), set(b), (x) => x.budgetAt);
+  const newerPlan = newerOf(plan(a), plan(b), (x) => x.planAt);
+  const start = !a.start ? b.start : !b.start ? a.start : newerOf(a.start, b.start, (x) => x.at);
+  // Unknown keys: from both copies; where both have one, the same choice either way.
+  const ea = extras(a as unknown as Record<string, unknown>, STORE_KEYS);
+  const eb = extras(b as unknown as Record<string, unknown>, STORE_KEYS);
+  const more: Record<string, unknown> = { ...ea };
+  for (const [k, v] of Object.entries(eb)) more[k] = k in ea ? firstText(ea[k], v) : v;
+  return pruneMarkers(
+    {
+      ...more,
+      v: 2,
+      ...newer,
+      entries: mergeById(a.entries, b.entries),
+      repeats: mergeById(a.repeats, b.repeats),
+      incomes: mergeById(a.incomes, b.incomes),
+      incomeRepeats: mergeById(a.incomeRepeats, b.incomeRepeats),
+      goals: mergeById(a.goals, b.goals, (x, y) => y.updatedAt - x.updatedAt),
+      saves: mergeById(a.saves, b.saves),
+      ...newerPlan,
+      ...(start ? { start } : {}),
+    },
+    now,
+  );
 }
 
 /** "2026-10" for a day in October 2026. */
