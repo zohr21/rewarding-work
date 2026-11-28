@@ -490,10 +490,17 @@ const TAGS = [
             (p.takenOut ? ` · ${t('budget.s.takenOutLine', { amount: whole(p.takenOut, sign) })}` : ''),
         );
         const [n, w, sv] = s.plan.split;
+        // Needs and wants are one pot: what needs go over comes out of the room for wants.
+        const needsOver = Math.max(0, p.needs - p.planned.needs);
+        const wantsRoom = Math.max(0, p.planned.wants - needsOver);
+        const wantsNote =
+          needsOver >= 1 && p.planned.wants > 0
+            ? t('budget.p.needsOverWants', { amount: whole(needsOver, sign), left: whole(Math.max(0, wantsRoom - p.wants), sign) })
+            : '';
         const bars = [
-          { label: t('budget.p.needs'), savings: false, got: p.needs, of: p.planned.needs, pct: n, color: 'var(--cat-visual)' },
-          { label: t('budget.p.wants'), savings: false, got: p.wants, of: p.planned.wants, pct: w, color: 'var(--cat-reward)' },
-          { label: t('budget.p.savings'), savings: true, got: p.saved, of: p.planned.savings, pct: sv, color: 'var(--cat-structure)' },
+          { label: t('budget.p.needs'), savings: false, got: p.needs, of: p.planned.needs, pct: n, color: 'var(--cat-visual)', note: '' },
+          { label: t('budget.p.wants'), savings: false, got: p.wants, of: wantsRoom, pct: w, color: 'var(--cat-reward)', note: wantsNote },
+          { label: t('budget.p.savings'), savings: true, got: p.saved, of: p.planned.savings, pct: sv, color: 'var(--cat-structure)', note: '' },
         ];
         $('[data-bp-bars]').replaceChildren(
           ...bars.map((b) => {
@@ -503,10 +510,11 @@ const TAGS = [
             head.append(el('strong', '', b.label), el('span', over ? 'bp__over' : 'muted', `${whole(b.got, sign)} / ${whole(b.of, sign)} · ${b.pct}%`));
             const track = el('span', 'bp__track');
             const fill = el('i');
-            fill.style.width = `${b.of ? Math.min(100, (b.got / b.of) * 100) : 0}%`;
+            fill.style.width = `${b.of ? Math.min(100, (b.got / b.of) * 100) : b.got > 0 ? 100 : 0}%`;
             fill.style.background = over ? 'var(--color-danger)' : b.color;
             track.append(fill);
             li.append(head, track);
+            if (b.note) li.append(el('span', 'bp__bar-note muted', b.note));
             return li;
           }),
         );
@@ -638,6 +646,13 @@ const TAGS = [
     }
 
     c.add(listen($('[data-sheet="income"]'), 'sheet:open', fillIncome));
+    // Savings first suits pay; money coming back (Other) or a gift starts unticked.
+    c.add(
+      listen(iForm, 'change', (e) => {
+        const r = e.target as HTMLInputElement;
+        if (r.name === 'bp-i-source') $<HTMLInputElement>('[data-bp-i-save]').checked = r.value === 'salary' || r.value === 'freelance';
+      }),
+    );
     c.add(
       listen(iForm, 'submit', (e) => {
         e.preventDefault();
@@ -1206,6 +1221,10 @@ const TAGS = [
   .bp__bar {
     display: grid;
     gap: 6px;
+  }
+
+  .bp__bar-note {
+    font-size: var(--text-xs);
   }
 
   .bp__bar-head,

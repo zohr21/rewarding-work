@@ -2493,6 +2493,7 @@ export const en = {
   'budget.p.toPutInSavings': '{amount} to put in savings, kept out of what is safe to spend',
   'budget.p.needs': 'Needs',
   'budget.p.wants': 'Wants',
+  'budget.p.needsOverWants': 'Needs went {amount} over, so wants has {left} left',
   'budget.p.savings': 'Savings',
   'budget.p.unsorted': '{amount} not sorted into need or want yet: tap “{ask}” on those expenses.',
   'budget.p.addOne': 'Add one',

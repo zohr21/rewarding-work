@@ -182,7 +182,14 @@ describe('balance', () => {
     setStartBalance(1200, '2026-11-02');
     addIncome({ what: 'Salary', source: 'salary', amount: 1800, day: '2026-11-26' }, { saveFirst: true });
     addSpend({ what: 'Groceries', category: 'food', amount: 24.6, day: '2026-11-28' });
-    expect(balance(getBudget())).toBe(2975.4);
+    expect(balance(getBudget(), '2026-11-30')).toBe(2975.4);
+  });
+
+  it('counts a salary written in for a later day only from that day', () => {
+    setStartBalance(0, '2026-11-28');
+    addIncome({ what: 'November salary', source: 'salary', amount: 2288.57, day: '2026-12-01' }, { saveFirst: true });
+    expect(balance(getBudget(), '2026-11-28')).toBe(0);
+    expect(balance(getBudget(), '2026-12-01')).toBe(2288.57);
   });
 
   it('reads back, drops a broken one, and the newer one wins in a merge', () => {
@@ -194,6 +201,30 @@ describe('balance', () => {
     expect(mergeBudgetStores(b, a).start?.amount).toBe(250);
     expect(mergeBudgetStores(none, a).start?.amount).toBe(100);
     expect(mergeBudgetStores(none, none).start).toBeUndefined();
+  });
+});
+
+describe('savings set aside ahead of time', () => {
+  it('count from their day, not before', () => {
+    addIncome({ what: 'October salary', source: 'salary', amount: 1000, day: '2026-11-01' }, { saveFirst: true });
+    addIncome({ what: 'November salary', source: 'salary', amount: 2000, day: '2026-12-01' }, { saveFirst: true });
+    expect(savingsWhere(getBudget().saves, '2026-11-28').total).toBe(200);
+    expect(savingsWhere(getBudget().saves, '2026-12-01').total).toBe(600);
+  });
+});
+
+describe('a month before the budget started', () => {
+  it('is never offered as gone over', () => {
+    // Spending was imported for October, but the first income is 1 November.
+    addSpend({ what: 'Birthday', category: 'fun', amount: 1569, day: '2026-10-19' });
+    addIncome({ what: 'October salary', source: 'salary', amount: 4262, day: '2026-11-01' }, { saveFirst: true });
+    expect(coverOffer('2026-11-28')).toBeNull();
+    expect(monthPlan(getBudget(), '2026-11', '2026-11-28').carried).toBe(0);
+  });
+
+  it('is not offered with no income at all', () => {
+    addSpend({ what: 'Birthday', category: 'fun', amount: 400, day: '2026-10-19' });
+    expect(coverOffer('2026-11-02')).toBeNull();
   });
 });
 
