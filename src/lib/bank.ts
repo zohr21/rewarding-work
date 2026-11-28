@@ -86,11 +86,22 @@ export interface BankStore {
   pending: Pending[];
   /** A place you put in a category, by `placeKey`, so the next payment there goes to the same one. */
   rules: Record<string, Category>;
-  /** Recent payments, to drop the same one told twice (the bank's app and an SMS). */
-  recent: { id: string; amount: number; currency: string; at: number }[];
+  /**
+   * Recent payments, to drop the same one told twice (the bank's app and an SMS). `from` is who
+   * told it: the same source twice is two payments. Left out by versions before 2026-11-28.
+   */
+  recent: Recent[];
   log: LogItem[];
   /** The last imports of past SMS, newest first, for Undo. */
   imports: ImportBatch[];
+}
+
+export interface Recent {
+  id: string;
+  amount: number;
+  currency: string;
+  at: number;
+  from?: string;
 }
 
 export const EMPTY_BANK: BankStore = { v: 1, on: false, auto: true, apps: [], senders: [], pending: [], rules: {}, recent: [], log: [], imports: [] };
@@ -143,7 +154,7 @@ export function normaliseBank(raw: unknown): BankStore {
   const recent = (Array.isArray(s.recent) ? s.recent : []).flatMap((x) => {
     const r = obj(x);
     return r && typeof r.id === 'string' && typeof r.amount === 'number' && typeof r.currency === 'string' && typeof r.at === 'number'
-      ? [{ id: r.id, amount: r.amount, currency: r.currency, at: r.at }]
+      ? [{ id: r.id, amount: r.amount, currency: r.currency, at: r.at, ...(typeof r.from === 'string' ? { from: r.from } : {}) }]
       : [];
   });
   const log = (Array.isArray(s.log) ? s.log : []).flatMap((x): LogItem[] => {
@@ -228,8 +239,8 @@ const CURRENCY_WORDS: [RegExp, string][] = [
   [/^(gbp|£)$/i, 'GBP'],
 ];
 const CUR = String.raw`AZN|₼|manat|man\.?|USD|\$|EUR|€|RUB|₽|руб\.?|TRY|₺|TL|GBP|£`;
-const NUM = String.raw`\d{1,3}(?:[   ]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
-/** "-2.80 AZN", "2 802.65 AZN", "₼12,50", "USD -5". */
+const NUM = String.raw`\d{1,3}(?:[   ]\d{3})+(?:[.,]\d{1,2})?|\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
+/** "-2.80 AZN", "2 802.65 AZN", "$1,234.56", "1.234,56 €", "₼12,50", "USD -5". */
 const MONEY = new RegExp(String.raw`([+\-−])?\s?(${NUM})\s?(${CUR})(?![A-Za-z])|(?<![A-Za-z])(${CUR})\s?([+\-−])?\s?(${NUM})`, 'giu');
 /** Amounts that are not the payment: what is left, and fees. */
 const NOT_PAYMENT = /(balans|balance|qalig\w*|qaliq|qalıq|остаток|баланс|vergi|komissiya|commission|fee|limit)\s*:?\s*[+\-−]?\s*$/i;
@@ -256,9 +267,12 @@ const PLACE_KEY = /(?:merchant|mercant|satici|obyekt|terminal|место|маг�
 /** Words for what happened, not where: "Payment Azercell" is Azercell, "Əməliyyat:" alone is no place. */
 const ACTION = /^(payment|purchase|ödəniş|odenis|odenish|alış|alis|əməliyyat|emeliyyat|köçürmə|kocurme|transfer)(?=[\s:]|$)[\s:]*/iu;
 
+/** "1,234.56", "1.234,56" and "1 234,56" are all 1234.56: a separator with one or two digits after it at the end is the decimal one, any other only groups thousands. */
 function toNumber(s: string): number {
-  const t = s.replace(/[   ]/g, '');
-  return Number(t.replace(',', '.'));
+  const t = s.replace(/[\s  ]/g, '');
+  const dec = /[.,](\d{1,2})$/.exec(t);
+  const whole = (dec ? t.slice(0, dec.index) : t).replace(/[.,]/g, '');
+  return Number(dec ? `${whole}.${dec[1]}` : whole);
 }
 
 function toCurrency(s: string): string {
@@ -424,10 +438,20 @@ export function planAlerts(notices: BankNotice[], now = Date.now()): Planned[] {
   const budget = getBudget();
   const budgetCurrency = currencyCode(budget.currency);
   const known = new Set([...store.log.map((l) => l.id), ...store.pending.map((p) => p.id), ...budget.entries.map((e) => e.id.replace(/^b-/, '').replace(/-r$/, ''))]);
-  // Expenses typed in by hand, so an alert for one of them doesn't add it again.
-  const typed = new Set(budget.entries.filter((e) => !e.from && !e.repeatId).map((e) => `${e.day}|${e.amount}`));
+  // Expenses typed in by hand, so an alert for one of them doesn't add it again. Counted: one
+  // typed coffee stands for one alert, and a second coffee at the same price still goes in.
+  const typed = new Map<string, number>();
+  for (const e of budget.entries) if (!e.from && !e.repeatId) typed.set(`${e.day}|${e.amount}`, (typed.get(`${e.day}|${e.amount}`) ?? 0) + 1);
+  const takeTyped = (key: string) => {
+    const n = typed.get(key) ?? 0;
+    if (n) typed.set(key, n - 1);
+    return n > 0;
+  };
   const today = dayKey(new Date(now));
-  const paid = store.recent.filter((r) => now - r.at < RECENT_MS);
+  const paid: Recent[] = store.recent.filter((r) => now - r.at < RECENT_MS);
+  // Told twice is the same payment from two sources (its app and an SMS); the same source twice is two payments.
+  const twin = (r: Recent, from: string, amount: number, currency: string, at: number) =>
+    r.from !== from && r.amount === amount && r.currency === currency && Math.abs(r.at - at) < TWICE_MS;
   const plan: Planned[] = [];
 
   for (const notice of [...notices].sort((a, b) => a.at - b.at)) {
@@ -436,7 +460,7 @@ export function planAlerts(notices: BankNotice[], now = Date.now()): Planned[] {
     const reading = readAlert(body);
     if (known.has(notice.id)) {
       // Still a payment told once already, so its twin from another source stays left out.
-      if (reading && reading.direction !== 'in') paid.push({ id: notice.id, amount: reading.amount, currency: reading.currency, at: notice.at });
+      if (reading && reading.direction !== 'in') paid.push({ id: notice.id, amount: reading.amount, currency: reading.currency, at: notice.at, from });
       plan.push({ notice, from, outcome: 'known' });
       continue;
     }
@@ -444,10 +468,10 @@ export function planAlerts(notices: BankNotice[], now = Date.now()): Planned[] {
     if (!reading || isNotice(body)) plan.push({ notice, from, outcome: 'not-money' });
     else if (reading.declined) plan.push({ notice, from, outcome: 'declined' });
     else if (reading.direction === 'in') plan.push({ notice, from, outcome: 'income' });
-    else if (paid.some((r) => r.amount === reading.amount && r.currency === reading.currency && Math.abs(r.at - notice.at) < TWICE_MS)) {
+    else if (paid.some((r) => twin(r, from, reading.amount, reading.currency, notice.at))) {
       plan.push({ notice, from, outcome: 'duplicate' });
     } else {
-      paid.push({ id: notice.id, amount: reading.amount, currency: reading.currency, at: notice.at });
+      paid.push({ id: notice.id, amount: reading.amount, currency: reading.currency, at: notice.at, from });
       const posted = dayKey(new Date(notice.at));
       // A day the alert gives is trusted only when it is close to when it came.
       const day = reading.day && reading.day <= today && reading.day >= dayKey(addDays(fromDayKey(posted), -7)) ? reading.day : posted;
@@ -465,7 +489,7 @@ export function planAlerts(notices: BankNotice[], now = Date.now()): Planned[] {
         why,
         text: body.slice(0, LOG_TEXT_MAX),
       };
-      const outcome = sure && typed.has(`${day}|${reading.amount}`) ? 'already' : sure ? 'added' : 'review';
+      const outcome = sure && takeTyped(`${day}|${reading.amount}`) ? 'already' : sure ? 'added' : 'review';
       plan.push({ notice, from, outcome, pending });
     }
   }
@@ -522,7 +546,7 @@ export function applyPlan(plan: Planned[], options: { add: boolean; review: bool
     : store.log;
   const recent = [
     ...store.recent,
-    ...fresh.filter((p) => p.pending).map((p) => ({ id: p.notice.id, amount: p.pending!.amount, currency: p.pending!.currency, at: p.notice.at })),
+    ...fresh.filter((p) => p.pending).map((p) => ({ id: p.notice.id, amount: p.pending!.amount, currency: p.pending!.currency, at: p.notice.at, from: p.from })),
   ].filter((r) => now - r.at < RECENT_MS);
   const imports =
     options.batch && (added.length || waiting.length)

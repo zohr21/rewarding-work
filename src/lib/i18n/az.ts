@@ -1554,6 +1554,7 @@ export const az: Messages = {
   'err.offline': 'Serverə qoşulmaq olmadı. Dəyişikliklər saxlanıb, sonra göndəriləcək.',
   'err.apiKey': 'Bu saytda hesablar səhv qurulub (Firebase API açarı yanlışdır).',
   'err.unknown': 'Nəsə alınmadı. Yenidən cəhd et.',
+  'err.tooBig': 'Məlumatların bir hissəsi hesaba köçürmək üçün çox böyükdür. Bu cihazda hamısı qalır.',
   'err.googleNotInApp': 'Google ilə giriş tətbiqdə hələ yoxdur. E-poçt və şifrə ilə daxil ol.',
   'err.currentPassword': 'İndiki şifrəni yaz.',
   'err.guestReauth': 'Qonaq hesabına yenidən daxil olmaq olmur — onu sil və ya əvvəlcə e-poçtla saxla.',

@@ -6,6 +6,15 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **28 Nov · Budget data safety (review items 1–5).** A bill or income a repeat added that you
+  removed or changed keeps its marker for as long as the repeat runs, so catch-up never brings it
+  back. `health` is merged on every sync, not only when this device has unsent changes, and the
+  merge picks the same copy on every device. Keys a version doesn't know are kept, and `v: 3` or
+  higher is read as v2, never as old wellbeing spend. A store over 700,000 characters goes to the
+  account gzipped (`gz1:` + base64, src/lib/account/pack.ts). Bank alerts read "$1,234.56" and
+  "1.234,56 €". The same amount twice within 5 minutes is one payment only when it comes from
+  two sources, and one typed expense now covers one alert, not every alert at that price.
+  Editing an expense still drops its repeat and bank link (review item 6, not fixed yet).
 - **28 Nov · Budget fixes after the first real month: one pot for needs and wants.** The
   budget starts with the first income, so a month before it (October's imported spending) is
   never offered as gone over. Savings and "You have" count entries up to today, so a salary

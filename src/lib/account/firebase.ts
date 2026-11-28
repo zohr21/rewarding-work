@@ -79,6 +79,7 @@ import {
 import { errorCode, friendlyError } from './errors';
 import { googleWebCredential, prepareGoogleWeb } from './google-web';
 import { mergeJson } from './merge';
+import { pack, SEND_MAX, unpack, isPacked } from './pack';
 import { getAccount, setAccount, type AccountUser } from './state';
 
 let auth: Auth;
@@ -189,7 +190,12 @@ async function send(name: SyncedStore): Promise<void> {
   updateStatus();
   try {
     if (json === null) await deleteDoc(storeRef(uid, name));
-    else await setDoc(storeRef(uid, name), { data: json, updatedAt: Date.now() });
+    else {
+      const data = await pack(json);
+      // Over the rules' limit even packed: say so, instead of the rules' "permission denied".
+      if (data.length > SEND_MAX) throw Object.assign(new Error('too big'), { code: 'sync/too-big' });
+      await setDoc(storeRef(uid, name), { data, updatedAt: Date.now() });
+    }
     if (syncUid === uid && (versions.get(name) ?? 0) === version) clearDirty(name);
     setAccount({ lastSynced: Date.now(), syncError: null, sync: 'saving' });
   } catch (err) {
@@ -200,10 +206,17 @@ async function send(name: SyncedStore): Promise<void> {
   }
 }
 
+/**
+ * Stores merged even when nothing here is unsent. Their merge only adds (a removal is a marker
+ * that travels), so it is safe; and an older app that dropped keys it doesn't know (Budget's
+ * goals and savings, say) can't wipe them here: they are merged back and sent again.
+ */
+const ALWAYS_MERGE: readonly SyncedStore[] = ['health'];
+
 /** Compare the account's copy of one store with this device's, and settle the difference. */
 function reconcile(name: SyncedStore, remote: string | null): void {
   const local = readJson(name);
-  if (isDirty(name)) {
+  if (isDirty(name) || (ALWAYS_MERGE.includes(name) && local !== null && remote !== null && remote !== local)) {
     const merged = remote === null ? local : mergeJson(name, local, remote);
     if (merged !== local) writeJsonFromSync(name, merged);
     if (merged === remote) clearDirty(name);
@@ -249,6 +262,8 @@ function startSync(uid: string): void {
 
   setAccount({ sync: 'saving', syncError: null });
   let first = true;
+  /** Copies seen per store, so a slow unpack never settles an older copy over a newer one. */
+  const seen = new Map<SyncedStore, number>();
   stopFns.push(
     onSnapshot(
       collection(db, 'users', uid, 'stores'),
@@ -264,7 +279,14 @@ function startSync(uid: string): void {
           const d = remote.get(name);
           if (d?.metadata.hasPendingWrites) continue; // our own write on its way
           const data = d?.get('data');
-          reconcile(name, typeof data === 'string' ? data : null);
+          const seq = (seen.get(name) ?? 0) + 1;
+          seen.set(name, seq);
+          if (typeof data === 'string' && isPacked(data)) {
+            // Unpacking takes a moment; a newer copy that came meanwhile wins. Unreadable: leave this device's copy alone.
+            void unpack(data).then((json) => {
+              if (json !== null && seen.get(name) === seq && syncUid === uid) reconcile(name, json);
+            });
+          } else reconcile(name, typeof data === 'string' ? data : null);
         }
         if (!snap.metadata.fromCache) setAccount({ lastSynced: Date.now(), syncError: null });
         updateStatus();

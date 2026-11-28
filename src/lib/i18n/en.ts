@@ -1641,6 +1641,7 @@ export const en = {
   'err.offline': 'Couldn\'t reach the server. Your changes are kept and will be sent later.',
   'err.apiKey': 'Accounts are misconfigured on this site (invalid Firebase API key).',
   'err.unknown': 'Something went wrong. Please try again.',
+  'err.tooBig': 'Some of your data is too big to copy to your account. It is all still on this device.',
   'err.googleNotInApp': 'Google sign-in isn\'t available in the app yet. Use your email and password.',
   'err.currentPassword': 'Enter your current password.',
   'err.guestReauth': 'Guest accounts can\'t sign in again — delete it instead, or save it with an email first.',
