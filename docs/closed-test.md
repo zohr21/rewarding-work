@@ -161,6 +161,20 @@ Yeni: həftəlik lövhə. Ləqəblə qoşul («Bağ» › «Lövhə») və fokus
 </az-AZ>
 ```
 
+Version 0.1.9 (Budget fixes):
+
+```
+<en-US>
+Fixes in Budget: a month before your first income is no longer shown as gone over. Savings and "You have" count a salary written in for a later day from that day. Save first is only ticked for salary and freelance, so refunds aren't split. When needs go over, the Wants bar shows how much room is really left. Tell us what you think: grovyn.support@gmail.com
+</en-US>
+<ru-RU>
+Исправления в Бюджете: месяц до первого дохода больше не считается перерасходом. Сбережения и «У вас есть» учитывают зарплату, записанную на будущий день, только с этого дня. «Сначала отложить в сбережения» отмечено только для зарплаты и фриланса, чтобы возвраты не делились. Если нужное вышло за план, полоска «Желаемое» показывает, сколько на самом деле осталось. Пишите, что думаете: grovyn.support@gmail.com
+</ru-RU>
+<az-AZ>
+Büdcədə düzəlişlər: ilk gəlirdən əvvəlki ay artıq xərc kimi göstərilmir. Yığımlar və «Səndə var» gələcək günə yazılan maaşı yalnız o gündən sayır. «Əvvəlcə yığıma qoy» yalnız maaş və frilans üçün seçilir, ona görə geri qaytarılan pullar bölünmür. Ehtiyaclar plandan çox olanda, İstəklər zolağı həqiqətən nə qədər qaldığını göstərir. Fikrini yaz: grovyn.support@gmail.com
+</az-AZ>
+```
+
 Version 0.1.8 (Budget months that start on payday):
 
 ```
@@ -228,3 +242,4 @@ Yeni: Mentor gününü izləyir. Səhər Top 3-ü seç, gün ərzində indi nə 
 | 26 Nov 2026 | Release 106 (0.1.6) uploaded to Alpha: Coach day rhythm and sync, the new Timer (task on top, rhythm and sound in a sheet, quiet while focusing). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.5 had been published 25 Nov. |
 | 27 Nov 2026 | Release 107 (0.1.7) uploaded to Alpha: Study (was Exam prep), several study plans at once, and the You page as rows that open sheets with one delete sheet (type DELETE). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). 0.1.6 was available to testers. |
 | 28 Nov 2026 | Release 108 (0.1.8) uploaded to Alpha: Budget months can start on payday, a month's rest or overspend carries into the next (savings only with a yes), and a "You have" balance row. Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
+| 28 Nov 2026 | 0.1.8 approved and available to testers. Release 109 (0.1.9) uploaded to Alpha: Budget fixes (no overspend card before the first income, savings and "You have" count up to today, save first only for salary and freelance, Wants bar shrinks when needs go over). Notes in 3 languages; supported devices unchanged; only warning is the usual missing deobfuscation file. Sent for review (managed publishing off). |
