@@ -2335,6 +2335,7 @@ export const az: Messages = {
   'budget.v.changed': 'Dəyişdirildi: {what}, {amount}',
   'budget.v.repeats': '{what}: hər ay {day} tarixində təkrarlanır',
   'budget.v.added': 'Əlavə olundu: {what}, {amount}',
+  'budget.bs.andMore': { one: ' və daha {n}', other: ' və daha {n}' },
   'budget.v.deleted': 'Silindi: «{what}»',
   'budget.v.saved': 'Büdcələr saxlanıldı.',
   'budget.p.nothingCameIn': 'Daxilolma olmayıb · {month}',

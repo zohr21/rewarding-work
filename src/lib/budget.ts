@@ -95,7 +95,12 @@ export const SPLITS: Split[] = [
 ];
 
 export const WHAT_MAX = 80;
-export const AMOUNT_MAX = 1_000_000;
+/**
+ * The largest amount Budget takes. A billion, so salaries in currencies with big numbers (dong,
+ * rupiah, som) fit; it only keeps out typing mistakes. Before 2026-11-28 it was a million, and
+ * that older app drops bigger amounts when it reads them (the account merge brings them back).
+ */
+export const AMOUNT_MAX = 1_000_000_000;
 export const CURRENCY_MAX = 4;
 
 export interface SpendEntry {
@@ -457,6 +462,27 @@ const byCreated = (a: Goal, b: Goal) => a.createdAt - b.createdAt || byId(a, b);
 const pick = <T>(list: unknown, fn: (v: unknown) => T | null): T[] =>
   Array.isArray(list) ? list.map(fn).filter((x): x is T => x !== null) : [];
 
+/**
+ * A repeating salary's savings, shared over the goals as it comes, have ids `<income>-s` or
+ * `<income>-s-<goal>`, all made in one go (one `createdAt`). Two devices adding the same salary
+ * at once can share it differently (a goal reached on one of them only), and both shares then
+ * arrive by sync and would be counted twice. The share made first stays; the other is left out.
+ */
+function oneSplit(saves: SaveEntry[], incomes: IncomeEntry[]): SaveEntry[] {
+  const bases = new Set(incomes.filter((i) => i.repeatId).map((i) => `${i.id}-s`));
+  if (!bases.size) return saves;
+  const baseOf = (id: string) => /^(.+?-\d{4}-\d{2}-s)(?:-|$)/.exec(id)?.[1];
+  const first = new Map<string, number>();
+  for (const x of saves) {
+    const base = x.deletedAt === undefined ? baseOf(x.id) : undefined;
+    if (base && bases.has(base)) first.set(base, Math.min(first.get(base) ?? Infinity, x.createdAt));
+  }
+  return saves.filter((x) => {
+    const base = x.deletedAt === undefined ? baseOf(x.id) : undefined;
+    return !base || !first.has(base) || x.createdAt === first.get(base);
+  });
+}
+
 /** Anything stored or synced, made into a store: bad entries dropped, missing parts filled in. */
 export function normaliseBudget(raw: unknown): BudgetStore {
   if (typeof raw !== 'object' || raw === null) return { ...EMPTY_BUDGET, currency: defaultCurrency() };
@@ -474,9 +500,11 @@ export function normaliseBudget(raw: unknown): BudgetStore {
   const goals = pick(s.goals, readGoal).sort(byCreated);
   // Money put towards a goal that was removed (or never reached this device) is savings with no goal.
   const liveGoals = new Set(goals.filter((g) => g.deletedAt === undefined).map((g) => g.id));
-  const saves = pick(s.saves, readSave)
-    .map((x) => (x.goalId && !liveGoals.has(x.goalId) ? { ...x, goalId: '' } : x))
-    .sort(byNewest);
+  const incomes = pick(s.incomes, readIncome).sort(byNewest);
+  const saves = oneSplit(
+    pick(s.saves, readSave).map((x) => (x.goalId && !liveGoals.has(x.goalId) ? { ...x, goalId: '' } : x)),
+    incomes,
+  ).sort(byNewest);
   return {
     ...(legacy ? {} : extras(s, STORE_KEYS)),
     v: 2,
@@ -486,7 +514,7 @@ export function normaliseBudget(raw: unknown): BudgetStore {
     budgetAt: typeof s.budgetAt === 'number' ? s.budgetAt : 0,
     entries: pick(s.entries, (e) => readEntry(e, legacy)).sort(byDay),
     repeats: pick(s.repeats, readRepeat).sort(byDayOfMonth),
-    incomes: pick(s.incomes, readIncome).sort(byNewest),
+    incomes,
     incomeRepeats: pick(s.incomeRepeats, readIncomeRepeat).sort(byDayOfMonth),
     goals,
     saves,
@@ -587,23 +615,49 @@ export function addSpend(input: SpendInput): SpendEntry | null {
  * Expenses read from bank alerts, in one write, each with an id made from its alert, so the
  * same alert never adds twice (not even after it was removed: the removal marker keeps the id).
  */
-export function importSpends(items: { input: SpendInput; id: string; from: string }[]): SpendEntry[] {
+export interface ImportItem {
+  input: SpendInput;
+  id: string;
+  from: string;
+  /** When the payment was made (the alert's time, epoch ms), so the balance knows which side of it it falls. */
+  at?: number;
+  /**
+   * Add it even if it was removed before (an import you undid, then read again; an alert you
+   * checked yourself). The removal marker keeps its id, so the new one gets `<id>-a<n>`.
+   */
+  again?: boolean;
+}
+
+export function importSpends(items: ImportItem[]): SpendEntry[] {
   const store = getStore();
   const known = new Set(store.entries.map((e) => e.id));
+  // Live under its own id, renamed (`-r`) or added again (`-a<n>`): already in Budget.
+  const liveIds = new Set(store.entries.filter(live).map((e) => e.id.replace(/(-r|-a\d+)+$/, '')));
   const added: SpendEntry[] = [];
-  for (const { input, id, from } of items) {
-    if (known.has(id)) continue;
+  for (const { input, id: wanted, from, at, again } of items) {
+    let id = wanted;
+    if (liveIds.has(wanted)) continue;
+    if (known.has(id)) {
+      // Live, or removed and not asked for again: the same alert never adds twice.
+      if (!again) continue;
+      let n = 1;
+      while (known.has(`${wanted}-a${n}`)) n++;
+      id = `${wanted}-a${n}`;
+    }
     const entry = makeEntry(input, id);
     if (!entry) continue;
     entry.from = from.slice(0, WHAT_MAX);
+    if (typeof at === 'number' && Number.isFinite(at)) entry.createdAt = at;
     known.add(id);
+    liveIds.add(wanted);
     added.push(entry);
   }
   if (added.length) writeStore({ ...store, entries: [...added, ...store.entries] });
   return added;
 }
 
-export const importSpend = (input: SpendInput, id: string, from: string): SpendEntry | null => importSpends([{ input, id, from }])[0] ?? null;
+export const importSpend = (input: SpendInput, id: string, from: string, more: Pick<ImportItem, 'at' | 'again'> = {}): SpendEntry | null =>
+  importSpends([{ input, id, from, ...more }])[0] ?? null;
 
 /**
  * Gives entries a new name, in one write. Like any change, each old entry is removed and a
@@ -646,6 +700,8 @@ export function changeSpend(id: string, input: SpendInput): SpendEntry | null {
   const entry: SpendEntry = { ...extras(old as unknown as Record<string, unknown>, ENTRY_KEYS), ...made };
   if (old.repeatId) entry.repeatId = old.repeatId;
   if (old.from) entry.from = old.from;
+  // When it was spent doesn't change with a fix to it (the balance counts from that moment).
+  entry.createdAt = old.createdAt;
   const now = Date.now();
   writeStore({ ...store, entries: [entry, ...store.entries.map((e) => (e.id === id ? marker(e, now) : e))] });
   return entry;
@@ -1031,8 +1087,11 @@ export function balance(store: BudgetStore, today: DayKey = dayKey(new Date())):
   if (!s) return null;
   // Counts what happened after the balance was set, up to today: a salary written in for a
   // later day counts on that day, not before.
-  const after = (x: { day: DayKey; createdAt: number; deletedAt?: number }) =>
-    x.deletedAt === undefined && x.day <= today && (x.day > s.day || (x.day === s.day && x.createdAt > s.at));
+  // On the day it was set, a bill or salary a repeat adds is taken as already in it (it is
+  // added when the day begins, whenever the app first opens), and anything else counts when it
+  // happened: a bank payment at the alert's time, a typed one when you typed it.
+  const after = (x: { day: DayKey; createdAt: number; deletedAt?: number; repeatId?: string }) =>
+    x.deletedAt === undefined && x.day <= today && (x.day > s.day || (x.day === s.day && !x.repeatId && x.createdAt > s.at));
   const income = store.incomes.filter(after).reduce((a, i) => a + i.amount, 0);
   const spent = store.entries.filter(after).reduce((a, e) => a + e.amount, 0);
   return round(s.amount + income - spent);
@@ -1115,7 +1174,10 @@ export function coverOffer(today: DayKey = dayKey(new Date())): CoverOffer | nul
   const first = store.incomes.filter(live).reduce<DayKey | null>((min, i) => (min === null || i.day < min ? i.day : min), null);
   if (!first || month < periodOf(first, startDay)) return null;
   if (store.saves.some((x) => x.id === coverId(month) || x.id.startsWith(`${coverId(month)}-`))) return null;
-  const over = round(-monthPlan(store, month, today).free);
+  const p = monthPlan(store, month, today);
+  // A month with no income written in wasn't planned: only what was spent is known, not that it went over.
+  if (!p.received) return null;
+  const over = round(-p.free);
   const saved = savingsWhere(store.saves, today).total;
   if (over < 1 || saved <= 0) return null;
   return { month, over, amount: round(Math.min(over, saved)) };
@@ -1380,9 +1442,13 @@ function mergeById<T extends { id: string; deletedAt?: number }>(a: T[], b: T[],
       if (x.deletedAt === undefined) return y;
       if (y.deletedAt === undefined) return x;
       if (x.deletedAt !== y.deletedAt) return x.deletedAt < y.deletedAt ? x : y;
-    } else if (prefer) {
-      const p = prefer(x, y);
+    } else {
+      // Two live copies: by `prefer` (goals: the one changed last), else the one made first.
+      const p = prefer ? prefer(x, y) : 0;
       if (p) return p < 0 ? x : y;
+      const cx = (x as { createdAt?: number }).createdAt ?? 0;
+      const cy = (y as { createdAt?: number }).createdAt ?? 0;
+      if (cx !== cy) return cx < cy ? x : y;
     }
     return firstText(x, y);
   };

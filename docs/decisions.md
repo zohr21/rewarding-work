@@ -17,6 +17,12 @@ canvases are private pages and this repository is public, so their links are not
   Items 6–8 too: a changed expense keeps its bill and bank link; a past month counts money
   taken out of savings (a month covered from savings ends even); a removed goal's savings read
   as savings with no goal on every device instead of being rewritten in place.
+  Items 9–14: a salary shared over goals on two devices at once counts the share made first; no
+  "cover from savings" offer for a month with no income written in (a minus still carries, as
+  chosen); amounts up to a billion (was a million); on the day the balance was set, a repeat's
+  bill or salary counts as already in it and a bank payment counts at the alert's time; reading
+  past SMS again after undoing an import adds them again (`<id>-a<n>`); the bank toast is
+  translated and its Undo takes back every expense it added.
 - **28 Nov · Budget fixes after the first real month: one pot for needs and wants.** The
   budget starts with the first income, so a month before it (October's imported spending) is
   never offered as gone over. Savings and "You have" count entries up to today, so a salary

@@ -2454,6 +2454,7 @@ export const en = {
   'budget.v.changed': 'Changed {what}, {amount}',
   'budget.v.repeats': '{what} repeats every month on day {day}',
   'budget.v.added': 'Added {what}, {amount}',
+  'budget.bs.andMore': { one: ' and {n} more', other: ' and {n} more' },
   'budget.v.deleted': 'Deleted “{what}”',
   'budget.v.saved': 'Budgets saved.',
   'budget.p.nothingCameIn': 'Nothing came in for {month}',

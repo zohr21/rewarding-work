@@ -437,7 +437,7 @@ export function planAlerts(notices: BankNotice[], now = Date.now()): Planned[] {
   const store = getBank();
   const budget = getBudget();
   const budgetCurrency = currencyCode(budget.currency);
-  const known = new Set([...store.log.map((l) => l.id), ...store.pending.map((p) => p.id), ...budget.entries.map((e) => e.id.replace(/^b-/, '').replace(/-r$/, ''))]);
+  const known = new Set([...store.log.map((l) => l.id), ...store.pending.map((p) => p.id), ...budget.entries.map((e) => e.id.replace(/^b-/, '').replace(/(-r|-a\d+)+$/, ''))]);
   // Expenses typed in by hand, so an alert for one of them doesn't add it again. Counted: one
   // typed coffee stands for one alert, and a second coffee at the same price still goes in.
   const typed = new Map<string, number>();
@@ -526,9 +526,13 @@ export function applyPlan(plan: Planned[], options: { add: boolean; review: bool
       input: { what: p.pending!.what, category: p.pending!.category, amount: p.pending!.amount, day: p.pending!.day },
       id: entryId(p.notice.id),
       from: p.from,
+      at: p.notice.at,
+      // Reading past SMS again after undoing an import adds them again; a live alert removed once stays removed.
+      again: options.batch === true,
     })),
   );
-  const addedIds = new Set(added.map((e) => e.id));
+  // By the alert's own id: one added again after a removal has `-a<n>` after it.
+  const addedIds = new Set(added.map((e) => e.id.replace(/-a\d+$/, '')));
   const waiting = options.review
     ? fresh.filter((p) => p.pending && (p.outcome === 'review' || (p.outcome === 'added' && !options.add))).map((p) => p.pending!)
     : [];
@@ -537,7 +541,9 @@ export function applyPlan(plan: Planned[], options: { add: boolean; review: bool
     p.outcome === 'added'
       ? addedIds.has(entryId(p.notice.id))
         ? 'added'
-        : 'review'
+        : options.add
+          ? 'duplicate' // removed before: it stays removed
+          : 'review'
       : p.outcome === 'already' || p.outcome === 'known'
         ? 'duplicate'
         : p.outcome;
@@ -609,7 +615,8 @@ export function acceptPending(id: string, input: { what: string; category: Categ
   const store = getBank();
   const item = store.pending.find((p) => p.id === id);
   if (!item) return null;
-  const entry = importSpend(input, entryId(id), item.from);
+  // You checked it and chose to add it, even if it was added and removed before.
+  const entry = importSpend(input, entryId(id), item.from, { at: item.at, again: true });
   if (item.category !== input.category) learnCategory(item.what, input.category);
   dropPending(id, 'added');
   return entry;
