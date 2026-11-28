@@ -451,7 +451,6 @@ const TAGS = [
       setText('#bp-label-empty', current ? t('budget.planTheMonth') : t('budget.p.nothingCameIn', { month: name }));
 
       if (planned) {
-        const keep = Math.max(p.saved, p.planned.savings);
         if (current) {
           const over = p.leftToday < 0;
           setText('[data-bp-label]', over ? t('budget.p.overToday') : `${t('budget.p.safeToday')} · ${formatDay(fromDayKey(today()))}`);
@@ -465,7 +464,8 @@ const TAGS = [
               : t('budget.p.overPlan', { amount: whole(-p.free, sign), month: name }) + bills,
           );
         } else {
-          const left = p.income + p.carried - keep - p.spent;
+          // What the month came to, money taken out of savings included (a month covered from savings ends even).
+          const left = p.free;
           setText('[data-bp-label]', left >= 0 ? t('budget.p.leftFrom', { month: name }) : t('budget.p.overIn', { month: name }));
           setText('[data-bp-big]', whole(Math.abs(left), sign));
           $('[data-bp-big]').classList.toggle('is-over', left < 0);

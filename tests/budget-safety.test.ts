@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { read, write } from '../src/lib/storage';
-import { catchUpRepeats, getBudget, mergeBudgetStores, normaliseBudget } from '../src/lib/budget';
+import { catchUpRepeats, changeSpend, getBudget, mergeBudgetStores, normaliseBudget, removeGoal, savedFor } from '../src/lib/budget';
 import { planAlerts, readAlert, setBankSettings } from '../src/lib/bank';
 import { pack, unpack, PLAIN_MAX } from '../src/lib/account/pack';
 import type { BankNotice } from '../src/lib/device';
@@ -148,5 +148,48 @@ describe('bank alerts told twice', () => {
     write('health', { v: 2, currency: 'AZN', entries: [{ id: 'h1', day: '2026-11-20', what: 'Coffee', category: 'food', amount: 3, createdAt: 1 }] });
     const plan = planAlerts([notice('n1', 'app', 'Odenis: 3.00 AZN Coffee'), notice('n2', 'app', 'Odenis: 3.00 AZN Coffee', 600_000)], at + 700_000);
     expect(plan.map((p) => p.outcome)).toEqual(['already', 'added']);
+  });
+});
+
+describe('changing an expense', () => {
+  it('keeps a bill a bill, and a bank payment from its bank', () => {
+    write('health', {
+      v: 2,
+      entries: [
+        { id: 'r1-2026-11', day: '2026-11-01', what: 'Rent', category: 'home', amount: 500, createdAt: 1, repeatId: 'r1' },
+        { id: 'b-n1', day: '2026-11-02', what: 'Wolt', category: 'other', amount: 7.2, createdAt: 2, from: 'ABB' },
+      ],
+    });
+    const bill = changeSpend('r1-2026-11', { what: 'Rent', category: 'home', amount: 520, day: '2026-11-01' });
+    const paid = changeSpend('b-n1', { what: 'Wolt', category: 'food', amount: 7.2, day: '2026-11-02' });
+    expect(bill).toMatchObject({ amount: 520, repeatId: 'r1' });
+    expect(paid).toMatchObject({ category: 'food', from: 'ABB' });
+    expect(getBudget().entries.map((e) => e.id)).not.toContain('r1-2026-11');
+  });
+});
+
+describe('a removed goal', () => {
+  const store = {
+    v: 2,
+    goals: [{ id: 'g1', name: 'Trip', target: 900, monthly: 100, createdAt: 1, updatedAt: 1 }],
+    saves: [{ id: 's1', goalId: 'g1', day: '2026-11-02', amount: 100, createdAt: 1 }],
+  };
+
+  it('leaves its money in savings with no goal, without changing the saves', () => {
+    write('health', store);
+    removeGoal('g1');
+    expect(savedFor(getBudget().saves, '')).toBe(100);
+    const raw = read<{ saves: { goalId: string }[] }>('health', { saves: [] });
+    expect(raw.saves[0]!.goalId).toBe('g1');
+  });
+
+  it('reads the same on a device whose saves still name the goal', () => {
+    write('health', store);
+    removeGoal('g1');
+    const here = getBudget();
+    const there = normaliseBudget(store);
+    const merged = normaliseBudget(JSON.parse(JSON.stringify(mergeBudgetStores(there, here))));
+    expect(savedFor(merged.saves, '')).toBe(100);
+    expect(savedFor(merged.saves, 'g1')).toBe(0);
   });
 });
