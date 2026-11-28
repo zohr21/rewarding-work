@@ -6,6 +6,13 @@ canvases are private pages and this repository is public, so their links are not
 
 ## 2026-11
 
+- **28 Nov · Budget fixes after the first real month: one pot for needs and wants.** The
+  budget starts with the first income, so a month before it (October's imported spending) is
+  never offered as gone over. Savings and "You have" count entries up to today, so a salary
+  written in ahead (1 Dec) counts from its day. Save first is ticked by default for Salary and
+  Freelance only, so refunds (Other) aren't split into savings. Needs and wants stay one pot:
+  when needs go over, the Wants bar shrinks by that much and says so (the owner asked for this
+  over keeping them apart).
 - **28 Nov · Budget months can start on payday (option A), with a balance row.** A salary paid
   late in the month (26 October for November) made one month look rich and the next broke.
   Plan › "Your month starts on" picks a day 1–28 (a repeating salary offers its own day);

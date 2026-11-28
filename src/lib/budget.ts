@@ -714,8 +714,8 @@ function makeIncome(input: IncomeInput, id = newId('i')): IncomeEntry | null {
   };
 }
 
-export function savedFor(saves: SaveEntry[], goalId: string): number {
-  return round(saves.filter((x) => x.deletedAt === undefined && x.goalId === goalId).reduce((a, x) => a + x.amount, 0));
+export function savedFor(saves: SaveEntry[], goalId: string, today: DayKey = dayKey(new Date())): number {
+  return round(saves.filter((x) => x.deletedAt === undefined && x.goalId === goalId && x.day <= today).reduce((a, x) => a + x.amount, 0));
 }
 
 /**
@@ -856,11 +856,12 @@ export function addSave(goalId: string, amount: number, where: SaveWhere = 'card
 const live = <T extends { deletedAt?: number }>(x: T) => x.deletedAt === undefined;
 
 /** All savings, and how much of it is on the card and in cash. */
-export function savingsWhere(saves: SaveEntry[]): { total: number; card: number; cash: number } {
+export function savingsWhere(saves: SaveEntry[], today: DayKey = dayKey(new Date())): { total: number; card: number; cash: number } {
   let total = 0;
   let cash = 0;
   for (const x of saves) {
-    if (!live(x)) continue;
+    // Money set aside on a later day (a salary written in ahead of time) isn't saved yet.
+    if (!live(x) || x.day > today) continue;
     total += x.amount;
     if (x.where === 'cash') cash += x.amount;
   }
@@ -975,10 +976,13 @@ export function setStartBalance(amount: number, day: DayKey = dayKey(new Date())
  * (on its own day, only what was added after it). Savings are still yours, so they stay in;
  * null until a starting balance is set.
  */
-export function balance(store: BudgetStore): number | null {
+export function balance(store: BudgetStore, today: DayKey = dayKey(new Date())): number | null {
   const s = store.start;
   if (!s) return null;
-  const after = (x: { day: DayKey; createdAt: number; deletedAt?: number }) => x.deletedAt === undefined && (x.day > s.day || (x.day === s.day && x.createdAt > s.at));
+  // Counts what happened after the balance was set, up to today: a salary written in for a
+  // later day counts on that day, not before.
+  const after = (x: { day: DayKey; createdAt: number; deletedAt?: number }) =>
+    x.deletedAt === undefined && x.day <= today && (x.day > s.day || (x.day === s.day && x.createdAt > s.at));
   const income = store.incomes.filter(after).reduce((a, i) => a + i.amount, 0);
   const spent = store.entries.filter(after).reduce((a, e) => a + e.amount, 0);
   return round(s.amount + income - spent);
@@ -1055,10 +1059,14 @@ const coverId = (month: MonthKey) => `cover-${month}`;
  */
 export function coverOffer(today: DayKey = dayKey(new Date())): CoverOffer | null {
   const store = getStore();
-  const month = shiftMonth(periodOf(today, startDayOf(store.plan)), -1);
+  const startDay = startDayOf(store.plan);
+  const month = shiftMonth(periodOf(today, startDay), -1);
+  // The budget starts with the first income: a month before it was never planned, so it can't go over.
+  const first = store.incomes.filter(live).reduce<DayKey | null>((min, i) => (min === null || i.day < min ? i.day : min), null);
+  if (!first || month < periodOf(first, startDay)) return null;
   if (store.saves.some((x) => x.id === coverId(month) || x.id.startsWith(`${coverId(month)}-`))) return null;
   const over = round(-monthPlan(store, month, today).free);
-  const saved = savingsWhere(store.saves).total;
+  const saved = savingsWhere(store.saves, today).total;
   if (over < 1 || saved <= 0) return null;
   return { month, over, amount: round(Math.min(over, saved)) };
 }

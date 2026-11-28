@@ -2372,6 +2372,7 @@ export const ru: Messages = {
   'budget.p.toPutInSavings': 'Отложить в сбережения: {amount}, это не входит в то, что можно тратить',
   'budget.p.needs': 'Нужное',
   'budget.p.wants': 'Желаемое',
+  'budget.p.needsOverWants': 'Нужное вышло за план на {amount}, поэтому на желаемое осталось {left}',
   'budget.p.savings': 'Сбережения',
   'budget.p.unsorted': '{amount} ещё не разделены на нужное и желаемое: нажмите «{ask}» у этих расходов.',
   'budget.p.addOne': 'Добавить',

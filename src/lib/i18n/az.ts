@@ -2374,6 +2374,7 @@ export const az: Messages = {
   'budget.p.toPutInSavings': 'Yığıma qoyulmalı: {amount}, rahat xərclənə biləndən çıxılır',
   'budget.p.needs': 'Ehtiyaclar',
   'budget.p.wants': 'İstəklər',
+  'budget.p.needsOverWants': 'Ehtiyaclar plandan {amount} çox oldu, ona görə istəklərə {left} qalır',
   'budget.p.savings': 'Yığım',
   'budget.p.unsorted': '{amount} hələ ehtiyac və istəyə ayrılmayıb: həmin xərclərdə «{ask}» düyməsinə toxun.',
   'budget.p.addOne': 'Əlavə et',
